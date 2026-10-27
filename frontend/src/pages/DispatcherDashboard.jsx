@@ -1180,9 +1180,17 @@ const DispatcherDashboard = () => {
                 };
                 const targetStatuses = statusMap[selectedStatus] || [selectedStatus.toLowerCase()];
                 if (!targetStatuses.includes(report.status)) return false;
+            } else if (dashboardMode === 'active') {
+                // Active / Dispatched Work mode scopes to assigned, dispatched, in-progress, blocked, and pending-review work
+                const activeStatuses = [
+                    'assigned', 'approved_internal', 'dispatched', 'in_progress',
+                    'blocked', 'completed_pending_review', 'awaiting_verification'
+                ];
+                if (!activeStatuses.includes(report.status)) return false;
+            } else if (dashboardMode === 'triage') {
+                // Triage mode excludes rejected/cancelled items unless explicitly selected via status filter
+                if (['rejected', 'cancelled'].includes(report.status)) return false;
             }
-            // By intentionally omitting the 'else' block, selecting 'All Statuses' overrides the 
-            // restrictive Triage/Active mode toggles and strictly displays 100% of the dataset.
 
             // 2. Comprehensive Search Query Filter (Report ID, Plain Title, Description, AI Summary, Category, Location)
             const searchLower = searchQuery.toLowerCase().trim();
@@ -1710,7 +1718,7 @@ const DispatcherDashboard = () => {
                     >
                         <div className="flex items-center gap-3">
                             <div className="w-2 h-2 rounded-full bg-white animate-ping" />
-                            <span className="text-white text-xs font-black uppercase tracking-wider">⚡ Tactical Command Response — Active Mission</span>
+                            <span className="text-white text-xs font-black uppercase tracking-wider">Selected report group</span>
                             <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                                 {tacticalContext.category
                                     ? tacticalContext.category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -1747,10 +1755,10 @@ const DispatcherDashboard = () => {
                 <header className="min-h-16 h-auto py-2 lg:py-0 lg:h-18 bg-white dark:bg-[#090e1a] flex items-center justify-between px-4 lg:px-6 shrink-0 z-50 relative border-b border-neutral-border dark:border-slate-800 transition-colors duration-150 gap-2 lg:gap-4 overflow-visible">
                     <div className="flex items-center gap-3 lg:gap-5 min-w-0">
                         <div className="min-w-0 flex flex-col text-left">
-                            <GovBreadcrumb category="Operations" current="Command Center & GIS Map" />
+                            <GovBreadcrumb category="Operations" current="Reports map" />
                             <div className="flex items-center gap-2 mt-0.5">
                                 <h1 className="font-heading font-black text-xl sm:text-2xl text-neutral-text dark:text-white tracking-tight leading-none whitespace-nowrap">
-                                    LGU Command Center
+                                    Reports map
                                 </h1>
                             </div>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden 2xl:block mt-0.5 truncate max-w-md">
@@ -2014,7 +2022,7 @@ const DispatcherDashboard = () => {
                                     <div className="mx-1 mb-2 px-3 py-2 rounded-xl border border-yellow-500/40 bg-yellow-500/10 flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse shrink-0" />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[10px] font-black text-yellow-400 uppercase tracking-wider">⚡ Tactical Zone Active</p>
+                                            <p className="text-[10px] font-black text-yellow-400 uppercase tracking-wider">Selected area</p>
                                             <p className="text-[10px] text-yellow-300/70 font-semibold truncate">
                                                 Brgy. {tacticalContext.barangay || 'All'} &nbsp;·&nbsp; {tacticalContext.category?.replace(/_/g,' ') || 'All Categories'}
                                             </p>
@@ -2462,7 +2470,7 @@ const DispatcherDashboard = () => {
                                                     LGU COMMAND CENTER
                                                 </h4>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
-                                                    Central Dispatch & Tactical Operations Hub • Caloocan City Hall
+                                                    City Engineering Department · Caloocan City Hall
                                                 </p>
 
                                                 <button

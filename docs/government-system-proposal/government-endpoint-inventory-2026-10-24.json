@@ -1,0 +1,3222 @@
+{
+  "status": "Observed route inventory; not a completion claim",
+  "route_count": 228,
+  "by_source": {
+    "backend/report_review_router.py": 4,
+    "backend/gov_router.py": 103,
+    "backend/project_workspace.py": 7,
+    "backend/notification_delivery.py": 2,
+    "backend/analytics_router.py": 15,
+    "backend/predictive_router.py": 11,
+    "backend/document_router.py": 7,
+    "backend/announcements_router.py": 18,
+    "backend/spatial_router.py": 4,
+    "backend/admin_router.py": 22,
+    "backend/main.py": 35
+  },
+  "duplicates": [],
+  "routes": [
+    {
+      "path": "/api/gov/report-review",
+      "methods": [
+        "GET"
+      ],
+      "function": "report_operations",
+      "source": "backend/report_review_router.py",
+      "line": 48,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/report-review/{report_id}/reviewers",
+      "methods": [
+        "GET"
+      ],
+      "function": "eligible_reviewers",
+      "source": "backend/report_review_router.py",
+      "line": 60,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/report-review/{report_id}/assignment",
+      "methods": [
+        "POST"
+      ],
+      "function": "assign_review",
+      "source": "backend/report_review_router.py",
+      "line": 67,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/report-review/{report_id}/priority",
+      "methods": [
+        "POST"
+      ],
+      "function": "set_priority",
+      "source": "backend/report_review_router.py",
+      "line": 83,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/account",
+      "methods": [
+        "GET"
+      ],
+      "function": "government_account",
+      "source": "backend/gov_router.py",
+      "line": 48,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/navigation",
+      "methods": [
+        "GET"
+      ],
+      "function": "government_navigation",
+      "source": "backend/gov_router.py",
+      "line": 55,
+      "dependencies": [
+        "get_current_user"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/report-map",
+      "methods": [
+        "GET"
+      ],
+      "function": "government_report_map",
+      "source": "backend/gov_router.py",
+      "line": 71,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/records-workspace/permissions",
+      "methods": [
+        "GET"
+      ],
+      "function": "records_workspace_permissions",
+      "source": "backend/gov_router.py",
+      "line": 103,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/records-workspace",
+      "methods": [
+        "GET"
+      ],
+      "function": "records_workspace_data",
+      "source": "backend/gov_router.py",
+      "line": 109,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/dashboard/stats",
+      "methods": [
+        "GET"
+      ],
+      "function": "gov_dashboard_stats",
+      "source": "backend/gov_router.py",
+      "line": 205,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/dispatch/eligible-assignees",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_eligible_assignees",
+      "source": "backend/gov_router.py",
+      "line": 222,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/assignment",
+      "methods": [
+        "POST"
+      ],
+      "function": "assign_work_order_owner",
+      "source": "backend/gov_router.py",
+      "line": 252,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_work_order",
+      "source": "backend/gov_router.py",
+      "line": 270,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/dispatch/suggest-agent/{report_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "suggest_agents_by_proximity",
+      "source": "backend/gov_router.py",
+      "line": 303,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_work_orders",
+      "source": "backend/gov_router.py",
+      "line": 322,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-order-workspace",
+      "methods": [
+        "GET"
+      ],
+      "function": "work_order_workspace",
+      "source": "backend/gov_router.py",
+      "line": 342,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-order-actions/{work_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "work_order_available_actions",
+      "source": "backend/gov_router.py",
+      "line": 349,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_work_order",
+      "source": "backend/gov_router.py",
+      "line": 356,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/evidence/{filename}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_work_order_evidence",
+      "source": "backend/gov_router.py",
+      "line": 371,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/completion-evidence",
+      "methods": [
+        "POST"
+      ],
+      "function": "submit_completion_evidence",
+      "source": "backend/gov_router.py",
+      "line": 400,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_work_order",
+      "source": "backend/gov_router.py",
+      "line": 450,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/updates",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_work_order_update_entry",
+      "source": "backend/gov_router.py",
+      "line": 466,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/status",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_work_order_status",
+      "source": "backend/gov_router.py",
+      "line": 487,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/approval",
+      "methods": [
+        "POST"
+      ],
+      "function": "approve_or_reject_work_order",
+      "source": "backend/gov_router.py",
+      "line": 512,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/approvals",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_work_order_approvals",
+      "source": "backend/gov_router.py",
+      "line": 559,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/timeline",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_all_timelines",
+      "source": "backend/gov_router.py",
+      "line": 592,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/timeline/report/{report_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_report_timeline",
+      "source": "backend/gov_router.py",
+      "line": 609,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/timeline/work-order/{wo_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_work_order_timeline",
+      "source": "backend/gov_router.py",
+      "line": 644,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/timeline/project/{project_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_project_timeline",
+      "source": "backend/gov_router.py",
+      "line": 660,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/documents",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_system_documents",
+      "source": "backend/gov_router.py",
+      "line": 679,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/procurement",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_procurement_request",
+      "source": "backend/gov_router.py",
+      "line": 696,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/procurement",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_procurement_requests",
+      "source": "backend/gov_router.py",
+      "line": 710,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/financial-history",
+      "methods": [
+        "GET"
+      ],
+      "function": "financial_history",
+      "source": "backend/gov_router.py",
+      "line": 726,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/procurement/{pr_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_procurement_request",
+      "source": "backend/gov_router.py",
+      "line": 738,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/procurement/{pr_id}/status",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_procurement_status",
+      "source": "backend/gov_router.py",
+      "line": 752,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/procurement/{pr_id}/funding-certification",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_procurement_funding",
+      "source": "backend/gov_router.py",
+      "line": 771,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/procurement/{pr_id}/cash-release",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_procurement_cash_release",
+      "source": "backend/gov_router.py",
+      "line": 783,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/procurement/{pr_id}/bac-schedule",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_procurement_bac_schedule",
+      "source": "backend/gov_router.py",
+      "line": 795,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/procurement/{pr_id}/ntp-issuance",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_procurement_ntp",
+      "source": "backend/gov_router.py",
+      "line": 807,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/procurement/{pr_id}/items",
+      "methods": [
+        "POST"
+      ],
+      "function": "add_boq_item",
+      "source": "backend/gov_router.py",
+      "line": 819,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/procurement/{pr_id}/items/{item_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "function": "delete_boq_item",
+      "source": "backend/gov_router.py",
+      "line": 831,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/projects",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_project",
+      "source": "backend/gov_router.py",
+      "line": 847,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/projects",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_projects",
+      "source": "backend/gov_router.py",
+      "line": 868,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/projects/{proj_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_project",
+      "source": "backend/gov_router.py",
+      "line": 886,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/projects/{proj_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_project",
+      "source": "backend/gov_router.py",
+      "line": 904,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/projects/{proj_id}/advance",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "advance_project",
+      "source": "backend/gov_router.py",
+      "line": 924,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/projects/{proj_id}/certificate",
+      "methods": [
+        "POST"
+      ],
+      "function": "issue_certificate",
+      "source": "backend/gov_router.py",
+      "line": 970,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/reports/{report_id}/project-mapping",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_project_mapping_by_report",
+      "source": "backend/gov_router.py",
+      "line": 989,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo-workspace",
+      "methods": [
+        "GET"
+      ],
+      "function": "obo_workspace",
+      "source": "backend/gov_router.py",
+      "line": 1035,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo/{obo_id}/history",
+      "methods": [
+        "GET"
+      ],
+      "function": "obo_history",
+      "source": "backend/gov_router.py",
+      "line": 1055,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo-options",
+      "methods": [
+        "GET"
+      ],
+      "function": "obo_options",
+      "source": "backend/gov_router.py",
+      "line": 1070,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo/{obo_id}/inspectors",
+      "methods": [
+        "GET"
+      ],
+      "function": "obo_inspectors",
+      "source": "backend/gov_router.py",
+      "line": 1087,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_obo_inspection",
+      "source": "backend/gov_router.py",
+      "line": 1095,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_obo_inspections",
+      "source": "backend/gov_router.py",
+      "line": 1116,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo/{obo_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_obo_inspection",
+      "source": "backend/gov_router.py",
+      "line": 1133,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo/{obo_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_obo_inspection",
+      "source": "backend/gov_router.py",
+      "line": 1149,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo/{obo_id}/technical-review",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_obo_technical_review",
+      "source": "backend/gov_router.py",
+      "line": 1183,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo/{obo_id}/appeal",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_obo_appeal",
+      "source": "backend/gov_router.py",
+      "line": 1199,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/obo/{obo_id}/order-of-payment",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_obo_order_of_payment",
+      "source": "backend/gov_router.py",
+      "line": 1215,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/users/stats",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_user_management_stats",
+      "source": "backend/gov_router.py",
+      "line": 1253,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/users",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_all_users",
+      "source": "backend/gov_router.py",
+      "line": 1272,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/users/{user_id}/status",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_user_status",
+      "source": "backend/gov_router.py",
+      "line": 1349,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/users/{user_id}/role",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_user_role",
+      "source": "backend/gov_router.py",
+      "line": 1389,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/design-requests",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_design_requests",
+      "source": "backend/gov_router.py",
+      "line": 1406,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analysis",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_structure_analysis",
+      "source": "backend/gov_router.py",
+      "line": 1454,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/surveys",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_field_surveys",
+      "source": "backend/gov_router.py",
+      "line": 1507,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/boq",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_boq",
+      "source": "backend/gov_router.py",
+      "line": 1604,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/estimation",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_cost_estimations",
+      "source": "backend/gov_router.py",
+      "line": 1654,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/reports",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_active_reports",
+      "source": "backend/gov_router.py",
+      "line": 1703,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/reports-archive",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_reports_archive",
+      "source": "backend/gov_router.py",
+      "line": 1758,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/records",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_administrative_records",
+      "source": "backend/gov_router.py",
+      "line": 1805,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/document-registry",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_document_archive",
+      "source": "backend/gov_router.py",
+      "line": 1817,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/agents/locations",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_all_agent_locations",
+      "source": "backend/gov_router.py",
+      "line": 1860,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/agents/{agent_id}/location",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_agent_location",
+      "source": "backend/gov_router.py",
+      "line": 1873,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/agents/location",
+      "methods": [
+        "POST"
+      ],
+      "function": "update_my_location",
+      "source": "backend/gov_router.py",
+      "line": 1890,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/agents/work-orders",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_agents_with_work_orders",
+      "source": "backend/gov_router.py",
+      "line": 1919,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/agents/my-work-orders",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_my_work_orders",
+      "source": "backend/gov_router.py",
+      "line": 1937,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/agents/field-report",
+      "methods": [
+        "POST"
+      ],
+      "function": "submit_field_report",
+      "source": "backend/gov_router.py",
+      "line": 1995,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/agents/work-orders/{wo_id}/status",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_my_work_order_status",
+      "source": "backend/gov_router.py",
+      "line": 2081,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/reports/{report_id}/approve-for-work",
+      "methods": [
+        "POST"
+      ],
+      "function": "approve_report_for_work",
+      "source": "backend/gov_router.py",
+      "line": 2117,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/projects/{project_id}/issue-certificate",
+      "methods": [
+        "POST"
+      ],
+      "function": "issue_fqa_certificate",
+      "source": "backend/gov_router.py",
+      "line": 2167,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/reports/{report_id}/approve-with-budget",
+      "methods": [
+        "POST"
+      ],
+      "function": "approve_report_with_budget",
+      "source": "backend/gov_router.py",
+      "line": 2178,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/promote",
+      "methods": [
+        "POST"
+      ],
+      "function": "promote_wo_to_project_endpoint",
+      "source": "backend/gov_router.py",
+      "line": 2194,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/roles",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_all_roles",
+      "source": "backend/gov_router.py",
+      "line": 2227,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/roles/templates",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_role_templates",
+      "source": "backend/gov_router.py",
+      "line": 2237,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/roles",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_role",
+      "source": "backend/gov_router.py",
+      "line": 2247,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/roles/{role_id}",
+      "methods": [
+        "PUT"
+      ],
+      "function": "update_role",
+      "source": "backend/gov_router.py",
+      "line": 2266,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/advisories",
+      "methods": [
+        "POST"
+      ],
+      "function": "post_advisory",
+      "source": "backend/gov_router.py",
+      "line": 2298,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/advisories",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_advisories",
+      "source": "backend/gov_router.py",
+      "line": 2309,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/advisories/{advisory_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "function": "delete_advisory",
+      "source": "backend/gov_router.py",
+      "line": 2326,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/assets",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_assets",
+      "source": "backend/gov_router.py",
+      "line": 2342,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/assets/stats",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_assets_stats",
+      "source": "backend/gov_router.py",
+      "line": 2362,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/asset-workspace",
+      "methods": [
+        "GET"
+      ],
+      "function": "asset_workspace",
+      "source": "backend/gov_router.py",
+      "line": 2373,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/assets/{asset_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_asset_detail",
+      "source": "backend/gov_router.py",
+      "line": 2381,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/asset-permissions",
+      "methods": [
+        "GET"
+      ],
+      "function": "asset_workspace_permissions",
+      "source": "backend/gov_router.py",
+      "line": 2399,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/assets/{asset_id}/inspections",
+      "methods": [
+        "POST"
+      ],
+      "function": "record_asset_condition",
+      "source": "backend/gov_router.py",
+      "line": 2409,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/assets",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_asset",
+      "source": "backend/gov_router.py",
+      "line": 2427,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/block",
+      "methods": [
+        "POST"
+      ],
+      "function": "block_work_order_endpoint",
+      "source": "backend/gov_router.py",
+      "line": 2446,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/unblock",
+      "methods": [
+        "POST"
+      ],
+      "function": "unblock_work_order_endpoint",
+      "source": "backend/gov_router.py",
+      "line": 2460,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/verify",
+      "methods": [
+        "POST"
+      ],
+      "function": "verify_work_order_endpoint",
+      "source": "backend/gov_router.py",
+      "line": 2474,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/work-orders/{wo_id}/inspections",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_work_order_inspections",
+      "source": "backend/gov_router.py",
+      "line": 2517,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/reports/{report_id}/request-info",
+      "methods": [
+        "POST"
+      ],
+      "function": "request_citizen_info",
+      "source": "backend/gov_router.py",
+      "line": 2553,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/reports/{report_id}/docket",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_report_docket",
+      "source": "backend/gov_router.py",
+      "line": 2588,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/operations/today",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_today_operations",
+      "source": "backend/gov_router.py",
+      "line": 2703,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/service-insights",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_service_insights",
+      "source": "backend/gov_router.py",
+      "line": 2720,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/disclosures",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_budget_disclosures",
+      "source": "backend/gov_router.py",
+      "line": 2741,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/disclosures",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_budget_disclosure",
+      "source": "backend/gov_router.py",
+      "line": 2796,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/project-workspace/options",
+      "methods": [
+        "GET"
+      ],
+      "function": "options",
+      "source": "backend/project_workspace.py",
+      "line": 368,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/project-workspace/report/{report_id}/context",
+      "methods": [
+        "GET"
+      ],
+      "function": "report_context",
+      "source": "backend/project_workspace.py",
+      "line": 382,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/project-workspace",
+      "methods": [
+        "GET"
+      ],
+      "function": "listing",
+      "source": "backend/project_workspace.py",
+      "line": 397,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/project-workspace",
+      "methods": [
+        "POST"
+      ],
+      "function": "opening",
+      "source": "backend/project_workspace.py",
+      "line": 414,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/project-workspace/{project_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "detail",
+      "source": "backend/project_workspace.py",
+      "line": 420,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/project-workspace/{project_id}/history",
+      "methods": [
+        "GET"
+      ],
+      "function": "history",
+      "source": "backend/project_workspace.py",
+      "line": 440,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/project-workspace/{project_id}/commands",
+      "methods": [
+        "POST"
+      ],
+      "function": "command",
+      "source": "backend/project_workspace.py",
+      "line": 448,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/notification-deliveries",
+      "methods": [
+        "GET"
+      ],
+      "function": "operations",
+      "source": "backend/notification_delivery.py",
+      "line": 201,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/notification-deliveries/{delivery_id}/retry",
+      "methods": [
+        "POST"
+      ],
+      "function": "retry_delivery",
+      "source": "backend/notification_delivery.py",
+      "line": 227,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/summary",
+      "methods": [
+        "GET"
+      ],
+      "function": "analytics_summary",
+      "source": "backend/analytics_router.py",
+      "line": 82,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/stress-zones",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_stress_zones",
+      "source": "backend/analytics_router.py",
+      "line": 105,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/clusters",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_clusters",
+      "source": "backend/analytics_router.py",
+      "line": 129,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/clusters/{cluster_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_cluster_detail",
+      "source": "backend/analytics_router.py",
+      "line": 158,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/heatmap",
+      "methods": [
+        "GET"
+      ],
+      "function": "heatmap_intelligence",
+      "source": "backend/analytics_router.py",
+      "line": 179,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/forecast",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_forecast",
+      "source": "backend/analytics_router.py",
+      "line": 199,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/recurrence",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_recurrence_events",
+      "source": "backend/analytics_router.py",
+      "line": 219,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/reports",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_analytics_reports",
+      "source": "backend/analytics_router.py",
+      "line": 243,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/narrative",
+      "methods": [
+        "POST"
+      ],
+      "function": "generate_narrative",
+      "source": "backend/analytics_router.py",
+      "line": 341,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/estimate",
+      "methods": [
+        "POST"
+      ],
+      "function": "estimate_budget",
+      "source": "backend/analytics_router.py",
+      "line": 385,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/create-procurement",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_procurement_from_cluster",
+      "source": "backend/analytics_router.py",
+      "line": 413,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/export/clusters",
+      "methods": [
+        "GET"
+      ],
+      "function": "export_clusters_csv",
+      "source": "backend/analytics_router.py",
+      "line": 514,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/export/forecast",
+      "methods": [
+        "GET"
+      ],
+      "function": "export_forecast_csv",
+      "source": "backend/analytics_router.py",
+      "line": 541,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/export/recurrence",
+      "methods": [
+        "GET"
+      ],
+      "function": "export_recurrence_csv",
+      "source": "backend/analytics_router.py",
+      "line": 566,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/analytics/export/full-report",
+      "methods": [
+        "GET"
+      ],
+      "function": "export_full_report_csv",
+      "source": "backend/analytics_router.py",
+      "line": 590,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/summary",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_predictive_summary",
+      "source": "backend/predictive_router.py",
+      "line": 109,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/health",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_predictive_health",
+      "source": "backend/predictive_router.py",
+      "line": 235,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/assets/{asset_id}/forecast",
+      "methods": [
+        "GET"
+      ],
+      "function": "asset_maintenance_forecast",
+      "source": "backend/predictive_router.py",
+      "line": 268,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/schedule",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_predictive_schedule",
+      "source": "backend/predictive_router.py",
+      "line": 303,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/risk-map",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_predictive_risk_map",
+      "source": "backend/predictive_router.py",
+      "line": 412,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/ai-plan",
+      "methods": [
+        "POST"
+      ],
+      "function": "generate_ai_plan",
+      "source": "backend/predictive_router.py",
+      "line": 483,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/convert-to-work-order",
+      "methods": [
+        "POST"
+      ],
+      "function": "convert_to_work_order",
+      "source": "backend/predictive_router.py",
+      "line": 560,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/export",
+      "methods": [
+        "GET"
+      ],
+      "function": "export_predictive_data",
+      "source": "backend/predictive_router.py",
+      "line": 606,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/maintenance-scores",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_maintenance_scores",
+      "source": "backend/predictive_router.py",
+      "line": 655,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/demand-forecast",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_demand_forecast",
+      "source": "backend/predictive_router.py",
+      "line": 726,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/predictive/model-diagnostics",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_model_diagnostics",
+      "source": "backend/predictive_router.py",
+      "line": 743,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/documents/upload",
+      "methods": [
+        "POST"
+      ],
+      "function": "upload_document",
+      "source": "backend/document_router.py",
+      "line": 111,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/documents/get/{document_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_document_file",
+      "source": "backend/document_router.py",
+      "line": 232,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/documents/target/{model}/{target_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_documents_by_target",
+      "source": "backend/document_router.py",
+      "line": 297,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/documents/registry",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_document_registry",
+      "source": "backend/document_router.py",
+      "line": 317,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/documents/registry/counts",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_document_counts",
+      "source": "backend/document_router.py",
+      "line": 373,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/documents/{document_id}/legal-hold",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "toggle_legal_hold",
+      "source": "backend/document_router.py",
+      "line": 402,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/documents/{document_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "function": "delete_document",
+      "source": "backend/document_router.py",
+      "line": 437,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/permissions",
+      "methods": [
+        "GET"
+      ],
+      "function": "publication_permissions",
+      "source": "backend/announcements_router.py",
+      "line": 307,
+      "dependencies": [
+        "get_current_user",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/scope-options",
+      "methods": [
+        "GET"
+      ],
+      "function": "publication_scope_options",
+      "source": "backend/announcements_router.py",
+      "line": 313,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/report-options",
+      "methods": [
+        "GET"
+      ],
+      "function": "publication_report_options",
+      "source": "backend/announcements_router.py",
+      "line": 325,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_announcements",
+      "source": "backend/announcements_router.py",
+      "line": 334,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_announcement_draft",
+      "source": "backend/announcements_router.py",
+      "line": 345,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_announcement_detail",
+      "source": "backend/announcements_router.py",
+      "line": 367,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_announcement",
+      "source": "backend/announcements_router.py",
+      "line": 372,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/status",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_announcement_status",
+      "source": "backend/announcements_router.py",
+      "line": 392,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/corrections",
+      "methods": [
+        "POST"
+      ],
+      "function": "add_announcement_correction",
+      "source": "backend/announcements_router.py",
+      "line": 432,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/suggest-reports",
+      "methods": [
+        "GET"
+      ],
+      "function": "suggest_candidate_reports",
+      "source": "backend/announcements_router.py",
+      "line": 449,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/report-links",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_announcement_report_links",
+      "source": "backend/announcements_router.py",
+      "line": 463,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/report-links",
+      "methods": [
+        "POST"
+      ],
+      "function": "upsert_announcement_report_link",
+      "source": "backend/announcements_router.py",
+      "line": 469,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/report-links/{assoc_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "review_announcement_report_link",
+      "source": "backend/announcements_router.py",
+      "line": 483,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/budget-disclosure",
+      "methods": [
+        "PUT"
+      ],
+      "function": "update_announcement_budget_disclosure",
+      "source": "backend/announcements_router.py",
+      "line": 493,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/deliveries",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_announcement_deliveries",
+      "source": "backend/announcements_router.py",
+      "line": 506,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/attachments",
+      "methods": [
+        "POST"
+      ],
+      "function": "upload_publication_file",
+      "source": "backend/announcements_router.py",
+      "line": 518,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/attachments/{file_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "function": "remove_publication_file",
+      "source": "backend/announcements_router.py",
+      "line": 547,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/gov/announcements/{announcement_id}/attachments/{file_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "preview_publication_file",
+      "source": "backend/announcements_router.py",
+      "line": 562,
+      "dependencies": [
+        "get_current_user",
+        "get_db",
+        "require_announcement_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/nearby",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_nearby_reports",
+      "source": "backend/spatial_router.py",
+      "line": 59,
+      "dependencies": [
+        "get_db",
+        "get_optional_current_user"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/map",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_reports_map_viewport",
+      "source": "backend/spatial_router.py",
+      "line": 105,
+      "dependencies": [
+        "get_db",
+        "get_optional_current_user"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/duplicates",
+      "methods": [
+        "GET"
+      ],
+      "function": "check_duplicate_suggestions",
+      "source": "backend/spatial_router.py",
+      "line": 155,
+      "dependencies": [
+        "get_db",
+        "require_spatial_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/analytics/hotspots",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_analytics_hotspots",
+      "source": "backend/spatial_router.py",
+      "line": 197,
+      "dependencies": [
+        "get_db",
+        "require_spatial_staff"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff-credentials/request",
+      "methods": [
+        "POST"
+      ],
+      "function": "request_staff_recovery",
+      "source": "backend/admin_router.py",
+      "line": 174,
+      "dependencies": [
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff-credentials/accept",
+      "methods": [
+        "POST"
+      ],
+      "function": "accept_staff_credentials",
+      "source": "backend/admin_router.py",
+      "line": 179,
+      "dependencies": [
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/access",
+      "methods": [
+        "GET"
+      ],
+      "function": "admin_access",
+      "source": "backend/admin_router.py",
+      "line": 184,
+      "dependencies": [
+        "require_admin"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff-options",
+      "methods": [
+        "GET"
+      ],
+      "function": "staff_options",
+      "source": "backend/admin_router.py",
+      "line": 189,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_staff_members",
+      "source": "backend/admin_router.py",
+      "line": 206,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff",
+      "methods": [
+        "POST"
+      ],
+      "function": "add_staff_member",
+      "source": "backend/admin_router.py",
+      "line": 269,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff/{staff_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_staff_member",
+      "source": "backend/admin_router.py",
+      "line": 278,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff/{staff_id}",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_staff_member",
+      "source": "backend/admin_router.py",
+      "line": 291,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff/{staff_id}/resend-invite",
+      "methods": [
+        "POST"
+      ],
+      "function": "resend_staff_invite",
+      "source": "backend/admin_router.py",
+      "line": 301,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/staff/{staff_id}/reset-password",
+      "methods": [
+        "POST"
+      ],
+      "function": "reset_staff_password",
+      "source": "backend/admin_router.py",
+      "line": 311,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/residents",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_residents",
+      "source": "backend/admin_router.py",
+      "line": 356,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/residents/{resident_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "resident_detail",
+      "source": "backend/admin_router.py",
+      "line": 364,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/residents/{resident_id}/history",
+      "methods": [
+        "GET"
+      ],
+      "function": "resident_history",
+      "source": "backend/admin_router.py",
+      "line": 369,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/residents/{resident_id}/status",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_resident_status",
+      "source": "backend/admin_router.py",
+      "line": 374,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/residents/{resident_id}/resend-confirmation",
+      "methods": [
+        "POST"
+      ],
+      "function": "resend_resident_confirmation",
+      "source": "backend/admin_router.py",
+      "line": 379,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/residents/{resident_id}/verification",
+      "methods": [
+        "GET"
+      ],
+      "function": "review_resident_id",
+      "source": "backend/admin_router.py",
+      "line": 385,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/residents/{resident_id}/verify",
+      "methods": [
+        "POST"
+      ],
+      "function": "verify_resident_account",
+      "source": "backend/admin_router.py",
+      "line": 390,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/settings",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_system_settings",
+      "source": "backend/admin_router.py",
+      "line": 399,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/settings/{key}/history",
+      "methods": [
+        "GET"
+      ],
+      "function": "system_setting_history",
+      "source": "backend/admin_router.py",
+      "line": 415,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/settings/{key}",
+      "methods": [
+        "PUT"
+      ],
+      "function": "update_system_setting",
+      "source": "backend/admin_router.py",
+      "line": 421,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/audit-integrity",
+      "methods": [
+        "GET"
+      ],
+      "function": "check_audit_integrity",
+      "source": "backend/admin_router.py",
+      "line": 436,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/admin/audit-logs",
+      "methods": [
+        "GET"
+      ],
+      "function": "list_audit_logs",
+      "source": "backend/admin_router.py",
+      "line": 462,
+      "dependencies": [
+        "dependency",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/analytics/stress-zones",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_stress_zones_alias",
+      "source": "backend/main.py",
+      "line": 435,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/stats",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_report_stats",
+      "source": "backend/main.py",
+      "line": 1733,
+      "dependencies": [
+        "_check",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_reports",
+      "source": "backend/main.py",
+      "line": 1741,
+      "dependencies": [
+        "_check",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/user/{user_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_user_reports",
+      "source": "backend/main.py",
+      "line": 1830,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/heatmap",
+      "methods": [
+        "GET"
+      ],
+      "function": "get_reports_heatmap",
+      "source": "backend/main.py",
+      "line": 1853,
+      "dependencies": [
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/public",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_public_reports",
+      "source": "backend/main.py",
+      "line": 1992,
+      "dependencies": [
+        "get_db",
+        "get_optional_current_user"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_report",
+      "source": "backend/main.py",
+      "line": 2045,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/timeline",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_report_timeline",
+      "source": "backend/main.py",
+      "line": 2062,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/analyze",
+      "methods": [
+        "POST"
+      ],
+      "function": "analyze_report_only",
+      "source": "backend/main.py",
+      "line": 2084,
+      "dependencies": [
+        "get_db",
+        "get_optional_current_user"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_new_report",
+      "source": "backend/main.py",
+      "line": 2103,
+      "dependencies": [
+        "get_db",
+        "get_optional_current_user"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/track",
+      "methods": [
+        "POST"
+      ],
+      "function": "track_report_status",
+      "source": "backend/main.py",
+      "line": 2286,
+      "dependencies": [
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/information-reply",
+      "methods": [
+        "POST"
+      ],
+      "function": "provide_report_information",
+      "source": "backend/main.py",
+      "line": 2404,
+      "dependencies": [
+        "get_db",
+        "get_optional_current_user"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/claim",
+      "methods": [
+        "POST"
+      ],
+      "function": "claim_guest_report",
+      "source": "backend/main.py",
+      "line": 2465,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/confirm",
+      "methods": [
+        "POST"
+      ],
+      "function": "confirm_report_resolution",
+      "source": "backend/main.py",
+      "line": 2576,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/status",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "update_report_status",
+      "source": "backend/main.py",
+      "line": 2815,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/reject",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "reject_report",
+      "source": "backend/main.py",
+      "line": 2872,
+      "dependencies": [
+        "_check",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/dispatch",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "dispatch_report",
+      "source": "backend/main.py",
+      "line": 2917,
+      "dependencies": [
+        "_check",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/cancel",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "cancel_report",
+      "source": "backend/main.py",
+      "line": 2926,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/cancel",
+      "methods": [
+        "POST"
+      ],
+      "function": "cancel_report",
+      "source": "backend/main.py",
+      "line": 2926,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}/resolve",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "resolve_report",
+      "source": "backend/main.py",
+      "line": 2939,
+      "dependencies": [
+        "_check",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/reports/{report_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "function": "delete_report",
+      "source": "backend/main.py",
+      "line": 2949,
+      "dependencies": [
+        "_check",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/advisories",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_advisories",
+      "source": "backend/main.py",
+      "line": 2962,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/advisories",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_advisory_route",
+      "source": "backend/main.py",
+      "line": 2984,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/advisories/{advisory_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "function": "delete_advisory",
+      "source": "backend/main.py",
+      "line": 2990,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/advisories/generate/{report_id}",
+      "methods": [
+        "POST"
+      ],
+      "function": "generate_ai_advisory",
+      "source": "backend/main.py",
+      "line": 2996,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/notifications/user/{user_id}",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_user_notifications",
+      "source": "backend/main.py",
+      "line": 3011,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/notifications/user/{user_id}/read",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "mark_user_notifications_read",
+      "source": "backend/main.py",
+      "line": 3028,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/notifications/{notification_id}/read",
+      "methods": [
+        "PATCH"
+      ],
+      "function": "mark_single_notification_read",
+      "source": "backend/main.py",
+      "line": 3045,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/notifications/{notification_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "function": "delete_single_notification",
+      "source": "backend/main.py",
+      "line": 3061,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/work-orders",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_work_orders",
+      "source": "backend/main.py",
+      "line": 3081,
+      "dependencies": [
+        "_check",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/work-orders",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_new_work_order",
+      "source": "backend/main.py",
+      "line": 3090,
+      "dependencies": [
+        "_check",
+        "get_db"
+      ],
+      "declared_disposition": "legacy_or_policy_blocked"
+    },
+    {
+      "path": "/api/news",
+      "methods": [
+        "GET"
+      ],
+      "function": "read_news",
+      "source": "backend/main.py",
+      "line": 3144,
+      "dependencies": [
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/news",
+      "methods": [
+        "POST"
+      ],
+      "function": "create_news_item",
+      "source": "backend/main.py",
+      "line": 3169,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/news/{news_id}",
+      "methods": [
+        "PUT"
+      ],
+      "function": "update_news_item",
+      "source": "backend/main.py",
+      "line": 3181,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    },
+    {
+      "path": "/api/news/{news_id}",
+      "methods": [
+        "DELETE"
+      ],
+      "function": "delete_news_item",
+      "source": "backend/main.py",
+      "line": 3193,
+      "dependencies": [
+        "get_current_user",
+        "get_db"
+      ],
+      "declared_disposition": "requires_behavioral_review"
+    }
+  ]
+}

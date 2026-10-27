@@ -70,10 +70,11 @@ def nearby_active_report(
 
 
 def nearby_available_agents(
-    db: Session, latitude: float, longitude: float, limit: int = 3, max_age_minutes: int = 15
+    db: Session, latitude: float, longitude: float, limit: int = 3, max_age_minutes: int = 15, allowed_agent_ids=None
 ):
     """Return fresh, active field officials nearest a report; older GPS is ineligible."""
     fresh_since = datetime.now(timezone.utc) - timedelta(minutes=max_age_minutes)
+    if allowed_agent_ids is not None and not allowed_agent_ids: return []
     eligible_roles = ("field_worker", "foreman", "construction_foreman", "project_engineer", "building_inspector")
     limit = max(1, min(limit, 20))
     if _has_spatial_column(db, "agent_locations"):
@@ -87,11 +88,13 @@ def nearby_available_agents(
               AND o.is_active = true AND o.is_suspended = false
               AND o.role IN ('field_worker', 'foreman', 'construction_foreman', 'project_engineer', 'building_inspector')
               AND a.location_geog IS NOT NULL
+              AND (:all_agents OR a.agent_id = ANY(CAST(:allowed_ids AS INTEGER[])))
               AND ST_DWithin(a.location_geog, ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)::geography, 50000)
             ORDER BY distance_m, a.agent_id
             LIMIT :limit
         """), {
             "latitude": latitude, "longitude": longitude, "fresh_since": fresh_since, "limit": limit,
+            "all_agents": allowed_agent_ids is None, "allowed_ids": list(allowed_agent_ids or []),
         }).mappings().all()
         return [{
             "agent_id": row["agent_id"], "full_name": row["full_name"],
@@ -107,7 +110,9 @@ def nearby_available_agents(
         models.Official.is_active == True,
         models.Official.is_suspended == False,
         models.Official.role.in_(eligible_roles),
-    ).all()
+    )
+    if allowed_agent_ids is not None: rows = rows.filter(models.Official.id.in_(allowed_agent_ids))
+    rows = rows.all()
     result = []
     for location, official in rows:
         if location.latitude is None or location.longitude is None:

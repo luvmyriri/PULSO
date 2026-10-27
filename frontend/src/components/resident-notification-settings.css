@@ -1,0 +1,13 @@
+.resident-notification-settings{display:grid;gap:16px;max-width:680px;color:#172536;font-size:14px;line-height:1.5}
+.resident-notification-settings p{margin:0;color:#526171;max-width:65ch;overflow-wrap:anywhere}
+.resident-notification-settings fieldset{min-width:0;border:0;border-top:1px solid #d4dce5;padding:16px 0 0;margin:0}
+.resident-notification-settings legend{font-weight:700;padding:0 8px 0 0}
+.resident-notification-settings label{display:flex;justify-content:space-between;align-items:center;gap:20px;min-height:48px;padding:10px 0}
+.resident-notification-settings label span{min-width:0;overflow-wrap:anywhere}
+.resident-notification-settings input{width:20px;height:20px;accent-color:#b84c00;flex-shrink:0}
+.resident-notification-settings button{min-height:44px;padding:10px 16px;justify-self:start;border:1px solid #b84c00;border-radius:8px;background:#b84c00;color:white;font-weight:600}
+.resident-notification-settings :focus-visible{outline:3px solid #2563eb!important;outline-offset:3px}
+.resident-notification-settings :disabled{opacity:.6;cursor:not-allowed}
+.dark .resident-notification-settings{color:#f0f4fa}.dark .resident-notification-settings p{color:#b4bfce}.dark .resident-notification-settings fieldset{border-color:#334155}
+.dark .resident-notification-settings button{background:#ff8b3d;color:#171a20;border-color:#ff8b3d}.dark .resident-notification-settings input{accent-color:#ff8b3d}
+@media(forced-colors:active){.resident-notification-settings button{border:1px solid ButtonText}.resident-notification-settings :focus-visible{outline-color:Highlight!important}}

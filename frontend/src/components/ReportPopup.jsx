@@ -7,9 +7,11 @@ import {
     Eye,
     ShieldCheck,
     Droplets,
+    Waves,
     Mountain,
     Zap,
     Car,
+    Signpost,
     AlertTriangle,
     Building2,
     MoreHorizontal
@@ -49,12 +51,13 @@ export function getFriendlyStatusName(rawStatus) {
  */
 export function getCategoryIconComponent(category, rawCategory) {
     const cat = (category || rawCategory || '').toLowerCase();
-    if (cat.includes('water') || cat.includes('flood') || cat.includes('drain') || cat.includes('tubig')) return Droplets;
+    if (cat.includes('flood') || cat.includes('drain')) return Waves;
+    if (cat.includes('water') || cat.includes('tubig')) return Droplets;
     if (cat.includes('power') || cat.includes('light') || cat.includes('electric') || cat.includes('kuryente')) return Zap;
-    if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole') || cat.includes('lubak') || cat.includes('kalsada')) return Mountain;
+    if (cat.includes('traffic') || cat.includes('sign') || cat.includes('signal')) return Signpost;
+    if (cat.includes('building') || cat.includes('facilit') || cat.includes('hall')) return Building2;
     if (cat.includes('safety') || cat.includes('hazard') || cat.includes('danger') || cat.includes('sunog')) return AlertTriangle;
-    if (cat.includes('building') || cat.includes('facility') || cat.includes('hall')) return Building2;
-    if (cat.includes('traffic') || cat.includes('sign')) return Car;
+    if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole') || cat.includes('lubak') || cat.includes('kalsada')) return Mountain;
     return MoreHorizontal;
 }
 

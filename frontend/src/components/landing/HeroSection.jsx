@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { SquarePen, Search, ArrowRight, Smartphone, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -14,9 +15,8 @@ import { API_BASE_URL } from '../../utils/apiBase';
  *   + Plain language explanation
  *   + Large paired CTAs: [Report a Problem ->] & [Track My Report ->]
  *   + Official Mobile App Installation card with scannable QR Code
- * - Right: Grand official Caloocan City seal
+ * - Right: Grand official Caloocan City Engineering Department seal
  *   + Caption: "Your report helps build a safer city."
- *   + Two-tone civic accent bar (Orange & Blue)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
@@ -56,19 +56,14 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
     <section
       id="hero-section"
       aria-label="Civic Reporting Hero"
-      className="relative flex-1 flex flex-col justify-center min-h-[calc(100vh-73px)] scroll-mt-[73px] bg-white dark:bg-[#070a12] transition-colors py-3 sm:py-5 lg:py-6 overflow-hidden"
+      className="relative flex-1 flex flex-col justify-start lg:justify-center min-h-0 lg:min-h-[calc(100vh-73px)] scroll-mt-[56px] sm:scroll-mt-[64px] lg:scroll-mt-[73px] bg-white dark:bg-[#070a12] transition-colors pt-3 pb-3 sm:pt-5 sm:pb-6 lg:py-6 overflow-hidden"
     >
       <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 xl:gap-16 items-center">
           
           {/* Left Column: Heading, Subhead & Action Buttons */}
-          <div className="lg:col-span-7 xl:col-span-7 flex flex-col items-start text-left max-w-[760px]">
+          <div className="lg:col-span-7 xl:col-span-6 2xl:col-span-6 flex flex-col items-start text-left max-w-[760px]">
             
-            {/* Eyebrow Kicker */}
-            <span className="font-heading font-black text-xs sm:text-sm md:text-[15px] tracking-wider text-[#0284c7] uppercase mb-2 sm:mb-2.5">
-              A SAFER, CLEANER, AND STRONGER CALOOCAN
-            </span>
-
             {/* Main Headline - Scaled to match 125% density */}
             <h1 className="font-heading font-black text-4xl sm:text-5xl md:text-[60px] lg:text-[68px] xl:text-[76px] tracking-tight text-[#0f2347] dark:text-white leading-[1.04] mb-3 sm:mb-3.5">
               See a problem in<br />
@@ -83,14 +78,14 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
 
             {/* Primary Action Button Pair */}
             <div className="flex flex-wrap items-center gap-3 w-full">
-              <a
-                href="/report"
+              <Link
+                to="/report"
                 className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs sm:text-sm tracking-wide shadow-sm hover:shadow transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
               >
                 <SquarePen size={17} className="shrink-0" />
                 <span>Report a Problem</span>
                 <ArrowRight size={15} className="shrink-0" />
-              </a>
+              </Link>
 
               <button
                 type="button"
@@ -159,32 +154,28 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
 
           </div>
 
-          {/* Right Column: Prominent Official Caloocan Seal + Caption + Pulse Accent Bar */}
-          <div className="lg:col-span-5 xl:col-span-5 flex flex-col items-center justify-center text-center w-full">
-            <div className="flex flex-col items-center justify-center text-center">
-              
-              {/* Grand High-Resolution Caloocan Seal */}
-              <div className="relative group transition-transform duration-300 hover:scale-[1.02]">
-                <img
-                  src="/caloocan-seal-large.png"
-                  alt="Lungsod ng Caloocan Official Seal"
-                  className="w-56 h-56 sm:w-72 sm:h-72 md:w-[330px] md:h-[330px] lg:w-[390px] lg:h-[390px] xl:w-[430px] xl:h-[430px] aspect-square object-contain drop-shadow-sm select-none"
-                />
+          {/* Right Column: Prominent Official Caloocan City Engineering Department Seal (Desktop only, hidden on mobile / mobile app) */}
+          {!isInstalledApp() && (
+            <div className="hidden lg:flex lg:col-span-5 xl:col-span-6 2xl:col-span-6 flex-col items-center justify-center text-center w-full">
+              <div className="flex flex-col items-center justify-center text-center">
+
+                {/* Grand High-Resolution Caloocan City Engineering Department Seal */}
+                <div className="relative group transition-transform duration-300 hover:scale-[1.02]">
+                  <img
+                    src="/city-engineering-logo-hd.png"
+                    alt="Caloocan City Engineering Department Official Seal"
+                    className="w-64 h-64 sm:w-80 sm:h-80 md:w-[380px] md:h-[380px] lg:w-[460px] lg:h-[460px] xl:w-[520px] xl:h-[520px] 2xl:w-[580px] 2xl:h-[580px] max-w-full aspect-square object-contain drop-shadow-md select-none"
+                  />
+                </div>
+
+                {/* Caption text */}
+                <p className="font-heading font-bold text-base sm:text-lg md:text-xl text-[#0b1c38] dark:text-white mt-4 sm:mt-5 tracking-tight">
+                  Your report helps build a safer city.
+                </p>
+
               </div>
-
-              {/* Caption text */}
-              <p className="font-heading font-bold text-base sm:text-lg md:text-xl text-[#0b1c38] dark:text-white mt-4 sm:mt-5 tracking-tight">
-                Your report helps build a safer city.
-              </p>
-
-              {/* Two-tone accent bar: orange and blue rounded pills */}
-              <div className="flex items-center justify-center gap-2 mt-2.5" aria-hidden="true">
-                <span className="w-12 h-2 rounded-full bg-[#ff6b00]" />
-                <span className="w-12 h-2 rounded-full bg-[#0284c7]" />
-              </div>
-
             </div>
-          </div>
+          )}
 
         </div>
       </div>

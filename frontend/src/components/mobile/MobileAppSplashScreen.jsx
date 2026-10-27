@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import PulsoBottomScrim from './PulsoBottomScrim';
 
 /**
  * MobileAppSplashScreen
@@ -160,14 +159,10 @@ export default function MobileAppSplashScreen({
     }
   };
 
-  const skyColor = isDark ? '#080D19' : '#EAF2FF';
-  const textColor = isDark ? '#ffffff' : '#0B1630';
-  const captionColor = isDark ? '#CBD5E1' : '#334155';
-  const orange = '#ff6b00';
-  const bgImg = isDark ? 'url(/pulso-bg-dark.svg)' : 'url(/pulso-bg-light.svg)';
-  const scrimGradient = isDark
-    ? 'linear-gradient(to top, rgba(11, 17, 32, 0.15) 0%, rgba(11, 17, 32, 0.10) 45%, rgba(11, 17, 32, 0) 100%)'
-    : 'linear-gradient(to top, rgba(245, 249, 255, 0.15) 0%, rgba(245, 249, 255, 0.10) 45%, rgba(245, 249, 255, 0) 100%)';
+  const skyColor = isDark ? '#020617' : '#f1f5f9';
+  const textColor = isDark ? '#ffffff' : '#0f172a';
+  const captionColor = isDark ? '#94a3b8' : '#64748b';
+  const orange = '#EA580C';
 
   // Slow connection message (> 5s) and offline error (> 12s or offline)
   const showSlowMessage = (elapsedSeconds >= 5 || forceSlow) && !isOffline && elapsedSeconds < 12 && !forceOffline;
@@ -191,21 +186,6 @@ export default function MobileAppSplashScreen({
           : 'fixed inset-0 z-[99999] w-full min-h-[100vh] min-h-[100dvh]'
       } flex flex-col justify-between items-center select-none overflow-hidden font-sans`}
     >
-      {/* Background illustration layer (30rem / 480px column centered on wide screens) */}
-      <div
-        className="absolute inset-0 w-full max-w-[480px] mx-auto pointer-events-none select-none z-0"
-        style={{
-          backgroundImage: bgImg,
-          backgroundSize: '100% auto',
-          backgroundPosition: 'center bottom',
-          backgroundRepeat: 'no-repeat',
-          transition: reducedMotion ? 'none' : 'background-image 150ms ease'
-        }}
-        aria-hidden="true"
-      />
-
-      {/* Soft blurred bottom fade scrim behind caption and action zone */}
-      <PulsoBottomScrim isDark={isDark} />
 
       {/* Invisible screen reader announcement */}
       <span className="sr-only">Loading PULSO</span>
@@ -290,55 +270,7 @@ export default function MobileAppSplashScreen({
           </span>
         </div>
 
-        {/* ── UNDERLINE WITH TRAVELING HEARTBEAT PULSE ── */}
-        <div className="relative w-full max-w-[170px] xs:max-w-[195px] sm:max-w-[220px] h-6 mt-1 flex items-center justify-center">
-          <svg
-            viewBox="0 0 200 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-full h-full overflow-visible"
-            preserveAspectRatio="none"
-          >
-            {/* Flat Base Underline */}
-            <line
-              x1="0"
-              y1="10"
-              x2="200"
-              y2="10"
-              stroke={orange}
-              strokeWidth="3"
-              strokeLinecap="round"
-              style={{
-                opacity: animationPhase === 'initial' && !reducedMotion ? 0 : 1,
-                transition: 'opacity 200ms ease-out'
-              }}
-            />
 
-            {/* Traveling Heartbeat Pulse Group (Active in underlined & looping phases) */}
-            {!reducedMotion && animationPhase !== 'initial' && (
-              <g
-                className={
-                  animationPhase === 'looping'
-                    ? 'pulso-splash-looping-pulse'
-                    : 'pulso-splash-initial-pulse'
-                }
-              >
-                {/* Background Mask to conceal the flat line directly beneath the heartbeat wave */}
-                <rect x="-14" y="0" width="28" height="20" fill={skyColor} />
-
-                {/* Heartbeat Peak & Dip Path */}
-                <path
-                  d="M -14,10 L -6,10 L -2,2 L 3,18 L 7,10 L 14,10"
-                  stroke={orange}
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              </g>
-            )}
-          </svg>
-        </div>
 
         {/* ── SLOW CONNECTION / OFFLINE STATUS MESSAGES ── */}
         <div className="min-h-[48px] mt-4 flex flex-col items-center justify-center text-center max-w-[280px]">
@@ -404,46 +336,7 @@ export default function MobileAppSplashScreen({
           }
         }
 
-        /* Initial 0.65s to 1.25s single pulse sweep */
-        @keyframes pulsoInitialPulseSweep {
-          0% {
-            transform: translateX(-25px);
-          }
-          100% {
-            transform: translateX(225px);
-          }
-        }
 
-        .pulso-splash-initial-pulse {
-          animation: pulsoInitialPulseSweep 650ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
-          will-change: transform;
-        }
-
-        /* Gentle looping pulse: sweeps for 0.8s, rests flat for 0.55s before next heartbeat */
-        @keyframes pulsoLoopingPulseSweep {
-          0% {
-            transform: translateX(-25px);
-          }
-          62% {
-            transform: translateX(225px);
-          }
-          100% {
-            transform: translateX(225px);
-          }
-        }
-
-        .pulso-splash-looping-pulse {
-          animation: pulsoLoopingPulseSweep 1.35s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-          will-change: transform;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .pulso-splash-initial-pulse,
-          .pulso-splash-looping-pulse {
-            animation: none !important;
-            display: none !important;
-          }
-        }
       `}</style>
     </div>
   );

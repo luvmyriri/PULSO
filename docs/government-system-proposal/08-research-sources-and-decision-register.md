@@ -2,6 +2,8 @@
 
 **Status:** Research record and proposed decisions. **Version/date:** 1.0 / 18 September 2026. Revalidate model catalogs, service terms and API availability before procurement or implementation.
 
+**Dated scope/research addendum — 23 October 2026:** [Document 16](16-government-core-workflow-navigation-and-disclosure-research-2026-10-23.md) records new official-source findings, current-source drift, and the user's explicit disclosure-only budget boundary. Read its GOV-16 decision register alongside D01–D14. Budget/funding/cash/procurement processing described in earlier plans is outside this user-directed scope; historical records and any external authorization references require reviewed migration rules. Document 16 also corrects the strength of earlier local-role claims and the older announcement-delivery observation. This does not approve the proposed LGU role, lifecycle, publishing, or deadline policies.
+
 ## Evidence limits
 
 Research combines targeted repository inspection and public primary-source documentation. It is not a production audit, model benchmark, legal opinion or approved organizational design. Sources establish documented capabilities/context; recommendations and architecture are the author's proposed application of them.

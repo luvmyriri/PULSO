@@ -32,29 +32,44 @@ _SDK_READY = False
 
 def _init():
     global _client, _SDK_READY
-    # Set credentials path for ADC (Application Default Credentials)
+    # 1. Try Vertex AI via service account credentials
     creds_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), GOOGLE_CREDENTIALS)
     if os.path.exists(creds_path):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
     elif os.path.exists(GOOGLE_CREDENTIALS):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_CREDENTIALS
-    else:
-        print(f"[AI] [FAILED] Service account credentials not found at '{GOOGLE_CREDENTIALS}' — AI features disabled.")
-        return
-    try:
-        from google import genai
-        _client = genai.Client(
-            vertexai=True,
-            project=GCP_PROJECT,
-            location=GCP_LOCATION,
-        )
-        _SDK_READY = True
-        print(f"[AI] [SUCCESS] Vertex AI SDK ready  |  Model: {GEMINI_MODEL}")
-        print(f"[AI]    Project  : {GCP_PROJECT}")
-        print(f"[AI]    Location : {GCP_LOCATION}")
-        print("[AI]    Auth     : Configured service account; request access verified on use")
-    except Exception as e:
-        print(f"[AI] [ERROR] Vertex AI SDK init failed: {e}")
+
+    vertex_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if vertex_creds and os.path.exists(vertex_creds):
+        try:
+            from google import genai
+            _client = genai.Client(
+                vertexai=True,
+                project=GCP_PROJECT,
+                location=GCP_LOCATION,
+            )
+            _SDK_READY = True
+            print(f"[AI] [SUCCESS] Vertex AI SDK ready  |  Model: {GEMINI_MODEL}")
+            print(f"[AI]    Project  : {GCP_PROJECT}")
+            print(f"[AI]    Location : {GCP_LOCATION}")
+            print("[AI]    Auth     : Configured service account; request access verified on use")
+            return
+        except Exception as e:
+            print(f"[AI] [WARN] Vertex AI init failed: {e}. Falling back to GOOGLE_GEMINI_API_KEY...")
+
+    # 2. Fallback to direct Gemini API key
+    gemini_key = os.getenv("GOOGLE_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        try:
+            from google import genai
+            _client = genai.Client(api_key=gemini_key)
+            _SDK_READY = True
+            print(f"[AI] [SUCCESS] Google Gemini API Key ready  |  Model: {GEMINI_MODEL}")
+            return
+        except Exception as e:
+            print(f"[AI] [ERROR] Gemini API Key init failed: {e}")
+
+    print(f"[AI] [FAILED] Service account credentials not found at '{GOOGLE_CREDENTIALS}' and no GOOGLE_GEMINI_API_KEY — AI features disabled.")
 
 _init()
 
@@ -502,11 +517,11 @@ Severity Guidelines:
             else:
                 parsed["is_inappropriate"] = False
                 parsed["is_infrastructure"] = True
-            return parsed
+            return dict(parsed,analysis_status='suggested',provider_used=True)
     except Exception as e:
         print(f"[AI] analyze_report parse error: {e}")
 
-    return _local_safety_check(description)
+    return dict(_local_safety_check(description),analysis_status='manual_review',provider_used=False)
 
 
 def extract_id_data(
@@ -549,6 +564,8 @@ Extract into a JSON object with these exact fields:
   "dob": "",
   "sex": "",
   "address": "",
+  "unit": "",
+  "building": "",
   "house_no": "",
   "block_lot": "",
   "subdivision": "",
@@ -570,7 +587,12 @@ Extract into a JSON object with these exact fields:
     "first_name": "high",
     "last_name": "high",
     "dob": "high",
-    "address": "high"
+    "address": "high",
+    "house_no": "high",
+    "building": "high",
+    "subdivision": "high",
+    "street": "high",
+    "barangay": "high"
   }}
 }}
 
@@ -624,10 +646,14 @@ Intelligence Rules (STRICT ZERO TOLERANCE FOR ERROR):
 6. PHILIPPINE ADDRESS & NAME INTELLIGENCE:
    - Names: Separate into first_name, middle_name, last_name, suffix.
    - Birthdate: Must be YYYY-MM-DD.
-   - house_no: House / Unit / Lot number.
-   - block_lot: Block and Lot if specified (e.g. "BLK 15 LOT 11").
-   - subdivision: Phase / Package / Subdivision name (e.g. "PH8A PKG14").
-   - barangay: Exact number for Caloocan (e.g. "176") or name. Priority: numeric string without "Barangay" prefix.
+   - unit: Unit, room or floor (e.g. "UNIT 224", "RM 5B", "3RD FLOOR").
+   - building: Building name or identifier (e.g. "BLDG. D", "BUILDING 7").
+   - house_no: House or unit number ONLY without building (e.g. "UNIT 224", "12").
+   - block_lot: Block and Lot if specified (e.g. "BLK 15 LOT 11", "PHASE 1").
+   - subdivision: Village, subdivision, condominium or residence name (e.g. "CAMARIN RESIDENCES I", "NORTHVILLE 2B", "PH8A PKG14").
+   - street: Street or road name (e.g. "CAMARIN ROAD", "SAMPAGUITA ST").
+   - barangay: Exact number for Caloocan (e.g. "175", "176") or name. Priority: numeric string without "Barangay" prefix.
+   - Copy words exactly, do not invent. If pattern is "BLDG. D UNIT 224 CAMARIN RESIDENCES I CAMARIN", set building="BLDG. D", unit="UNIT 224", house_no="UNIT 224", subdivision="CAMARIN RESIDENCES I", street="CAMARIN".
    - Assign confidence ("high", "medium", "low") for key fields based on image legibility.
 
 7. RESPONSE FORMAT:

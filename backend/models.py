@@ -85,16 +85,24 @@ class Resident(Base):
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, index=True)
     email = Column(String, unique=True, index=True)
+    normalized_email = Column(String, index=True, nullable=True)
     password_hash = Column(String)
     
     address = Column(String, nullable=True)
     barangay_id = Column(Integer, ForeignKey("barangays.id"), nullable=True, index=True)
     district_id = Column(Integer, ForeignKey("districts.id"), nullable=True, index=True)
     phone_number = Column(String, nullable=True)
+    normalized_phone_number = Column(String, index=True, nullable=True)
     
     # Citizen-specific features
     trust_score = Column(Integer, default=100)
     verification_code = Column(String, nullable=True)
+    email_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+    email_code_sent_at = Column(DateTime(timezone=True), nullable=True)
+    email_code_attempts = Column(Integer, nullable=False, default=0, server_default='0')
+    administration_version = Column(Integer, nullable=False, default=0, server_default='0')
+    notification_preferences_version = Column(Integer, nullable=False, default=0, server_default='0')
+    access_version = Column(Integer, nullable=False, default=0, server_default='0')
     is_verified = Column(Boolean, default=False)
     kyc_level = Column(String, default="Bronze (Self-Signed)")  # Bronze, Silver, Gold
     id_tier = Column(String, nullable=True)  # "primary" or "secondary"
@@ -115,6 +123,9 @@ class Resident(Base):
     id_verification_status = Column(String, default="N/A", nullable=True)  # "Verified", "Pending review", "Rejected", "N/A"
     id_rejection_reason = Column(String, nullable=True)
     id_verified_at = Column(DateTime(timezone=True), nullable=True)
+    id_review_reference = Column(String(255), nullable=True)
+    id_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    id_reviewed_by_id = Column(Integer, ForeignKey('officials.id'), nullable=True)
 
     avatar_url = Column(String, nullable=True)
     preferences = Column(JSON, nullable=True, default=dict)
@@ -198,6 +209,8 @@ class Official(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     role = Column(String, default="staff", index=True)  # Denormalized for query performance & compatibility
+    invitation_pending = Column(Boolean, nullable=False, default=False, server_default="false")
+    access_version = Column(Integer, nullable=False, default=0, server_default="0")
 
 
     @property
@@ -211,14 +224,26 @@ class Official(Base):
         return 100
 
     @property
+    def role_details(self):
+        """Alias for role_ref to keep RBAC resolution consistent across services."""
+        return self.role_ref
+
+    @property
     def capabilities(self):
         """Resolves capabilities from the linked role_ref or defaults."""
         if self.role_ref and self.role_ref.capabilities:
-            return self.role_ref.capabilities
+            caps = self.role_ref.capabilities
+            return {**caps, 'admin': caps.get('admin', ['*'])} if self.role in ('admin','system_admin') else caps
         # Fallback for staff/admin if role_ref is missing or empty
-        if self.role == "admin":
-            return {"admin": ["*"]}
-        return {"general": ["view"]}
+        if self.role in ("admin", "system_admin"):
+            return {"admin": ["*"], "records": ["*"], "announcements": ["*"], "reports": ["*"], "work": ["*"], "assets": ["*"], "insights": ["*"]}
+        if self.role == "manager":
+            return {"records": ["*"], "announcements": ["*"], "reports": ["*"], "work": ["*"], "assets": ["*"], "insights": ["*"], "projects": ["*"]}
+        if self.role in ("supervisor", "dispatcher"):
+            return {"reports": ["view", "edit", "assign"], "work": ["view", "create", "edit"], "assets": ["view"], "insights": ["view"], "announcements": ["view", "create"]}
+        if self.role == "records_officer":
+            return {"records": ["view", "create", "edit", "legal_hold"], "announcements": ["view", "create"], "reports": ["view"]}
+        return {"general": ["view"], "reports": ["view"], "work": ["view"]}
 
     @property
     def kyc_level(self):
@@ -235,11 +260,26 @@ class Official(Base):
 # Segregated Identity Models (Phase 3: Finalized)
 # -----------------------------------------------------------------------------
 
+class StaffCredentialToken(Base):
+    """Hashed single-use staff credentials; raw secrets never enter audit history."""
+    __tablename__ = "staff_credential_tokens"
+    id = Column(Integer, primary_key=True)
+    official_id = Column(Integer, ForeignKey("officials.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True)
+    purpose = Column(String(16), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("officials.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True)
     outbox_event_id = Column(Integer, ForeignKey("outbox_events.id"), nullable=True, unique=True)
+    target_url = Column(String, nullable=True)
     
     # Dual FK support for segregated architecture
     resident_id = Column(Integer, ForeignKey("residents.id"), nullable=True)
@@ -296,6 +336,16 @@ class Report(Base):
     ai_summary = Column(String, nullable=True)
     ai_reasoning = Column(String, nullable=True)
     severity_score = Column(Float, default=0.0)
+    review_assigned_to_id = Column(Integer, ForeignKey('officials.id'), nullable=True, index=True)
+    review_assigned_at = Column(DateTime(timezone=True), nullable=True)
+    review_assignment_mode = Column(String(24), nullable=True)
+    review_routing_reason = Column(String, nullable=True)
+    priority_grade = Column(String(2), nullable=True, index=True)
+    priority_policy_version = Column(String(48), nullable=True)
+    priority_reason = Column(String, nullable=True)
+    priority_reviewed_by_id = Column(Integer, ForeignKey('officials.id'), nullable=True)
+    priority_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    next_review_at = Column(DateTime(timezone=True), nullable=True)
     ai_metadata = Column(JSON, nullable=True)  # Formatted JSON: {"image_description": "...", "tags": [...]}
     
     # Deduplication, Routing & Trust
@@ -465,7 +515,7 @@ class ChatMessage(Base):
 class SystemSetting(Base):
     """
     Persisted system-wide configurations, policies, SLAs, and retention standards.
-    Supports versioning and tamper-evident history.
+    Records versioned configuration and attributed change history.
     """
     __tablename__ = "system_settings"
 

@@ -63,7 +63,12 @@ Base = declarative_base()
 def init_db():
     """Initialize database tables."""
     from models import Resident, Official, Report, Notification, Advisory, PasswordResetToken
-    from gov_models import WorkOrder, WorkOrderUpdate, AuditLog, ProcessTimeline, ProcurementRequest, BoQItem, ProjectRequest, OBOInspection, AgentLocation
+    from gov_models import (
+        WorkOrder, WorkOrderUpdate, AuditLog, ProcessTimeline,
+        ProcurementRequest, BoQItem, ProjectRequest, OBOInspection,
+        AgentLocation, Announcement, AnnouncementCorrection,
+        AnnouncementDelivery, AnnouncementReportAssociation, BudgetDisclosure
+    )
     Base.metadata.create_all(bind=engine)
 
 

@@ -1,0 +1,12 @@
+/* Layout/controls use Tailwind utilities and the shared government tokens. */
+.publication-editor { min-width:0; width:100%; }
+.publication-editor__scroll { padding:24px 1px 1px; }
+@media(min-width:1280px) and (min-height:600px) {
+    .publication-editor { display:flex; flex:1; flex-direction:column; min-height:0; }
+    .publication-editor > :not(.publication-editor__scroll) { flex-shrink:0; }
+    .publication-editor__scroll { flex:1; min-height:0; overflow-y:auto; scrollbar-gutter:stable; }
+}
+.publication-editor [hidden] { display:none!important; }
+.publication-editor :is(a,button,input,textarea,select,summary):focus-visible { outline:3px solid var(--workspace-focus); outline-offset:3px; }
+.publication-editor input[type="file"]:focus-visible { outline:0; }
+@media(forced-colors:active) { .publication-editor :is(button,input,textarea,select,details) { border-color:ButtonText; }.publication-editor :is(button,a,summary,input,select,textarea):focus-visible { outline-color:Highlight; } }

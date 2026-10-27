@@ -25,6 +25,7 @@ class ResidentBase(BaseModel):
 
 class ResidentCreate(ResidentBase):
     password: str
+    barangay: Optional[str] = Field(None, max_length=200)
 
 class ResidentUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -373,6 +374,7 @@ class NotificationResponse(NotificationBase):
     user_id: Optional[int] = None
     is_read: bool
     is_hidden: bool = False
+    target_url: Optional[str] = None
     created_at: datetime
 
     class Config:

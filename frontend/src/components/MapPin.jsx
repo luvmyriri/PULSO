@@ -15,6 +15,7 @@ export default function MapPin({
     report,
     isSelected = false,
     isDark = false,
+    categoryColor,
     onClick,
     innerRef,
     reportLocation
@@ -23,7 +24,30 @@ export default function MapPin({
 
     if (!report) return null;
 
-    const rawImg = report.photo_url || report.photo_thumbnail || report.image_url || report.media_url || report.image;
+    const getCategoryColorFallback = (rep) => {
+        const cat = (rep?.category || rep?.raw_category || rep?.title || '').toLowerCase();
+        if (cat.includes('flood') || cat.includes('drain')) return '#06B6D4'; // Drainage
+        if (cat.includes('light') || cat.includes('lamp') || cat.includes('streetlight')) return '#F59E0B'; // Lighting
+        if (cat.includes('water') || cat.includes('tubig') || cat.includes('pipe')) return '#0EA5E9'; // Water
+        if (cat.includes('safety') || cat.includes('hazard') || cat.includes('danger')) return '#F43F5E'; // Safety
+        if (cat.includes('traffic') || cat.includes('sign') || cat.includes('signal')) return '#A855F7'; // Traffic
+        if (cat.includes('building') || cat.includes('facilit') || cat.includes('hall')) return '#6366F1'; // Buildings
+        if (cat.includes('electric') || cat.includes('wire') || cat.includes('kuryente')) return '#EAB308'; // Electrical
+        if (cat.includes('waste') || cat.includes('garbage') || cat.includes('basura')) return '#10B981'; // Waste
+        return '#EA580C'; // Roads
+    };
+
+    const pinColor = categoryColor || report.categoryColor || getCategoryColorFallback(report);
+
+    const rawImg = (
+        report.photo_url ||
+        report.image_url ||
+        report.image ||
+        report.photo_thumbnail ||
+        report.media_url ||
+        (Array.isArray(report.photos) ? report.photos[0] : null) ||
+        (Array.isArray(report.media_urls) ? report.media_urls[0] : null)
+    );
     let photoUrl = null;
     if (rawImg && !imgFailed) {
         photoUrl = rawImg.startsWith('http') || rawImg.startsWith('data:')
@@ -50,13 +74,13 @@ export default function MapPin({
             aria-label={ariaLabel}
             title={ariaLabel}
             tabIndex={0}
-            className={`group relative w-14 h-14 rounded-full flex items-center justify-center select-none cursor-pointer transition-transform duration-200 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-[#ff6b00] ${
+            className={`group relative w-14 h-14 rounded-full flex items-center justify-center select-none cursor-pointer transition-transform duration-200 focus-visible:outline-none ${
                 isSelected ? 'scale-105 z-50' : 'hover:scale-105 z-30'
             }`}
             style={{
                 boxShadow: isSelected
-                    ? `0 0 0 3px #ff6b00, 0 0 0 5px ${cardBgColor}, 0 10px 25px rgba(0,0,0,0.4)`
-                    : `0 0 0 2.5px #ff6b00, 0 0 0 4px ${cardBgColor}, 0 6px 18px rgba(0,0,0,0.3)`
+                    ? `0 0 0 3.5px ${pinColor}, 0 0 0 5.5px ${cardBgColor}, 0 10px 25px rgba(0,0,0,0.4)`
+                    : `0 0 0 2.5px ${pinColor}, 0 0 0 4.5px ${cardBgColor}, 0 6px 18px rgba(0,0,0,0.3)`
             }}
         >
             {photoUrl ? (
@@ -72,7 +96,7 @@ export default function MapPin({
                     aria-hidden="true"
                     className="w-full h-full rounded-full flex items-center justify-center bg-[#0c1427] dark:bg-[#0c1427] text-white"
                 >
-                    <CategoryIcon size={24} className="text-[#ff6b00]" />
+                    <CategoryIcon size={24} style={{ color: pinColor }} />
                 </div>
             )}
         </button>

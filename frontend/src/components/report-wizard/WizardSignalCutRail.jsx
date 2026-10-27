@@ -90,28 +90,44 @@ export default function WizardSignalCutRail({ currentStep, maxStepReached, onSte
         })}
       </ol>
 
-      {/* Mobile Compact Stepper */}
+      {/* Mobile Segmented Stepper */}
       <div className="sm:hidden flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-orange-600 text-white flex items-center justify-center text-xs font-bold">
-              {currentStep}
-            </span>
-            <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-              {t(`reportWizard.steps.${STEPS[currentStep - 1]?.key}`, STEPS[currentStep - 1]?.defaultLabel)}
-            </span>
-          </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-            {currentStep} / {STEPS.length}
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold text-xs uppercase tracking-wider text-orange-600 dark:text-[#ff8a3d]">
+            {t('reportWizard.stepCountUppercase', 'STEP {{current}} OF {{total}}', { current: currentStep, total: 6 })}
+          </span>
+          <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
+            {t(`reportWizard.steps.${STEPS[currentStep - 1]?.key}`, STEPS[currentStep - 1]?.defaultLabel)}
           </span>
         </div>
 
-        {/* Continuous Progress Bar */}
-        <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-          <div
-            className="bg-orange-600 dark:bg-orange-500 h-full transition-all duration-300"
-            style={{ width: `${(currentStep / STEPS.length) * 100}%` }}
-          />
+        {/* 6 Segmented Progress Bars */}
+        <div
+          className="grid grid-cols-6 gap-2 w-full"
+          role="progressbar"
+          aria-valuenow={currentStep}
+          aria-valuemin={1}
+          aria-valuemax={6}
+        >
+          {STEPS.map((step) => {
+            const isPassedOrCurrent = step.id <= currentStep;
+            const isClickable = step.id <= maxStepReached;
+
+            return (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => isClickable && onStepClick(step.id)}
+                disabled={!isClickable}
+                aria-label={`Step ${step.id}: ${step.defaultLabel}`}
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                } ${
+                  isPassedOrCurrent ? 'bg-[#ff6b00]' : 'bg-slate-200 dark:bg-slate-800'
+                }`}
+              />
+            );
+          })}
         </div>
       </div>
     </nav>

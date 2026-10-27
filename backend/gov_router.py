@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from database import get_db
 from auth import get_current_user
@@ -31,6 +31,8 @@ import gov_schemas
 import gov_crud
 import roles_service
 import command_integrity
+import report_review
+import legacy_operations
 import os
 import io
 import uuid
@@ -42,7 +44,80 @@ import fqa_engine
 
 router = APIRouter(prefix="/api/gov", tags=["Government"])
 
+
+@router.get('/account')
+def government_account(db: Session = Depends(get_db),current_user=Depends(get_current_user)):
+    if not isinstance(current_user,models.Official): raise HTTPException(403,'Staff access is required.')
+    import staff_accounts
+    return {**staff_accounts.project(db,current_user),'phone_number':current_user.phone_number,'address':current_user.address}
+
+
+@router.get('/navigation')
+def government_navigation(db: Session=Depends(get_db), current_user=Depends(get_current_user)):
+    from government_access import can
+    if not isinstance(current_user, models.Official):
+        raise HTTPException(403, 'Staff access is required.')
+    modules = ['my-work']
+    if can(current_user, 'overview'): modules.append('overview')
+    modules += ['reports', 'work-orders']
+    import project_workspace
+    if project_workspace.allowed(current_user): modules.append('projects')
+    if can(current_user, 'maintenance'): modules += ['assets', 'analytics', 'predictive']
+    if roles_service.has_permission(db, current_user, 'records', 'view'): modules.append('records')
+    if can(current_user, 'announcements'): modules.append('announcements')
+    import staff_accounts
+    if any(staff_accounts.allowed(current_user,action) for action in ('staff_view','residents_view','settings_view','audit_view')): modules.append('settings')
+    return {'modules': modules}
+
+
+@router.get('/report-map')
+def government_report_map(ids: Optional[str] = None, asset_id: Optional[str] = None, context_asset_id: Optional[str] = None, overview: Optional[str] = None, area: Optional[str] = None, priority: Optional[str] = None, radius_m: int = Query(500, ge=50, le=2000), db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    _assert_role(current_user, *GOV_ROLES)
+    from government_access import scoped_reports
+    from math import isfinite
+    if overview is not None:
+        from operations_workspace import overview_report_query
+        query = overview_report_query(db, current_user, overview, area, priority)
+    else:
+        query = scoped_reports(db.query(models.Report), current_user)
+        if current_user.role in FIELD_SELF_ROLES:
+            query = query.filter(models.Report.id.in_(db.query(gov_models.WorkOrder.report_id).filter(gov_models.WorkOrder.assigned_to_id == current_user.id)))
+    if ids is not None:
+        parts = ids.split(',') if ids else []
+        if len(parts) > 1000 or any(not p.isdigit() for p in parts): raise HTTPException(422, 'Select at most 1000 numeric report identifiers.')
+        query = query.filter(models.Report.id.in_([int(p) for p in parts]))
+    if asset_id is not None:
+        query = query.filter(models.Report.id.in_(db.query(gov_models.WorkOrder.report_id).filter(gov_models.WorkOrder.asset_id == asset_id)))
+    context = None
+    if context_asset_id:
+        from asset_map_context import asset_report_context
+        context = asset_report_context(db, current_user, context_asset_id, radius_m)
+        query = query.filter(models.Report.id.in_([r.id for r in context['reports']]))
+    total = query.count()
+    rows = query.order_by(models.Report.created_at.desc()).limit(1000).all()
+    def point(report):
+        lat, lng = report.location_lat, report.location_lng
+        if lat is None or lng is None or not isfinite(lat) or not isfinite(lng) or not (-90 <= lat <= 90 and -180 <= lng <= 180) or (lat == 0 and lng == 0): return None
+        return dict(lat=lat, lng=lng)
+    return dict(as_of=datetime.now().astimezone(), total=total, truncated=total > len(rows),
+        asset=context['asset'] if context else None, radius_m=radius_m if context else None,
+        items=[dict(id=r.id, ticket_id=r.ticket_id, title=(r.description or 'Resident report')[:180], category=r.category or r.ai_category or 'Unclassified', status=r.status, barangay=r.location_barangay, address=r.location_string, position=point(r), image_url=r.image_url, created_at=r.created_at, updated_at=r.updated_at, review_operations=report_review.projection(db,r),
+            relationship='linked' if context and r.id in context['linked_ids'] else 'nearby' if context else None,
+            distance_m=context['distances'].get(r.id) if context else None) for r in rows])
+
 # Role groups (FR-13 RBAC)
+@router.get('/records-workspace/permissions')
+def records_workspace_permissions(db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    from records_workspace import record_permissions
+    return record_permissions(db,current_user)
+
+
+@router.get('/records-workspace')
+def records_workspace_data(view: str='documents',page: int=Query(1,ge=1),search: str=Query('',max_length=160),db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    from records_workspace import workspace_records
+    return workspace_records(db,current_user,view,page,search)
+
+
 GOV_ROLES = [
     "city_engineer", "asst_city_engineer", "admin_clerk", "manager",
     "project_engineer", "dispatcher", "estimator", "architect",
@@ -61,6 +136,8 @@ FIELD_SELF_ROLES = {"field_worker", "foreman", "construction_foreman"}
 
 
 def _require_work_order_view(wo, user):
+    from government_access import require_scope
+    require_scope(user, wo)
     if user.role in FIELD_SELF_ROLES and wo.assigned_to_id != user.id:
         raise HTTPException(status_code=403, detail="Work order is outside your assignment")
 
@@ -69,6 +146,7 @@ def _require_assigned_or_dispatcher(db: Session, wo_id: int, user):
     wo = gov_crud.get_work_order(db, wo_id)
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
+    _require_work_order_view(wo, user)
     if user.role not in DISPATCH_ROLES and wo.assigned_to_id != user.id:
         raise HTTPException(status_code=403, detail="Work order is not assigned to you")
     return wo
@@ -149,6 +227,7 @@ def gov_dashboard_stats(
 
 @router.get("/dispatch/eligible-assignees")
 def list_eligible_assignees(
+    wo_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -159,7 +238,40 @@ def list_eligible_assignees(
         models.Official.is_suspended == False,
         models.Official.role.in_(eligible_roles),
     ).order_by(models.Official.full_name).all()
-    return [{"id": person.id, "full_name": person.full_name, "role": person.role} for person in officials]
+    from government_access import require_scope, jurisdiction_ids
+    wo = db.query(gov_models.WorkOrder).filter_by(id=wo_id).first() if wo_id else None
+    if wo_id and not wo:
+        raise HTTPException(404, 'Work order not found.')
+    if wo: require_scope(current_user, wo)
+    eligible = []
+    for person in officials:
+        try:
+            ids = jurisdiction_ids(person)
+        except HTTPException:
+            continue
+        if wo and ids and wo.district_id not in ids:
+            continue
+        eligible.append({'id': person.id, 'full_name': person.full_name, 'role': person.role})
+    return eligible
+
+
+@router.post('/work-orders/{wo_id}/assignment', response_model=gov_schemas.WorkOrderResponse)
+def assign_work_order_owner(wo_id: int, payload: gov_schemas.WorkOrderAssignment, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    _assert_role(current_user, *DISPATCH_ROLES)
+    from government_access import require_scope, jurisdiction_ids
+    wo = db.query(gov_models.WorkOrder).filter_by(id=wo_id).with_for_update().first()
+    if not wo: raise HTTPException(404, 'Work order not found.')
+    require_scope(current_user, wo)
+    if wo.status == 'assigned' and wo.assigned_to_id == payload.assigned_to_id:
+        return gov_crud.enrich_work_order(wo, db)
+    if wo.status != 'open': raise HTTPException(409, 'Only an open work order can receive its first assignment. Reload the current record.')
+    gov_crud._validate_assignee(db, payload.assigned_to_id)
+    person = db.query(models.Official).filter_by(id=payload.assigned_to_id).first()
+    ids = jurisdiction_ids(person)
+    if ids and wo.district_id not in ids: raise HTTPException(403, 'This work is outside the selected official’s configured district scope.')
+    wo.assigned_to_id, wo.assigned_by_id = person.id, current_user.id
+    wo = gov_crud.update_work_order_status(db, wo.id, 'assigned', current_user.id, current_user.role, note=f'Owner assigned to {person.full_name}. Reason: {payload.reason.strip()}')
+    return gov_crud.enrich_work_order(wo, db)
 
 @router.post("/work-orders", response_model=gov_schemas.WorkOrderResponse)
 def create_work_order(
@@ -177,6 +289,11 @@ def create_work_order(
     - wo_type = "preemptive"  : Created proactively (FR-11)
     """
     _assert_role(current_user, *DISPATCH_ROLES)
+    from government_access import require_report_scope
+    if data.report_id:
+        report = db.get(models.Report, data.report_id)
+        if not report: raise HTTPException(404, 'Source report not found')
+        require_report_scope(db, current_user, report)
     key = command_integrity.validate_key(idempotency_key)
     expected = command_integrity.parse_version(if_match)
     if (key or expected is not None) and data.report_id is None:
@@ -200,7 +317,13 @@ def suggest_agents_by_proximity(
     Used for intelligent manual dispatch recommendations.
     """
     _assert_role(current_user, *DISPATCH_ROLES)
-    return gov_crud.find_smart_dispatch_suggestions(db, report_id)
+    from government_access import require, require_report_scope
+    require(current_user, 'reports')
+    report = db.get(models.Report, report_id)
+    if not report: raise HTTPException(404, 'Report not found.')
+    require_report_scope(db, current_user, report)
+    visible = legacy_operations.location_rows(db, current_user)
+    return gov_crud.find_smart_dispatch_suggestions(db, report_id, allowed_agent_ids=list(visible))
 
 @router.get("/work-orders", response_model=List[gov_schemas.WorkOrderResponse])
 def list_work_orders(
@@ -217,8 +340,23 @@ def list_work_orders(
     _assert_role(current_user, *GOV_ROLES)
     if current_user.role in FIELD_SELF_ROLES:
         assigned_to_id = current_user.id
-    items = gov_crud.list_work_orders(db, skip, limit, status, wo_type, assigned_to_id, search)
+    from government_access import jurisdiction_ids
+    items = gov_crud.list_work_orders(db, skip, limit, status, wo_type, assigned_to_id, search, district_ids=jurisdiction_ids(current_user))
     return [gov_crud.enrich_work_order(w, db) for w in items]
+
+
+@router.get('/work-order-workspace')
+def work_order_workspace(page: int=Query(1,ge=1),view: str='all',search: str=Query('',max_length=160),assignee: Optional[str]=None,db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    _assert_role(current_user,*GOV_ROLES)
+    from work_order_workspace import queue
+    return queue(db,current_user,page,view,search,assignee)
+
+
+@router.get('/work-order-actions/{work_id}')
+def work_order_available_actions(work_id: int,db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    _assert_role(current_user,*GOV_ROLES)
+    from work_order_workspace import actions
+    return actions(db,current_user,work_id)
 
 
 @router.get("/work-orders/{wo_id}", response_model=gov_schemas.WorkOrderResponse)
@@ -324,6 +462,7 @@ def update_work_order(
 ):
     """Update work order fields (status, assignee, notes, etc.)."""
     _assert_role(current_user, *DISPATCH_ROLES)
+    _require_assigned_or_dispatcher(db,wo_id,current_user)
     wo = gov_crud.update_work_order(db, wo_id, data, actor_id=current_user.id, actor_role=current_user.role)
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
@@ -363,6 +502,7 @@ def update_work_order_status(
     Valid transitions: open→assigned→in_progress→completed | cancelled
     """
     _assert_role(current_user, *DISPATCH_ROLES)
+    _require_assigned_or_dispatcher(db,wo_id,current_user)
     if not payload.status:
         raise HTTPException(status_code=422, detail="'status' field is required")
     wo = gov_crud.update_work_order_status(
@@ -390,6 +530,7 @@ def approve_or_reject_work_order(
     Accessible to: Dispatcher, City Engineer, Project Engineer, Admin
     """
     _assert_role(current_user, "dispatcher", "city_engineer", "project_engineer", "admin", "senior_dispatcher")
+    _require_assigned_or_dispatcher(db,wo_id,current_user)
     
     if payload.action not in ("approve", "reject"):
         raise HTTPException(status_code=422, detail="Action must be 'approve' or 'reject'")
@@ -466,7 +607,8 @@ def get_all_timelines(
     LGU staff only. Allows rendering of the 'Process Timeline' dashboard.
     """
     _assert_role(current_user, *DISPATCH_ROLES, *INSPECTOR_ROLES)
-    entries = gov_crud.list_all_timelines(db, skip, limit)
+    from records_workspace import activity_query
+    entries = activity_query(db,current_user,gov_models.ProcessTimeline).order_by(gov_models.ProcessTimeline.created_at.desc(),gov_models.ProcessTimeline.id.desc()).offset(skip).limit(limit).all()
     return gov_crud.enrich_timeline(entries, db)
 
 
@@ -489,6 +631,10 @@ def get_report_timeline(
             raise HTTPException(status_code=403, detail="Not authorized")
     else:
         _assert_role(current_user, *GOV_ROLES)
+        from government_access import require_report_scope
+        report=db.get(models.Report,report_id)
+        if not report: raise HTTPException(404,'Report not found.')
+        require_report_scope(db,current_user,report)
         if current_user.role in FIELD_SELF_ROLES:
             linked = db.query(gov_models.WorkOrder).filter(
                 gov_models.WorkOrder.report_id == report_id,
@@ -526,6 +672,10 @@ def get_project_timeline(
 ):
     """Full process timeline for an LGU project."""
     _assert_role(current_user, *GOV_ROLES)
+    from government_access import require_scope
+    project=db.get(gov_models.ProjectRequest,project_id)
+    if not project: raise HTTPException(404,'Project not found.')
+    require_scope(current_user,project)
     entries = gov_crud.get_timeline_for_project(db, project_id, public_only)
     return gov_crud.enrich_timeline(entries, db)
 
@@ -541,7 +691,8 @@ def get_system_documents(
 ):
     """Centralized Electronic Records registry (RA 9470)."""
     _assert_role(current_user, *SENIOR_ROLES)
-    return gov_crud.list_system_documents(db, skip, limit)
+    from records_workspace import documents_query,document_projection
+    return [document_projection(doc) for doc in documents_query(db,current_user).order_by(gov_models.SystemDocument.uploaded_at.desc()).offset(skip).limit(limit).all()]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -558,15 +709,14 @@ def create_procurement_request(
     Raise a new Procurement Request Letter (draft state).
     Raised by: Project Engineer, Estimator, Admin Officer roles.
     """
-    _assert_role(current_user, *PROCUREMENT_ROLES)
-    pr = gov_crud.create_procurement_request(db, data, actor_id=current_user.id, actor_role=current_user.role)
-    return gov_crud.enrich_procurement(pr, db)
+    _assert_role(current_user, *GOV_ROLES)
+    raise HTTPException(status_code=409, detail="PULSO records sourced disclosures only. Budget and procurement processing must be completed through the responsible city office and official systems.")
 
 
 @router.get("/procurement", response_model=List[gov_schemas.ProcurementRequestResponse])
 def list_procurement_requests(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=200),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -574,8 +724,21 @@ def list_procurement_requests(
 ):
     """Procurement list view. Filtered by status e.g. 'sent_to_procurement'."""
     _assert_role(current_user, *GOV_ROLES)
-    items = gov_crud.list_procurement_requests(db, skip, limit, status, search)
+    query = legacy_operations.financial_query(db, current_user)
+    items = gov_crud.list_procurement_requests(db, skip, limit, status, search, query=query)
     return [gov_crud.enrich_procurement(p, db) for p in items]
+
+
+@router.get('/financial-history')
+def financial_history(page: int = Query(1, ge=1), search: str = Query('', max_length=200),
+    db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    query = legacy_operations.financial_query(db, current_user)
+    if search:
+        query = query.filter(or_(gov_models.ProcurementRequest.title.ilike(f'%{search}%'),
+            gov_models.ProcurementRequest.pr_number.ilike(f'%{search}%')))
+    total = query.count()
+    rows = query.order_by(gov_models.ProcurementRequest.created_at.desc(), gov_models.ProcurementRequest.id.desc()).offset((page-1)*15).limit(15).all()
+    return dict(total=total, page=page, items=[gov_schemas.ProcurementRequestResponse.model_validate(gov_crud.enrich_procurement(row, db)).model_dump() for row in rows])
 
 
 @router.get("/procurement/{pr_id}", response_model=gov_schemas.ProcurementRequestResponse)
@@ -586,7 +749,7 @@ def get_procurement_request(
 ):
     """Get a single Procurement Request with all BoQ items."""
     _assert_role(current_user, *GOV_ROLES)
-    pr = gov_crud.get_procurement_request(db, pr_id)
+    pr = legacy_operations.financial_query(db, current_user).filter_by(id=pr_id).first()
     if not pr:
         raise HTTPException(status_code=404, detail="Procurement request not found")
     return gov_crud.enrich_procurement(pr, db)
@@ -607,28 +770,8 @@ def update_procurement_status(
       sent_to_procurement → procured  (Procurement Officer / Admin)
       any → rejected  (Admin Officer or City Engineer)
     """
-    status = payload.status
-
-    # Role enforcement per workflow step
-    if status == "submitted":
-        _assert_role(current_user, *PROCUREMENT_ROLES)
-    elif status == "validated":
-        _assert_role(current_user, "admin_officer", "manager", "system_admin")
-    elif status in ("sent_to_procurement", "rejected"):
-        _assert_role(current_user, *EXECUTIVE_ROLES)
-    elif status == "procured":
-        _assert_role(current_user, "admin_officer", *EXECUTIVE_ROLES)
-    else:
-        raise HTTPException(status_code=422, detail=f"Invalid procurement status: {status}")
-
-    pr = gov_crud.update_procurement_status(
-        db, pr_id, status,
-        actor_id=current_user.id, actor_role=current_user.role,
-        rejection_reason=payload.rejection_reason,
-    )
-    if not pr:
-        raise HTTPException(status_code=404, detail="Procurement request not found")
-    return gov_crud.enrich_procurement(pr, db)
+    _assert_role(current_user, *GOV_ROLES)
+    raise HTTPException(status_code=409, detail="PULSO records sourced disclosures only. Budget and procurement processing must be completed through the responsible city office and official systems.")
 
 
 @router.patch("/procurement/{pr_id}/funding-certification", response_model=gov_schemas.ProcurementRequestResponse)
@@ -639,25 +782,8 @@ def update_procurement_funding(
     current_user=Depends(get_current_user),
 ):
     """Certify that funding is available for this procurement and assign an ObR Number."""
-    _assert_role(current_user, "admin_officer", "manager", "system_admin", "budget_officer")
-    pr = gov_crud.update_procurement_funding(
-        db, pr_id, payload,
-        actor_id=current_user.id, actor_role=current_user.role,
-    )
-    if not pr:
-        raise HTTPException(status_code=404, detail="Procurement request not found")
-    
-    # [RA 9184 Digital Handshake] - Notify Engineering that funds are certified
-    if pr.funding_certified and pr.obr_number:
-        notification_service.notify_funds_certified(
-            asset_id=pr.pr_number, 
-            project_name=pr.title,
-            amount=sum(item.total_cost for item in pr.items),
-            obr_no=pr.obr_number,
-            target_user_id=str(pr.raised_by_id)
-        )
-        
-    return gov_crud.enrich_procurement(pr, db)
+    _assert_role(current_user, *GOV_ROLES)
+    raise HTTPException(status_code=409, detail="PULSO records sourced disclosures only. Budget and procurement processing must be completed through the responsible city office and official systems.")
 
 
 @router.patch("/procurement/{pr_id}/cash-release", response_model=gov_schemas.ProcurementRequestResponse)
@@ -668,30 +794,8 @@ def update_procurement_cash_release(
     current_user=Depends(get_current_user),
 ):
     """Record that cash has been released for this procurement."""
-    _assert_role(current_user, "admin_officer", "manager", "system_admin", "finance_officer")
-    pr = gov_crud.update_procurement_cash_release(
-        db, pr_id, payload,
-        actor_id=current_user.id, actor_role=current_user.role,
-    )
-    if not pr:
-        raise HTTPException(status_code=404, detail="Procurement request not found")
-
-    # [RA 12009 Compliance] - Notify when project is Ready for Bidding (Budget + Cash cleared)
-    if pr.funding_certified and pr.cash_released:
-        # Fetch the raised_by user's email if possible, or send to city engineer
-        engineer_email = os.getenv("CITY_ENGINEER_EMAIL", "engineer@caloocan.gov.ph")
-        notification_service.send_ready_for_bidding_notice(
-            email=engineer_email,
-            data={
-                "asset_id": pr.pr_number,
-                "project_name": pr.title,
-                "location": "North Caloocan District",
-                "amount": sum(item.total_cost for item in pr.items),
-                "funding_source": "General Fund / 20% Development Fund"
-            }
-        )
-
-    return gov_crud.enrich_procurement(pr, db)
+    _assert_role(current_user, *GOV_ROLES)
+    raise HTTPException(status_code=409, detail="PULSO records sourced disclosures only. Budget and procurement processing must be completed through the responsible city office and official systems.")
 
 
 @router.patch("/procurement/{pr_id}/bac-schedule", response_model=gov_schemas.ProcurementRequestResponse)
@@ -702,14 +806,8 @@ def update_procurement_bac_schedule(
     current_user=Depends(get_current_user),
 ):
     """Schedule the BAC Pre-Procurement Conference for this request."""
-    _assert_role(current_user, "admin_officer", "manager", "system_admin", "bac_secretariat")
-    pr = gov_crud.update_procurement_bac_schedule(
-        db, pr_id, payload,
-        actor_id=current_user.id, actor_role=current_user.role,
-    )
-    if not pr:
-        raise HTTPException(status_code=404, detail="Procurement request not found")
-    return gov_crud.enrich_procurement(pr, db)
+    _assert_role(current_user, *GOV_ROLES)
+    raise HTTPException(status_code=409, detail="PULSO records sourced disclosures only. Budget and procurement processing must be completed through the responsible city office and official systems.")
 
 
 @router.patch("/procurement/{pr_id}/ntp-issuance", response_model=gov_schemas.ProcurementRequestResponse)
@@ -720,14 +818,8 @@ def update_procurement_ntp(
     current_user=Depends(get_current_user),
 ):
     """Issue a Notice to Proceed for this procurement, unlocking project execution."""
-    _assert_role(current_user, *EXECUTIVE_ROLES)
-    pr = gov_crud.update_procurement_ntp(
-        db, pr_id, payload,
-        actor_id=current_user.id, actor_role=current_user.role,
-    )
-    if not pr:
-        raise HTTPException(status_code=404, detail="Procurement request not found")
-    return gov_crud.enrich_procurement(pr, db)
+    _assert_role(current_user, *GOV_ROLES)
+    raise HTTPException(status_code=409, detail="PULSO records sourced disclosures only. Budget and procurement processing must be completed through the responsible city office and official systems.")
 
 
 @router.post("/procurement/{pr_id}/items", response_model=gov_schemas.BoQItemResponse)
@@ -738,13 +830,8 @@ def add_boq_item(
     current_user=Depends(get_current_user),
 ):
     """Add a Bill of Quantities line item to an existing Procurement Request."""
-    _assert_role(current_user, *PROCUREMENT_ROLES)
-    pr = gov_crud.get_procurement_request(db, pr_id)
-    if not pr:
-        raise HTTPException(status_code=404, detail="Procurement request not found")
-    if pr.status not in ("draft", "submitted"):
-        raise HTTPException(status_code=400, detail="Cannot add items to a request that is already validated or further.")
-    return gov_crud.add_boq_item(db, pr_id, item)
+    _assert_role(current_user, *GOV_ROLES)
+    raise HTTPException(status_code=409, detail="PULSO records sourced disclosures only. Budget and procurement processing must be completed through the responsible city office and official systems.")
 
 
 @router.delete("/procurement/{pr_id}/items/{item_id}")
@@ -755,16 +842,8 @@ def delete_boq_item(
     current_user=Depends(get_current_user),
 ):
     """Remove a BoQ line item. Only allowed while request is still draft/submitted."""
-    _assert_role(current_user, *PROCUREMENT_ROLES)
-    pr = gov_crud.get_procurement_request(db, pr_id)
-    if not pr:
-        raise HTTPException(status_code=404, detail="Procurement request not found")
-    if pr.status not in ("draft", "submitted"):
-        raise HTTPException(status_code=400, detail="Cannot modify items after validation.")
-    success = gov_crud.delete_boq_item(db, item_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="BoQ item not found")
-    return {"message": f"BoQ item {item_id} deleted"}
+    _assert_role(current_user, *GOV_ROLES)
+    raise HTTPException(status_code=409, detail="PULSO records sourced disclosures only. Budget and procurement processing must be completed through the responsible city office and official systems.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -782,6 +861,12 @@ def create_project(
     Raised by: City Engineer, Admin Clerk, or Manager.
     """
     _assert_role(current_user, "city_engineer", "admin_clerk", "manager", "system_admin")
+    import project_workspace
+    project_workspace.require(current_user,'manage')
+    from government_access import resolve_record_area
+    resolve_record_area(db,current_user,data)
+    if {'estimated_cost','procurement_modality','is_emergency'} & data.model_fields_set:
+        raise HTTPException(409,'Project coordination does not process budgets, procurement or emergency authorization.')
     proj = gov_crud.create_project_request(db, data, actor_id=current_user.id, actor_role=current_user.role)
     return gov_crud.enrich_project(proj, db)
 
@@ -798,7 +883,9 @@ def list_projects(
 ):
     """List LGU infrastructure projects. All gov staff can view."""
     _assert_role(current_user, *GOV_ROLES)
-    items = gov_crud.list_project_requests(db, skip, limit, status, current_phase, search)
+    import project_workspace
+    project_workspace.require(current_user,'view')
+    items = gov_crud.list_project_requests(db, skip, limit, status, current_phase, search,user=current_user)
     return [gov_crud.enrich_project(p, db) for p in items]
 
 
@@ -810,9 +897,13 @@ def get_project(
 ):
     """Get a single LGU project by ID."""
     _assert_role(current_user, *GOV_ROLES)
+    import project_workspace
+    project_workspace.require(current_user,'view')
     proj = gov_crud.get_project_request(db, proj_id)
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
+    from government_access import require_scope
+    require_scope(current_user,proj)
     return gov_crud.enrich_project(proj, db)
 
 
@@ -825,7 +916,12 @@ def update_project(
 ):
     """Update project metadata (personnel assignments, attachments, etc.)."""
     _assert_role(current_user, *SENIOR_ROLES)
-    proj = gov_crud.update_project(db, proj_id, data, actor_id=current_user.id, actor_role=current_user.role)
+    import project_workspace
+    project_workspace.require(current_user,'manage')
+    from government_access import require_entity_scope
+    require_entity_scope(db,current_user,gov_models.ProjectRequest,proj_id)
+    import project_workspace
+    proj = project_workspace.update_metadata(db,current_user,proj_id,data)
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
     return gov_crud.enrich_project(proj, db)
@@ -855,18 +951,26 @@ def advance_project(
     - Phase 12→13 (certificate): Asst. City Engineer (done via /certificate endpoint)
     """
     _assert_role(current_user, *GOV_ROLES)
+    import project_workspace
+    project_workspace.require(current_user,'manage')
+    from government_access import require_entity_scope
+    require_entity_scope(db,current_user,gov_models.ProjectRequest,proj_id)
     if not payload.status:
         raise HTTPException(status_code=422, detail="'status' field required to advance the project")
-    try:
-        result = gov_crud.advance_project_phase(
-            db, proj_id, payload.status,
-            actor_id=current_user.id, actor_role=current_user.role,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    if not result:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return gov_crud.enrich_project(result["project"], db)
+    if payload.status in {'pending_budget_check', 'budget_confirmed'}:
+        raise HTTPException(409, 'Budget processing is outside PULSO. Record sourced public information in an update disclosure.')
+    import project_workspace
+    project=project_workspace.target(db,current_user,proj_id)
+    if payload.expected_version is None:
+        raise HTTPException(428,'Open the project coordination record and provide its expected_version.')
+    if project_workspace.NEXT.get(project.status)!=payload.status:
+        raise HTTPException(409,'Use the available next action in the project coordination record.')
+    if not payload.reason or len(payload.reason.strip())<10:
+        raise HTTPException(422,'Record the reason for this project transition.')
+    result=project_workspace.execute(db,current_user,proj_id,project_workspace.Command(action='advance',
+        expected_version=payload.expected_version,reason=payload.reason,document_id=payload.document_id,next_review_at=payload.next_review_at))
+    return gov_crud.enrich_project(result,db)
+
 
 
 @router.post("/projects/{proj_id}/certificate", response_model=gov_schemas.ProjectRequestResponse)
@@ -876,9 +980,17 @@ def issue_certificate(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Certificate issuance awaits the governed project evidence and records contract."""
-    _assert_role(current_user, "asst_city_engineer", "city_engineer", "manager", "system_admin")
-    raise HTTPException(status_code=409, detail="Project certificate issuance requires governed evidence review")
+    """Record an externally issued certificate after independent project review."""
+    import project_workspace
+    project_workspace.target(db,current_user,proj_id)
+    if payload.expected_version is None:
+        raise HTTPException(409,'Open the completed project and record its official certificate with evidence and a reference.')
+    if not payload.notes or len(payload.notes.strip())<10:
+        raise HTTPException(422,'Record the reason for adding this certificate.')
+    project=project_workspace.execute(db,current_user,proj_id,project_workspace.Command(action='record_certificate',
+        expected_version=payload.expected_version,reason=payload.notes,document_id=payload.document_id,reference=payload.reference,office=payload.office))
+    return gov_crud.enrich_project(project,db)
+
 
 @router.get("/reports/{report_id}/project-mapping")
 def get_project_mapping_by_report(
@@ -891,22 +1003,100 @@ def get_project_mapping_by_report(
     Used by the DispatcherDashboard to trigger FQA audits.
     """
     _assert_role(current_user, *GOV_ROLES)
-    
-    # Link: Report -> WorkOrder -> ProjectRequest
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.report_id == report_id).first()
-    if not wo or not wo.project_id:
-        raise HTTPException(status_code=404, detail="No linked project found for this report.")
-    
-    proj = gov_crud.get_project_request(db, wo.project_id)
+    from report_review_router import get_report
+    from government_access import require_scope
+    get_report(db,current_user,report_id)
+    proj=db.query(gov_models.ProjectRequest).filter_by(source_report_id=report_id).order_by(gov_models.ProjectRequest.id.desc()).first()
+    if proj is None:
+        wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.report_id == report_id,gov_models.WorkOrder.project_id.isnot(None)).order_by(gov_models.WorkOrder.id.desc()).first()
+        proj = gov_crud.get_project_request(db,wo.project_id) if wo else None
     if not proj:
         raise HTTPException(status_code=404, detail="Linked project not found.")
-        
+    require_scope(current_user,proj)
     return gov_crud.enrich_project(proj, db)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OBO Inspections  (Section 6.4 — Office of Building Official)
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _obo_inspectors(db, record):
+    from government_access import jurisdiction_ids
+    people = db.query(models.Official).filter(
+        models.Official.is_active == True, models.Official.is_suspended == False,
+        models.Official.role.in_(INSPECTOR_ROLES),
+    ).order_by(models.Official.full_name).all()
+    eligible = []
+    for person in people:
+        try:
+            ids = jurisdiction_ids(person)
+        except HTTPException:
+            continue
+        if ids and record.district_id not in ids:
+            continue
+        eligible.append(person)
+    return eligible
+
+
+@router.get("/obo-workspace")
+def obo_workspace(
+    page: int = Query(1, ge=1), view: str = Query('all'), search: str = Query('', max_length=200),
+    db: Session = Depends(get_db), current_user=Depends(get_current_user),
+):
+    _assert_role(current_user, *GOV_ROLES)
+    from government_access import scoped
+    entity = gov_models.OBOInspection
+    query = scoped(db.query(entity), entity.district_id, current_user)
+    if search.strip():
+        term = '%' + search.strip() + '%'
+        query = query.filter(or_(entity.obo_number.ilike(term), entity.applicant_name.ilike(term), entity.property_address.ilike(term)))
+    counts = dict(query.with_entities(entity.status, func.count(entity.id)).group_by(entity.status).all())
+    if view != 'all':
+        query = query.filter(entity.status == view)
+    total = query.count()
+    rows = query.order_by(entity.created_at.desc(), entity.id.desc()).offset((page-1)*15).limit(15).all()
+    return dict(items=[gov_schemas.OBOInspectionResponse.model_validate(gov_crud.enrich_obo(row, db)) for row in rows], total=total, counts=counts)
+
+
+@router.get("/obo/{obo_id}/history")
+def obo_history(obo_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    _assert_role(current_user, *GOV_ROLES)
+    from government_access import require_entity_scope
+    record = require_entity_scope(db,current_user,gov_models.OBOInspection,obo_id)
+    # Historical OBO audit entries have no OBO foreign key. Match the complete
+    # generated record reference, never applicant text or a partial record ID.
+    events = db.query(gov_models.AuditLog).filter(or_(
+        gov_models.AuditLog.action.startswith(f'OBO {record.obo_number} ', autoescape=True),
+        gov_models.AuditLog.action.startswith(f'OBO {record.obo_number}:', autoescape=True),
+        gov_models.AuditLog.action.startswith(f'OBO inspection {record.obo_number} filed', autoescape=True),
+    )).order_by(gov_models.AuditLog.created_at.desc(),gov_models.AuditLog.id.desc()).limit(100).all()
+    return [dict(id=e.id,action=e.action,actor_name=e.actor.full_name if e.actor else None,actor_role=e.actor_role,created_at=e.created_at) for e in events]
+
+
+@router.get("/obo-options")
+def obo_options(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    _assert_role(current_user, *GOV_ROLES)
+    from government_access import jurisdiction_ids
+    ids = jurisdiction_ids(current_user)
+    query = db.query(models.Barangay)
+    if ids:
+        query = query.filter(models.Barangay.district_id.in_(ids))
+    role = current_user.role
+    return dict(
+        create=role in ["admin_clerk", "admin", *INSPECTOR_ROLES],
+        inspect=role in ["admin", *INSPECTOR_ROLES],
+        record_decision=role in ["admin", *EXECUTIVE_ROLES],
+        barangays=[dict(id=b.id, name=b.name) for b in query.order_by(models.Barangay.name).all()],
+    )
+
+
+@router.get("/obo/{obo_id}/inspectors")
+def obo_inspectors(obo_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    _assert_role(current_user, *INSPECTOR_ROLES)
+    from government_access import require_entity_scope
+    record = require_entity_scope(db, current_user, gov_models.OBOInspection, obo_id)
+    return [dict(id=p.id, full_name=p.full_name, role=p.role) for p in _obo_inspectors(db, record)]
+
 
 @router.post("/obo", response_model=gov_schemas.OBOInspectionResponse)
 def create_obo_inspection(
@@ -919,6 +1109,12 @@ def create_obo_inspection(
     Filed by: Admin Clerk, Building Inspector, or senior roles.
     """
     _assert_role(current_user, "admin_clerk", *INSPECTOR_ROLES)
+    from government_access import resolve_record_area,require_report_scope
+    resolve_record_area(db,current_user,data)
+    if data.source_report_id:
+        source=db.get(models.Report,data.source_report_id)
+        if not source: raise HTTPException(404,'Source report not found.')
+        require_report_scope(db,current_user,source)
     obo = gov_crud.create_obo_inspection(db, data, actor_id=current_user.id, actor_role=current_user.role)
     return gov_crud.enrich_obo(obo, db)
 
@@ -936,7 +1132,7 @@ def list_obo_inspections(
 ):
     """List OBO inspections. Filterable by status, type, or barangay."""
     _assert_role(current_user, *GOV_ROLES)
-    items = gov_crud.list_obo_inspections(db, skip, limit, status, inspection_type, barangay, search)
+    items = gov_crud.list_obo_inspections(db, skip, limit, status, inspection_type, barangay, search,user=current_user)
     return [gov_crud.enrich_obo(o, db) for o in items]
 
 
@@ -951,6 +1147,8 @@ def get_obo_inspection(
     obo = gov_crud.get_obo_inspection(db, obo_id)
     if not obo:
         raise HTTPException(status_code=404, detail="OBO inspection not found")
+    from government_access import require_scope
+    require_scope(current_user,obo)
     return gov_crud.enrich_obo(obo, db)
 
 
@@ -975,6 +1173,10 @@ def update_obo_inspection(
     else:
         _assert_role(current_user, *INSPECTOR_ROLES)
 
+    from government_access import require_entity_scope
+    record = require_entity_scope(db,current_user,gov_models.OBOInspection,obo_id)
+    if data.assigned_inspector_id is not None and data.assigned_inspector_id not in {p.id for p in _obo_inspectors(db, record)}:
+        raise HTTPException(422, 'Choose an active inspector who can work in this district.')
     obo = gov_crud.update_obo_inspection(
         db, obo_id, data,
         actor_id=current_user.id, actor_role=current_user.role,
@@ -992,6 +1194,8 @@ def update_obo_technical_review(
     current_user=Depends(get_current_user),
 ):
     _assert_role(current_user, *INSPECTOR_ROLES)
+    from government_access import require_entity_scope
+    require_entity_scope(db,current_user,gov_models.OBOInspection,obo_id)
     obo = gov_crud.update_obo_technical_review(db, obo_id, payload, current_user.id, current_user.role)
     if not obo:
         raise HTTPException(status_code=404, detail="OBO inspection not found")
@@ -1006,6 +1210,8 @@ def update_obo_appeal(
     current_user=Depends(get_current_user),
 ):
     _assert_role(current_user, *INSPECTOR_ROLES)
+    from government_access import require_entity_scope
+    require_entity_scope(db,current_user,gov_models.OBOInspection,obo_id)
     obo = gov_crud.update_obo_appeal(db, obo_id, payload, current_user.id, current_user.role)
     if not obo:
         raise HTTPException(status_code=404, detail="OBO inspection not found")
@@ -1020,6 +1226,8 @@ def update_obo_order_of_payment(
     current_user=Depends(get_current_user),
 ):
     _assert_role(current_user, *EXECUTIVE_ROLES, "admin_clerk")
+    from government_access import require_entity_scope
+    require_entity_scope(db,current_user,gov_models.OBOInspection,obo_id)
     obo = gov_crud.update_obo_order_of_payment(db, obo_id, payload, current_user.id, current_user.role)
     if not obo:
         raise HTTPException(status_code=404, detail="OBO inspection not found")
@@ -1033,6 +1241,8 @@ def update_obo_order_of_payment(
 
 class RoleUpdatePayload(BaseModel):
     role: str
+    reason: str = Field(min_length=10,max_length=2000)
+    expected_version: int = Field(ge=0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1042,6 +1252,7 @@ class RoleUpdatePayload(BaseModel):
 class UserStatusPayload(BaseModel):
     action: str
     reason: Optional[str] = None
+    expected_version: Optional[int] = Field(None,ge=0)
 
 
 
@@ -1050,18 +1261,18 @@ def get_user_management_stats(
     db: Session = Depends(get_db),
     current_user: models.Official = Depends(get_current_user)
 ):
-    """Admin: Quick counts for user management dashboard."""
-    _assert_role(current_user, *ADMIN_ONLY)
-    
-    resident_active = db.query(models.Resident).filter(models.Resident.is_active == True).count()
-    gov_active = db.query(models.Official).filter(models.Official.is_active == True, models.Official.is_suspended == False).count()
-    gov_suspended = db.query(models.Official).filter(models.Official.is_suspended == True).count()
-    
-    return {
-        "resident": {"active": resident_active, "suspended": 0},  # Consolidated for UI
-        "government": {"active": gov_active, "suspended": gov_suspended},
-        "total_active": resident_active + gov_active
-    }
+    import staff_accounts
+    from government_access import scoped_residents
+    residents_allowed=staff_accounts.allowed(current_user,'residents_view')
+    staff_allowed=staff_accounts.allowed(current_user,'staff_view')
+    if not residents_allowed and not staff_allowed: raise HTTPException(403,'Account viewing permission is required.')
+    residents=scoped_residents(db.query(models.Resident),current_user) if residents_allowed else None
+    staff=staff_accounts.visible_query(db,current_user) if staff_allowed else None
+    resident_active=residents.filter(models.Resident.is_active==True).count() if residents_allowed else None
+    gov_active=staff.filter(models.Official.is_active==True,models.Official.is_suspended==False).count() if staff_allowed else None
+    return {'resident':{'active':resident_active,'suspended':residents.filter(models.Resident.is_active==False).count() if residents_allowed else None},
+        'government':{'active':gov_active,'suspended':staff.filter(models.Official.is_suspended==True).count() if staff_allowed else None},
+        'total_active':resident_active+gov_active if residents_allowed and staff_allowed else None}
 
 
 @router.get("/users")
@@ -1078,18 +1289,20 @@ def list_all_users(
     List all users with filtering. Admin only.
     Separates residents and government accounts.
     """
-    _assert_role(current_user, *ADMIN_ONLY, "city_engineer", "asst_city_engineer")
+    import staff_accounts
+    from government_access import scoped_residents
+    staff_accounts.require_action(current_user,'residents_view' if account_type=='resident' else 'staff_view')
     
     # Select table based on account_type
     if account_type == "resident":
-        q = db.query(models.Resident)
+        q = scoped_residents(db.query(models.Resident),current_user)
         if status == "active":
             q = q.filter(models.Resident.is_active == True)
         elif status == "suspended":
             # Residents don't have suspended status, filter them out entirely if suspended is requested
             q = q.filter(False)
     else:
-        q = db.query(models.Official)
+        q = staff_accounts.visible_query(db,current_user)
         if status == "active":
             q = q.filter(models.Official.is_active == True, models.Official.is_suspended == False)
         elif status == "suspended":
@@ -1137,6 +1350,8 @@ VALID_ROLES = list(GOV_ROLES) + ["resident", "system_admin"]
 
 class RoleUpdatePayload(BaseModel):
     role: str
+    reason: str = Field(min_length=10,max_length=2000)
+    expected_version: int = Field(ge=0)
 @router.patch("/users/{user_id}/status")
 def update_user_status(
     user_id: int,
@@ -1147,62 +1362,34 @@ def update_user_status(
     """
     Update user status: activate, suspend, deactivate, reactivate.
     """
-    _assert_role(current_user, *ADMIN_ONLY, "city_engineer", "asst_city_engineer")
+    import staff_accounts
+    if not (staff_accounts.allowed(current_user,'staff_manage') or staff_accounts.allowed(current_user,'residents_manage')):
+        raise HTTPException(403,'Account management permission is required.')
     
     user = db.query(models.Official).filter(models.Official.id == user_id).first()
-    if not user:
-        user = db.query(models.Resident).filter(models.Resident.id == user_id).first()
-        
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if type(user) is type(current_user) and user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot modify your own account")
-    
-    action = payload.action.lower()
-    if action in {"suspend", "deactivate"} and not (payload.reason or "").strip():
-        raise HTTPException(status_code=400, detail="A reason is required to restrict an account.")
-    if action == "suspend":
-        if isinstance(user, models.Official):
-            user.is_suspended = True
-            user.suspended_at = func.now()
-            user.suspended_by = current_user.id
-            user.suspension_reason = payload.reason
-        user.is_active = False
-        action_msg = "suspended"
-    elif action == "activate":
-        if isinstance(user, models.Official):
-            user.is_suspended = False
-            user.suspended_at = None
-            user.suspended_by = None
-            user.suspension_reason = None
-        user.is_active = True
-        action_msg = "activated"
-    elif action == "deactivate":
-        user.is_active = False
-        if isinstance(user, models.Official):
-            user.is_suspended = False
-        action_msg = "deactivated"
-    elif action == "reactivate":
-        user.is_active = True
-        if isinstance(user, models.Official):
-            user.is_suspended = False
-            user.suspension_reason = None
-            user.suspended_at = None
-            user.suspended_by = None
-        action_msg = "reactivated"
-    else:
-        raise HTTPException(status_code=400, detail=f"Invalid action: {action}")
-    
-    gov_crud._append_audit(
-        db, trigger_type="user_status_change",
-        action=f"User {user.email} {action_msg}",
-        actor_id=current_user.id, actor_role=current_user.role,
-        details=f"Target type: {type(user).__name__}; target ID: {user.id}; reason: {payload.reason or 'none'}",
-    )
-    db.commit()
-    
-    return {"message": f"User {user.full_name} has been {action_msg}."}
+    if user:
+        staff_accounts.require_action(current_user,'staff_manage')
+        if payload.expected_version is None:
+            raise HTTPException(428,'Refresh the staff record and provide its expected_version.')
+        action=payload.action.lower()
+        if action not in ('activate','reactivate','deactivate','suspend'):
+            raise HTTPException(422,'Choose an account activation or restriction action.')
+        from admin_router import StaffUpdateRequest
+        return staff_accounts.update_staff(db,current_user,user_id,StaffUpdateRequest(
+            is_active=action in ('activate','reactivate'),reason=payload.reason or '',expected_version=payload.expected_version))
+    staff_accounts.require_action(current_user,'residents_manage')
+    import resident_accounts
+    from admin_router import ResidentStatusCommand
+    resident_accounts.target(db,current_user,user_id)
+    if payload.expected_version is None:
+        raise HTTPException(428,'Refresh the resident record and provide its expected_version.')
+    states={'activate':'active','reactivate':'active','suspend':'suspended','deactivate':'deactivated'}
+    if payload.action.lower() not in states:
+        raise HTTPException(422,'Choose an account activation or restriction action.')
+    if len((payload.reason or '').strip())<10:
+        raise HTTPException(422,'Provide a reason of at least 10 characters.')
+    return resident_accounts.set_status(db,current_user,user_id,ResidentStatusCommand(
+        status=states[payload.action.lower()],reason=payload.reason,expected_version=payload.expected_version))
 
 
 @router.patch("/users/{user_id}/role")
@@ -1212,27 +1399,10 @@ def update_user_role(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Update an official's role/position. Admin only."""
-    _assert_role(current_user, *ADMIN_ONLY)
-    
-    user = db.query(models.Official).filter(models.Official.id == user_id).first()
-    if not user:
-        # Residents don't have roles in the same way (they are always 'resident')
-        raise HTTPException(status_code=404, detail="Government official not found")
-        
-    if payload.role not in GOV_ROLES:
-        raise HTTPException(status_code=400, detail="Unknown government role.")
-    old_role = user.role
-    user.role = payload.role
-    gov_crud._append_audit(
-        db, trigger_type="role_change",
-        action=f"Changed {user.email} role from {old_role} to {payload.role}",
-        actor_id=current_user.id, actor_role=current_user.role,
-        details=f"Admin {current_user.email} modified role for {user.email}"
-    )
-    db.commit()
-    
-    return {"message": f"Role for {user.full_name} updated to {payload.role}."}
+    import staff_accounts
+    from admin_router import StaffUpdateRequest
+    return staff_accounts.update_staff(db,current_user,user_id,StaffUpdateRequest(
+        role=payload.role,reason=payload.reason,expected_version=payload.expected_version))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1241,15 +1411,15 @@ def update_user_role(
 
 @router.get("/design-requests", response_model=List[dict])
 def list_design_requests(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=200),
     status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     """List design requests linked to LGU infrastructure projects."""
     _assert_role(current_user, *GOV_ROLES)
-    q = db.query(gov_models.ProjectRequest)
+    q = legacy_operations.project_query(db, current_user)
     
     # Standard 3-part multi-status filter
     if status:
@@ -1263,7 +1433,7 @@ def list_design_requests(
         q = q.filter(
             gov_models.ProjectRequest.status.in_([
                 "design_in_progress", "request_received", "survey_in_progress",
-                "approved_by_city_engineer"
+                "approved_by_city_engineer", "assessment", "planning", "ready_for_work"
             ])
         )
 
@@ -1289,8 +1459,8 @@ def list_design_requests(
 
 @router.get("/analysis", response_model=List[dict])
 def list_structure_analysis(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=200),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -1298,7 +1468,7 @@ def list_structure_analysis(
 ):
     """Returns projects that are in the design or analysis phase with search support."""
     _assert_role(current_user, *GOV_ROLES)
-    q = db.query(gov_models.ProjectRequest)
+    q = legacy_operations.project_query(db, current_user)
     
     if status:
         if "," in status:
@@ -1308,7 +1478,7 @@ def list_structure_analysis(
             q = q.filter(gov_models.ProjectRequest.status == status)
     else:
         q = q.filter(gov_models.ProjectRequest.status.in_([
-            "design_in_progress", "approved_by_city_engineer", "survey_in_progress"
+            "design_in_progress", "approved_by_city_engineer", "survey_in_progress", "assessment", "planning"
         ]))
 
     if search:
@@ -1342,8 +1512,8 @@ def list_structure_analysis(
 
 @router.get("/surveys", response_model=List[dict])
 def list_field_surveys(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=200),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -1358,7 +1528,11 @@ def list_field_surveys(
         filter_statuses = [s.strip() for s in status.split(",")]
 
     # Surveys = work orders in field/survey phase + project requests in survey_in_progress
-    wo_q = db.query(gov_models.WorkOrder)
+    import project_workspace
+    work_access = legacy_operations.work_view(current_user)
+    project_access = project_workspace.allowed(current_user)
+    if not work_access and not project_access: raise HTTPException(403, 'Survey record access is required.')
+    wo_q = legacy_operations.work_query(db, current_user) if work_access else db.query(gov_models.WorkOrder).filter(False)
     if filter_statuses:
         # Filter work orders by statuses that apply to them
         wo_status_options = ["pending", "assigned", "in_progress", "completed"]
@@ -1379,18 +1553,18 @@ def list_field_surveys(
             gov_models.WorkOrder.description.ilike(s)
         ))
 
-    wo_items = wo_q.order_by(gov_models.WorkOrder.created_at.desc()).offset(skip).limit(limit // 2 + 1).all()
+    wo_items = wo_q.order_by(gov_models.WorkOrder.created_at.desc(), gov_models.WorkOrder.id.desc()).limit(skip + limit).all()
 
-    proj_q = db.query(gov_models.ProjectRequest)
+    proj_q = legacy_operations.project_query(db, current_user) if project_access else db.query(gov_models.ProjectRequest).filter(False)
     if filter_statuses:
-        proj_status_options = ["request_received", "survey_in_progress", "survey_complete"]
+        proj_status_options = ["request_received", "survey_in_progress", "survey_complete", "assessment"]
         proj_active_filters = [s for s in filter_statuses if s in proj_status_options]
         if proj_active_filters:
             proj_q = proj_q.filter(gov_models.ProjectRequest.status.in_(proj_active_filters))
         else:
             proj_q = proj_q.filter(gov_models.ProjectRequest.id == -1)
     else:
-        proj_q = proj_q.filter(gov_models.ProjectRequest.status == "survey_in_progress")
+        proj_q = proj_q.filter(gov_models.ProjectRequest.status.in_(["survey_in_progress", "assessment"]))
 
     if search:
         s = f"%{search}%"
@@ -1400,12 +1574,13 @@ def list_field_surveys(
             gov_models.ProjectRequest.description.ilike(s)
         ))
 
-    proj_items = proj_q.order_by(gov_models.ProjectRequest.created_at.desc()).limit(limit // 2 + 1).all()
+    proj_items = proj_q.order_by(gov_models.ProjectRequest.created_at.desc(), gov_models.ProjectRequest.id.desc()).limit(skip + limit).all()
 
     results = []
     for w in wo_items:
         results.append({
             "id": w.id,
+            "record_type": "work_order",
             "wo_number": w.wo_number,
             "title": w.title,
             "status": w.status,
@@ -1416,6 +1591,7 @@ def list_field_surveys(
     for p in proj_items:
         results.append({
             "id": p.id,
+            "record_type": "project",
             "project_number": p.proj_number,
             "title": p.title,
             "status": p.status,
@@ -1423,7 +1599,8 @@ def list_field_surveys(
             "location": p.location_string,
             "created_at": str(p.created_at),
         })
-    return results[:limit]
+    results.sort(key=lambda item: (item['created_at'], item['record_type'], item['id']), reverse=True)
+    return results[skip:skip + limit]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1432,8 +1609,8 @@ def list_field_surveys(
 
 @router.get("/boq", response_model=List[dict])
 def list_boq(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0, le=10000),
+    limit: int = Query(100, ge=1, le=200),
     pr_id: Optional[int] = Query(None),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
@@ -1443,7 +1620,8 @@ def list_boq(
     """List all Bill of Quantities items across procurement requests with multi-status and search support."""
     _assert_role(current_user, *GOV_ROLES)
     
-    q = db.query(gov_models.BoQItem).join(gov_models.ProcurementRequest)
+    visible = legacy_operations.financial_query(db, current_user).with_entities(gov_models.ProcurementRequest.id)
+    q = db.query(gov_models.BoQItem).join(gov_models.ProcurementRequest).filter(gov_models.BoQItem.procurement_request_id.in_(visible))
     
     if pr_id:
         q = q.filter(gov_models.BoQItem.procurement_request_id == pr_id)
@@ -1459,7 +1637,7 @@ def list_boq(
         s = f"%{search}%"
         q = q.filter(gov_models.BoQItem.item_name.ilike(s))
         
-    items = q.offset(skip).limit(limit).all()
+    items = q.order_by(gov_models.BoQItem.id).offset(skip).limit(limit).all()
     result = []
     for item in items:
         pr = item.procurement_request
@@ -1481,8 +1659,8 @@ def list_boq(
 
 @router.get("/estimation", response_model=List[dict])
 def list_cost_estimations(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=200),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -1490,7 +1668,7 @@ def list_cost_estimations(
 ):
     """Cost estimation view aggregating procurement requests with BoQ totals, status filtering, and search."""
     _assert_role(current_user, *GOV_ROLES)
-    q = db.query(gov_models.ProcurementRequest)
+    q = legacy_operations.financial_query(db, current_user)
     
     if status:
         if "," in status:
@@ -1539,7 +1717,8 @@ def list_active_reports(
 ):
     """Active incoming citizen reports matching triage queue."""
     _assert_role(current_user, *DISPATCH_ROLES)
-    q = db.query(models.Report)
+    from government_access import scoped_reports
+    q = scoped_reports(db.query(models.Report),current_user)
     if status and status.strip().lower() != "all":
         if "," in status:
             q = q.filter(models.Report.status.in_([s.strip().lower() for s in status.split(",")]))
@@ -1596,7 +1775,7 @@ def list_reports_archive(
     _assert_role(current_user, *DISPATCH_ROLES)
     
     # Use standardized CRUD
-    items = gov_crud.list_reports_archive(db, skip, limit, status, category, search)
+    items = gov_crud.list_reports_archive(db, skip, limit, status, category, search,user=current_user)
     
     return [
         {
@@ -1638,7 +1817,8 @@ def get_administrative_records(
 ):
     """Finalized administrative records registry."""
     _assert_role(current_user, *GOV_ROLES)
-    return gov_crud.list_all_records(db, skip, limit)
+    from records_workspace import documents_query,document_projection
+    return [document_projection(doc) for doc in documents_query(db,current_user).order_by(gov_models.SystemDocument.uploaded_at.desc()).offset(skip).limit(limit).all()]
 
 @router.get("/document-registry", response_model=List[dict])
 def get_document_archive(
@@ -1649,28 +1829,38 @@ def get_document_archive(
 ):
     """Archived system documents and technical files."""
     _assert_role(current_user, *GOV_ROLES)
-    items = gov_crud.list_system_documents(db, skip, limit)
+    from records_workspace import documents_query,document_projection
+    items = documents_query(db,current_user).order_by(gov_models.SystemDocument.uploaded_at.desc()).offset(skip).limit(limit).all()
     return [
         {
             "id": d.id,
-            "title": d.filename,
-            "description": d.description or f"Type: {d.doc_type}",
+            **document_projection(d),
+            "title": d.file_name,
+            "description": f"Type: {d.document_type}",
             "status": "Archived",
             "barangay": "—",
-            "created_at": str(d.created_at),
-            "file_url": f"/api/files/{d.id}"
+            "created_at": str(d.uploaded_at),
+            "file_url": f"/api/gov/documents/get/{d.id}"
         }
         for d in items
     ]
 # ─────────────────────────────────────────────────────────────────────────────
 
 class AgentLocationUpdate(BaseModel):
-    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
-    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180, allow_inf_nan=False)
     status: str = Field(default="available", pattern="^(offline|available|en_route|on_site|returning)$")
     accuracy: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     battery_level: Optional[int] = Field(default=None, ge=0, le=100)
     location_name: Optional[str] = Field(default=None, max_length=255)
+
+    @model_validator(mode='after')
+    def require_coordinates_when_sharing(self):
+        if self.status != 'offline' and (self.latitude is None or self.longitude is None):
+            raise ValueError('Latitude and longitude are required while sharing a work location.')
+        if self.status == 'offline':
+            self.latitude = self.longitude = self.accuracy = self.battery_level = self.location_name = None
+        return self
 
 
 @router.get("/agents/locations", response_model=List[dict])
@@ -1683,7 +1873,7 @@ def get_all_agent_locations(
     """
     _assert_role(current_user, "dispatcher", "manager", "city_engineer", "asst_city_engineer", 
                  "division_chief", "system_admin", "project_engineer", "construction_foreman")
-    return gov_crud.get_all_agent_locations(db)
+    return list(legacy_operations.location_rows(db, current_user).values())
 
 
 @router.get("/agents/{agent_id}/location")
@@ -1697,7 +1887,7 @@ def get_agent_location(
     """
     _assert_role(current_user, "dispatcher", "manager", "city_engineer", "asst_city_engineer",
                  "division_chief", "system_admin")
-    loc = gov_crud.get_agent_location(db, agent_id)
+    loc = legacy_operations.location_rows(db, current_user).get(agent_id)
     if not loc:
         raise HTTPException(status_code=404, detail="Agent location not found")
     return loc
@@ -1714,6 +1904,10 @@ def update_my_location(
     Agents can only update their own location.
     """
     _assert_role(current_user, *FIELD_ROLES)
+    import staff_accounts
+    staff_accounts.lock_accounts(db, current_user)
+    if not legacy_operations.granted(current_user, 'agents', 'location_share', set(FIELD_ROLES)):
+        raise HTTPException(403, 'Your account cannot share a staff location.')
     loc = gov_crud.update_agent_location(
         db,
         agent_id=current_user.id,
@@ -1739,7 +1933,7 @@ def get_agents_with_work_orders(
     """
     _assert_role(current_user, "dispatcher", "manager", "city_engineer", "asst_city_engineer",
                  "division_chief", "system_admin")
-    return gov_crud.get_agents_with_work_orders(db)
+    return legacy_operations.agent_work(db, current_user)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1757,11 +1951,11 @@ def get_my_work_orders(
     """
     _assert_role(current_user, *FIELD_ROLES)
     from sqlalchemy.orm import joinedload as jl
-    work_orders = db.query(gov_models.WorkOrder).options(
+    work_orders = legacy_operations.work_query(db, current_user).options(
         jl(gov_models.WorkOrder.assigned_by)
     ).filter(
         gov_models.WorkOrder.assigned_to_id == current_user.id,
-        gov_models.WorkOrder.status.in_(["assigned", "in_progress", "open"])
+        gov_models.WorkOrder.status.in_(["assigned", "in_progress", "blocked", "rework_required"])
     ).order_by(gov_models.WorkOrder.created_at.desc()).all()
 
     result = []
@@ -1771,7 +1965,8 @@ def get_my_work_orders(
         loc_lat = None
         loc_lng = None
         if wo.report_id:
-            report = db.query(models.Report).filter(models.Report.id == wo.report_id).first()
+            from government_access import can, scoped_reports
+            report = scoped_reports(db.query(models.Report), current_user).filter(models.Report.id == wo.report_id).first() if can(current_user, 'reports') else None
             if report:
                 loc_string = report.location_string
                 loc_lat = report.location_lat
@@ -1944,6 +2139,8 @@ def approve_report_for_work(
     report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    from government_access import require_report_scope
+    require_report_scope(db, current_user, report)
     receipt = command_integrity.find_receipt(
         db, actor_id=current_user.id, operation="report_approve_for_work",
         report_id=report_id, key=key, digest=digest,
@@ -1971,32 +2168,6 @@ def approve_report_for_work(
     db.commit()
     return result
 
-@router.get("/reports/{report_id}/project-mapping")
-def get_report_project_mapping(
-    report_id: int,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    """
-    Finds the ProjectRequest associated with a citizen report.
-    Used by Dispatchers to check if a project is ready for FQA.
-    """
-    _assert_role(current_user, *DISPATCH_ROLES)
-    report = db.query(models.Report).filter(models.Report.id == report_id).first()
-    if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
-    
-    project = db.query(gov_models.ProjectRequest).filter(
-        gov_models.ProjectRequest.linked_report_id == report_id
-    ).first()
-    
-    return {
-        "report_id": report_id,
-        "report_status": report.status,
-        "project_id": project.id if project else None,
-        "project_status": project.status if project else "No project linked",
-        "title": project.title if project else report.title
-    }
 
 
 @router.post("/projects/{project_id}/issue-certificate")
@@ -2006,9 +2177,8 @@ def issue_fqa_certificate(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Legacy certificate shortcut is closed pending a governed proof review."""
-    _assert_role(current_user, "dispatcher", "manager", "system_admin")
-    raise HTTPException(status_code=409, detail="Project certificate issuance requires governed evidence review")
+    """Legacy alias for recording an external certificate; never issue one automatically."""
+    return issue_certificate(project_id,gov_schemas.CertificateOfCompletionIssue(**payload.model_dump()),db,current_user)
 
 
 @router.post("/reports/{report_id}/approve-with-budget")
@@ -2020,11 +2190,17 @@ def approve_report_with_budget(
 ):
     """Require an approved monetary and emergency decision policy before this shortcut is used."""
     _assert_role(current_user, "dispatcher", "manager", "system_admin")
-    raise HTTPException(status_code=409, detail="Budget approval requires the governed project decision workflow")
+    raise HTTPException(status_code=409, detail="PULSO does not approve budgets. Add sourced public information through an update disclosure.")
+
+class ProjectReferralRequest(BaseModel):
+    reason: str = Field(min_length=10,max_length=2000)
+    expected_updated_at: datetime
+
 
 @router.post("/work-orders/{wo_id}/promote", response_model=gov_schemas.ProjectRequestResponse)
 def promote_wo_to_project_endpoint(
     wo_id: int,
+    payload: Optional[ProjectReferralRequest] = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -2032,10 +2208,18 @@ def promote_wo_to_project_endpoint(
     Escalate a Work Order to a full Infrastructure Project flow.
     Allowed: City Engineer, Dispatcher, Manager.
     """
-    _assert_role(current_user, "city_engineer", "dispatcher", "manager", "system_admin")
+    _assert_role(current_user, *DISPATCH_ROLES)
+    import project_workspace
+    project_workspace.require(current_user,'manage')
+    _require_assigned_or_dispatcher(db,wo_id,current_user)
+    import staff_accounts
+    staff_accounts.lock_accounts(db,current_user)
+    if not payload or len(payload.reason.strip())<10:
+        raise HTTPException(428,'Refresh the work record and provide the referral reason and expected_updated_at.')
     
     proj = gov_crud.promote_work_order_to_project(
-        db, wo_id, actor_id=current_user.id, actor_role=current_user.role
+        db, wo_id, actor_id=current_user.id, actor_role=current_user.role,
+        note=payload.reason.strip(),expected_updated_at=payload.expected_updated_at
     )
     if not proj:
         raise HTTPException(status_code=404, detail="Work order not found")
@@ -2052,8 +2236,8 @@ def get_all_roles(
     current_user=Depends(get_current_user)
 ):
     """List all available government roles."""
-    _assert_role(current_user, *GOV_ROLES)
-    roles_service.assert_permission(db, current_user, "admin", "roles")
+    import staff_accounts
+    staff_accounts.require_action(current_user,'staff_view')
     return roles_service.get_all_roles(db)
 
 @router.get("/roles/templates", response_model=List[gov_schemas.SystemRoleResponse])
@@ -2062,8 +2246,8 @@ def get_role_templates(
     current_user=Depends(get_current_user)
 ):
     """List available role templates for creation."""
-    _assert_role(current_user, *GOV_ROLES)
-    roles_service.assert_permission(db, current_user, "admin", "roles")
+    import staff_accounts
+    staff_accounts.require_action(current_user,'staff_view')
     return roles_service.get_templates(db)
 
 @router.post("/roles", response_model=gov_schemas.SystemRoleResponse)
@@ -2072,25 +2256,18 @@ def create_role(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    """Create a new dynamic role from a template or scratch."""
-    _assert_role(current_user, *GOV_ROLES)
-    roles_service.assert_permission(db, current_user, "admin", "roles")
-    
-    existing = db.query(models.SystemRole).filter(models.SystemRole.name == data.name).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Role name already exists.")
-        
-    new_role = models.SystemRole(
-        name=data.name,
-        label=data.label,
-        capabilities=data.capabilities,
-        access_level=data.access_level,
-        is_template=False
-    )
-    db.add(new_role)
-    db.commit()
-    db.refresh(new_role)
-    return new_role
+    import staff_accounts
+    if '*' not in staff_accounts.admin_grants(current_user):
+        raise HTTPException(403,'System administrator authority is required to define roles.')
+    staff_accounts.lock_accounts(db,current_user)
+    if '*' not in staff_accounts.admin_grants(current_user): raise HTTPException(403,'System administrator authority is required.')
+    if len(data.reason.strip())<10: raise HTTPException(422,'Provide an authority-change reason.')
+    if db.query(models.SystemRole).filter_by(name=data.name).first(): raise HTTPException(409,'Role name already exists.')
+    role=models.SystemRole(name=data.name,label=data.label,capabilities=data.capabilities,access_level=data.access_level,is_template=False)
+    db.add(role);db.flush()
+    staff_accounts.audit(db,current_user,'Staff role defined',{'role_id':role.id,'name':role.name,'capabilities':role.capabilities,'reason':data.reason.strip()})
+    db.commit();db.refresh(role)
+    return role
 
 @router.put("/roles/{role_id}", response_model=gov_schemas.SystemRoleResponse)
 def update_role(
@@ -2099,21 +2276,24 @@ def update_role(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    """Update role capabilities and label."""
-    _assert_role(current_user, *GOV_ROLES)
-    roles_service.assert_permission(db, current_user, "admin", "roles")
-    
-    role = db.query(models.SystemRole).filter(models.SystemRole.id == role_id).first()
-    if not role:
-        raise HTTPException(status_code=404, detail="Role not found.")
-    
-    # Don't allow renaming system protected roles easily through UI if needed
-    role.label = data.label
-    role.capabilities = data.capabilities
-    role.access_level = data.access_level
-    
-    db.commit()
-    db.refresh(role)
+    import staff_accounts
+    if '*' not in staff_accounts.admin_grants(current_user): raise HTTPException(403,'System administrator authority is required to edit roles.')
+    staff_accounts.lock_accounts(db,current_user)
+    if '*' not in staff_accounts.admin_grants(current_user): raise HTTPException(403,'System administrator authority is required.')
+    role=db.query(models.SystemRole).filter_by(id=role_id).with_for_update().first()
+    if not role: raise HTTPException(404,'Role not found.')
+    if current_user.role_id==role.id: raise HTTPException(409,'Ask another system administrator to change your own role definition.')
+    if data.name!=role.name: raise HTTPException(422,'Role identifiers cannot be renamed.')
+    if data.expected_capabilities is None or data.expected_capabilities != role.capabilities:
+        raise HTTPException(409,'Refresh the role definition before saving its expected_capabilities.')
+    if len(data.reason.strip())<10: raise HTTPException(422,'Provide an authority-change reason.')
+    before={'label':role.label,'capabilities':role.capabilities,'access_level':role.access_level}
+    role.label=data.label;role.capabilities=data.capabilities;role.access_level=data.access_level
+    for person in db.query(models.Official).filter_by(role_id=role.id).with_for_update().all():
+        person.access_version+=1
+        staff_accounts.revoke_tokens(db,person)
+    staff_accounts.audit(db,current_user,'Staff role definition updated',{'role_id':role.id,'before':before,'after':{'label':role.label,'capabilities':role.capabilities,'access_level':role.access_level},'reason':data.reason.strip()})
+    db.commit();db.refresh(role)
     return role
 
 
@@ -2128,8 +2308,9 @@ def post_advisory(
     current_user=Depends(get_current_user)
 ):
     """Publish a city-wide advisory or tactical alert."""
-    _assert_role(current_user, *SENIOR_ROLES)
-    return gov_crud.create_advisory(db, data, current_user.id)
+    from government_access import require
+    require(current_user,'announcements','create')
+    raise HTTPException(410,'Create an advisory draft through /api/gov/announcements for review and publication.')
 
 @router.get("/advisories", response_model=List[gov_schemas.AdvisoryResponse])
 def get_advisories(
@@ -2155,11 +2336,9 @@ def delete_advisory(
     current_user=Depends(get_current_user)
 ):
     """Remove an advisory from the system."""
-    _assert_role(current_user, *SENIOR_ROLES)
-    success = gov_crud.delete_advisory(db, advisory_id, current_user.id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Advisory not found")
-    return {"success": True, "message": "Deleted successfully"}
+    from government_access import require
+    require(current_user,'announcements','withdraw')
+    raise HTTPException(410,'Use governed publication withdrawal. Permanent advisory deletion is retired.')
 
 
 # =============================================================================
@@ -2181,7 +2360,8 @@ def list_assets(
 ):
     """List and filter municipal infrastructure assets. All gov staff can access."""
     _assert_role(current_user, *GOV_ROLES)
-    items = gov_crud.list_infrastructure_assets(db, skip, limit, category, barangay, condition_score, search, sort_by, order)
+    from government_access import jurisdiction_ids
+    items = gov_crud.list_infrastructure_assets(db, skip, limit, category, barangay, condition_score, search, sort_by, order, district_ids=jurisdiction_ids(current_user))
     return [gov_crud.enrich_asset_response(a, db) for a in items]
 
 
@@ -2192,7 +2372,16 @@ def get_assets_stats(
 ):
     """Aggregate statistics and condition tier breakdowns across all 5 categories."""
     _assert_role(current_user, *GOV_ROLES)
-    return gov_crud.get_infrastructure_assets_stats(db)
+    from government_access import jurisdiction_ids
+    return gov_crud.get_infrastructure_assets_stats(db,jurisdiction_ids(current_user))
+
+
+@router.get('/asset-workspace')
+def asset_workspace(page: int=Query(1,ge=1), category: Optional[str]=None, condition: Optional[str]=None, search: str=Query('',max_length=160),db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    _assert_role(current_user,*GOV_ROLES)
+    from government_access import jurisdiction_ids
+    rows,total=gov_crud.list_infrastructure_assets(db,skip=(page-1)*15,limit=15,category=category,condition_score=condition,search=search,include_total=True,district_ids=jurisdiction_ids(current_user))
+    return dict(items=[gov_crud.enrich_asset_response(a,db) for a in rows],total=total,page=page)
 
 
 @router.get("/assets/{asset_id}", response_model=gov_schemas.AssetDetailResponse)
@@ -2208,7 +2397,37 @@ def get_asset_detail(
     ).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Infrastructure asset not found")
+    from government_access import require_asset_scope
+    require_asset_scope(db,current_user,asset)
     return gov_crud.enrich_asset_detail(asset, db)
+
+
+@router.get('/asset-permissions')
+def asset_workspace_permissions(db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    _assert_role(current_user, *GOV_ROLES)
+    from government_access import can, jurisdiction_ids
+    ids=jurisdiction_ids(current_user)
+    areas=db.query(models.Barangay)
+    if ids: areas=areas.filter(models.Barangay.district_id.in_(ids))
+    return dict(register=current_user.role in SENIOR_ROLES, assess=current_user.role in INSPECTOR_ROLES,plan=can(current_user,'maintenance'),barangays=[dict(id=area.id,name=area.name) for area in areas.order_by(models.Barangay.name).all()])
+
+
+@router.post('/assets/{asset_id}/inspections', response_model=gov_schemas.AssetResponse)
+def record_asset_condition(asset_id: str, payload: gov_schemas.AssetConditionAssessment, db: Session=Depends(get_db), current_user=Depends(get_current_user)):
+    _assert_role(current_user, *INSPECTOR_ROLES)
+    from government_access import require_asset_scope
+    import json
+    asset=db.query(gov_models.InfrastructureAsset).filter_by(asset_id=asset_id).with_for_update().first()
+    if not asset: raise HTTPException(404,'Infrastructure asset not found.')
+    require_asset_scope(db,current_user,asset)
+    if asset.condition_score != payload.expected_condition_score:
+        raise HTTPException(409,'The recorded condition changed. Reload the asset before assessing it again.')
+    previous=asset.condition_score
+    asset.condition_score=payload.condition_score
+    gov_crud._append_audit(db,trigger_type='asset_condition',action=f'Condition assessment recorded for {asset.asset_id}',actor_id=current_user.id,actor_role=current_user.role,details=json.dumps(dict(asset_id=asset.asset_id,previous_score=previous,condition_score=payload.condition_score,notes=payload.notes)))
+    db.commit()
+    db.refresh(asset)
+    return gov_crud.enrich_asset_response(asset,db)
 
 
 @router.post("/assets", response_model=gov_schemas.AssetResponse)
@@ -2219,6 +2438,9 @@ def create_asset(
 ):
     """Register a new physical infrastructure asset."""
     _assert_role(current_user, *SENIOR_ROLES)
+    from government_access import require_asset_scope
+    from types import SimpleNamespace
+    require_asset_scope(db,current_user,SimpleNamespace(barangay_id=data.barangay_id))
     asset = gov_crud.create_infrastructure_asset(db, data, actor_id=current_user.id, actor_role=current_user.role)
     return gov_crud.enrich_asset_response(asset, db)
 
@@ -2277,6 +2499,7 @@ def verify_work_order_endpoint(
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
 
+    _require_work_order_view(wo,current_user)
     if wo.assigned_to_id is not None and current_user.id == wo.assigned_to_id:
         raise HTTPException(
             status_code=403,
@@ -2305,6 +2528,9 @@ def get_work_order_inspections(
 ):
     """Retrieve independent inspection logs for a work order."""
     _assert_role(current_user, *GOV_ROLES)
+    wo=db.get(gov_models.WorkOrder,wo_id)
+    if not wo: raise HTTPException(404,'Work order not found.')
+    _require_work_order_view(wo,current_user)
     inspections = db.query(gov_models.WorkOrderInspection).filter(
         gov_models.WorkOrderInspection.work_order_id == wo_id
     ).order_by(gov_models.WorkOrderInspection.created_at.desc()).all()
@@ -2346,10 +2572,15 @@ def request_citizen_info(
     - Dispatches resident Notification
     - Appends AuditLog
     """
-    _assert_role(current_user, *DISPATCH_ROLES)
     key = command_integrity.validate_key(idempotency_key)
     expected = command_integrity.parse_version(if_match)
     digest = command_integrity.request_hash(payload.model_dump(mode="json")) if key else None
+    from government_access import require_report_scope
+    report = db.get(models.Report, report_id)
+    if not report: raise HTTPException(404, 'Report not found')
+    require_report_scope(db, current_user, report)
+    import report_review
+    report_review.require_decision(db,current_user,report,'review')
     return gov_crud.request_citizen_information(
         db, report_id, payload,
         actor_id=current_user.id,
@@ -2373,10 +2604,27 @@ def get_report_docket(
     - Linked work orders with inspections and blockers
     - Audit logs
     """
-    _assert_role(current_user, *DISPATCH_ROLES)
+    from government_access import require, require_report_scope
+    require(current_user, 'reports')
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Citizen report not found")
+
+    require_report_scope(db, current_user, report)
+    intake = {'pending', 'unverified', 'needs_information', 'received', 'unvalidated', 'under_review'}
+    from report_review_router import require_report_access
+    import report_review
+    import external_referrals
+    require_report_access(db, current_user, report)
+    actions = []
+    can_review = report_review.permitted(current_user,'review') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id)
+    if can_review and report.status in intake: actions.append('verify')
+    if current_user.role in {'dispatcher', 'manager', 'system_admin', 'admin'}:
+        if report.status in intake | {'pending_approval'}: actions.append('reject')
+    if can_review and report.status in (intake - {'needs_information'}) | {'validated', 'pending_approval'}: actions.append('request_info')
+    if current_user.role in DISPATCH_ROLES:
+        if report.status == 'approved_internal': actions.append('assign')
+    if current_user.role in {'dispatcher', 'asst_city_engineer', 'city_engineer', 'manager', 'system_admin'} and report.status == 'pending_approval': actions.append('approve')
 
     timeline = db.query(gov_models.ProcessTimeline).filter(
         gov_models.ProcessTimeline.report_id == report_id
@@ -2390,9 +2638,27 @@ def get_report_docket(
         gov_models.AuditLog.report_id == report_id
     ).order_by(gov_models.AuditLog.created_at.desc()).all()
 
+    import project_workspace
+    from government_access import scoped
+    projects=[]
+    if project_workspace.allowed(current_user):
+        linked=scoped(db.query(gov_models.ProjectRequest),gov_models.ProjectRequest.district_id,current_user).filter(or_(
+            gov_models.ProjectRequest.source_report_id==report_id,
+            gov_models.ProjectRequest.id.in_([work.project_id for work in work_orders if work.project_id])))
+        projects=[dict(id=project.id,reference=project.proj_number,title=project.title,
+            status=project.status if project.coordination_started_at else 'historical_record',open=project.status not in project_workspace.CLOSED) for project in linked]
     return {
+        "projects": projects,
+        "can_create_project": project_workspace.allowed(current_user,'manage') and bool(report.barangay_id) and report.status not in {'resolved','completed','rejected','cancelled','spam','duplicate'} and not any(project['open'] for project in projects),
+        "allowed_actions": actions,
+        "review_operations": report_review.projection(db, report),
+        "review_history": report_review.history(db, report),
+        "referral_permissions": external_referrals.permissions(current_user, report),
+        "can_assign_review": report_review.permitted(current_user,'assign'),
+        "can_grade_priority": report_review.permitted(current_user,'review') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id),
         "report": {
             "id": report.id,
+            "version": report.version,
             "ticket_id": report.ticket_id,
             "category": report.category,
             "ai_category": report.ai_category,
@@ -2448,12 +2714,166 @@ def get_today_operations(
     current_user=Depends(get_current_user),
 ):
     """
-    Centralized leadership dashboard:
+    Unified My Work & Operations Today inbox:
     - 5 Core Metrics (unassigned, overdue, awaiting_verification, open_high_priority, resolved_period)
-    - Actionable Needs Attention Triage Feed
+    - Role-scoped task buckets (assigned_to_me, needs_my_review, waiting_on_others, recently_completed)
     - Dual-Sector Summary (North & South Caloocan)
     - Team Capacity and Blocker Breakdown
     """
-    _assert_role(current_user, *DISPATCH_ROLES)
-    return gov_crud.get_operations_today_hub(db)
+    _assert_role(current_user, *GOV_ROLES)
+    from operations_workspace import my_work
+    return my_work(db, current_user)
+
+
+@router.get("/service-insights")
+def read_service_insights(
+    days: int = Query(90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    from government_access import require
+    from operations_workspace import service_insights
+    require(current_user, 'insights')
+    return service_insights(db, current_user, days)
+
+
+@router.get('/overview')
+def get_operations_overview(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    from government_access import require
+    from operations_workspace import operations_overview
+    require(current_user, 'overview')
+    return operations_overview(db, current_user)
+
+
+# =============================================================================
+# Sourced Budget Disclosures & Official Procurement References (Section 9)
+# =============================================================================
+
+def _ensure_disclosure_tables(db: Session):
+    from announcements_router import _ensure_announcement_tables
+    _ensure_announcement_tables(db)
+
+
+@router.get("/disclosures", response_model=List[gov_schemas.BudgetDisclosureResponse])
+def list_budget_disclosures(
+    project_id: Optional[int] = Query(None),
+    work_order_id: Optional[int] = Query(None),
+    announcement_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    List sourced budget disclosure records.
+    PULSO collects approved disclosures and links externally to official Caloocan procurement pages;
+    it does not process budgeting, obligations, cash release, or procurement in-app.
+    """
+    _assert_role(current_user, *GOV_ROLES)
+    _ensure_disclosure_tables(db)
+    q = db.query(gov_models.BudgetDisclosure)
+    if project_id is not None:
+        q = q.filter(gov_models.BudgetDisclosure.project_id == project_id)
+    if work_order_id is not None:
+        q = q.filter(gov_models.BudgetDisclosure.work_order_id == work_order_id)
+    if announcement_id is not None:
+        q = q.filter(gov_models.BudgetDisclosure.announcement_id == announcement_id)
+    rows = q.order_by(gov_models.BudgetDisclosure.created_at.desc()).limit(100).all()
+    results = []
+    for r in rows:
+        results.append(gov_schemas.BudgetDisclosureResponse(
+            id=r.id,
+            disclosure_id=r.disclosure_id,
+            announcement_id=r.announcement_id,
+            project_id=r.project_id,
+            work_order_id=r.work_order_id,
+            version=r.version,
+            publication_format=r.publication_format,
+            amount=r.amount,
+            currency=r.currency,
+            amount_type=r.amount_type,
+            source_label=r.source_label,
+            source_url=r.source_url,
+            official_bidding_url=r.official_bidding_url,
+            source_date=r.source_date,
+            fiscal_period=r.fiscal_period,
+            issuing_office=r.issuing_office,
+            scope_caveat=r.scope_caveat,
+            review_state=r.review_state,
+            entered_by_id=r.entered_by_id,
+            entered_by_name=_name(db, r.entered_by_id),
+            reviewed_by_id=r.reviewed_by_id,
+            reviewed_by_name=_name(db, r.reviewed_by_id),
+            reviewed_at=r.reviewed_at,
+            created_at=r.created_at,
+            updated_at=r.updated_at,
+        ))
+    return results
+
+
+@router.post("/disclosures", response_model=gov_schemas.BudgetDisclosureResponse)
+def create_budget_disclosure(
+    payload: gov_schemas.BudgetDisclosureInput,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Record a sourced budget disclosure or external authorization reference for a project or work order.
+    """
+    _assert_role(current_user, *SENIOR_ROLES)
+    _ensure_disclosure_tables(db)
+
+    if payload.amount is not None and not payload.source_label:
+        raise HTTPException(
+            status_code=422,
+            detail="A disclosed budget amount requires an official source label (e.g., BAC Resolution, AIP reference, or Contract ID)."
+        )
+
+    disc = gov_models.BudgetDisclosure(
+        project_id=payload.project_id,
+        work_order_id=payload.work_order_id,
+        publication_format=payload.publication_format or "announcement",
+        amount=payload.amount,
+        currency=payload.currency or "PHP",
+        amount_type=payload.amount_type or ("not_disclosed" if payload.amount is None else "allocated_project_budget"),
+        source_label=payload.source_label,
+        source_url=payload.source_url,
+        official_bidding_url=payload.official_bidding_url or "https://caloocancity.gov.ph/invitation-to-bid/",
+        source_date=payload.source_date,
+        fiscal_period=payload.fiscal_period,
+        issuing_office=payload.issuing_office or "City Engineering Department",
+        scope_caveat=payload.scope_caveat,
+        review_state=payload.review_state or "reviewed",
+        entered_by_id=current_user.id,
+        reviewed_by_id=current_user.id if payload.review_state in ("reviewed", "approved") else None,
+    )
+    db.add(disc)
+    db.commit()
+    db.refresh(disc)
+
+    return gov_schemas.BudgetDisclosureResponse(
+        id=disc.id,
+        disclosure_id=disc.disclosure_id,
+        announcement_id=disc.announcement_id,
+        project_id=disc.project_id,
+        work_order_id=disc.work_order_id,
+        version=disc.version,
+        publication_format=disc.publication_format,
+        amount=disc.amount,
+        currency=disc.currency,
+        amount_type=disc.amount_type,
+        source_label=disc.source_label,
+        source_url=disc.source_url,
+        official_bidding_url=disc.official_bidding_url,
+        source_date=disc.source_date,
+        fiscal_period=disc.fiscal_period,
+        issuing_office=disc.issuing_office,
+        scope_caveat=disc.scope_caveat,
+        review_state=disc.review_state,
+        entered_by_id=disc.entered_by_id,
+        entered_by_name=_name(db, disc.entered_by_id),
+        reviewed_by_id=disc.reviewed_by_id,
+        reviewed_by_name=_name(db, disc.reviewed_by_id),
+        reviewed_at=disc.reviewed_at,
+        created_at=disc.created_at,
+        updated_at=disc.updated_at,
+    )
 

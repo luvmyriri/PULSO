@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import React, { useState } from 'react';
 import { AlertTriangle, Search, Map, PhoneCall, ChevronRight, ArrowRight } from 'lucide-react';
 
@@ -60,8 +61,8 @@ export default function QuickActionsSection({ onOpenTrackModal }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           
           {/* Card 1: Report an Issue (Primary Action) */}
-          <a
-            href="/report"
+          <Link
+            to="/report"
             className="group relative flex flex-col justify-between p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs hover:shadow-sm transition-all text-left min-h-[170px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
           >
             <div>
@@ -86,7 +87,7 @@ export default function QuickActionsSection({ onOpenTrackModal }) {
               <span>Start Report</span>
               <ArrowRight size={16} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
-          </a>
+          </Link>
 
           {/* Card 2: Track My Report */}
           <div

@@ -4,7 +4,7 @@ City Engineering Office, Caloocan City — PULSO System
 """
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, null
 from datetime import datetime, timezone, timedelta, date
 from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
@@ -66,6 +66,9 @@ def _append_timeline(
     )
     db.add(entry)
     db.flush()  # gets an id without full commit
+    if report_id and is_public:
+        from report_notifications import enqueue_report_update
+        enqueue_report_update(db, report_id, entry.id)
     return entry
 
 
@@ -181,7 +184,7 @@ def log_jurisdictional_waiver(db: Session, actor_id: int, assigned_id: int, repo
     )
 
 
-def find_smart_dispatch_suggestions(db: Session, report_id: int, limit: int = 3) -> List[dict]:
+def find_smart_dispatch_suggestions(db: Session, report_id: int, limit: int = 3, allowed_agent_ids=None) -> List[dict]:
     """
     Find the nearest available or returning engineers for a specific report.
     Returns: List of dicts with {agent_id, full_name, distance_km, status}
@@ -190,7 +193,7 @@ def find_smart_dispatch_suggestions(db: Session, report_id: int, limit: int = 3)
     if not report or report.location_lat is None or report.location_lng is None:
         return []
 
-    return nearby_available_agents(db, report.location_lat, report.location_lng, limit=limit)
+    return nearby_available_agents(db, report.location_lat, report.location_lng, limit=limit, allowed_agent_ids=allowed_agent_ids)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Work Orders
@@ -319,24 +322,6 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
     # Trigger notification logic (if applicable, though usually handled by notify_citizen)
     # For now, relying on timeline as the single source of truth for the resident app.
 
-    # Citizen notification
-    ticket = report.ticket_id or f"PUL-{datetime.now().year}-{report.id:04d}"
-    notif_map = {
-        "pending_approval": ("Report Verified", f"Your report {ticket} has been verified and is pending engineering approval."),
-        "approved_internal": ("Report Approved", f"Good news! Your report {ticket} has been approved and is ready for dispatch."),
-        "dispatched": ("Team Dispatched", f"A field team has been dispatched for your report {ticket}. They are on the way."),
-        "in_progress": ("Work In Progress", f"Repair work is actively underway for your report {ticket}."),
-        "resolved": ("Report Resolved", f"Your report {ticket} has been resolved. Thank you for making North Caloocan better!"),
-        "rejected": ("Report Rejected", f"Your report {ticket} could not be verified. Please re-submit with clearer details if this was an error."),
-    }
-    if new_status in notif_map:
-        title, msg = notif_map[new_status]
-        if report.resident_id is not None:
-            db.add(gov_models.OutboxEvent(
-                event_key=f"report-status:{timeline.id}:resident:{report.resident_id}",
-                event_type="resident_in_app_notification",
-                payload={"resident_id": report.resident_id, "title": title, "message": msg},
-            ))
 
 
 def create_work_order(
@@ -472,11 +457,14 @@ def list_work_orders(
     wo_type: Optional[str] = None,
     assigned_to_id: Optional[int] = None,
     search: Optional[str] = None,
+    district_ids: Optional[List[int]] = None,
 ) -> List[gov_models.WorkOrder]:
     q = db.query(gov_models.WorkOrder).options(
         joinedload(gov_models.WorkOrder.assigned_by),
         joinedload(gov_models.WorkOrder.assigned_to)
     )
+    if district_ids:
+        q = q.filter(gov_models.WorkOrder.district_id.in_(district_ids))
     if status:
         if "," in status:
             statuses = [s.strip() for s in status.split(",")]
@@ -533,22 +521,10 @@ def update_work_order_status(
         if new_status in report_status_map:
             _sync_report_status(db, wo.report_id, report_status_map[new_status], actor_id, actor_role)
 
-    # ── Digital Handshake: Advance linked ProjectRequest to Phase 11 (Inspections) ──
-    if wo.project_id and new_status == "completed":
-        # Check if all other work orders for this project are also completed
-        remaining_wos = db.query(gov_models.WorkOrder).filter(
-            gov_models.WorkOrder.project_id == wo.project_id,
-            gov_models.WorkOrder.status != "completed",
-            gov_models.WorkOrder.id != wo_id
-        ).count()
-        
-        if remaining_wos == 0:
-            proj = db.query(gov_models.ProjectRequest).filter(gov_models.ProjectRequest.id == wo.project_id).first()
-            if proj and proj.current_phase == 10: # "in_progress"
-                advance_project_phase(
-                    db, proj.id, "milestone_inspections", actor_id, actor_role,
-                    note="Automated: All linked work orders completed. Transitioning to inspection phase."
-                )
+    # Project coordination retains its own independent evidence review.
+    if wo.project_id and new_status == 'completed':
+        _append_audit(db,trigger_type='project_coordination',action='Linked work completed; project review remains separate',
+            actor_id=actor_id,actor_role=actor_role,work_order_id=wo.id,project_id=wo.project_id)
 
     db.commit()
     db.refresh(wo)
@@ -650,6 +626,10 @@ def enrich_work_order(wo: gov_models.WorkOrder, db: Session) -> gov_models.WorkO
     source_report = db.query(models.Report).filter(models.Report.id == wo.report_id).first() if wo.report_id else None
     wo.location_string = source_report.location_string if source_report else None
     wo.barangay = source_report.location_barangay if source_report else None
+    if not wo.barangay and wo.barangay_ref:
+        wo.barangay = wo.barangay_ref.name
+    if not wo.location_string:
+        wo.location_string = wo.barangay
     
     # Enrich updates
     if getattr(wo, 'updates', None):
@@ -981,8 +961,9 @@ def list_procurement_requests(
     limit: int = 50,
     status: Optional[str] = None,
     search: Optional[str] = None,
+    query=None,
 ) -> List[gov_models.ProcurementRequest]:
-    q = db.query(gov_models.ProcurementRequest).options(
+    q = (query if query is not None else db.query(gov_models.ProcurementRequest)).options(
         joinedload(gov_models.ProcurementRequest.raised_by),
         joinedload(gov_models.ProcurementRequest.validated_by),
         joinedload(gov_models.ProcurementRequest.approved_by),
@@ -1086,7 +1067,8 @@ def enrich_procurement(pr: gov_models.ProcurementRequest, db: Session):
     pr.raised_by_name    = pr.raised_by.full_name if getattr(pr, 'raised_by', None) else None
     pr.validated_by_name = pr.validated_by.full_name if getattr(pr, 'validated_by', None) else None
     pr.approved_by_name  = pr.approved_by.full_name if getattr(pr, 'approved_by', None) else None
-    pr.total_estimated_cost = sum(i.total_cost for i in getattr(pr, 'items', []))
+    items = getattr(pr, 'items', [])
+    pr.total_estimated_cost = sum(i.total_cost for i in items) if items and all(i.total_cost is not None for i in items) else None
     return pr
 
 
@@ -1229,6 +1211,7 @@ def create_project_request(
     actor_id: int,
     actor_role: str,
     source_report_id: Optional[int] = None,
+    commit: bool = True,
 ) -> gov_models.ProjectRequest:
     # Resolve IDs from name/schema
     barangay_id = data.barangay_id
@@ -1250,15 +1233,19 @@ def create_project_request(
         location_lat=data.location_lat,
         location_lng=data.location_lng,
         created_by_id=actor_id,
-        status="request_received",
+        status="intake",
+        coordination_started_at=_now(),
         current_phase=1,
+        estimated_cost=null(),
+        procurement_modality='not_recorded',
+        category=data.category if 'category' in data.model_fields_set else 'engineering_coordination',
         source_report_id=source_report_id,
     )
     db.add(proj)
     db.flush()
 
     _append_timeline(
-        db, status="request_received",
+        db, status="intake",
         actor_id=actor_id, actor_role=actor_role,
         note=f"Project request received from {data.requesting_party}",
         project_id=proj.id, is_public=True,
@@ -1268,8 +1255,9 @@ def create_project_request(
         action=f"Project {proj.proj_number} created",
         actor_id=actor_id, actor_role=actor_role, project_id=proj.id,
     )
-    db.commit()
-    db.refresh(proj)
+    if commit:
+        db.commit()
+        db.refresh(proj)
     return proj
 
 
@@ -1286,6 +1274,7 @@ def list_project_requests(
     status: Optional[str] = None,
     current_phase: Optional[int] = None,
     search: Optional[str] = None,
+    user=None,
 ) -> List[gov_models.ProjectRequest]:
     q = db.query(gov_models.ProjectRequest).options(
         joinedload(gov_models.ProjectRequest.created_by),
@@ -1293,6 +1282,9 @@ def list_project_requests(
         joinedload(gov_models.ProjectRequest.design_lead),
         joinedload(gov_models.ProjectRequest.project_engineer)
     )
+    if user is not None:
+        from government_access import scoped
+        q=scoped(q,gov_models.ProjectRequest.district_id,user)
     if status:
         if ',' in status:
             q = q.filter(gov_models.ProjectRequest.status.in_([s.strip() for s in status.split(',')]))
@@ -1591,10 +1583,14 @@ def list_obo_inspections(
     inspection_type: Optional[str] = None,
     barangay: Optional[str] = None,
     search: Optional[str] = None,
+    user=None,
 ) -> List[gov_models.OBOInspection]:
     q = db.query(gov_models.OBOInspection).options(
         joinedload(gov_models.OBOInspection.assigned_inspector)
     )
+    if user is not None:
+        from government_access import scoped
+        q=scoped(q,gov_models.OBOInspection.district_id,user)
     if status:
         if ',' in status:
             q = q.filter(gov_models.OBOInspection.status.in_([s.strip() for s in status.split(',')]))
@@ -1614,38 +1610,49 @@ def list_obo_inspections(
     return q.order_by(gov_models.OBOInspection.created_at.desc()).offset(skip).limit(limit).all()
 
 
-def update_obo_inspection(
-    db: Session,
-    obo_id: int,
-    data: gov_schemas.OBOInspectionUpdate,
-    actor_id: int,
-    actor_role: str,
-) -> Optional[gov_models.OBOInspection]:
-    obo = db.query(gov_models.OBOInspection).filter(
-        gov_models.OBOInspection.id == obo_id
-    ).first()
+def update_obo_inspection(db, obo_id, data, actor_id, actor_role):
+    obo = db.query(gov_models.OBOInspection).filter(gov_models.OBOInspection.id == obo_id).with_for_update().first()
     if not obo:
         return None
-    update_data = data.dict(exclude_unset=True)
-    previous_status = obo.status
-    for k, v in update_data.items():
-        setattr(obo, k, v)
-
-    if "status" in update_data and update_data["status"] != previous_status:
-        # If issuing clearance, record who cleared it
-        if update_data["status"] in ("permit_issued", "cleared"):
-            obo.cleared_by_id = actor_id
-            
-            # ── Digital Handshake: Resolve source Report if applicable ──
-            if obo.source_report_id:
-                _sync_report_status(db, obo.source_report_id, "resolved", actor_id, actor_role)
-                
-        _append_audit(
-            db, trigger_type="maintenance",
-            action=f"OBO {obo.obo_number} → {update_data['status']}",
-            actor_id=actor_id, actor_role=actor_role,
-        )
-
+    changes = data.model_dump(exclude_unset=True)
+    notes = (changes.pop('notes', None) or '').strip()
+    reference = (changes.pop('decision_reference', None) or '').strip()
+    status = changes.get('status', obo.status)
+    transitions = {
+        'application_received': {'technical_review','inspection_scheduled'},
+        'technical_review': {'inspection_scheduled'},
+        'inspection_scheduled': {'inspection_complete'},
+        'inspection_complete': {'notice_issued','permit_issued','inspection_scheduled'},
+        'notice_issued': {'re_inspection_scheduled'},
+        're_inspection_scheduled': {'inspection_complete'},
+        'permit_issued': {'cleared'}, 'cleared': set(),
+    }
+    if status != obo.status and status not in transitions.get(obo.status, set()):
+        raise HTTPException(409, 'This inspection stage has changed or does not allow that action. Refresh the record.')
+    if 'payment_verified' in changes:
+        raise HTTPException(409, 'Receipt verification requires a recorded official receipt and an authorized payment workflow.')
+    if obo.status in ('permit_issued', 'cleared') and any(key != 'status' for key in changes):
+        raise HTTPException(409, 'This inspection is closed. Record a separate inspection for new findings.')
+    if status in ('inspection_scheduled', 're_inspection_scheduled'):
+        if not changes.get('assigned_inspector_id', obo.assigned_inspector_id) or not changes.get('inspection_date', obo.inspection_date):
+            raise HTTPException(422, 'Choose an inspector and inspection date before scheduling.')
+    if status == 'inspection_complete':
+        if not (changes.get('findings', obo.findings) or '').strip() or changes.get('is_compliant', obo.is_compliant) is None:
+            raise HTTPException(422, 'Record findings and an explicit compliance assessment.')
+    if changes.get('is_compliant') is False and not (changes.get('violation_details', obo.violation_details) or '').strip():
+        raise HTTPException(422, 'Describe the observed compliance concerns.')
+    if status in ('permit_issued', 'notice_issued', 'cleared') and status != obo.status:
+        if len(reference) < 5 or len(notes) < 10:
+            raise HTTPException(422, 'Provide the official decision reference and a reason of at least 10 characters.')
+        if status in ('permit_issued', 'cleared') and (changes.get('is_compliant', obo.is_compliant) is not True or not (changes.get('findings', obo.findings) or '').strip()):
+            raise HTTPException(409, 'Record a completed compliant inspection before recording this decision.')
+        obo.cleared_by_id = actor_id
+    for key, value in changes.items():
+        setattr(obo, key, value)
+    # An OBO decision does not establish that a resident report was resolved.
+    _append_audit(db, trigger_type='maintenance',
+        action=f"OBO {obo.obo_number}: {', '.join(sorted(changes))}. {notes}" + (f" Official reference: {reference}" if reference else ''),
+        actor_id=actor_id, actor_role=actor_role)
     db.commit()
     db.refresh(obo)
     return obo
@@ -1663,14 +1670,16 @@ def update_obo_technical_review(
     actor_id: int,
     actor_role: str,
 ) -> Optional[gov_models.OBOInspection]:
-    obo = db.query(gov_models.OBOInspection).filter(gov_models.OBOInspection.id == obo_id).first()
+    obo = db.query(gov_models.OBOInspection).filter(gov_models.OBOInspection.id == obo_id).with_for_update().first()
     if not obo:
         return None
     
+    if obo.status in ('permit_issued', 'cleared'):
+        raise HTTPException(409, 'This inspection is closed. Register a separate inspection for a new review.')
     setattr(obo, f"{data.department}_review", data.status)
     _append_audit(
         db, trigger_type="maintenance",
-        action=f"OBO {obo.obo_number} {data.department.upper()} Review → {data.status}",
+        action=f"OBO {obo.obo_number} {data.department.upper()} Review → {data.status}. {data.remarks}",
         actor_id=actor_id, actor_role=actor_role,
     )
 
@@ -1968,7 +1977,13 @@ def update_agent_location(
     location_name: str = None,
 ):
     """Update or create agent location."""
-    loc = db.query(gov_models.AgentLocation).filter(gov_models.AgentLocation.agent_id == agent_id).first()
+    locations = db.query(gov_models.AgentLocation).filter(gov_models.AgentLocation.agent_id == agent_id).order_by(gov_models.AgentLocation.updated_at.desc(), gov_models.AgentLocation.id.desc()).with_for_update().all()
+    loc = locations[0] if locations else None
+    # Old data may contain duplicate snapshots. A stop-sharing command must
+    # clear every copy, and an update must not leave a second active position.
+    for previous in locations[1:]:
+        previous.status = 'offline'
+        previous.latitude = previous.longitude = previous.accuracy = previous.battery_level = previous.location_name = None
     if loc:
         loc.latitude = latitude
         loc.longitude = longitude
@@ -1988,6 +2003,12 @@ def update_agent_location(
         )
         db.add(loc)
     db.flush()
+    # The older optional geometry column is not mapped by the ORM. Keep it in
+    # sync as well, so stopping sharing does not retain a second stored point.
+    from sqlalchemy import text
+    has_geometry = db.execute(text("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='agent_locations' AND column_name='location')")).scalar()
+    if has_geometry:
+        db.execute(text("UPDATE agent_locations SET location=CASE WHEN status <> 'offline' AND latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180 THEN ST_SetSRID(ST_MakePoint(longitude,latitude),4326) ELSE NULL END WHERE agent_id=:agent_id"), {'agent_id':agent_id})
     return loc
 
 
@@ -2036,40 +2057,39 @@ def promote_work_order_to_project(
     wo_id: int,
     actor_id: int,
     actor_role: str,
-    note: Optional[str] = None
+    note: Optional[str] = None,
+    expected_updated_at: Optional[datetime] = None,
 ) -> Optional[gov_models.ProjectRequest]:
     """
     Promote a simple Work Order to a full ProjectRequest.
     Often triggered when an assessment shows a 'repair' is actually a full reconstruction.
     """
-    wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
-    if not wo:
-        return None
-    
-    # 1. Create the Project
-    proj_data = gov_schemas.ProjectRequestCreate(
-        title=f"PROMOTED: {wo.title}",
-        description=f"Escalated from Work Order {wo.wo_number}. Original: {wo.description}",
-        requesting_party="Engineering Dept Escalation",
-        barangay=db.query(models.Barangay).filter(models.Barangay.id == wo.barangay_id).first().name if wo.barangay_id else None,
-        location_string="Same as source WO",
-        estimated_cost=wo.estimated_cost or 0
-    )
-    
-    # Using the existing creator to maintain consistency
-    new_proj = create_project_request(db, proj_data, actor_id, actor_role, source_report_id=wo.report_id)
-    new_proj.location_lat = wo.location_lat if hasattr(wo, 'location_lat') else None
-    new_proj.location_lng = wo.location_lng if hasattr(wo, 'location_lng') else None
-    
-    # 2. Link WO to Project
-    wo.project_id = new_proj.id
-    wo.status = "cancelled" # CANCELLED in favor of full project flow
-    
-    _append_timeline(db, status="cancelled", actor_id=actor_id, note=f"Escalated to Project {new_proj.proj_number}", work_order_id=wo.id)
-    _append_audit(db, trigger_type="status_change", action=f"WO {wo.wo_number} Escalated to Project", actor_id=actor_id, work_order_id=wo.id, project_id=new_proj.id)
-    
-    db.commit()
-    db.refresh(new_proj)
+    wo = db.query(gov_models.WorkOrder).filter_by(id=wo_id).populate_existing().with_for_update().first()
+    if not wo: return None
+    if wo.project_id:
+        return db.get(gov_models.ProjectRequest,wo.project_id)
+    if not expected_updated_at or expected_updated_at!=wo.updated_at:
+        raise HTTPException(409,'This work order changed. Refresh it before creating a project referral.')
+    if wo.status in {'completed','cancelled'}:
+        raise HTTPException(409,'Closed work cannot be escalated to a new project.')
+    area=db.get(models.Barangay,wo.barangay_id) if wo.barangay_id else None
+    if not area: raise HTTPException(422,'Record the work order barangay before creating a project.')
+    proj_data=gov_schemas.ProjectRequestCreate(title=wo.title,description=wo.description or f'Coordination for {wo.wo_number}',
+        requesting_party='Engineering work referral',barangay_id=area.id,district_id=area.district_id,barangay=area.name)
+    new_proj=db.query(gov_models.ProjectRequest).filter(gov_models.ProjectRequest.source_report_id==wo.report_id,
+        gov_models.ProjectRequest.district_id==area.district_id,
+        gov_models.ProjectRequest.status.notin_({'completed','resolved','closed_completion_certified','cancelled'})).with_for_update().first() if wo.report_id else None
+    if not new_proj:
+        new_proj=create_project_request(db,proj_data,actor_id,actor_role,source_report_id=wo.report_id,commit=False)
+        new_proj.asset_id=wo.asset_id
+    wo.project_id=new_proj.id
+    import project_workspace
+    project_workspace.event(db,db.get(models.Official,actor_id),new_proj,'Work referral received',note or 'Engineering work requires project coordination.')
+    _append_timeline(db,status=wo.status,previous_status=wo.status,actor_id=actor_id,actor_role=actor_role,
+        note=f'Linked to project coordination {new_proj.proj_number}. Work status retained.',work_order_id=wo.id)
+    _append_audit(db,trigger_type='project_coordination',action='Work linked to project coordination',
+        actor_id=actor_id,actor_role=actor_role,work_order_id=wo.id,project_id=new_proj.id,details=note)
+    db.commit();db.refresh(new_proj)
     return new_proj
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2083,11 +2103,15 @@ def list_reports_archive(
     status: Optional[str] = None,
     category: Optional[str] = None,
     search: Optional[str] = None,
+    user=None,
 ):
     """Returns archived citizen reports (resolved, rejected, closed) with search support."""
     from models import Report
     from sqlalchemy import or_
     q = db.query(Report)
+    if user is not None:
+        from government_access import scoped_reports
+        q=scoped_reports(q,user)
     
     if status:
         if "," in status:
@@ -2212,6 +2236,7 @@ def normalize_asset_category(category_input: str) -> str:
 
 
 def get_condition_tier(score: float) -> str:
+    if score is None: return 'unknown'
     if score >= 80.0: return "good"
     elif score >= 60.0: return "fair"
     elif score >= 40.0: return "poor"
@@ -2219,8 +2244,7 @@ def get_condition_tier(score: float) -> str:
 
 
 def enrich_asset_response(asset: gov_models.InfrastructureAsset, db: Session) -> gov_schemas.AssetResponse:
-    from predictive_engine import calculate_ahs
-    score = asset.condition_score if asset.condition_score is not None else calculate_ahs(db, asset.asset_id)
+    score = asset.condition_score
     tier = get_condition_tier(score)
     
     active_wo_count = db.query(func.count(gov_models.WorkOrder.id)).filter(
@@ -2246,7 +2270,7 @@ def enrich_asset_response(asset: gov_models.InfrastructureAsset, db: Session) ->
         gps_coordinates=asset.gps_coordinates,
         material_type=asset.material_type,
         date_completed=asset.date_completed,
-        design_life=asset.design_life or 20,
+        design_life=asset.design_life,
         original_contractor=asset.original_contractor,
         barangay=barangay_name,
         barangay_id=asset.barangay_id,
@@ -2263,6 +2287,7 @@ def enrich_asset_response(asset: gov_models.InfrastructureAsset, db: Session) ->
 
 def enrich_asset_detail(asset: gov_models.InfrastructureAsset, db: Session) -> gov_schemas.AssetDetailResponse:
     from predictive_engine import calculate_dv
+    import json
     base_resp = enrich_asset_response(asset, db)
     dv = calculate_dv(db, asset.asset_id)
 
@@ -2288,7 +2313,8 @@ def enrich_asset_detail(asset: gov_models.InfrastructureAsset, db: Session) -> g
     ]
 
     wos = db.query(gov_models.WorkOrder).filter(
-        gov_models.WorkOrder.asset_id == asset.asset_id
+        gov_models.WorkOrder.asset_id == asset.asset_id,
+        gov_models.WorkOrder.status.notin_(['completed','resolved','cancelled'])
     ).order_by(gov_models.WorkOrder.created_at.desc()).limit(20).all()
 
     active_wos_data = [
@@ -2317,6 +2343,7 @@ def enrich_asset_detail(asset: gov_models.InfrastructureAsset, db: Session) -> g
 
     return gov_schemas.AssetDetailResponse(
         **base_resp.model_dump(),
+        condition_assessments=[dict(id=entry.id,actor=_name(db,entry.actor_id) or 'Recorded official',created_at=entry.created_at,**json.loads(entry.details)) for entry in db.query(gov_models.AuditLog).filter_by(trigger_type='asset_condition',action=f'Condition assessment recorded for {asset.asset_id}').order_by(gov_models.AuditLog.created_at.desc(),gov_models.AuditLog.id.desc()).all()],
         deterioration_velocity=dv,
         flood_risk_level=env.flood_risk_level if env else "Low",
         soil_subsidence=env.soil_subsidence if env else 0.0,
@@ -2358,11 +2385,11 @@ def create_infrastructure_asset(
         gps_coordinates=data.gps_coordinates,
         material_type=data.material_type,
         date_completed=data.date_completed,
-        design_life=data.design_life,
+        design_life=data.design_life if data.design_life is not None else null(),
         original_contractor=data.original_contractor,
         barangay=barangay_name,
         barangay_id=data.barangay_id,
-        condition_score=data.condition_score or 100.0,
+        condition_score=data.condition_score if data.condition_score is not None else null(),
         status=data.status or "operational",
     )
     db.add(asset)
@@ -2391,10 +2418,14 @@ def list_infrastructure_assets(
     search: Optional[str] = None,
     sort_by: Optional[str] = "asset_id",
     order: Optional[str] = "asc",
+    include_total: bool = False,
+    district_ids=None,
 ) -> List[gov_models.InfrastructureAsset]:
     q = db.query(gov_models.InfrastructureAsset).options(
         joinedload(gov_models.InfrastructureAsset.barangay_ref)
     )
+    if district_ids:
+        q=q.filter(gov_models.InfrastructureAsset.barangay_id.in_(db.query(models.Barangay.id).filter(models.Barangay.district_id.in_(district_ids))))
 
     if category:
         cat_norm = normalize_asset_category(category)
@@ -2414,7 +2445,9 @@ def list_infrastructure_assets(
 
     if condition_score:
         cs = condition_score.strip().lower()
-        if cs == "critical":
+        if cs == 'unknown':
+            q=q.filter(gov_models.InfrastructureAsset.condition_score.is_(None))
+        elif cs == "critical":
             q = q.filter(gov_models.InfrastructureAsset.condition_score < 40.0)
         elif cs == "poor":
             q = q.filter(gov_models.InfrastructureAsset.condition_score >= 40.0,
@@ -2438,6 +2471,7 @@ def list_infrastructure_assets(
             gov_models.InfrastructureAsset.asset_name.ilike(s),
             gov_models.InfrastructureAsset.material_type.ilike(s),
             gov_models.InfrastructureAsset.original_contractor.ilike(s)
+            ,gov_models.InfrastructureAsset.barangay.ilike(s)
         ))
 
     sort_col = getattr(gov_models.InfrastructureAsset, sort_by, gov_models.InfrastructureAsset.asset_id)
@@ -2446,12 +2480,16 @@ def list_infrastructure_assets(
     else:
         q = q.order_by(sort_col.asc())
 
-    return q.offset(skip).limit(limit).all()
+    total=q.count() if include_total else None
+    rows=q.offset(skip).limit(limit).all()
+    return (rows,total) if include_total else rows
 
 
-def get_infrastructure_assets_stats(db: Session) -> gov_schemas.AssetStatsResponse:
-    from predictive_engine import calculate_ahs
-    all_assets = db.query(gov_models.InfrastructureAsset).all()
+def get_infrastructure_assets_stats(db: Session, district_ids=None) -> gov_schemas.AssetStatsResponse:
+    query=db.query(gov_models.InfrastructureAsset)
+    if district_ids:
+        query=query.filter(gov_models.InfrastructureAsset.barangay_id.in_(db.query(models.Barangay.id).filter(models.Barangay.district_id.in_(district_ids))))
+    all_assets=query.all()
 
     standard_categories = ["Roads", "Drainage", "Bridges", "Public Buildings", "Facilities"]
     category_data = {
@@ -2459,7 +2497,7 @@ def get_infrastructure_assets_stats(db: Session) -> gov_schemas.AssetStatsRespon
             "category_name": cat,
             "total_count": 0,
             "scores": [],
-            "condition_breakdown": {"good": 0, "fair": 0, "poor": 0, "critical": 0},
+            "condition_breakdown": {"good": 0, "fair": 0, "poor": 0, "critical": 0, "unknown": 0},
             "active_work_orders": 0,
         }
         for cat in standard_categories
@@ -2484,12 +2522,10 @@ def get_infrastructure_assets_stats(db: Session) -> gov_schemas.AssetStatsRespon
             cat = "Facilities"
 
         score = asset.condition_score
-        if score is None:
-            score = calculate_ahs(db, asset.asset_id)
-
-        all_scores.append(score)
         category_data[cat]["total_count"] += 1
-        category_data[cat]["scores"].append(score)
+        if score is not None:
+            all_scores.append(score)
+            category_data[cat]["scores"].append(score)
 
         tier = get_condition_tier(score)
         category_data[cat]["condition_breakdown"][tier] += 1
@@ -2500,7 +2536,7 @@ def get_infrastructure_assets_stats(db: Session) -> gov_schemas.AssetStatsRespon
 
     cat_stats_dict = {}
     for cat_name, val in category_data.items():
-        avg_score = round(sum(val["scores"]) / max(len(val["scores"]), 1), 1)
+        avg_score = round(sum(val["scores"]) / len(val["scores"]), 1) if val['scores'] else None
         cat_stats_dict[cat_name] = gov_schemas.CategoryStats(
             category_name=cat_name,
             total_count=val["total_count"],
@@ -2509,8 +2545,8 @@ def get_infrastructure_assets_stats(db: Session) -> gov_schemas.AssetStatsRespon
             active_work_orders=val["active_work_orders"],
         )
 
-    overall_avg = round(sum(all_scores) / max(len(all_scores), 1), 1) if all_scores else 100.0
-    total_active_wos = sum(active_wo_counts.values())
+    overall_avg = round(sum(all_scores) / len(all_scores), 1) if all_scores else None
+    total_active_wos = sum(active_wo_counts.get(a.asset_id,0) for a in all_assets)
 
     return gov_schemas.AssetStatsResponse(
         total_assets=len(all_assets),
@@ -2709,8 +2745,20 @@ def verify_work_order_inspection(
                 gov_models.WorkOrder.id != wo.id,
                 gov_models.WorkOrder.status.notin_(("completed", "cancelled", "rejected")),
             ).count()
-            if remaining == 0:
+            project_pending=bool(db.query(gov_models.ProjectRequest.id).filter(
+                or_(gov_models.ProjectRequest.id==wo.project_id,gov_models.ProjectRequest.source_report_id==wo.report_id),
+                gov_models.ProjectRequest.status.notin_({'completed','closed_completion_certified','resolved','cancelled'})).first())
+            from referral_models import ExternalReferral
+            referral_pending = bool(db.query(ExternalReferral.id).filter(ExternalReferral.report_id == wo.report_id,
+                ExternalReferral.status.notin_({'coordinated_closed', 'superseded', 'cancelled'})).first())
+            if remaining == 0 and not project_pending and not referral_pending:
                 _sync_report_status(db, wo.report_id, "resolved", inspector_id, inspector_role)
+            elif project_pending:
+                report=db.get(models.Report,wo.report_id)
+                if report:
+                    _append_timeline(db,status=report.status,previous_status=report.status,report_id=report.id,
+                        actor_id=inspector_id,actor_role=inspector_role,is_public=True,
+                        note='Linked field work was verified. The related engineering project still requires follow-up.')
     else:
         wo.status = "rework_required"
         timeline_note = f"Independent inspection FAILED: Rework required. Notes: {data.notes or 'None'}"
@@ -2820,19 +2868,8 @@ def request_citizen_information(
         report_id=report.id,
     )
 
-    # 2. Resident Notification Dispatch
+    # The public timeline queues one durable private notice above.
     ticket = report.ticket_id or f"PUL-{report.id}"
-    notif_msg = f"City Engineering requested more information for report {ticket}: {message}"
-    if report.resident_id:
-        notif = models.Notification(
-            resident_id=report.resident_id,
-            title="Information Needed on Your Report",
-            message=notif_msg,
-            priority=10
-        )
-        db.add(notif)
-    elif report.contact_email:
-        notification_service.log_notification("guest_email", report.contact_email, notif_msg, "request_info")
 
     # 3. Audit Log Entry
     _append_audit(
@@ -2884,232 +2921,8 @@ def format_time_diff(dt, now_utc):
         return f"{total_seconds // 86400}d ago"
 
 
-def get_operations_today_hub(db: Session) -> gov_schemas.GovOperationsTodayResponse:
-    now_utc = datetime.now(timezone.utc)
-    seven_days_ago = now_utc - timedelta(days=7)
-
-    # 1. Leadership Metrics
-    assigned_rows = db.query(gov_models.WorkOrder.report_id).filter(
-        gov_models.WorkOrder.report_id.isnot(None),
-        gov_models.WorkOrder.assigned_to_id.isnot(None)
-    ).all()
-    assigned_report_ids = [r[0] for r in assigned_rows if r[0] is not None]
-
-    unassigned_query = db.query(func.count(models.Report.id)).filter(
-        models.Report.status.in_(["received", "pending", "under_review", "validated"])
-    )
-    if assigned_report_ids:
-        unassigned_query = unassigned_query.filter(models.Report.id.notin_(assigned_report_ids))
-    unassigned_count = unassigned_query.scalar() or 0
-
-    overdue_count = db.query(func.count(gov_models.WorkOrder.id)).filter(
-        gov_models.WorkOrder.status.notin_(["completed", "cancelled"]),
-        gov_models.WorkOrder.scheduled_date.isnot(None),
-        gov_models.WorkOrder.scheduled_date < now_utc
-    ).scalar() or 0
-
-    awaiting_count = db.query(func.count(gov_models.WorkOrder.id)).filter(
-        gov_models.WorkOrder.status == "awaiting_verification"
-    ).scalar() or 0
-
-    open_reports_hp = db.query(func.count(models.Report.id)).filter(
-        models.Report.status.notin_(["resolved", "cancelled", "rejected"]),
-        or_(models.Report.ai_urgency.in_(["critical", "high"]), models.Report.severity_score >= 7.0)
-    ).scalar() or 0
-    open_wo_hp = db.query(func.count(gov_models.WorkOrder.id)).filter(
-        gov_models.WorkOrder.status.notin_(["completed", "cancelled"]),
-        gov_models.WorkOrder.priority.in_(["critical", "high"])
-    ).scalar() or 0
-    open_hp = open_reports_hp + open_wo_hp
-
-    resolved_7d = db.query(func.count(models.Report.id)).filter(
-        models.Report.status == "resolved",
-        models.Report.updated_at >= seven_days_ago
-    ).scalar() or 0
-
-    metrics = gov_schemas.OperationsLeadershipMetrics(
-        unassigned_concerns=unassigned_count,
-        overdue_actions=overdue_count,
-        awaiting_verification=awaiting_count,
-        open_high_priority=open_hp,
-        resolved_in_period=resolved_7d,
-    )
-
-    # 2. Triage items
-    triage_items: List[gov_schemas.OperationsTriageItem] = []
-
-    urgent_reports = db.query(models.Report).filter(
-        models.Report.status.in_(["received", "pending", "under_review", "validated"]),
-        or_(models.Report.ai_urgency == "critical", models.Report.severity_score >= 8.5)
-    ).order_by(models.Report.created_at.asc()).limit(5).all()
-
-    for r in urgent_reports:
-        time_ago = format_time_diff(r.created_at, now_utc)
-        triage_items.append(gov_schemas.OperationsTriageItem(
-            id=r.id,
-            entity_type="report",
-            ticket_id=r.ticket_id or f"PUL-{r.id}",
-            title=r.description[:50] if r.description else "Critical Citizen Report",
-            category=r.category or "Civic Concern",
-            priority="critical",
-            status=r.status,
-            barangay=r.location_barangay,
-            time_in_state=time_ago,
-            action_url=f"/gov/reports/{r.id}",
-            recommended_action="Dispatch Emergency Work Order",
-        ))
-
-    blocked_wos = db.query(gov_models.WorkOrder).filter(
-        gov_models.WorkOrder.status == "blocked"
-    ).order_by(gov_models.WorkOrder.updated_at.desc()).limit(5).all()
-
-    for wo in blocked_wos:
-        time_ago = format_time_diff(wo.updated_at or wo.created_at, now_utc)
-        triage_items.append(gov_schemas.OperationsTriageItem(
-            id=wo.id,
-            entity_type="work_order",
-            ticket_id=wo.wo_number,
-            title=wo.title,
-            category=wo.category or "Field Repair",
-            priority=wo.priority or "normal",
-            status="blocked",
-            barangay=f"District {wo.district_id}" if wo.district_id else None,
-            time_in_state=time_ago,
-            action_url=f"/gov/work/{wo.id}",
-            recommended_action="Resolve Site Blocker",
-        ))
-
-    verify_wos = db.query(gov_models.WorkOrder).filter(
-        gov_models.WorkOrder.status == "awaiting_verification"
-    ).order_by(gov_models.WorkOrder.updated_at.asc()).limit(5).all()
-
-    for wo in verify_wos:
-        time_ago = format_time_diff(wo.updated_at or wo.created_at, now_utc)
-        triage_items.append(gov_schemas.OperationsTriageItem(
-            id=wo.id,
-            entity_type="work_order",
-            ticket_id=wo.wo_number,
-            title=wo.title,
-            category=wo.category or "Field Repair",
-            priority=wo.priority or "normal",
-            status="awaiting_verification",
-            barangay=f"District {wo.district_id}" if wo.district_id else None,
-            time_in_state=time_ago,
-            action_url=f"/gov/work/{wo.id}",
-            recommended_action="Dispatch Independent Inspector",
-        ))
-
-    # 3. Sector summary
-    all_active_reports = db.query(models.Report).filter(
-        models.Report.status.notin_(["resolved", "cancelled", "rejected"])
-    ).all()
-
-    def _is_report_north(rep) -> bool:
-        if rep.barangay_id:
-            b = db.query(models.Barangay).filter(models.Barangay.id == rep.barangay_id).first()
-            if b and b.district_id in (2, 3):
-                return True
-        if rep.location_lat and rep.location_lat >= 14.69:
-            return True
-        if rep.location_barangay:
-            digits = "".join(filter(str.isdigit, str(rep.location_barangay)))
-            if digits and int(digits) >= 165:
-                return True
-        return False
-
-    north_open, south_open = 0, 0
-    north_crit, south_crit = 0, 0
-    for r in all_active_reports:
-        is_north = _is_report_north(r)
-        is_crit = (r.ai_urgency == "critical" or (r.severity_score is not None and r.severity_score >= 8.5))
-        if is_north:
-            north_open += 1
-            if is_crit: north_crit += 1
-        else:
-            south_open += 1
-            if is_crit: south_crit += 1
-
-    all_resolved_7d = db.query(models.Report).filter(
-        models.Report.status == "resolved",
-        models.Report.updated_at >= seven_days_ago
-    ).all()
-    north_res, south_res = 0, 0
-    for r in all_resolved_7d:
-        if _is_report_north(r):
-            north_res += 1
-        else:
-            south_res += 1
-
-    all_active_wos = db.query(gov_models.WorkOrder).filter(
-        gov_models.WorkOrder.status.notin_(["completed", "cancelled"])
-    ).all()
-    north_wo, south_wo = 0, 0
-    for w in all_active_wos:
-        if w.district_id in (2, 3):
-            north_wo += 1
-        else:
-            south_wo += 1
-
-    sector_summary = gov_schemas.SectorSummary(
-        north_caloocan=gov_schemas.SectorMetric(
-            open_tickets=north_open,
-            critical_count=north_crit,
-            resolved_7d=north_res,
-            active_work_orders=north_wo,
-        ),
-        south_caloocan=gov_schemas.SectorMetric(
-            open_tickets=south_open,
-            critical_count=south_crit,
-            resolved_7d=south_res,
-            active_work_orders=south_wo,
-        )
-    )
-
-    # 4. Team capacity
-    taskforces = [
-        {"team_id": "roads_div", "team_name": "Road & Pavement Taskforce", "category": "Road", "base_capacity": 10},
-        {"team_id": "drainage_div", "team_name": "North Drainage Maintenance Unit", "category": "Drainage", "base_capacity": 8},
-        {"team_id": "lights_div", "team_name": "Streetlight & Electrical Section", "category": "Light", "base_capacity": 8},
-        {"team_id": "bldg_div", "team_name": "Public Buildings & Structures", "category": "Building", "base_capacity": 6},
-        {"team_id": "bridges_div", "team_name": "Bridge & Overpass Engineering", "category": "Bridge", "base_capacity": 4},
-    ]
-
-    team_capacity_list = []
-    for tf in taskforces:
-        cat_filter = tf["category"]
-        active_cnt = db.query(func.count(gov_models.WorkOrder.id)).filter(
-            gov_models.WorkOrder.category.ilike(f"%{cat_filter}%"),
-            gov_models.WorkOrder.status.in_(["assigned", "in_progress", "awaiting_verification"])
-        ).scalar() or 0
-
-        blocked_cnt = db.query(func.count(gov_models.WorkOrder.id)).filter(
-            gov_models.WorkOrder.category.ilike(f"%{cat_filter}%"),
-            gov_models.WorkOrder.status == "blocked"
-        ).scalar() or 0
-
-        personnel_cnt = db.query(func.count(models.Official.id)).filter(
-            models.Official.is_active == True,
-            models.Official.account_type == "staff"
-        ).scalar() or 5
-
-        cap_max = tf["base_capacity"]
-        cap_pct = round(min((active_cnt / max(cap_max, 1)) * 100.0, 100.0), 1)
-
-        team_capacity_list.append(gov_schemas.TeamCapacityItem(
-            team_id=tf["team_id"],
-            team_name=tf["team_name"],
-            category=tf["category"],
-            active_orders=active_cnt,
-            blocked_orders=blocked_cnt,
-            personnel_count=personnel_cnt,
-            capacity_pct=cap_pct,
-        ))
-
-    return gov_schemas.GovOperationsTodayResponse(
-        timestamp=now_utc,
-        metrics=metrics,
-        needs_attention=triage_items,
-        sector_summary=sector_summary,
-        team_capacity=team_capacity_list,
-    )
-
+def get_operations_today_hub(db: Session, current_user: Optional[models.Official] = None):
+    from operations_workspace import my_work
+    if current_user is None:
+        raise HTTPException(403, "A staff session is required for the personal inbox.")
+    return my_work(db, current_user)

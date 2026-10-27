@@ -1,496 +1,177 @@
-/**
- * GovBiDashboard.jsx
- * ─────────────────────────────────────────────────────────────────────────────
- * Executive Business Intelligence Graph Dashboard
- * City Engineering Office, Caloocan City
- * Civic Aperture Design Language
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
-import React, { useState, useEffect, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-    Activity, TrendingUp, TrendingDown, Layers, MapPin,
-    ArrowUpRight, BarChart3, ChevronDown, ChevronUp,
-    RefreshCw, ShieldAlert, CheckCircle2, Clock, Brain, ExternalLink
-} from 'lucide-react';
-import { API_BASE_URL } from '../utils/apiBase';
+import { ArrowUpRight, AlertTriangle } from 'lucide-react';
 import './gov-bi-dashboard.css';
+import { GovAssistantSlot } from './government/GovAssistantHost';
 
-// ── Time Horizon Trajectories (Simulated Telemetry for Smooth Graphs) ───────────
-const TRAJECTORY_DATA = {
-    '7D': [
-        { label: 'Day 1', incoming: 14, resolved: 11, sla: 78.5 },
-        { label: 'Day 2', incoming: 19, resolved: 16, sla: 84.2 },
-        { label: 'Day 3', incoming: 12, resolved: 13, sla: 88.0 },
-        { label: 'Day 4', incoming: 22, resolved: 18, sla: 81.8 },
-        { label: 'Day 5', incoming: 16, resolved: 15, sla: 87.5 },
-        { label: 'Day 6', incoming: 10, resolved: 12, sla: 92.0 },
-        { label: 'Today', incoming: 15, resolved: 14, sla: 86.7 },
-    ],
-    '30D': [
-        { label: 'Wk 1', incoming: 92, resolved: 76, sla: 82.6 },
-        { label: 'Wk 2', incoming: 114, resolved: 98, sla: 85.9 },
-        { label: 'Wk 3', incoming: 105, resolved: 94, sla: 89.5 },
-        { label: 'Wk 4', incoming: 88, resolved: 81, sla: 92.0 },
-    ],
-    '90D': [
-        { label: 'Month 1', incoming: 380, resolved: 312, sla: 82.1 },
-        { label: 'Month 2', incoming: 445, resolved: 391, sla: 87.8 },
-        { label: 'Month 3', incoming: 410, resolved: 375, sla: 91.4 },
-    ],
-    'YTD': [
-        { label: 'Q1 2026', incoming: 1180, resolved: 994, sla: 84.2 },
-        { label: 'Q2 (P)', incoming: 1320, resolved: 1180, sla: 89.3 },
-    ],
+const count = value => new Intl.NumberFormat('en-PH').format(value || 0);
+const dateLabel = value => {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 };
+const PRIORITIES = [['P5', 'P5 · Critical'], ['P4', 'P4 · Urgent'], ['P3', 'P3'], ['P2', 'P2'], ['P1', 'P1'], ['P0', 'P0'], ['unassessed', 'Not assessed']];
 
-const SECTOR_METRICS = [
-    { key: 'drainage', name: 'Water & Drainage Network', count: 48, pct: 38, color: '#0284c7', sub: '38 flood/culvert points active' },
-    { key: 'roads', name: 'Roads, Bridges & Pavements', count: 34, pct: 27, color: '#f59e0b', sub: '27 pothole/overlay segments' },
-    { key: 'lighting', name: 'Public Lighting & Electrical', count: 22, pct: 18, color: '#eab308', sub: '18 pole repairs scheduled' },
-    { key: 'safety', name: 'Public Safety & Structural', count: 12, pct: 10, color: '#ef4444', sub: '10 structural risk tickets' },
-    { key: 'facilities', name: 'City Facilities & Parks', count: 9, pct: 7, color: '#10b981', sub: '7 municipal maintenance tasks' },
-];
+function DataTable({ label, columns, rows, note }) {
+    return <details className="gov-bi-data-table"><summary>View {label} values</summary>
+        {note && <p className="gov-bi-demand__note">{note}</p>}
+        <div role="region" aria-label={`${label} values`} tabIndex={0}>
+            <table><caption className="sr-only">{label} values</caption><thead><tr>{columns.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead>
+                <tbody>{rows.map((row, index) => <tr key={`${row[0]}-${index}`}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>)}</tbody></table>
+        </div>
+    </details>;
+}
 
-const DEFAULT_TOP_BARANGAYS = [
-    { rank: '01', name: 'Brgy. 176 (Bagong Silang)', score: 92, count: 38, threat: 'CRITICAL', color: '#ef4444' },
-    { rank: '02', name: 'Brgy. 171 (Bagumbong)', score: 74, count: 26, threat: 'HIGH', color: '#f97316' },
-    { rank: '03', name: 'Brgy. 178 (Camarin)', score: 68, count: 21, threat: 'HIGH', color: '#f97316' },
-    { rank: '04', name: 'Brgy. 165 (Bagbaguin)', score: 51, count: 15, threat: 'EMERGING', color: '#eab308' },
-    { rank: '05', name: 'Brgy. 167 (Llano)', score: 42, count: 11, threat: 'MONITORING', color: '#10b981' },
-];
+function KpiCard({ title, value, detail, url, action, segments, total, children }) {
+    return <section className="gov-bi-surface gov-bi-kpi" aria-label={title}>
+        <header className="gov-bi-kpi__head"><h2>{title}</h2><Link to={url} aria-label={action} title={action}><ArrowUpRight size={16} aria-hidden="true"/></Link></header>
+        <div className="gov-bi-kpi__value"><strong>{count(value)}</strong><span>{detail}</span></div>
+        <div className="gov-bi-kpi__meter" role="img" aria-label={segments.map(segment => `${segment.label}: ${count(segment.value)}`).join('; ')}>
+            {segments.map(segment => <span key={segment.label} className={`gov-bi-kpi__segment gov-bi-kpi__segment--${segment.kind}`} style={{ width: `${total ? segment.value / total * 100 : 0}%` }}/>) }
+        </div>
+        <div className="gov-bi-kpi__breakdown">{children}</div>
+    </section>;
+}
 
-const CAPITAL_MILESTONES = [
-    { stage: 'Phase 1: BoQ Design', desc: 'Engineering plan & estimates', count: '4 Active', pct: 85, color: '#0284c7' },
-    { stage: 'Phase 2: Procurement (BAC)', desc: 'RA 9184 compliance bidding', count: '2 Pending', pct: 50, color: '#f59e0b' },
-    { stage: 'Phase 3: Crew Execution', desc: 'Field repair & construction', count: '7 In-Progress', pct: 65, color: '#10b981' },
-    { stage: 'Phase 4: COA Sign-off', desc: 'Final turnover & audit log', count: '3 Ready', pct: 90, color: '#6366f1' },
-];
+function KpiSummary({ data }) {
+    const relation = data.relationships;
+    const open = relation.open_reports;
+    const work = relation.current_work_orders;
+    const needsReview = data.totals.unreviewed_reports;
+    const otherWork = Math.max(0, work - relation.blocked_orders - relation.awaiting_verification);
+    return <div className="gov-bi-kpis" aria-label="Operational key indicators">
+        <KpiCard title="Open reports" value={open} detail="Current report workload" url="/gov/reports?overview=open" action="Open all open reports" total={open} segments={[
+            { label: 'With current work', value: relation.reports_with_current_work, kind: 'active' },
+            { label: 'Without current work', value: relation.reports_without_current_work, kind: 'neutral' },
+        ]}>
+            <Link to="/gov/reports?overview=with_work"><i className="gov-bi-kpi__key gov-bi-kpi__key--active" aria-hidden="true"/>{count(relation.reports_with_current_work)} with work</Link>
+            <Link to="/gov/reports?overview=without_work"><i className="gov-bi-kpi__key gov-bi-kpi__key--neutral" aria-hidden="true"/>{count(relation.reports_without_current_work)} without</Link>
+        </KpiCard>
+        <KpiCard title="Current work orders" value={work} detail="Across permitted records" url="/gov/work-orders?tab=current" action="Open current work orders" total={work} segments={[
+            { label: 'Blocked', value: relation.blocked_orders, kind: 'warning' },
+            { label: 'For verification', value: relation.awaiting_verification, kind: 'active' },
+            { label: 'Other current work', value: otherWork, kind: 'neutral' },
+        ]}>
+            <Link to="/gov/work-orders?tab=blocked"><i className="gov-bi-kpi__key gov-bi-kpi__key--warning" aria-hidden="true"/>{count(relation.blocked_orders)} blocked</Link>
+            <Link to="/gov/work-orders?tab=completed_pending_review"><i className="gov-bi-kpi__key gov-bi-kpi__key--active" aria-hidden="true"/>{count(relation.awaiting_verification)} for verification</Link>
+            <span><i className="gov-bi-kpi__key gov-bi-kpi__key--neutral" aria-hidden="true"/>{count(otherWork)} other</span>
+        </KpiCard>
+        <KpiCard title="Needs triage or owner" value={needsReview} detail="Of currently open reports" url="/gov/reports?overview=triage" action="Open reports needing triage or an owner" total={open} segments={[
+            { label: 'Needs triage or owner', value: needsReview, kind: 'active' },
+            { label: 'Other open reports', value: Math.max(0, open - needsReview), kind: 'neutral' },
+        ]}>
+            <span><i className="gov-bi-kpi__key gov-bi-kpi__key--active" aria-hidden="true"/>{count(needsReview)} of {count(open)} open</span>
+            <Link to="/gov/reports?overview=triage">Open queue <ArrowUpRight size={13} aria-hidden="true"/></Link>
+        </KpiCard>
+    </div>;
+}
 
-export default function GovBiDashboard({ token, currentUser }) {
-    const [timeHorizon, setTimeHorizon] = useState('7D');
-    const [expanded, setExpanded] = useState(true);
-    const [hoveredPoint, setHoveredPoint] = useState(null);
-    const [analytics, setAnalytics] = useState(null);
-    const [loading, setLoading] = useState(false);
+function AttentionPanel({ data }) {
+    const items = [
+        { label: 'Needs triage or owner', count: data.totals.unreviewed_reports, url: '/gov/reports?overview=triage', detail: 'Open reports' },
+        { label: 'Urgent P4–P5', count: data.totals.urgent_reports, url: '/gov/reports?overview=urgent', detail: 'Open reports' },
+        { label: 'Blocked work', count: data.totals.blocked_work_orders, url: '/gov/work-orders?tab=blocked', detail: 'Current orders' },
+        { label: 'Awaiting verification', count: data.totals.awaiting_verification, url: '/gov/work-orders?tab=completed_pending_review', detail: 'Current orders' },
+    ];
+    return <aside className="gov-bi-surface gov-bi-attention" aria-labelledby="gov-bi-attention-title">
+        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-attention-title">Needs attention</h2><p>Recorded queues to inspect next</p></div><AlertTriangle size={19} aria-hidden="true"/></header>
+        <div className="gov-bi-attention__list">{items.map(item => <Link key={item.label} to={item.url} className="gov-bi-attention__row"><span><strong>{item.label}</strong><small>{item.detail}</small></span><span className="gov-bi-attention__count">{count(item.count)}<ArrowUpRight size={13} aria-hidden="true"/></span></Link>)}</div>
+        {(Array.isArray(data.asset_exceptions) || Array.isArray(data.update_exceptions)) && <div className="gov-bi-attention__related">
+            {Array.isArray(data.asset_exceptions) && <Link to="/gov/assets">{count(data.asset_exceptions.length)} infrastructure exceptions shown <ArrowUpRight size={13}/></Link>}
+            {Array.isArray(data.update_exceptions) && <Link to="/gov/announcements">{count(data.update_exceptions.length)} public updates shown <ArrowUpRight size={13}/></Link>}
+        </div>}
+    </aside>;
+}
 
-    // Fetch real analytics summary from backend
+function IntakeChart({ intake }) {
+    const [days, setDays] = useState(14);
+    const plot = useRef(null);
+    const [plotWidth, setPlotWidth] = useState(360);
+    const all = intake?.series || [];
+    const points = all.slice(-days);
+    const total = points.reduce((sum, point) => sum + point.count, 0);
     useEffect(() => {
-        let mounted = true;
-        const fetchSummary = async () => {
-            if (!token) return;
-            try {
-                setLoading(true);
-                const res = await fetch(`${API_BASE_URL}/api/gov/analytics/summary`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (mounted) setAnalytics(data);
-                }
-            } catch (err) {
-                console.warn('GovBiDashboard: Live telemetry endpoint unavailable, using cached telemetry.', err);
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        };
+        if (!plot.current) return;
+        const observer = new ResizeObserver(([entry]) => setPlotWidth(Math.max(220, Math.round(entry.contentRect.width))));
+        observer.observe(plot.current);
+        return () => observer.disconnect();
+    }, [total]);
+    const previousSeven = all.slice(-14, -7).reduce((sum, point) => sum + point.count, 0);
+    const lastSeven = all.slice(-7).reduce((sum, point) => sum + point.count, 0);
+    const max = Math.max(4, Math.ceil(Math.max(0, ...points.map(point => point.count)) / 4) * 4);
+    const left = 32, right = plotWidth - 12, top = 12, bottom = 108;
+    const x = index => left + (points.length < 2 ? 0 : index / (points.length - 1)) * (right - left);
+    const y = value => bottom - value / max * (bottom - top);
+    const line = points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(point.count)}`).join(' ');
+    const fill = points.length ? `${line} L ${x(points.length - 1)} ${bottom} L ${left} ${bottom} Z` : '';
+    const labels = new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]);
+    return <section className="gov-bi-surface gov-bi-intake" aria-labelledby="gov-bi-intake-title">
+        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-intake-title">Incoming reports</h2><p>Daily submissions · Asia/Manila · includes reports now closed</p></div><div className="gov-bi-period" role="group" aria-label="Report intake period">{[7, 14].map(value => <button key={value} type="button" aria-pressed={days === value} onClick={() => setDays(value)}>{value} days</button>)}</div></header>
+        <div className="gov-bi-intake__summary"><strong>{count(total)}</strong><span>received in {days} days</span><small>Last 7: {count(lastSeven)} · previous 7: {count(previousSeven)}</small></div>
+        {total ? <figure ref={plot} className="gov-bi-intake__chart" aria-label={`${count(total)} reports received across the selected ${days} days. The line shows daily counts; exact values are in the table below.`}><svg viewBox={`0 0 ${plotWidth} 136`} preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+            {[0, .5, 1].map(fraction => { const ordinate = y(max * fraction); return <g key={fraction}><line x1={left} x2={right} y1={ordinate} y2={ordinate} className="gov-bi-gridline"/><text x={left - 9} y={ordinate + 4} textAnchor="end" className="gov-bi-axis-label">{max * fraction}</text></g>; })}
+            <path d={fill} className="gov-bi-area"/><path d={line} className="gov-bi-line"/>
+            {points.map((point, index) => <g key={point.date}><circle cx={x(index)} cy={y(point.count)} r="3.5" className="gov-bi-point"/>{labels.has(index) && <text x={x(index)} y="129" textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'} className="gov-bi-axis-label">{dateLabel(point.date)}</text>}</g>)}
+        </svg></figure> : <p className="gov-bi-empty">No reports were submitted in this period.</p>}
+        <DataTable label="daily report intake" columns={['Date (Asia/Manila)', 'Reports received']} rows={points.map(point => [dateLabel(point.date), count(point.count)])}/>
+    </section>;
+}
 
-        fetchSummary();
-        return () => { mounted = false; };
-    }, [token]);
+function DemandChart({ data }) {
+    const [view, setView] = useState(() => data.areas?.length ? 'areas' : 'priority');
+    const areas = data.areas || [];
+    const shown = areas.slice(0, 6);
+    const areaMax = Math.max(1, ...shown.map(item => item.count));
+    const shownPriorities = PRIORITIES.filter(([key]) => data.priorities?.[key]);
+    const priorityMax = Math.max(1, ...shownPriorities.map(([key]) => data.priorities[key]));
+    const splitBar = (withWork, withoutWork, max, label, filter) => <span className="gov-bi-demand__track" role="group" aria-label={`${label}: ${count(withWork)} with current work, ${count(withoutWork)} without current work`}>
+        {withWork > 0 && <Link className="gov-bi-demand__with" to={`/gov/reports?overview=with_work&${filter}`} style={{ width: `${withWork / max * 100}%` }} aria-label={`${label}: open ${count(withWork)} reports with current work`} title={`${count(withWork)} with current work`}/>}
+        {withoutWork > 0 && <Link className="gov-bi-demand__without" to={`/gov/reports?overview=without_work&${filter}`} style={{ width: `${withoutWork / max * 100}%` }} aria-label={`${label}: open ${count(withoutWork)} reports without current work`} title={`${count(withoutWork)} without current work`}/>}
+    </span>;
+    return <section className="gov-bi-surface gov-bi-demand" aria-labelledby="gov-bi-demand-title">
+        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-demand-title">{view === 'areas' ? 'Open reports by area' : 'Open reports by priority'}</h2><p>{view === 'areas' ? 'Up to six recorded areas' : 'Recorded staff priority'} · select a bar to inspect reports</p></div><div className="gov-bi-period" role="group" aria-label="Report breakdown">{[['areas', 'Areas'], ['priority', 'Priority']].map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>)}</div></header>
+        <div className="gov-bi-demand__legend"><span><i className="gov-bi-demand__key gov-bi-demand__key--with" aria-hidden="true"/>With current work</span><span><i className="gov-bi-demand__key gov-bi-demand__key--without" aria-hidden="true"/>Without current work</span></div>
+        {view === 'areas' ? <>
+            {shown.length ? <div className="gov-bi-demand__bars">{shown.map(area => <div key={area.barangay} className="gov-bi-demand__row"><Link to={area.url} title={`Open ${count(area.count)} reports in ${area.barangay}`}>{area.barangay}</Link>{splitBar(area.with_work_count, area.without_work_count, areaMax, area.barangay, `area=${encodeURIComponent(area.barangay)}`)}<strong>{count(area.count)}</strong></div>)}</div> : <p className="gov-bi-empty">No open reports have a recorded area in this scope.</p>}
+            {data.coverage?.unlocated_reports > 0 && <Link className="gov-bi-demand__missing" to="/gov/reports?overview=unlocated">{count(data.coverage.unlocated_reports)} open reports have no recorded area <ArrowUpRight size={13} aria-hidden="true"/></Link>}
+            <DataTable note="Without current work may still be in review. Counts show distinct open reports, not overdue work." label="area and current work" columns={['Recorded area', 'Open reports', 'With current work', 'Without current work']} rows={areas.map(area => [area.barangay, count(area.count), <Link key="with" to={`/gov/reports?overview=with_work&area=${encodeURIComponent(area.barangay)}`}>{count(area.with_work_count)}</Link>, <Link key="without" to={`/gov/reports?overview=without_work&area=${encodeURIComponent(area.barangay)}`}>{count(area.without_work_count)}</Link>])}/>
+        </> : <>
+            {shownPriorities.length ? <div className="gov-bi-demand__bars">{shownPriorities.map(([key, label]) => {
+                const split = data.priority_work[key];
+                return <div key={key} className="gov-bi-demand__row"><Link to={`/gov/reports?overview=priority&priority=${encodeURIComponent(key)}`}>{label}</Link>{splitBar(split.with_work, split.without_work, priorityMax, label, `priority=${encodeURIComponent(key)}`)}<strong>{count(data.priorities?.[key])}</strong></div>;
+            })}</div> : <p className="gov-bi-empty">No open reports are recorded in this scope.</p>}
+            <DataTable note="Without current work may still be in review. Counts show distinct open reports, not overdue work." label="priority and current work" columns={['Priority', 'Open reports', 'With current work', 'Without current work']} rows={PRIORITIES.map(([key, label]) => [label, count(data.priorities?.[key]), <Link key="with" to={`/gov/reports?overview=with_work&priority=${encodeURIComponent(key)}`}>{count(data.priority_work[key].with_work)}</Link>, <Link key="without" to={`/gov/reports?overview=without_work&priority=${encodeURIComponent(key)}`}>{count(data.priority_work[key].without_work)}</Link>])}/>
+        </>}
+    </section>;
+}
 
-    const activePoints = useMemo(() => TRAJECTORY_DATA[timeHorizon] || TRAJECTORY_DATA['7D'], [timeHorizon]);
+function WorkStageChart({ data }) {
+    const stages = data.work_stages || [];
+    const total = data.relationships.current_work_orders;
+    const max = Math.max(1, ...stages.map(stage => stage.count));
+    return <section className="gov-bi-surface gov-bi-stage" aria-labelledby="gov-bi-stage-title">
+        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-stage-title">Current work by stage</h2><p>Recorded work orders, grouped by their current state</p></div><Link to="/gov/work-orders?tab=current" className="gov-bi-text-link">All work <ArrowUpRight size={15} aria-hidden="true"/></Link></header>
+        {total ? <div className="gov-bi-stage__plot" role="group" aria-label="Select a work stage to open its work orders">
+            {stages.map(stage => {
+                const content = <><strong>{count(stage.count)}</strong><span className="gov-bi-stage__slot"><span className="gov-bi-stage__bar" data-empty={stage.count === 0} style={{ height: `${stage.count ? Math.max(7, stage.count / max * 100) : 0}%` }}/></span><span className="gov-bi-stage__label">{stage.label}</span></>;
+                return stage.url ? <Link key={stage.key} to={stage.url} className={`gov-bi-stage__item is-${stage.key}`} aria-label={`${stage.label}: ${count(stage.count)} work orders. Open matching work orders.`}>{content}</Link>
+                    : <div key={stage.key} className={`gov-bi-stage__item is-${stage.key}`} aria-label={`${stage.label}: ${count(stage.count)} work orders`}>{content}</div>;
+            })}
+        </div> : <p className="gov-bi-empty">No current work orders are recorded in this scope.</p>}
+        <DataTable label="current work stages" columns={['Recorded stage', 'Work orders']} rows={stages.map(stage => [stage.label, stage.url ? <Link key={stage.key} to={stage.url}>{count(stage.count)}</Link> : count(stage.count)])}/>
+    </section>;
+}
 
-    // SVG Chart Geometry Calculations
-    const chartWidth = 760;
-    const chartHeight = 170;
-    const paddingX = 40;
-    const paddingY = 25;
-
-    const maxVal = useMemo(() => {
-        const highest = Math.max(...activePoints.map(p => Math.max(p.incoming, p.resolved)));
-        return Math.ceil(highest * 1.25) || 20;
-    }, [activePoints]);
-
-    const getX = (idx) => paddingX + (idx / (activePoints.length - 1)) * (chartWidth - paddingX * 2);
-    const getY = (val) => chartHeight - paddingY - (val / maxVal) * (chartHeight - paddingY * 2);
-
-    // Generate Path Strings
-    const incomingPath = useMemo(() => {
-        return activePoints.reduce((acc, pt, i) => {
-            const x = getX(i);
-            const y = getY(pt.incoming);
-            return i === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
-        }, '');
-    }, [activePoints, maxVal]);
-
-    const resolvedPath = useMemo(() => {
-        return activePoints.reduce((acc, pt, i) => {
-            const x = getX(i);
-            const y = getY(pt.resolved);
-            return i === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
-        }, '');
-    }, [activePoints, maxVal]);
-
-    const resolvedAreaPath = useMemo(() => {
-        if (!activePoints.length) return '';
-        const firstX = getX(0);
-        const lastX = getX(activePoints.length - 1);
-        const baselineY = chartHeight - paddingY;
-        return `${resolvedPath} L ${lastX} ${baselineY} L ${firstX} ${baselineY} Z`;
-    }, [resolvedPath, activePoints]);
-
-    // Target benchmark calculation (85% SLA baseline)
-    const benchmarkY = getY(maxVal * 0.72);
-
-    return (
-        <section className="gov-bi-dashboard" aria-label="Executive Business Intelligence">
-            {/* ── Top Header Toolbar ────────────────────────────────────────── */}
-            <div className="gov-bi-header">
-                <div className="gov-bi-header__title">
-                    <div className="gov-bi-header__icon">
-                        <Activity size={18} strokeWidth={2.2} />
-                    </div>
-                    <div className="gov-bi-header__text">
-                        <h2>Executive Business Intelligence & Operational Telemetry</h2>
-                        <p>Real-time infrastructure velocity, SLA clearance rate, and territorial stress analysis</p>
-                    </div>
-                </div>
-
-                <div className="gov-bi-controls">
-                    {/* Time Horizon Toggles */}
-                    <div className="gov-bi-time-toggle" role="group" aria-label="Select time horizon">
-                        {['7D', '30D', '90D', 'YTD'].map((t) => (
-                            <button
-                                key={t}
-                                type="button"
-                                onClick={() => setTimeHorizon(t)}
-                                className={`gov-bi-time-btn ${timeHorizon === t ? 'is-active' : ''}`}
-                            >
-                                {t}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Expand/Collapse Toggle */}
-                    <button
-                        type="button"
-                        onClick={() => setExpanded(!expanded)}
-                        className="gov-bi-toggle-view-btn"
-                        aria-expanded={expanded}
-                    >
-                        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        <span>{expanded ? 'Collapse' : 'Expand BI'}</span>
-                    </button>
-                </div>
+export default function GovBiDashboard({ data }) {
+    return <div className="gov-bi-dashboard">
+        <KpiSummary data={data}/>
+        <div className="gov-bi-workbench">
+            <div className="gov-bi-charts">
+                <DemandChart data={data}/>
+                <AttentionPanel data={data}/>
+                <div className="gov-bi-analysis"><IntakeChart intake={data.report_intake}/><WorkStageChart data={data}/></div>
             </div>
-
-            {/* ── Executive KPI Ribbon ──────────────────────────────────────── */}
-            <div className="gov-bi-kpi-ribbon">
-                <div className="gov-bi-kpi-cell">
-                    <span className="gov-bi-kpi-label">SLA Clearance Rate</span>
-                    <div className="gov-bi-kpi-value-row">
-                        <span className="gov-bi-kpi-value">{analytics?.resolution_rate_pct ? `${analytics.resolution_rate_pct}%` : '88.4%'}</span>
-                        <span className="gov-bi-kpi-trend is-up">
-                            <TrendingUp size={12} /> +4.2%
-                        </span>
-                    </div>
-                    <span className="gov-bi-kpi-subtext">Benchmark: 85.0% compliance</span>
-                </div>
-
-                <div className="gov-bi-kpi-cell">
-                    <span className="gov-bi-kpi-label">Active Workload Influx</span>
-                    <div className="gov-bi-kpi-value-row">
-                        <span className="gov-bi-kpi-value">{analytics?.total_all_time || 125}</span>
-                        <span className="gov-bi-kpi-trend is-down">
-                            <TrendingDown size={12} /> -6.8%
-                        </span>
-                    </div>
-                    <span className="gov-bi-kpi-subtext">Total public tickets mapped</span>
-                </div>
-
-                <div className="gov-bi-kpi-cell">
-                    <span className="gov-bi-kpi-label">Closed / Resolved Orders</span>
-                    <div className="gov-bi-kpi-value-row">
-                        <span className="gov-bi-kpi-value">{analytics?.total_resolved_all_time || 98}</span>
-                        <span className="gov-bi-kpi-trend is-up">
-                            <TrendingUp size={12} /> +12.5%
-                        </span>
-                    </div>
-                    <span className="gov-bi-kpi-subtext">Full sign-off verified</span>
-                </div>
-
-                <div className="gov-bi-kpi-cell">
-                    <span className="gov-bi-kpi-label">Capital Exposure (DPWH)</span>
-                    <div className="gov-bi-kpi-value-row">
-                        <span className="gov-bi-kpi-value">{analytics?.total_budget_exposure || 'PHP 14.8M'}</span>
-                    </div>
-                    <span className="gov-bi-kpi-subtext">Estimated BoQ maintenance</span>
-                </div>
-            </div>
-
-            {/* ── Expandable Charts Body ───────────────────────────────────── */}
-            {expanded && (
-                <>
-                    {/* Primary Two-Column Visual Grid */}
-                    <div className="gov-bi-grid">
-                        {/* 1. Resolution Velocity & SLA Trajectory Chart */}
-                        <div className="gov-bi-card">
-                            <div className="gov-bi-card__header">
-                                <div>
-                                    <h3>Resolution Velocity & Influx Curve</h3>
-                                    <p>Incoming public issues vs completed engineering work orders</p>
-                                </div>
-                                <div className="gov-bi-legend">
-                                    <div className="gov-bi-legend-item">
-                                        <span className="gov-bi-legend-dot" style={{ background: '#f97316' }} />
-                                        <span>Incoming Tickets</span>
-                                    </div>
-                                    <div className="gov-bi-legend-item">
-                                        <span className="gov-bi-legend-dot" style={{ background: '#0284c7' }} />
-                                        <span>Resolved Orders</span>
-                                    </div>
-                                    <div className="gov-bi-legend-item">
-                                        <span className="gov-bi-legend-dot" style={{ background: '#10b981' }} />
-                                        <span>85% Target</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="gov-bi-chart-container">
-                                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="gov-bi-svg">
-                                    <defs>
-                                        <linearGradient id="biResolvedGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#0284c7" stopOpacity="0.25" />
-                                            <stop offset="100%" stopColor="#0284c7" stopOpacity="0.0" />
-                                        </linearGradient>
-                                    </defs>
-
-                                    {/* Horizontal Guidelines */}
-                                    {[0.25, 0.5, 0.75].map((factor, i) => (
-                                        <line
-                                            key={i}
-                                            x1={paddingX}
-                                            y1={paddingY + factor * (chartHeight - paddingY * 2)}
-                                            x2={chartWidth - paddingX}
-                                            y2={paddingY + factor * (chartHeight - paddingY * 2)}
-                                            className="gov-bi-chart-axis"
-                                        />
-                                    ))}
-
-                                    {/* 85% Benchmark Target Line */}
-                                    <line
-                                        x1={paddingX}
-                                        y1={benchmarkY}
-                                        x2={chartWidth - paddingX}
-                                        y2={benchmarkY}
-                                        stroke="#10b981"
-                                        strokeWidth="1.5"
-                                        strokeDasharray="4 4"
-                                        opacity="0.75"
-                                    />
-
-                                    {/* Shaded Area for Resolved */}
-                                    <path d={resolvedAreaPath} fill="url(#biResolvedGrad)" />
-
-                                    {/* Influx Line */}
-                                    <path d={incomingPath} fill="none" stroke="#f97316" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-
-                                    {/* Resolved Line */}
-                                    <path d={resolvedPath} fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-
-                                    {/* Data Points and Interaction Circles */}
-                                    {activePoints.map((pt, i) => {
-                                        const cx = getX(i);
-                                        const cyResolved = getY(pt.resolved);
-                                        const cyIncoming = getY(pt.incoming);
-                                        const isHovered = hoveredPoint?.idx === i;
-
-                                        return (
-                                            <g key={i}>
-                                                {/* Influx Point */}
-                                                <circle cx={cx} cy={cyIncoming} r={isHovered ? 5 : 3.5} fill="#f97316" stroke="var(--gov-surface)" strokeWidth="1.5" />
-
-                                                {/* Resolved Point */}
-                                                <circle
-                                                    cx={cx}
-                                                    cy={cyResolved}
-                                                    r={isHovered ? 5.5 : 4}
-                                                    fill="#0284c7"
-                                                    stroke="var(--gov-surface)"
-                                                    strokeWidth="2"
-                                                    className="gov-bi-point-hit"
-                                                    onMouseEnter={() => setHoveredPoint({ idx: i, ...pt, x: cx, y: cyResolved })}
-                                                    onMouseLeave={() => setHoveredPoint(null)}
-                                                />
-
-                                                {/* X Axis Date Label */}
-                                                <text
-                                                    x={cx}
-                                                    y={chartHeight - 6}
-                                                    textAnchor="middle"
-                                                    className="gov-bi-chart-label"
-                                                >
-                                                    {pt.label}
-                                                </text>
-                                            </g>
-                                        );
-                                    })}
-                                </svg>
-
-                                {/* Floating Tooltip */}
-                                {hoveredPoint && (
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            left: `${(hoveredPoint.x / chartWidth) * 100}%`,
-                                            top: `${Math.max(10, (hoveredPoint.y / chartHeight) * 100 - 35)}%`,
-                                            transform: 'translate(-50%, -100%)',
-                                            pointerEvents: 'none',
-                                            background: 'var(--gov-surface-elevated, #0e283e)',
-                                            border: '1px solid var(--gov-rule)',
-                                            borderRadius: '6px',
-                                            padding: '6px 10px',
-                                            boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-                                            zIndex: 20,
-                                            fontSize: '11px',
-                                            whiteSpace: 'nowrap'
-                                        }}
-                                    >
-                                        <div style={{ fontWeight: 700, color: 'var(--gov-text)', marginBottom: '2px' }}>
-                                            {hoveredPoint.label}
-                                        </div>
-                                        <div style={{ color: '#0284c7', display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                                            <span>Resolved:</span> <strong>{hoveredPoint.resolved} orders</strong>
-                                        </div>
-                                        <div style={{ color: '#f97316', display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                                            <span>Incoming:</span> <strong>{hoveredPoint.incoming} reports</strong>
-                                        </div>
-                                        <div style={{ color: '#10b981', display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                                            <span>SLA Velocity:</span> <strong>{hoveredPoint.sla}%</strong>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 2. Utility Sector Workload Distribution */}
-                        <div className="gov-bi-card">
-                            <div className="gov-bi-card__header">
-                                <div>
-                                    <h3>Utility Sector Workload</h3>
-                                    <p>Active maintenance volume by civil discipline</p>
-                                </div>
-                                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--gov-action-strong)' }}>
-                                    125 Active Tickets
-                                </span>
-                            </div>
-
-                            <div className="gov-bi-sector-list">
-                                {SECTOR_METRICS.map((sec) => (
-                                    <div key={sec.key} className="gov-bi-sector-item">
-                                        <div className="gov-bi-sector-info">
-                                            <span className="gov-bi-sector-name">
-                                                <span className="bullet" style={{ background: sec.color }} />
-                                                {sec.name}
-                                            </span>
-                                            <span className="gov-bi-sector-metrics">
-                                                {sec.count} ({sec.pct}%)
-                                            </span>
-                                        </div>
-                                        <div className="gov-bi-progress-bar">
-                                            <div
-                                                className="gov-bi-progress-fill"
-                                                style={{ width: `${sec.pct}%`, background: sec.color }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Secondary Intelligence Row (Ranked Hotspots + Capital Execution) */}
-                    <div className="gov-bi-sub-grid">
-                        {/* 3. Territorial Barangay Stress Index */}
-                        <div className="gov-bi-sub-card">
-                            <div className="gov-bi-card__header">
-                                <div>
-                                    <h3>Territorial Stress Ranking</h3>
-                                    <p>Top vulnerable barangays requiring focused civil teams</p>
-                                </div>
-                                <span style={{ fontSize: '10.5px', color: 'var(--gov-text-secondary)' }}>
-                                    North Caloocan
-                                </span>
-                            </div>
-
-                            <div className="gov-bi-rank-list">
-                                {DEFAULT_TOP_BARANGAYS.map((b) => (
-                                    <div key={b.rank} className="gov-bi-rank-item">
-                                        <span className="gov-bi-rank-num">{b.rank}</span>
-                                        <span className="gov-bi-rank-name" title={b.name}>{b.name}</span>
-                                        <div className="gov-bi-rank-bar-wrap">
-                                            <div
-                                                className="gov-bi-rank-bar-fill"
-                                                style={{ width: `${b.score}%`, background: b.color }}
-                                            />
-                                        </div>
-                                        <span className="gov-bi-rank-val" style={{ color: b.color }}>
-                                            {b.count} issues
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 4. Capital Outlay & Procurement Flow */}
-                        <div className="gov-bi-sub-card">
-                            <div className="gov-bi-card__header">
-                                <div>
-                                    <h3>Capital & Procurement Pipeline</h3>
-                                    <p>RA 9184 contract validation and project execution</p>
-                                </div>
-                                <span style={{ fontSize: '10.5px', color: 'var(--gov-text-secondary)' }}>
-                                    16 Projects
-                                </span>
-                            </div>
-
-                            <div className="gov-bi-milestone-flow">
-                                {CAPITAL_MILESTONES.map((m) => (
-                                    <div key={m.stage} className="gov-bi-milestone-stage">
-                                        <div>
-                                            <div className="gov-bi-milestone-name">{m.stage}</div>
-                                            <div className="gov-bi-milestone-desc">{m.desc}</div>
-                                        </div>
-                                        <div className="gov-bi-progress-bar" style={{ height: '5px' }}>
-                                            <div
-                                                className="gov-bi-progress-fill"
-                                                style={{ width: `${m.pct}%`, background: m.color }}
-                                            />
-                                        </div>
-                                        <span className="gov-bi-milestone-count">{m.count}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ── Footer Telemetry & Quick Action ─────────────────────── */}
-                    <div className="gov-bi-footer">
-                        <div className="gov-bi-footer-status">
-                            <span className="gov-bi-pulse-indicator" />
-                            <span>PULSO Geospatial Triage Engine · Continuous Telemetry Active</span>
-                        </div>
-
-                        <Link to="/gov/analytics" className="gov-bi-deep-link">
-                            <Brain size={14} />
-                            <span>Explore Full Spatial GIS Clusters & Predictive Engine</span>
-                            <ArrowUpRight size={13} />
-                        </Link>
-                    </div>
-                </>
-            )}
-        </section>
-    );
+            <GovAssistantSlot />
+        </div>
+        <footer className="gov-bi-footer"><span>Counts are from permitted records at the as-of time above, not a live stream.</span><details><summary>Coverage and interpretation</summary><div className="gov-bi-footer__detail"><p>{count(data.coverage?.total_open_reports - data.coverage?.unlocated_reports)} of {count(data.coverage?.total_open_reports)} open reports have a recorded barangay. {count(data.coverage?.total_open_reports - data.coverage?.unassigned_reports)} have a review owner.</p><ul>{(data.limitations || []).map(limit => <li key={limit}>{limit}</li>)}</ul></div></details></footer>
+    </div>;
 }

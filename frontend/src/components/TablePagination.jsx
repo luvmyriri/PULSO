@@ -47,7 +47,7 @@ export default function TablePagination({
 
     return (
         <div
-            className={`min-h-14 shrink-0 border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-black dark:text-white bg-white dark:bg-slate-900 ${className}`}
+            className={`gov-pagination min-h-14 shrink-0 border-t border-slate-200 dark:border-slate-800 px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-black dark:text-white bg-white dark:bg-slate-900 ${className}`}
         >
             {/* Count text on the left */}
             <div aria-live="polite" className="font-normal text-black dark:text-white text-sm">

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -20,6 +20,8 @@ from datetime import timezone
 import roles_service
 import gov_crud
 import gov_schemas
+from government_access import can, scoped_assets, require_asset_scope
+from maintenance_planning import maintenance_projection
 from services import lightgbm_service
 
 router = APIRouter(prefix="/api/gov/predictive", tags=["predictive"])
@@ -44,14 +46,7 @@ def format_currency(val: float) -> str:
     return f"PHP{val:,.2f}"
 
 def _allow_access(user):
-    """Simplified access check for predictive."""
-    allowed = ["system_admin", "city_engineer", "manager", "admin_officer", 
-              "division_chief", "division_chief_arch", "division_chief_structural",
-              "division_chief_electrical", "project_engineer", "design_engineer",
-              "asst_city_engineer"]
-    if user.role in allowed:
-        return True
-    return False
+    return can(user, 'maintenance')
 
 def get_asset_incident_metrics(db: Session, asset: InfrastructureAsset, days_back: int = 90):
     """
@@ -118,7 +113,7 @@ def get_predictive_summary(
 ):
     if not _allow_access(current_user):
         raise HTTPException(status_code=403, detail="Access denied to predictive engine")
-    assets = db.query(InfrastructureAsset).limit(200).all()
+    assets = scoped_assets(db.query(InfrastructureAsset), current_user).limit(200).all()
     
     total_assets = len(assets)
     if total_assets == 0:
@@ -204,94 +199,105 @@ def get_predictive_summary(
     }
 
 
-@router.get("/health")
-def get_predictive_health(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
-):
-    if not _allow_access(current_user):
-        raise HTTPException(status_code=403, detail="Access denied to predictive engine")
-    assets = db.query(InfrastructureAsset).limit(200).all()
-    health_scores = []
-    for a in assets:
-        ahs = a.condition_score if a.condition_score is not None else calculate_ahs(db, a.asset_id)
-        brgy_id = int(a.barangay) if a.barangay and a.barangay.isdigit() else 170
-        fvf = calculate_fvf(db, brgy_id)
-        dv = calculate_dv(db, a.asset_id)
-        
-        report_count, freq_per_month, recurrence_rate, days_since = get_asset_incident_metrics(db, a)
+def _resolve_asset_health_score(db: Session, asset: InfrastructureAsset) -> float:
+    """Single authoritative condition/health score resolution across summary, health, schedule, and risk-map."""
+    return float(asset.condition_score if asset.condition_score is not None else calculate_ahs(db, asset.asset_id))
 
-        fail_prob_30 = _failure_probability(freq_per_month, recurrence_rate, days_since, a.category or "default", target_days=30)
-        fail_prob_60 = max(fail_prob_30, _failure_probability(freq_per_month, recurrence_rate, days_since, a.category or "default", target_days=60))
-        fail_prob_90 = max(fail_prob_60, _failure_probability(freq_per_month, recurrence_rate, days_since, a.category or "default", target_days=90))
-        
-        next_maint = _next_maintenance_date(ahs)
-        trend = "WORSENING" if dv > 0.3 else ("IMPROVING" if dv < -0.15 else "STABLE")
 
-        # Fetch Audit & Compliance documents
-        project_ids = [p.id for p in a.projects]
-        docs = db.query(SystemDocument).filter(
-            SystemDocument.target_model == 'ProjectRequest',
-            SystemDocument.target_id.in_(project_ids) if project_ids else False
-        ).all()
-
-        audit_compliance = []
-        doc_types_map = {
-            "materials_test": "Materials Test Report",
-            "design_plans": "NPKI-Signed Design Plans",
-            "ntp": "Notice to Proceed",
-            "audit_report": "FQA Final Audit Report"
-        }
-
-        for d in docs:
-            if d.document_type in doc_types_map:
-                audit_compliance.append({
-                    "name": doc_types_map[d.document_type],
-                    "status": "verified" if d.npki_signature else "available",
-                    "doc_id": d.id,
-                    "file_name": d.file_name,
-                    "date": d.uploaded_at.strftime("%Y-%m-%d") if d.uploaded_at else "N/A"
-                })
-
-        lgbm_pred = lightgbm_service.predict_for_asset(
-            db, a, days_since_override=days_since, linked_reports_override=report_count
-        )
-        health_scores.append({
-            "asset_id": a.asset_id,
-            "asset_name": a.asset_name,
-            "barangay": str(a.barangay),
-            "category": a.category,
-            "health_score": ahs,
-            "priority": determine_priority(ahs),
-            "rainy_season_warning": fvf > 60,
-            "failure_probability_30d": fail_prob_30,
-            "failure_probability_60d": fail_prob_60,
-            "failure_probability_90d": fail_prob_90,
-            "lgbm_failure_probability_30d": lgbm_pred["lgbm_failure_probability_30d"],
-            "lgbm_failure_probability_60d": lgbm_pred["lgbm_failure_probability_60d"],
-            "lgbm_failure_probability_90d": lgbm_pred["lgbm_failure_probability_90d"],
-            "predicted_repair_days_p50": lgbm_pred["predicted_repair_days_p50"],
-            "predicted_repair_days_p90": lgbm_pred["predicted_repair_days_p90"],
-            "spatial_telemetry": lgbm_pred["spatial_telemetry"],
-            "risk_drivers": lgbm_pred["risk_drivers"],
-            "report_count": report_count,
-            "trend": trend,
-            "growth_pct": round(dv * 100),
-            "recurrence_rate": recurrence_rate,
-            "days_since_last_maintenance": days_since,
-            "next_maintenance_date": next_maint,
-            "freq_per_month": freq_per_month,
-            "audit_compliance": audit_compliance
-        })
-        
-    health_scores.sort(key=lambda x: x["health_score"])
-
+def _get_existing_open_wo(db: Session, asset_id: str) -> Optional[Dict[str, Any]]:
+    wo = db.query(WorkOrder).filter(
+        WorkOrder.asset_id == asset_id,
+        WorkOrder.status.notin_(["completed", "cancelled"])
+    ).order_by(WorkOrder.created_at.desc()).first()
+    if not wo:
+        return None
     return {
-        "model_status": "exploratory_heuristic_unvalidated",
-        "ml_engine": lightgbm_service.get_global_model_diagnostics(db),
-        "data_window_days": 90,
-        "health_scores": health_scores
+        "id": wo.id,
+        "wo_number": wo.wo_number,
+        "status": wo.status,
+        "wo_type": wo.wo_type,
+        "assigned_to_id": wo.assigned_to_id,
+        "title": wo.title,
     }
+
+
+def _build_why_review(ahs: float, pri: str, report_count: int, days_since: int, rainy_warn: bool) -> str:
+    reasons = [f"Condition score {round(ahs)}/100 ({pri.title()})"]
+    if report_count > 0:
+        reasons.append(f"{report_count} explicitly linked report{'s' if report_count != 1 else ''} in 90d")
+    if days_since and days_since > 0:
+        reasons.append(f"{days_since}d since last recorded maintenance")
+    if rainy_warn:
+        reasons.append("elevated flood/rainy-season exposure")
+    return " · ".join(reasons)
+
+
+@router.get("/health")
+def get_predictive_health(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    if not _allow_access(current_user):
+        raise HTTPException(status_code=403, detail="Access denied to maintenance review")
+    assets = scoped_assets(db.query(InfrastructureAsset), current_user).all()
+    rows = []
+    today = datetime.date.today()
+    for asset in assets:
+        score = float(asset.condition_score) if asset.condition_score is not None else None
+        priority = determine_priority(score) if score is not None else 'UNKNOWN'
+        count, _, _, _ = get_asset_incident_metrics(db, asset)
+        completions = [log.completion_date for log in asset.maintenance_logs if log.completion_date]
+        last = max((day for day in completions if day <= today), default=None)
+        days = max(0, (today - last).days) if last else None
+        existing = _get_existing_open_wo(db, asset.asset_id)
+        projection = maintenance_projection(asset.maintenance_logs, today)
+        review_needed = score is None or score <= 75 or bool(projection and projection['days_until_review'] <= 30) or count > 0
+        reasons = [f"Condition index {score:g}/100 from the asset registry." if score is not None else 'No inspected condition index is recorded.']
+        reasons.append(f"{count} reports explicitly linked through work orders in the past 90 days.")
+        reasons.append(f"Last recorded maintenance completed {days} days ago." if last else "No maintenance completion is recorded; inspect the history before planning work.")
+        rows.append(dict(asset_id=asset.asset_id, asset_name=asset.asset_name,
+            barangay=str(asset.barangay or 'Not recorded'), category=asset.category or 'Unclassified',
+            health_score=score, condition_source='asset_registry' if score is not None else 'not_recorded',
+            priority=priority, report_count=count, why_review=' '.join(reasons),
+            existing_work_order=existing, last_maintenance_date=last.isoformat() if last else None,
+            days_since_last_maintenance=days,
+            projection=projection, review_needed=review_needed,
+            review_status='open_work' if existing else 'suggested_review' if review_needed else 'monitoring'))
+    rows.sort(key=lambda row: (0 if row['review_needed'] else 1, row['health_score'] if row['health_score'] is not None else 101))
+    return dict(model_status='record_based_maintenance_projection', as_of=datetime.datetime.now(timezone.utc),
+        data_window_days=90, can_create_work_order=can(current_user, 'maintenance', 'create_work_order'), health_scores=rows)
+
+
+@router.get('/assets/{asset_id}/forecast')
+def asset_maintenance_forecast(asset_id: str, include_model: bool = False, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    if not _allow_access(current_user): raise HTTPException(403, 'Maintenance access is required.')
+    asset = db.query(InfrastructureAsset).filter_by(asset_id=asset_id).first()
+    if not asset: raise HTTPException(404, 'Infrastructure asset not found.')
+    require_asset_scope(db, current_user, asset)
+    from asset_map_context import asset_report_context
+    location = asset_report_context(db, current_user, asset_id, 500)
+    logs = sorted(asset.maintenance_logs, key=lambda row: row.completion_date or datetime.date.min, reverse=True)
+    projection = maintenance_projection(logs)
+    cutoff = datetime.datetime.now(timezone.utc) - datetime.timedelta(days=90)
+    from government_access import scoped_reports, jurisdiction_ids
+    reports = scoped_reports(db.query(models.Report), current_user).filter(models.Report.id.in_(db.query(WorkOrder.report_id).filter(WorkOrder.asset_id == asset_id)), models.Report.created_at >= cutoff, models.Report.status.notin_(['rejected', 'spam'])).order_by(models.Report.created_at.desc()).all()
+    experimental = None
+    if include_model:
+        if jurisdiction_ids(current_user):
+            experimental = dict(status='unavailable', reason='The existing experimental model has citywide training scope. It is not available for a district-restricted account.')
+        else:
+            try:
+                prediction = lightgbm_service.predict_for_asset(db, asset)
+                experimental = dict(status='experimental', engine=prediction['engine'], training_mode='synthetic_examples_and_registry_proxy_labels',
+                    review_index=round(prediction['lgbm_failure_probability_30d'] * 100, 1),
+                    limitation='Existing LightGBM model combines synthetic training examples and proxy labels. This is an exploratory review index, not a validated probability of failure, repair deadline, or engineering approval.')
+            except Exception:
+                experimental = dict(status='unavailable', reason='The experimental model could not complete this calculation. Recorded history and manual work creation remain available.')
+    return dict(asset_id=asset_id, as_of=datetime.datetime.now(timezone.utc), projection=projection,
+        location=location['asset'], linked_report_count=len(location['linked_ids']), nearby_report_count=len(set(location['distances'])-location['linked_ids']),
+        projection_status='available' if projection else 'insufficient_comparable_history',
+        method='Historical maintenance interval, grouped by recorded work type. At least three distinct completed dates are required. No budget values are used.',
+        limitation='A projected review date is a planning prompt based on recorded past work. It does not establish a failure date or an approved maintenance schedule.',
+        history=[dict(id=log.log_id, work_type=log.work_type, completed_date=log.completion_date) for log in logs],
+        linked_reports=[dict(id=r.id, ticket_id=r.ticket_id, status=r.status, created_at=r.created_at) for r in reports],
+        experimental_model=experimental)
 
 
 @router.get("/schedule")
@@ -301,7 +307,7 @@ def get_predictive_schedule(
 ):
     if not _allow_access(current_user):
         raise HTTPException(status_code=403, detail="Access denied to predictive engine")
-    assets = db.query(InfrastructureAsset).limit(200).all()
+    assets = scoped_assets(db.query(InfrastructureAsset), current_user).limit(200).all()
     
     schedule_items = []
     total_cost = 0.0
@@ -311,45 +317,71 @@ def get_predictive_schedule(
     now = datetime.datetime.now()
     rainy_active = (now.month >= 6 and now.month <= 11)
 
+    horizon_labels = {
+        1: "Immediate Review (Within 14 Days)",
+        2: "30-Day Inspection Window (Days 15–30)",
+        3: "60-Day Preventive Window (Days 31–60)",
+        4: "Later review (more than 60 days)",
+    }
+
     for a in assets:
-        ahs = a.condition_score if a.condition_score is not None else calculate_ahs(db, a.asset_id)
-        if ahs > 75: continue  # Only schedule assets needing attention
+        ahs = _resolve_asset_health_score(db, a)
+        if ahs > 75:
+            continue  # Only schedule assets needing attention
         
         pri = determine_priority(ahs)
-        if pri == "CRITICAL": crit_count += 1
+        if pri == "CRITICAL":
+            crit_count += 1
         
         report_count, freq_per_month, recurrence_rate, days_since = get_asset_incident_metrics(db, a)
         fail_prob = _failure_probability(freq_per_month, recurrence_rate, days_since, a.category or "default", target_days=30)
         
         next_maint = _next_maintenance_date(ahs)
         next_maint_date_obj = datetime.datetime.strptime(next_maint, "%Y-%m-%d").date()
-        days_until = (next_maint_date_obj - today).days
+        days_until = max(0, (next_maint_date_obj - today).days)
 
-        # Deterministic calendar week binning (1 to 4)
-        week = max(1, min(4, (max(0, days_until) // 7) + 1))
+        # Truthful review horizon binning without false week-4 date capping
+        if days_until <= 14:
+            horizon_bucket = 1
+        elif days_until <= 30:
+            horizon_bucket = 2
+        elif days_until <= 60:
+            horizon_bucket = 3
+        else:
+            horizon_bucket = 4
 
-        # Deterministic cost from DPWH unit price standard
+        # Deterministic reference cost (kept only for backward-compatibility; UI leads with inspection scope)
         cost_key = _match_cost_key(a.category)
         unit_cost = COST_MODEL.get(cost_key, COST_MODEL["default"])["cost"]
         cost = round(unit_cost * PREVENTIVE_COST_RATIO, 2)
         total_cost += cost
+
+        rainy_warn = rainy_active and (a.category or "").lower() in ["drainage", "road", "pothole", "flooding"]
+        existing_wo = _get_existing_open_wo(db, a.asset_id)
         
         schedule_items.append({
-            "week_number": week,
+            "asset_id": a.asset_id,
+            "asset_name": a.asset_name,
+            "week_number": horizon_bucket,
+            "horizon_label": horizon_labels[horizon_bucket],
+            "days_until_review": days_until,
             "priority": pri,
-            "rainy_season_warning": rainy_active and (a.category or "").lower() in ["drainage", "road", "pothole", "flooding"],
+            "health_score": ahs,
+            "rainy_season_warning": rainy_warn,
             "category": a.category,
             "barangay": str(a.barangay),
-            "maintenance_type": "Emergency Intervention" if pri == "CRITICAL" else ("Preventive Repair" if pri == "HIGH" else "Scheduled Service"),
+            "maintenance_type": "Immediate Field Inspection" if pri == "CRITICAL" else ("Preventive Engineering Review" if pri == "HIGH" else "Routine Condition Check"),
+            "why_review": _build_why_review(ahs, pri, report_count, days_since, rainy_warn),
+            "existing_work_order": existing_wo,
             "scheduled_date": next_maint,
             "estimated_cost_formatted": format_currency(cost),
             "failure_prob": fail_prob
         })
         
-        if len(schedule_items) > 30:
+        if len(schedule_items) > 40:
             break
             
-    # Group by week
+    # Group by truthful review horizon bucket
     weekly_summary = []
     for w in range(1, 5):
         w_items = [i for i in schedule_items if i["week_number"] == w]
@@ -357,11 +389,9 @@ def get_predictive_schedule(
         w_crit = sum([1 for i in w_items if i["priority"] == "CRITICAL"])
         
         if w_items:
-            start_d = today + datetime.timedelta(days=(w-1)*7)
-            end_d = today + datetime.timedelta(days=w*7)
             weekly_summary.append({
                 "week_number": w,
-                "week_label": f"Week {w} ({start_d.strftime('%b %d')} - {end_d.strftime('%b %d')})",
+                "week_label": horizon_labels[w],
                 "item_count": len(w_items),
                 "total_cost_formatted": format_currency(w_cost),
                 "critical_count": w_crit
@@ -386,43 +416,58 @@ def get_predictive_risk_map(
 ):
     if not _allow_access(current_user):
         raise HTTPException(status_code=403, detail="Access denied to predictive engine")
-    brgys = db.query(EnvironmentalContext).all()
+    all_assets = scoped_assets(db.query(InfrastructureAsset), current_user).limit(300).all()
+    by_barangay: Dict[str, List[InfrastructureAsset]] = {}
+    for a in all_assets:
+        b_key = str(a.barangay or "Unassigned").strip()
+        by_barangay.setdefault(b_key, []).append(a)
+
     risk_map = []
-    
-    for b in brgys:
-        b_assets = db.query(InfrastructureAsset).filter_by(barangay=str(b.barangay_id)).all()
-        if not b_assets: continue
-        
-        sum_ahs = 0
+    for b_key, b_assets in by_barangay.items():
+        if not b_assets:
+            continue
+        sum_ahs = 0.0
         crit_assets = 0
+        high_assets = 0
+        open_wos = 0
         at_risk_cats = set()
         
         for a in b_assets:
-            ahs = calculate_ahs(db, a.asset_id)
+            ahs = _resolve_asset_health_score(db, a)
             sum_ahs += ahs
             if ahs <= 35: 
                 crit_assets += 1
                 at_risk_cats.add(a.category)
+            elif ahs <= 50:
+                high_assets += 1
+                at_risk_cats.add(a.category)
+            if _get_existing_open_wo(db, a.asset_id):
+                open_wos += 1
                 
         avg_ahs = round(sum_ahs / len(b_assets))
         pri = determine_priority(avg_ahs)
+        if crit_assets > 0 and pri not in ("CRITICAL", "HIGH"):
+            pri = "HIGH"
         
-        color = "#22c55e" # GOOD
+        color = "#22c55e"  # GOOD
         if pri == "CRITICAL": color = "#ef4444"
         elif pri == "HIGH": color = "#f97316"
         elif pri == "MODERATE": color = "#eab308"
         elif pri == "WATCH": color = "#3b82f6"
         
         risk_map.append({
-            "barangay": str(b.barangay_id),
+            "barangay": b_key,
+            "asset_count": len(b_assets),
             "risk_color": color,
             "avg_health_score": avg_ahs,
             "overall_priority": pri,
             "critical_assets": crit_assets,
-            "categories_at_risk": list(at_risk_cats)
+            "high_risk_assets": high_assets,
+            "open_work_orders": open_wos,
+            "categories_at_risk": sorted(list(at_risk_cats))
         })
         
-    risk_map.sort(key=lambda x: x["avg_health_score"])
+    risk_map.sort(key=lambda x: (-x["critical_assets"], x["avg_health_score"]))
 
     return {
         "risk_map": risk_map
@@ -461,7 +506,8 @@ def generate_ai_plan(
             raise HTTPException(status_code=409, detail="Select a specific infrastructure asset")
         asset = matches[0]
 
-    ahs = calculate_ahs(db, asset.asset_id)
+    require_asset_scope(db, current_user, asset)
+    ahs = _resolve_asset_health_score(db, asset)
     env = db.query(EnvironmentalContext).filter_by(barangay_id=asset.barangay_id).first()
     lgbm_pred = lightgbm_service.predict_for_asset(db, asset)
     asset_data = {
@@ -503,10 +549,11 @@ def generate_ai_plan(
 
 
 class ConvertWORequest(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
     asset_id: str
     plan_summary: str = Field(min_length=10)
     priority: str
-    estimated_cost: float = Field(ge=0, allow_inf_nan=False)
+    estimated_cost: Optional[float] = Field(default=0.0, ge=0, allow_inf_nan=False)
     review_reason: str = Field(min_length=10)
 
 
@@ -516,13 +563,12 @@ def convert_to_work_order(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    if not isinstance(current_user, models.Official) or current_user.role not in (
-        "dispatcher", "project_engineer", "asst_city_engineer", "city_engineer", "manager", "system_admin"
-    ):
+    if not can(current_user, 'maintenance', 'create_work_order'):
         raise HTTPException(status_code=403, detail="Access denied to convert to work order")
     asset = db.query(InfrastructureAsset).filter_by(asset_id=req.asset_id).with_for_update().first()
     if not asset:
         raise HTTPException(status_code=404, detail="Infrastructure asset not found")
+    require_asset_scope(db, current_user, asset)
     priority = {"critical": "critical", "high": "high", "moderate": "normal", "low": "low"}.get(req.priority.lower())
     if priority is None:
         raise HTTPException(status_code=422, detail="Unsupported priority")
@@ -543,7 +589,7 @@ def convert_to_work_order(
             estimated_cost=req.estimated_cost,
             wo_type="preemptive",
             asset_id=asset.asset_id,
-            ai_plan_summary=req.plan_summary.strip(),
+            ai_plan_summary=None,
             notes=f"Human review reason: {req.review_reason.strip()}",
         ),
         actor_id=current_user.id,
@@ -571,7 +617,7 @@ def export_predictive_data(
     import io
     from fastapi.responses import StreamingResponse
     
-    assets = db.query(InfrastructureAsset).limit(200).all()
+    assets = scoped_assets(db.query(InfrastructureAsset), current_user).limit(200).all()
     
     output = io.StringIO()
     writer = csv.writer(output)

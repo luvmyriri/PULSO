@@ -91,8 +91,8 @@
 }
 
 .work-orders-tab.is-active {
-    color: #ff6b00;
-    border-bottom-color: #ff6b00;
+    color: var(--gov-action, #166534);
+    border-bottom-color: var(--gov-action, #166534);
     font-weight: 700;
 }
 
@@ -103,13 +103,13 @@
     font-size: 11px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     font-weight: 700;
-    border: 1px solid var(--gov-rule, #c9d4d9);
+    border: 1px solid var(--gov-rule, #e2e8f0);
 }
 
 .work-orders-tab.is-active .work-orders-tab-count {
-    background: #ffefe5;
-    color: #ff6b00;
-    border-color: rgba(255, 107, 0, 0.3);
+    background: #f0fdf4;
+    color: #166534;
+    border-color: rgba(22, 101, 52, 0.3);
 }
 
 .work-orders-create-btn {
@@ -122,10 +122,10 @@
     color: #ffffff;
     background: #ff6b00;
     border: 1px solid #ff6b00;
-    border-radius: 12px;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s ease;
-    box-shadow: 0 1px 2px rgba(255, 107, 0, 0.2);
+    box-shadow: 0 1px 2px rgba(22, 101, 52, 0.2);
 }
 
 .work-orders-create-btn:hover {
@@ -248,7 +248,7 @@
     background: transparent;
     border: none;
     font-weight: 700;
-    color: var(--gov-action, #0b4f6c);
+    color: var(--gov-action, #166534);
     cursor: pointer;
     font-family: "IBM Plex Mono", monospace;
     font-size: 12px;
@@ -281,8 +281,8 @@
 }
 
 .gov-priority-badge.is-normal {
-    background: var(--gov-action-soft, rgba(11, 79, 108, 0.12));
-    color: var(--gov-action, #0b4f6c);
+    background: var(--gov-action-soft, rgba(22, 101, 52, 0.12));
+    color: var(--gov-action, #166534);
 }
 
 .gov-priority-badge.is-low {
@@ -307,7 +307,7 @@
 
 .gov-state-badge.is-assigned {
     background: var(--gov-action-soft, rgba(11, 79, 108, 0.1));
-    color: var(--gov-action, #0b4f6c);
+    color: var(--gov-action, #166534);
 }
 
 .gov-state-badge.is-in_progress {
@@ -372,7 +372,7 @@
     align-self: flex-start;
     font-size: 12px;
     font-weight: 600;
-    color: var(--gov-action, #0b4f6c);
+    color: var(--gov-action, #166534);
     background: transparent;
     border: none;
     cursor: pointer;
@@ -417,7 +417,7 @@
 .wo-docket-btn-back {
     background: transparent;
     border: none;
-    color: var(--gov-action, #0b4f6c);
+    color: var(--gov-action, #166534);
     cursor: pointer;
     font-weight: 600;
     padding: 0;
@@ -500,12 +500,12 @@
 }
 
 .wo-pulseline-step.is-done .wo-pulseline-dot {
-    border-color: var(--gov-action, #0b4f6c);
+    border-color: var(--gov-action, #166534);
     background: var(--gov-action, #0b4f6c);
 }
 
 .wo-pulseline-step.is-current .wo-pulseline-dot {
-    border-color: var(--gov-action, #0b4f6c);
+    border-color: var(--gov-action, #166534);
     background: var(--gov-surface, #ffffff);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--gov-action, #0b4f6c) 25%, transparent);
 }
@@ -518,7 +518,7 @@
 }
 
 .wo-pulseline-step.is-current .wo-pulseline-label {
-    color: var(--gov-action, #0b4f6c);
+    color: var(--gov-action, #166534);
     font-weight: 700;
 }
 

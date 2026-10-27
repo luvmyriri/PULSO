@@ -56,6 +56,12 @@ Use compact mono data for real record context, for example ticket, barangay, coo
 
 ## Color contract
 
+**Latest user-supplied reference, 27 October 2026:** supersedes the earlier lime/pale-green selection mapping below. Follow the supplied resident-portal palette: orange primary emphasis, pale warm-orange selection, white/cool-neutral surfaces and restrained teal/mint secondary accents. Keep semantic status/focus colors distinct and retain dark-blue operational text. The screenshot is visual direction; its resident sample names/data are not government content.
+
+**Application correction, 27 October 2026:** emphasize orange/light-green accents and chart marks while light-mode page/card backgrounds remain white. Keep existing text colors. Subtle raised bar highlights/shadows and recessed tracks are explicitly requested. This supersedes the earlier proposed color dosage/role mapping where it conflicts; status and focus roles remain distinct.
+
+**User correction, 27 October 2026:** PULSO's brand palette is orange, light green, white, and dark blue. This is the current approved palette direction; exact swatches remain unspecified. The role table below records the earlier Civic Aperture working mapping and requires reconciliation with this correction. Do not present cyan/Field Blue and teal as the complete brand palette. A working application is orange for primary emphasis, light green for supporting accents, white for work surfaces, and dark blue for structure/dark mode; the white-first action/selection mapping was subsequently approved by the user on 27 October 2026: orange for actions and AI/chart emphasis, the same pale green for navigation/tab/record selection, white work surfaces and existing text colors. Preserve distinct semantic warning, critical, resolved and focus meanings.
+
 | Semantic role | Light | Dark | Use |
 |---|---:|---:|---|
 | Canvas | `#F4F7F5` | `#071A2B` | Page environment |

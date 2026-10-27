@@ -20,11 +20,11 @@ from sqlalchemy.engine import make_url
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / "backend" / "schema" / "baseline_c455ca49f6d5.sql"
 BASELINE_INVENTORY = ROOT / "backend" / "schema" / "baseline_c455ca49f6d5.inventory.json"
-HEAD_INVENTORY = ROOT / "backend" / "schema" / "head_f3a6d8c1b250.inventory.json"
-PREVIOUS_INVENTORY = ROOT / "backend" / "schema" / "head_e4b7c9d2f610.inventory.json"
+HEAD_INVENTORY = ROOT / "backend" / "schema" / "head_18efa117cb09.inventory.json"
+PREVIOUS_INVENTORY = ROOT / "backend" / "schema" / "head_f3a6d8c1b250.inventory.json"
 BASELINE_REVISION = "c455ca49f6d5"
-HEAD_REVISION = "f3a6d8c1b250"
-PREVIOUS_REVISION = "e4b7c9d2f610"
+HEAD_REVISION = "18efa117cb09"
+PREVIOUS_REVISION = "f3a6d8c1b250"
 
 
 def connection_kwargs(database: str | None = None) -> dict:
@@ -298,6 +298,18 @@ def command_check_existing() -> None:
     elif revision == PREVIOUS_REVISION:
         expected = load_inventory(PREVIOUS_INVENTORY)
         state = "previous"
+    elif revision == '11d6f8a0b432':
+        expected = load_inventory(ROOT / 'backend/schema/head_11d6f8a0b432.inventory.json')
+        state = 'previous'
+    elif revision == '10c5e7f9a321':
+        expected = load_inventory(ROOT / 'backend/schema/head_10c5e7f9a321.inventory.json')
+        state = 'previous'
+    elif revision == '09b4d6e8f210':
+        expected = load_inventory(ROOT / 'backend/schema/head_09b4d6e8f210.inventory.json')
+        state = 'previous'
+    elif revision == 'e4b7c9d2f610':
+        expected = load_inventory(ROOT / 'backend/schema/head_e4b7c9d2f610.inventory.json')
+        state = 'previous'
     elif revision in {None, BASELINE_REVISION}:
         expected = load_inventory(BASELINE_INVENTORY)
         state = "baseline"

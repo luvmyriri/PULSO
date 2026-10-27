@@ -1,0 +1,137 @@
+.gov-assistant {
+    --assistant-edge:24px;
+    --assistant-action-ink:#ffffff;
+    color:var(--gov-text, var(--text-primary));
+    font-family:inherit;
+    font-size:14px;
+    line-height:1.5;
+}
+.dark .gov-assistant {--assistant-action-ink:#082536;}
+.gov-assistant__launcher {
+    position:fixed;
+    z-index:80;
+    right:var(--assistant-edge);
+    bottom:calc(var(--assistant-edge) + env(safe-area-inset-bottom));
+    display:grid;
+    place-items:center;
+    width:56px;
+    height:56px;
+    border:0;
+    border-radius:50%;
+    background:transparent;
+    color:var(--assistant-action-ink);
+    box-shadow:var(--gov-depth-dialog);
+    cursor:pointer;
+    opacity:1;
+    transition:opacity 240ms ease-out;
+}
+.gov-assistant__launcher[data-idle="true"] {opacity:.65;}
+.gov-assistant__launcher > .ai-brand-mark {width:56px;height:56px;}
+.gov-assistant[data-open="true"] .gov-assistant__launcher {background:var(--gov-surface-elevated);color:var(--gov-text);border:1px solid var(--gov-rule);}
+.gov-assistant__launcher:is(:hover,:focus-visible,:active) {opacity:1;}
+.gov-assistant__unread {position:absolute;top:1px;right:1px;width:12px;height:12px;border:2px solid var(--gov-surface);border-radius:50%;background:var(--gov-action);}
+.gov-assistant__panel {
+    position:fixed;
+    margin:0;
+    padding:0;
+    color:inherit;
+    z-index:80;
+    right:var(--assistant-edge);
+    left:auto;
+    top:auto;
+    bottom:calc(92px + env(safe-area-inset-bottom));
+    display:flex;
+    flex-direction:column;
+    width:408px;
+    max-width:calc(100vw - 32px);
+    height:min(640px, calc(100dvh - 116px));
+    min-height:0;
+    overflow:hidden;
+    border:1px solid var(--gov-rule);
+    border-radius:16px;
+    background:var(--gov-surface);
+    box-shadow:var(--gov-depth-dialog);
+}
+.gov-assistant__panel::backdrop {background:rgb(8 20 35 / .35);}
+.gov-assistant button {font:inherit;}
+.gov-assistant button:disabled {cursor:not-allowed;opacity:.48;}
+.gov-assistant :is(button,textarea,[tabindex]):focus-visible {outline:3px solid var(--gov-focus, #2563eb);outline-offset:3px;}
+.gov-assistant__header {position:relative;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 20px;flex-shrink:0;}
+.gov-assistant__header > svg {color:var(--gov-action);flex-shrink:0;}
+.gov-assistant__header > div {flex:1;min-width:0;}
+.gov-assistant__header h2 {margin:0;font-size:16px;font-weight:700;}
+.gov-assistant__header p {margin:2px 0 0;font-size:12px;color:var(--gov-text-secondary);}
+.gov-assistant__header button {display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;}
+.gov-assistant__header button:hover {background:var(--gov-surface-subtle);}
+.gov-assistant__log {flex:1;min-height:0;overflow:auto;padding:22px 20px;scrollbar-width:none;overflow-wrap:anywhere;}
+.gov-assistant__welcome h3 {margin:0 0 10px;font-size:26px;font-weight:650;line-height:1.25;text-wrap:balance;}
+.gov-assistant__welcome > p {color:var(--gov-text-secondary);margin:0;font-size:13px;text-wrap:balance;}
+.gov-assistant__starters {display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:14px 20px 0;flex-shrink:0;}
+.gov-assistant__starters button {min-height:44px;padding:8px 12px;border:1px solid var(--gov-rule);border-radius:22px;background:transparent;color:var(--gov-text-secondary);font:inherit;font-size:12px;cursor:pointer;}
+.gov-assistant__starters button:hover {background:var(--gov-selection);color:var(--gov-action);}
+.gov-assistant__log::-webkit-scrollbar,.gov-assistant__composer textarea::-webkit-scrollbar {display:none;}
+.gov-assistant__about {position:static;}
+.gov-assistant__about summary {display:grid;place-items:center;width:44px;height:44px;border-radius:10px;color:var(--gov-text-secondary);cursor:pointer;list-style:none;}
+.gov-assistant__about summary::-webkit-details-marker {display:none;}
+.gov-assistant__about summary:focus-visible {outline:3px solid var(--gov-focus);outline-offset:3px;}
+.gov-assistant__about p {position:absolute;z-index:2;right:12px;top:calc(100% - 2px);width:calc(100% - 24px);max-width:280px;padding:14px;border:1px solid var(--gov-rule);border-radius:12px;background:var(--gov-surface-elevated);box-shadow:var(--gov-depth-dialog);font-size:12px;line-height:1.6;color:var(--gov-text-secondary);}
+.gov-assistant__message + .gov-assistant__message {margin-top:24px;}
+.gov-assistant__speaker {margin:0 0 6px;font-size:12px;font-weight:700;color:var(--gov-text-secondary);}
+.gov-assistant__message--user {margin-left:24px;padding:12px 14px;background:var(--gov-selection);border-radius:12px;}
+.gov-assistant__question {white-space:pre-wrap;margin:0;}
+.gov-assistant__answer > :first-child {margin-top:0;}
+.gov-assistant__answer > :last-child {margin-bottom:0;}
+.gov-assistant__answer p {margin:0 0 12px;}
+.gov-assistant__answer :is(ul,ol) {padding-left:22px;margin:10px 0;}
+.gov-assistant__answer ul {list-style:disc;}
+.gov-assistant__answer ol {list-style:decimal;}
+.gov-assistant__answer li + li {margin-top:6px;}
+.gov-assistant__answer :is(h1,h2,h3,h4) {font-size:16px;font-weight:700;margin:20px 0 8px;}
+.gov-assistant__answer pre {white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:var(--gov-surface-subtle);border-radius:8px;}
+.gov-assistant__answer a {color:var(--gov-action);text-decoration:underline;text-underline-offset:3px;}
+.gov-assistant__answer blockquote {margin:12px 0;padding-left:12px;border-left:1px solid var(--gov-rule);}
+.gov-assistant__waiting,.gov-assistant__caption {font-size:12px;color:var(--gov-text-secondary);margin:16px 0 0;}
+.gov-assistant__error {margin-top:18px;padding:12px;background:var(--gov-surface-subtle);border:1px solid var(--gov-rule);border-radius:10px;}
+.gov-assistant__error p {margin:0;}
+.gov-assistant__error > div {display:flex;gap:12px;}
+.gov-assistant__error button {min-height:44px;border:0;padding:6px 0;background:transparent;color:var(--gov-action);text-decoration:underline;cursor:pointer;}
+.gov-assistant__composer {display:flex;gap:8px;align-items:flex-end;margin:0 16px;padding:8px;border:1px solid var(--gov-rule);border-radius:20px;background:var(--gov-control-surface);box-shadow:var(--gov-depth-inset);flex-shrink:0;}
+.gov-assistant__composer textarea {flex:1;min-width:0;min-height:48px;max-height:120px;resize:none;scrollbar-width:none;padding:5px 6px;background:transparent;border:0;border-radius:6px;color:inherit;font:inherit;caret-color:var(--gov-action);}
+.gov-assistant__composer textarea::placeholder {color:var(--gov-text-secondary);opacity:1;}
+.gov-assistant__send {display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;border:1px solid var(--gov-action);border-radius:50%;color:var(--assistant-action-ink);background:var(--gov-action);cursor:pointer;}
+.gov-assistant__hint {margin:10px 20px 14px;font-size:11px;color:var(--gov-text-secondary);text-align:center;flex-shrink:0;}
+.gov-assistant__sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
+/* Keep the floating launcher out of the last action in shared workspace footers. */
+#root:has(.gov-assistant[data-mode="floating"]) :is(.gov-table-footer,.gov-pagination,.gov-form-actions):not(dialog *) {padding-inline-end:88px;}
+@media(max-width:639px),(max-height:500px) {
+    .gov-assistant {--assistant-edge:16px;}
+    .gov-assistant__panel {inset:8px 8px calc(8px + env(safe-area-inset-bottom));width:auto;max-width:none;height:auto;border-radius:12px;}
+    .gov-assistant[data-open="true"] .gov-assistant__launcher {display:none;}
+    .gov-assistant__header {gap:8px;padding:10px 8px 10px 14px;}
+    .gov-assistant__header > svg {display:none;}
+    .gov-assistant__log {padding:20px 16px;}
+}
+
+.gov-assistant[data-mode="floating"][data-has-messages="false"] .gov-assistant__log {display:flex;align-items:center;justify-content:center;text-align:center;}
+.gov-assistant[data-mode="floating"][data-has-messages="false"] .gov-assistant__welcome {max-width:30ch;}
+.gov-assistant[data-mode="embedded"] .gov-assistant__panel {position:relative;inset:auto;width:100%;max-width:none;height:clamp(520px, calc(100dvh - 420px), 640px);max-height:none;border-radius:16px;box-shadow:var(--gov-depth-panel);}
+.gov-assistant[data-mode="embedded"] .gov-assistant__header {padding:10px 12px 10px 18px;}
+.gov-assistant[data-mode="embedded"] .gov-assistant__header h2 {font-size:15px;}
+.gov-assistant[data-mode="embedded"] .gov-assistant__log {padding:24px 22px;}
+.gov-assistant[data-mode="embedded"][data-has-messages="false"] .gov-assistant__log {display:flex;align-items:center;justify-content:center;text-align:center;}
+.gov-assistant[data-mode="embedded"] .gov-assistant__welcome h3 {font-size:26px;margin:0 0 12px;}
+.gov-assistant[data-mode="embedded"] .gov-assistant__composer {margin-inline:14px;}
+.gov-assistant-slot {min-width:0;}
+.gov-page-content > .gov-assistant-slot {max-width:400px;margin:0 0 20px auto;}
+@media(max-width:639px) {
+    .gov-assistant[data-mode="embedded"] .gov-assistant__header {padding:8px 8px 8px 14px;}
+    .gov-assistant[data-mode="embedded"] .gov-assistant__welcome h3 {font-size:24px;}
+    .gov-assistant[data-mode="embedded"] .gov-assistant__log {padding-inline:18px;}
+    .gov-assistant__starters {gap:6px;padding-inline:12px;}
+}
+@media(prefers-reduced-motion:reduce) {.gov-assistant__launcher {transition:none;}}
+@media(forced-colors:active) {
+    .gov-assistant__panel,.gov-assistant__launcher,.gov-assistant__composer,.gov-assistant__send {border:1px solid ButtonText;box-shadow:none;}
+    .gov-assistant__launcher[data-idle="true"] {opacity:1;}
+    .gov-assistant :is(button,textarea,[tabindex]):focus-visible {outline-color:Highlight;}
+}

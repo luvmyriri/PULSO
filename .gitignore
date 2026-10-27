@@ -58,3 +58,6 @@ backend/scratch/
 .agent/
 diag_out.json
 *.pptx
+
+# Private editorial draft documents
+backend/private_publications/

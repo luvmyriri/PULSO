@@ -1,11 +1,11 @@
+import { adminAllows } from '../utils/adminAccess';
 import React, { useState, useRef } from 'react';
 import ReCAPTCHA from "react-google-recaptcha";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    Shield, Lock, User, Eye, EyeOff, ChevronRight, Activity,
-    Mail, ArrowLeft, CheckCircle, FileCheck, BookOpen, ExternalLink,
-    Map, ShieldCheck, Home, Users, AlertCircle, X
+    Shield, Lock, User, Eye, EyeOff, ChevronRight,
+    Mail, ArrowLeft, CheckCircle, Home, Users, AlertCircle, ShieldCheck
 } from 'lucide-react';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -30,7 +30,6 @@ export default function GovLanding() {
     const [captchaToken, setCaptchaToken] = useState(null);
     const recaptchaRef = useRef(null);
     const passwordInputRef = useRef(null);
-    const [activeModal, setActiveModal] = useState(null); // 'directives' | 'resources' | null
 
     const handleLogin = async (e) => {
         if (e && e.preventDefault) e.preventDefault();
@@ -61,8 +60,10 @@ export default function GovLanding() {
                         'building_inspector','electrical_inspector','mechanical_inspector',
                         'dispatcher','manager','system_admin',
                     ];
-                    if (GOV_ROLES.includes(data.user.role)) {
-                        navigate('/gov/my-dashboard');
+                    if (GOV_ROLES.includes(data.user.role) || data.user.account_type === 'staff') {
+                        const returnTo=new URLSearchParams(window.location.search).get('returnTo');
+                        const fallback=GOV_ROLES.includes(data.user.role)?'/gov/my-dashboard':adminAllows(data.user,'view')?'/gov/administration':'/gov/account';
+                        navigate(returnTo && /^\/gov\/(?:account|reports|map|dashboard|my-work|today|work-orders|assets|records-workspace|insights|announcements|administration)(?:[/?#]|$)/.test(returnTo) && !returnTo.includes('\\') ? returnTo : fallback);
                     } else {
                         setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');
                         clearAuthSession();
@@ -79,7 +80,7 @@ export default function GovLanding() {
                     setCaptchaToken(null);
                 }
             } catch (err) {
-                setError('System Connectivity Error');
+                setError('We could not reach PULSO. Check your connection and try again.');
                 throw err;
             }
         }, 2000); // 2 second throttle between clicks
@@ -91,7 +92,7 @@ export default function GovLanding() {
         
         await throttleAction(async () => {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+                const response = await fetch(`${API_BASE_URL}/api/admin/staff-credentials/request`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: recoveryEmail })
@@ -104,31 +105,17 @@ export default function GovLanding() {
                     const msg = typeof data.detail === 'object' 
                         ? (Array.isArray(data.detail) ? data.detail[0].msg : JSON.stringify(data.detail))
                         : data.detail;
-                    setError(msg || 'Recovery failed. Internal protocol error.');
+                    setError(msg || 'The request could not be saved. Try again.');
                 }
             } catch (err) {
-                setError('System Connectivity Error');
+                setError('We could not reach PULSO. Check your connection and try again.');
                 throw err;
             }
         }, 3000); // 3 second throttle for recovery requests (DB protection)
     };
 
-    const DIRECTIVES = [
-        { id: 'DIR-2026-004', title: 'Q1 Infrastructure Maintenance Protocol', date: 'March 22, 2026', author: 'City Engineer' },
-        { id: 'DIR-2026-003', title: 'Updated Safety Standards for Field Personnel', date: 'March 15, 2026', author: 'Safety Office' },
-        { id: 'DIR-2026-002', title: 'Digital Transition and AI Triage Training', date: 'March 10, 2026', author: 'IT Division' },
-        { id: 'DIR-2026-001', title: 'Fiscal Year 2026 Engineering Budget Allocation', date: 'January 5, 2026', author: 'Admin' },
-    ];
-
-    const RESOURCES = [
-        { title: 'Civil Engineering Code (v2.4)', type: 'Document', size: '12.4 MB', icon: BookOpen },
-        { title: 'Procurement (RA 9184) Handbook', type: 'Legal Reference', size: '4.2 MB', icon: ShieldCheck },
-        { title: 'LGU Standard Operating Procedures', type: 'Flowchart', size: '1.8 MB', icon: Activity },
-        { title: 'Caloocan Utility Map', type: 'Geospatial Data', size: '88 MB', icon: Map },
-    ];
-
     return (
-        <div className="relative min-h-screen w-full bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
+        <div className="relative min-h-screen w-full bg-[#f7f8fa] dark:bg-[#090e18] text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden">
 
             {/* ── Top Header: Branding & Navigation ───────────── */}
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
@@ -146,22 +133,6 @@ export default function GovLanding() {
 
                 {/* Controls & Nav */}
                 <div className="flex items-center gap-2.5 sm:gap-4">
-                    <div className="hidden md:flex items-center gap-4 text-xs font-bold pr-4 border-r border-slate-200 dark:border-slate-800">
-                        <button
-                            type="button"
-                            onClick={() => setActiveModal('directives')}
-                            className="text-slate-600 dark:text-slate-300 hover:text-[#ff6b00] transition-colors uppercase tracking-wider cursor-pointer"
-                        >
-                            Directives
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveModal('resources')}
-                            className="text-slate-600 dark:text-slate-300 hover:text-[#ff6b00] transition-colors uppercase tracking-wider cursor-pointer"
-                        >
-                            Resources
-                        </button>
-                    </div>
                     <ThemeToggle />
                     <Link
                         to="/login"
@@ -210,7 +181,7 @@ export default function GovLanding() {
 
                         {/* Plain-Language Subtitle */}
                         <p className="text-sm sm:text-base lg:text-lg text-slate-600 dark:text-slate-300 font-normal leading-relaxed mb-6 max-w-xl">
-                            Official engineering management and public service operations platform for LGU personnel. Authorized access only.
+                            Review reports, coordinate engineering work and maintain city records. Access is limited to authorized staff.
                         </p>
                     </div>
 
@@ -231,10 +202,10 @@ export default function GovLanding() {
                                         >
                                             <div className="mb-6 text-left">
                                                 <h2 className="text-xl sm:text-2xl font-heading font-black text-slate-900 dark:text-white tracking-tight">
-                                                    Internal Gateway
+                                                    Staff sign in
                                                 </h2>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                    Verify credentials for command center access.
+                                                    Use your assigned PULSO staff account.
                                                 </p>
                                             </div>
 
@@ -361,7 +332,7 @@ export default function GovLanding() {
                                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                     ) : (
                                                         <>
-                                                            <span>Initialize Session</span>
+                                                            <span>Sign in</span>
                                                             <ChevronRight size={16} />
                                                         </>
                                                     )}
@@ -383,10 +354,10 @@ export default function GovLanding() {
                                                         <CheckCircle size={30} />
                                                     </div>
                                                     <h2 className="text-xl font-heading font-bold text-slate-900 dark:text-white mb-1.5">
-                                                        Recovery Sent
+                                                        Recovery request recorded
                                                     </h2>
                                                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                                                        An administrative recovery protocol has been initiated for <span className="text-[#ff6b00] font-semibold">{recoveryEmail}</span>. Please check your official inbox.
+                                                        If this is an eligible staff account, your request is recorded for administrator review. Contact your department administrator to arrange recovery. No email has been sent.
                                                     </p>
                                                     <button
                                                         onClick={() => { setView('login'); setRecoverySent(false); }}
@@ -399,10 +370,10 @@ export default function GovLanding() {
                                                 <>
                                                     <div className="mb-6 text-left">
                                                         <h2 className="text-xl sm:text-2xl font-heading font-black text-slate-900 dark:text-white tracking-tight">
-                                                            Recover Password
+                                                            Request account recovery
                                                         </h2>
                                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                            Enter your registered personnel email to initiate recovery.
+                                                            Enter your staff email to request help from your administrator.
                                                         </p>
                                                     </div>
 
@@ -442,7 +413,7 @@ export default function GovLanding() {
                                                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                             ) : (
                                                                 <>
-                                                                    <span>Send Recovery Link</span>
+                                                                    <span>Request account recovery</span>
                                                                     <ChevronRight size={16} />
                                                                 </>
                                                             )}
@@ -507,91 +478,7 @@ export default function GovLanding() {
                 initialTab={legalModal.tab}
             />
 
-            {/* PORTAL MODALS (Directives & Resources) */}
-            <AnimatePresence>
-                {activeModal && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setActiveModal(null)}
-                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, y: 16, opacity: 0 }}
-                            animate={{ scale: 1, y: 0, opacity: 1 }}
-                            exit={{ scale: 0.95, y: 16, opacity: 0 }}
-                            onClick={e => e.stopPropagation()}
-                            className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden"
-                        >
-                            <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                                <div className="flex items-center gap-3.5">
-                                    <div className="w-10 h-10 bg-orange-50 dark:bg-orange-950/60 text-[#ff6b00] rounded-xl flex items-center justify-center border border-orange-200 dark:border-orange-800/60">
-                                        {activeModal === 'directives' ? <FileCheck size={20} /> : <BookOpen size={20} />}
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-heading font-black text-slate-900 dark:text-white tracking-tight capitalize">{activeModal}</h3>
-                                        <p className="text-[10px] font-mono-data font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Engineering Official Repository</p>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => setActiveModal(null)} 
-                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
 
-                            <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                                {activeModal === 'directives' ? (
-                                    <div className="space-y-3">
-                                        {DIRECTIVES.map(dir => (
-                                            <div key={dir.id} className="group p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-[#ff6b00]/40 transition-all flex items-center justify-between">
-                                                <div className="flex items-center gap-3.5">
-                                                    <div className="font-mono-data text-[10px] font-black px-2 py-1 bg-slate-900 dark:bg-slate-700 text-white rounded-md shrink-0">{dir.id}</div>
-                                                    <div>
-                                                        <h4 className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">{dir.title}</h4>
-                                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">{dir.author} • {dir.date}</p>
-                                                    </div>
-                                                </div>
-                                                <button className="flex items-center gap-1 text-xs font-bold text-[#ff6b00] opacity-0 group-hover:opacity-100 transition-opacity shrink-0 cursor-pointer">
-                                                    <span>View</span> <ExternalLink size={12} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                                        {RESOURCES.map((res, i) => (
-                                            <div key={i} className="group p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-[#ff6b00]/40 transition-all">
-                                                <div className="flex items-center gap-2.5 mb-2.5">
-                                                    <div className="w-8 h-8 bg-orange-50 dark:bg-orange-950/60 text-[#ff6b00] rounded-lg flex items-center justify-center border border-orange-200 dark:border-orange-800/50">
-                                                        <res.icon size={16} />
-                                                    </div>
-                                                    <div className="text-[10px] font-mono-data font-bold text-[#ff6b00] uppercase tracking-wider">{res.type}</div>
-                                                </div>
-                                                <h4 className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white leading-snug mb-2 group-hover:text-[#ff6b00] transition-colors">{res.title}</h4>
-                                                <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800">
-                                                    <span className="text-[10px] font-mono-data text-slate-500 dark:text-slate-400">{res.size}</span>
-                                                    <button className="p-1 text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer">
-                                                        <ExternalLink size={13} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-800 text-center">
-                                <p className="text-[10px] font-mono-data font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Confidential Administrative System • Authorized Personnel Only
-                                </p>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </div>
     );
 }

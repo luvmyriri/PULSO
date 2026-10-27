@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import GovReportsDashboard from './GovReportsDashboard';
-import DispatcherDashboard from './DispatcherDashboard';
+import GovReportsMapPage from './GovReportsMapPage';
 import GovAnalyticsPage from './GovAnalyticsPage';
 import AdministrationWorkspacePage from './AdministrationWorkspacePage';
 import PredictiveMaintenancePage from './PredictiveMaintenancePage';
@@ -17,7 +17,7 @@ import {
 
 const VIEW_COMPONENTS = {
     operations: {
-        dispatch: DispatcherDashboard,
+        dispatch: GovReportsMapPage,
         reports: GovReportsDashboard,
         'work-orders': WorkOrdersPage,
         closed: () => <GovDivisionPage workspace="operations" activePathOverride="/gov/reports-archive" />,
@@ -36,6 +36,7 @@ const VIEW_COMPONENTS = {
     },
     administration: {
         staff: AdministrationWorkspacePage,
+        audit: AdministrationWorkspacePage,
         residents: AdministrationWorkspacePage,
         settings: AdministrationWorkspacePage,
         'automated-ai': AdministrationWorkspacePage,
@@ -51,11 +52,16 @@ export default function GovernmentWorkspaceRoute({ workspace }) {
     const availableViews = getAvailableWorkspaceViews(workspace, currentUser);
     const searchParams = new URLSearchParams(location.search);
     const rawRequested = searchParams.get('view') || searchParams.get('tab');
-    const requestedView = (rawRequested === 'agents' || rawRequested === 'ai-tools') ? 'automated-ai' : rawRequested;
+    const requestedView =
+        rawRequested === 'agents' || rawRequested === 'ai-tools'
+            ? 'automated-ai'
+            : rawRequested === 'overview'
+            ? 'analytics'
+            : rawRequested;
     const activeView = availableViews.find((view) => view.key === requestedView) || availableViews[0];
 
-    if (!definition || !activeView) return <Navigate to="/gov/my-dashboard" replace />;
-    if (requestedView !== activeView.key) {
+    if (!definition || !activeView) return <Navigate to="/gov/dashboard" replace />;
+    if (requestedView && requestedView !== activeView.key) {
         const nextParams = new URLSearchParams(location.search);
         nextParams.set('view', activeView.key);
         nextParams.set('tab', activeView.key);

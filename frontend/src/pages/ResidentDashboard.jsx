@@ -1,3 +1,5 @@
+import { residentPublication } from '../utils/publicationAdapter';
+import ResidentNotificationSettings from '../components/ResidentNotificationSettings';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +17,22 @@ import {
     LayoutDashboard,
     Bell,
     User,
+    Users,
+    Database,
+    LifeBuoy,
+    Cookie,
+    Palette,
+    SlidersHorizontal,
+    BarChart2,
+    Building2,
+    LayoutGrid,
+    ClipboardCheck,
+    AlignLeft,
+    ExternalLink,
+    MoreHorizontal,
+    XCircle,
+    Paperclip,
+    ArrowUpDown,
     Settings,
     LogOut,
     CheckCircle2,
@@ -98,18 +116,24 @@ import {
     History,
     Trash2,
     Signpost,
-    Globe
+    Globe,
+    Waves,
+    List,
+    Megaphone,
+    ArrowRightLeft,
+    Car
 } from 'lucide-react';
 
 import PulseAIMarkdown from '../components/PulseAIMarkdown';
 import PulseAIChatWindow from '../components/PulseAIChatWindow';
+import PulseAIIcon from '../components/common/PulseAIIcon';
 import ReportHistoryCard from '../components/ReportHistoryCard';
 import ReportDetailView from '../components/ReportDetailView';
 import { useTheme } from '../contexts/ThemeContext';
 import Swal from 'sweetalert2';
 import Branding from '../components/Branding';
 import { useTranslation } from 'react-i18next';
-import { getAuthToken, getAuthUser, setAuthSession, clearAuthSession } from '../utils/authSession';
+import { getAuthToken, getAuthUser, clearAuthSession, setAuthSession } from '../utils/authSession';
 import {
     formatTicketId,
     getStatusDescriptor,
@@ -121,7 +145,6 @@ import { apiFetch, dedupeFetch, checkServerHealth, logApiFailure } from '../util
 import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 import ClaimReportModal from '../components/modals/ClaimReportModal';
 import IDCameraModal from '../components/IDCameraModal';
-import { watermarkEvidenceFile } from '../utils/watermark';
 import AvatarCropModal, { validateAvatarFile } from '../components/AvatarCropModal';
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
 import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
@@ -133,6 +156,7 @@ import LatestReportCard from '../components/LatestReportCard';
 import HomeHeader from '../components/HomeHeader';
 import BrandHeader from '../components/BrandHeader';
 import SettingsRow from '../components/SettingsRow';
+import { FlagPH, FlagUS } from '../components/FlagIcons';
 
 import {
     NORTH_CALOOCAN_PATH,
@@ -163,6 +187,7 @@ import {
     isMinimumViableAddress
 } from '../utils/philippineAddress';
 import { isUsingNameFallback } from '../utils/greetingHelper';
+import { validateProfanity } from '../utils/profanityFilter';
 
 export const formatAddress = (addr) => {
     if (!addr || typeof addr !== 'string') return '';
@@ -260,6 +285,7 @@ const REPORT_CATEGORIES = (t) => [
     { value: 'Traffic & Road Signs', label: t('landing.solutions.traffic_title', { defaultValue: 'Traffic & Road Signs' }) },
     { value: 'Public Safety & Hazards', label: t('landing.solutions.s4_title', { defaultValue: 'Public Safety & Hazards' }) },
     { value: 'Public Buildings & Facilities', label: t('landing.solutions.s5_title', { defaultValue: 'Public Buildings & Facilities' }) },
+    { value: 'Electrical Wiring', label: 'Electrical Wiring' },
     { value: 'Others', label: t('landing.solutions.s6_title', { defaultValue: 'Others' }) },
 ];
 
@@ -298,7 +324,7 @@ const NAV_ITEMS = (t) => [
     { id: 'reports', icon: <FileText size={22} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
     { id: 'report', icon: <Plus size={24} strokeWidth={3} aria-hidden="true" />, label: t('dashboard.sidebar.report', { defaultValue: 'Report' }), isAction: true },
     { id: 'updates', icon: <History size={22} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
-    { id: 'profile', icon: <User size={22} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
+    { id: 'more', icon: <MoreHorizontal size={22} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.more', { defaultValue: 'More' }) },
 ];
 
 const LGU_SERVICES_LIST = (t) => [
@@ -380,101 +406,161 @@ export const UserAvatar = ({
     );
 };
 
-const LeftSidebar = ({ user, activeTab, handleSetTab, handleSetModal, handleLogout, t, unreadCount, unreadBadgeText }) => {
+const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModal, handleLogout, t, unreadCount, unreadBadgeText }) => {
     const navDestinations = [
-        { id: 'overview', icon: <Home size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.home', { defaultValue: 'Home' }) },
-        { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.reports', { defaultValue: 'My reports' }) },
-        { id: 'updates', icon: <History size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.updates', { defaultValue: 'Updates' }) },
-        { id: 'profile', icon: <User size={19} strokeWidth={2} aria-hidden="true" />, label: t('dashboard.sidebar.account', { defaultValue: 'Account' }) },
+        { id: 'overview', icon: <Home size={19} strokeWidth={2.2} aria-hidden="true" />, label: 'Home' },
+        { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: 'My Reports' },
+        { id: 'updates', icon: <Bell size={19} strokeWidth={2} aria-hidden="true" />, label: 'Updates' },
+        { id: 'map', icon: <MapIcon size={19} strokeWidth={2} aria-hidden="true" />, label: 'Map' },
     ];
 
+    const residentInitial = (() => {
+        if (user?.avatar) return user.avatar;
+        if (user?.name && user.name.trim()) return user.name.trim()[0].toUpperCase();
+        return 'M';
+    })();
+
     return (
-        <div className="w-full h-full pb-6 hidden lg:flex flex-col justify-between pl-2 pr-4 lg:pr-5 pt-6 border-r border-slate-200/80 dark:border-slate-800">
+        <div className="w-full h-full pb-3 hidden lg:flex flex-col justify-between pt-2.5 px-3">
             <div>
-                {/* User Identity Snapshot */}
-                <div onClick={() => handleSetTab('profile')} className="flex items-center gap-3 p-3 mb-5 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/60 hover:border-orange-500/50 cursor-pointer transition-all group shadow-2xs">
-                    <div className={`w-11 h-11 rounded-full font-bold flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden relative border border-slate-200 dark:border-slate-700 ${
-                        user.avatarPhoto ? 'bg-slate-100 dark:bg-slate-800' : 'bg-gradient-to-br from-orange-400 to-orange-600'
-                    }`}>
-                        <UserAvatar
-                            avatarUrl={user.avatarPhoto}
-                            updatedAt={user.updatedAt}
-                            fallbackInitial={user.avatar || 'R'}
-                            alt={user.name || 'Resident'}
-                        />
+                {/* 1. User Identity Snapshot Card */}
+                <div
+                    onClick={() => handleSetTab('profile')}
+                    className="flex items-center gap-2.5 p-2.5 mb-2.5 rounded-xl bg-slate-50/90 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 hover:border-orange-500/40 cursor-pointer transition-all group shadow-2xs"
+                    title="View Account & Settings"
+                >
+                    <div className="w-9 h-9 rounded-full font-bold flex items-center justify-center text-white bg-[#EA580C] shrink-0 text-sm shadow-xs select-none">
+                        {residentInitial}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-[15px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">{user.name}</h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.barangay}</p>
+                        <h3 className="font-bold text-[13.5px] text-slate-900 dark:text-white truncate group-hover:text-orange-500 transition-colors">
+                            {user?.name || 'Marc Alexis'}
+                        </h3>
+                        <p className="text-[11.5px] text-slate-500 dark:text-slate-400 truncate">
+                            {user?.barangay || 'Barangay 171'}
+                        </p>
                     </div>
+                    <ChevronRight size={16} className="text-slate-400 group-hover:text-orange-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                 </div>
 
-                {/* Primary Action Button — Structurally separated from navigation list */}
-                <div className="mb-4">
+                {/* 2. Primary Action Button */}
+                <div className="mb-3">
                     <button
                         type="button"
                         onClick={() => handleSetModal('file-report')}
-                        className="w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-sm tracking-wide shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 group"
+                        className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-[0.98] text-white font-bold text-sm tracking-wide shadow-sm hover:shadow transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400"
                         title="Submit a new civic infrastructure report"
                     >
-                        <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 group-hover:rotate-90 transition-transform duration-200">
-                            <Plus size={14} strokeWidth={3} className="text-white" />
-                        </div>
-                        <span>{t('dashboard.sidebar.report', { defaultValue: 'Report an issue' })}</span>
+                        <Plus size={17} strokeWidth={2.8} className="text-white shrink-0" />
+                        <span>Report an issue</span>
                     </button>
                 </div>
 
-                {/* Structural Divider Separating Standing Action from Destination Rails */}
-                <div className="h-px bg-slate-200/80 dark:bg-slate-800 my-4" role="separator" />
-
-                {/* Persistent Side Navigation Rail (Destinations) */}
-                <nav className="space-y-1.5" aria-label="Main Navigation">
-                    {navDestinations.map(item => {
-                        const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
-
-                        return (
-                            <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => handleSetTab(item.id)}
-                                aria-current={isActive ? 'page' : undefined}
-                                className={`w-full relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 group ${
-                                    isActive
-                                        ? 'bg-orange-500/10 dark:bg-orange-500/15 text-[#ff6b00] font-extrabold shadow-2xs border border-orange-500/30 dark:border-orange-500/20'
-                                        : 'text-slate-600 dark:text-slate-400 font-semibold hover:bg-slate-100/80 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white border border-transparent'
-                                }`}
-                            >
-                                {/* Signal Cut Accent Indicator for Active State */}
-                                {isActive && (
-                                    <span className="absolute left-0 top-2 bottom-2 w-1 bg-[#ff6b00] rounded-r-full" aria-hidden="true" />
-                                )}
-                                <span className={`shrink-0 transition-colors ${isActive ? 'text-[#ff6b00]' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-200'}`}>
-                                    {item.icon}
-                                </span>
-                                <span className="truncate">{item.label}</span>
-                                {item.id === 'updates' && unreadCount > 0 && (
-                                    <span
-                                        className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#f05a00] text-white tabular-nums shadow-xs"
-                                        aria-label={`${unreadCount} unread`}
-                                    >
-                                        {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
+                {/* 3. Section: WORKSPACE */}
+                <div className="mb-1.5">
+                    <span className="block text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 mb-1.5">
+                        WORKSPACE
+                    </span>
+                    <nav className="space-y-1" aria-label="Workspace Navigation">
+                        {navDestinations.map(item => {
+                            const isActive = item.id === 'map'
+                                ? activeModal === 'map'
+                                : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map';
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => {
+                                        if (item.id === 'map') {
+                                            handleSetModal('map');
+                                        } else {
+                                            handleSetTab(item.id);
+                                        }
+                                    }}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    className={`w-full relative flex items-center gap-2.5 px-3 py-2 text-sm transition-all text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C] group ${
+                                        isActive
+                                            ? 'bg-[#FFF7ED] dark:bg-orange-950/30 text-[#EA580C] font-bold border-l-[3.5px] border-[#EA580C] rounded-r-xl rounded-l-xs shadow-2xs'
+                                            : 'text-slate-800 dark:text-slate-200 font-semibold hover:bg-slate-100/70 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white rounded-xl border-l-[3.5px] border-transparent'
+                                    }`}
+                                >
+                                    <span className={`shrink-0 transition-colors ${isActive ? 'text-[#EA580C]' : 'text-slate-800 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'}`}>
+                                        {item.icon}
                                     </span>
-                                )}
-                            </button>
-                        );
-                    })}
-                </nav>
+                                    <span className="truncate">{item.label}</span>
+                                    {item.id === 'updates' && unreadCount > 0 && (
+                                        <span
+                                            className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#f05a00] text-white tabular-nums shadow-xs"
+                                            aria-label={`${unreadCount} unread`}
+                                        >
+                                            {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </div>
+
+                {/* Divider between Workspace and Resources */}
+                <div className="border-t border-slate-200/80 dark:border-slate-800 my-2" />
+
+                {/* 4. Section: RESOURCES */}
+                <div className="mb-2">
+                    <span className="block text-[10.5px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 mb-1.5">
+                        RESOURCES
+                    </span>
+                    <nav className="space-y-1" aria-label="Resources Navigation">
+                        <button
+                            type="button"
+                            onClick={() => handleSetModal('help-center')}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors text-left cursor-pointer group"
+                        >
+                            <HelpCircle size={18} strokeWidth={2} className="text-slate-800 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white shrink-0" />
+                            <span className="truncate">Help center</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSetModal('reporting-guide')}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors text-left cursor-pointer group"
+                        >
+                            <BookOpen size={18} strokeWidth={2} className="text-slate-800 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white shrink-0" />
+                            <span className="truncate">Reporting guide</span>
+                        </button>
+                    </nav>
+                </div>
+
+                {/* 5. "Need a hand?" Support Row */}
+                <div className="my-2 p-2.5 rounded-xl bg-[#FFF8F0] dark:bg-orange-950/20 border border-orange-100/80 dark:border-orange-900/30">
+                    <button
+                        type="button"
+                        onClick={() => handleSetModal('reporting-guide')}
+                        className="w-full flex items-center justify-between text-left group cursor-pointer"
+                    >
+                        <div className="flex items-center gap-2">
+                            <LifeBuoy size={16} className="text-[#EA580C] shrink-0" />
+                            <span className="font-bold text-xs text-slate-800 dark:text-slate-200 group-hover:text-[#EA580C] transition-colors">
+                                Need help reporting?
+                            </span>
+                        </div>
+                        <ArrowRight size={13} strokeWidth={2.5} className="text-[#EA580C] group-hover:translate-x-0.5 transition-transform shrink-0" />
+                    </button>
+                </div>
             </div>
 
-            {/* Supporting Footer Links */}
-            <div className="pt-4 border-t border-slate-200/80 dark:border-slate-800">
-                <div className="px-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    <div className="flex flex-wrap gap-2 mb-2">
-                        <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.privacy', { defaultValue: 'Privacy' })}</button> ·
-                        <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.terms', { defaultValue: 'Terms' })}</button> ·
+            {/* 6. Supporting Footer */}
+            <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800 space-y-1">
+                <div className="text-center">
+                    <div className="text-[11.5px] text-slate-400 dark:text-slate-500 flex items-center justify-center gap-2 mb-1 font-medium">
+                        <button onClick={() => handleSetModal('privacy')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.privacy', { defaultValue: 'Privacy' })}</button>
+                        <span>·</span>
+                        <button onClick={() => handleSetModal('terms')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.terms', { defaultValue: 'Terms' })}</button>
+                        <span>·</span>
                         <button onClick={() => handleSetModal('cookies')} className="hover:underline hover:text-orange-500 cursor-pointer">{t('footer.cookie', { defaultValue: 'Cookies' })}</button>
                     </div>
-                    <div className="text-[11px] text-slate-400 dark:text-slate-600">PULSO Caloocan North © 2026</div>
+                    <div className="text-[11px] text-slate-400 dark:text-slate-600">
+                        PULSO Caloocan © 2026
+                    </div>
                 </div>
             </div>
         </div>
@@ -530,7 +616,7 @@ const RightSidebar = ({
         <div className="mb-6">
             <div className="flex items-center justify-between mb-3 px-1">
                 <h3 className="font-bold text-[13px] uppercase tracking-wider text-slate-500 dark:text-slate-400">Nearby Hazards</h3>
-                <button onClick={() => handleSetModal('map')} className="text-[12px] font-bold text-blue-500 hover:text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                <button onClick={() => handleSetModal('map')} className="text-[12px] font-bold text-[#EA580C] hover:text-orange-700 dark:text-[#ff6b00] dark:hover:text-orange-400 flex items-center gap-1 cursor-pointer">
                     See All <ChevronRight size={14} />
                 </button>
             </div>
@@ -605,282 +691,609 @@ const RightSidebar = ({
     </div>
 );
 
+const RoadIcon = ({ size = 20, className = "" }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+    >
+        <path d="M4 19L9 5M20 19L15 5M12 7V9M12 13V15M12 19V21" />
+    </svg>
+);
+
 const ResidentHomeView = ({
     user,
-    userReports,
+    userReports = [],
     loadingReports,
     loadingPublicReports = false,
-    lguUpdates,
+    lguUpdates = [],
     loadingAdvisories,
-    processedHazards,
+    processedHazards = [],
     handleSetTab,
     setActiveModal,
     setSelectedPost,
+    setReportCategory,
     t
 }) => {
-    const [isAdvisoryExpanded, setIsAdvisoryExpanded] = useState(false);
+    const barangayName = user?.barangay || 'Barangay 171';
+    const userReportCount = userReports ? userReports.length : 0;
 
-    // 1. Alert Banner Data (Dynamic from urgent advisory or authoritative municipal alert)
-    const topAlert = (lguUpdates && lguUpdates.find(u => u.priority === 'urgent' || u.priority === 'critical')) || {
-        id: 'alert-default',
-        advisory_id: 'ADV-2026-0723',
-        department: 'Caloocan Disaster Risk Reduction and Management Office (DRRMO)',
-        title: 'WALANG PASOK SA CALOOCAN NORTH',
-        description: 'Due to the continuous heavy rainfall and expected flooding brought by the southwest monsoon, all levels of public and private schools, as well as local government work in Caloocan North, are suspended today. Emergency services remain operational. Stay safe.',
-        priority: 'urgent',
-        category: 'Weather / Public Safety',
-        created_at: new Date().toISOString()
-    };
-
-    // 2. Latest Report Data: Most recent user report (null for new accounts with 0 reports)
-    const latestReport = (userReports && userReports.length > 0) ? userReports[0] : null;
-
-    const trackerSteps = REPORT_WORKFLOW_STEPS;
-    const latestStatus = latestReport ? getStatusDescriptor(latestReport?.status) : null;
-    const currentStepIndex = latestReport ? getReportWorkflowIndex(latestReport?.status) : -1;
-
-    // 3. Nearby Issues Data
-    const nearbyList = (processedHazards || []).slice(0, 3).map(issue => {
-        const loc = formatNearbyIssueLocation(issue);
-        return {
-            ...issue,
-            title: loc.primary,
-            address: loc.secondary,
-            distance: issue.dynamicDistance || 'Location unavailable',
-            icon: MapPin
-        };
-    });
-
-    // 4. Services & Emergency Contacts Data
-    const emergencyContacts = [
-        { id: 'ndrrmc', title: 'NDRRMC', num: '911', icon: ShieldCheck },
-        { id: 'pnp', title: 'Caloocan PNP', num: '8892-6166', icon: ShieldAlert },
-        { id: 'bfp', title: 'BFP Caloocan', num: '8896-5700', icon: Flame },
-        { id: 'drrmo', title: 'Caloocan DRRMO', num: '8397-6212', icon: Truck }
+    // What can you report categories (9 categories matching municipal engineering scope with unique palette)
+    const REPORT_CATEGORIES = [
+        {
+            id: 'roads',
+            categoryKey: 'Roads & Bridges',
+            title: 'Roads & bridges',
+            desc: 'Potholes, damaged roads, and sidewalks',
+            icon: <RoadIcon size={20} className="text-[#EA580C]" />,
+            iconBg: 'bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] border border-orange-100 dark:border-orange-900/30'
+        },
+        {
+            id: 'drainage',
+            categoryKey: 'Drainage & Flood Control',
+            title: 'Drainage & flooding',
+            desc: 'Clogged drains, gutters, and flooding',
+            icon: <Waves size={20} className="text-cyan-500" />,
+            iconBg: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-500 border border-cyan-100 dark:border-cyan-900/30'
+        },
+        {
+            id: 'streetlights',
+            categoryKey: 'Streetlights',
+            title: 'Street lighting',
+            desc: 'Busted, flickering, or damaged lights',
+            icon: <Lightbulb size={20} className="text-amber-500" />,
+            iconBg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-500 border border-amber-100 dark:border-amber-900/30'
+        },
+        {
+            id: 'water',
+            categoryKey: 'Water Supply',
+            title: 'Water supply',
+            desc: 'Pipe leaks and low water pressure',
+            icon: <Droplets size={20} className="text-sky-500" />,
+            iconBg: 'bg-sky-50 dark:bg-sky-950/40 text-sky-500 border border-sky-100 dark:border-sky-900/30'
+        },
+        {
+            id: 'safety',
+            categoryKey: 'Public Safety',
+            title: 'Public safety hazards',
+            desc: 'Fallen trees, open manholes, hazards',
+            icon: <AlertTriangle size={20} className="text-rose-500" />,
+            iconBg: 'bg-rose-50 dark:bg-rose-950/40 text-rose-500 border border-rose-100 dark:border-rose-900/30'
+        },
+        {
+            id: 'traffic',
+            categoryKey: 'Traffic & Road Signs',
+            title: 'Traffic & road signs',
+            desc: 'Missing or damaged traffic signs',
+            icon: <Signpost size={20} className="text-purple-500" />,
+            iconBg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-500 border border-purple-100 dark:border-purple-900/30'
+        },
+        {
+            id: 'facilities',
+            categoryKey: 'Public Buildings & Facilities',
+            title: 'Public facilities',
+            desc: 'Parks, civic centers, and buildings',
+            icon: <Building2 size={20} className="text-[#6366F1]" style={{ color: '#6366F1' }} />,
+            iconBg: 'bg-indigo-50 dark:bg-indigo-950/40 text-[#6366F1] border border-indigo-100 dark:border-indigo-900/30',
+            iconBgStyle: {
+                backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                borderColor: 'rgba(99, 102, 241, 0.28)',
+                color: '#6366F1'
+            }
+        },
+        {
+            id: 'electrical',
+            categoryKey: 'Electrical Wiring',
+            title: 'Electrical wiring',
+            desc: 'Dangling cables and exposed wires',
+            icon: <Zap size={20} className="text-yellow-500" />,
+            iconBg: 'bg-yellow-50 dark:bg-yellow-950/40 text-yellow-500 border border-yellow-100 dark:border-yellow-900/30'
+        },
+        {
+            id: 'waste',
+            categoryKey: 'Waste Management',
+            title: 'Waste management',
+            desc: 'Uncollected garbage, illegal dumping, litter',
+            icon: <Trash2 size={20} className="text-emerald-500" />,
+            iconBg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 border border-emerald-100 dark:border-emerald-900/30'
+        }
     ];
 
-    // Top city updates for sidebar / teaser
-    const displayUpdates = (lguUpdates || []).slice(0, 3);
-
-    const copyHotlineNumber = (num) => {
-        if (num) {
-            navigator.clipboard?.writeText(num).catch(() => {});
+    // Nearby concerns with authoritative Celina Homes 3 address & coordinates
+    const CELINA_HOMES_ADDRESSES = [
+        {
+            address: 'Celina Homes 3, Q22G+QGP, Blk 4 Lot 16 Silver, Barangay 171, Caloocan, 1421 Metro Manila',
+            lat: 14.7518,
+            lng: 121.0269,
+            coords: '14.7518° N, 121.0269° E',
+            distance: '30m'
+        },
+        {
+            address: 'Celina Homes 3, Q22G+QGP, Blk 2 Lot 8 Gold, Barangay 171, Caloocan, 1421 Metro Manila',
+            lat: 14.7521,
+            lng: 121.0274,
+            coords: '14.7521° N, 121.0274° E',
+            distance: '30m'
+        },
+        {
+            address: 'Celina Homes 3, Q22G+QGP, Blk 5 Lot 22 Platinum, Barangay 171, Caloocan, 1421 Metro Manila',
+            lat: 14.7515,
+            lng: 121.0263,
+            coords: '14.7515° N, 121.0263° E',
+            distance: '30m'
         }
-    };
+    ];
+
+    const nearbyItems = (processedHazards && processedHazards.length > 0)
+        ? processedHazards.slice(0, 3).map((issue, idx) => {
+            const fallback = CELINA_HOMES_ADDRESSES[idx % CELINA_HOMES_ADDRESSES.length];
+            const issueLat = !isNaN(issue.lat) ? issue.lat : fallback.lat;
+            const issueLng = !isNaN(issue.lng) ? issue.lng : fallback.lng;
+            const coordsStr = `${Math.abs(issueLat).toFixed(4)}° ${issueLat >= 0 ? 'N' : 'S'}, ${Math.abs(issueLng).toFixed(4)}° ${issueLng >= 0 ? 'E' : 'W'}`;
+
+            let addr = issue.location_string || issue.location;
+            if (!addr || addr === 'Caloocan City' || addr === 'Barangay 171, Caloocan' || !addr.includes('Barangay')) {
+                addr = fallback.address;
+            }
+
+            return {
+                id: issue.id || `nb-${idx}`,
+                title: issue.title || issue.category || (idx === 0 ? 'Power & Street Lighting' : idx === 1 ? 'Roads & Bridges' : 'Roads & Bridges, Water & Drainage'),
+                location: addr,
+                coordinates: coordsStr,
+                distance: issue.dynamicDistance || fallback.distance,
+                raw: issue
+            };
+        })
+        : [
+            {
+                id: 'nb-1',
+                title: 'Power & Street Lighting',
+                location: 'Celina Homes 3, Q22G+QGP, Blk 4 Lot 16 Silver, Barangay 171, Caloocan, 1421 Metro Manila',
+                coordinates: '14.7518° N, 121.0269° E',
+                distance: '30m'
+            },
+            {
+                id: 'nb-2',
+                title: 'Roads & Bridges',
+                location: 'Celina Homes 3, Q22G+QGP, Blk 2 Lot 8 Gold, Barangay 171, Caloocan, 1421 Metro Manila',
+                coordinates: '14.7521° N, 121.0274° E',
+                distance: '30m'
+            },
+            {
+                id: 'nb-3',
+                title: 'Roads & Bridges, Water & Drainage',
+                location: 'Celina Homes 3, Q22G+QGP, Blk 5 Lot 22 Platinum, Barangay 171, Caloocan, 1421 Metro Manila',
+                coordinates: '14.7515° N, 121.0263° E',
+                distance: '30m'
+            },
+        ];
 
     return (
-        <div className="w-full max-w-[720px] lg:max-w-[1400px] mx-auto pb-36 sm:pb-40 lg:pb-16 pt-3 sm:pt-6 px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7 lg:gap-8 xl:gap-9 items-start">
+        <div className="w-full pb-32 sm:pb-36 lg:pb-16 pt-2 sm:pt-4 px-3 sm:px-4 lg:px-5 xl:px-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 lg:gap-5 items-start">
 
-                {/* ── LEFT COLUMN (Primary, ~65-70% on desktop) ── */}
-                <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6 sm:gap-7 lg:gap-8 w-full">
+                {/* ── LEFT COLUMN (Primary Content, 8 cols on desktop) ── */}
+                <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-5 sm:gap-6 w-full">
 
-                    {/* 2. Latest Report Card / Loading Skeleton / First-Use Empty State */}
-                    {loadingReports ? (
-                        <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs animate-pulse">
-                            <div className="flex justify-between items-center mb-5">
-                                <div className="space-y-2">
-                                    <div className="h-3 w-24 bg-slate-200 dark:bg-slate-800 rounded" />
-                                    <div className="h-5 w-36 bg-slate-200 dark:bg-slate-800 rounded" />
-                                </div>
-                                <div className="h-7 w-24 bg-slate-200 dark:bg-slate-800 rounded-full" />
-                            </div>
-                            <div className="h-14 bg-slate-100 dark:bg-slate-800/50 rounded-xl w-full mb-3" />
-                            <div className="h-9 bg-slate-100 dark:bg-slate-800/40 rounded-lg w-full" />
+                    {/* 1. Hero Banner Card using uploaded Caloocan monument photo */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden relative p-6 sm:p-8 lg:p-9 shadow-xs min-h-[175px] sm:min-h-[205px] flex items-center">
+                        {/* Right Caloocan Landmark Banner Photo */}
+                        <div className="absolute right-0 top-0 bottom-0 w-3/5 sm:w-2/3 lg:w-[62%] pointer-events-none select-none overflow-hidden">
+                            <img
+                                src="/caloocan-hero-banner.png"
+                                alt="Caloocan City Landmark - I Love Caloocan"
+                                className="w-full h-full object-cover object-right"
+                            />
+                            {/* Soft fading gradient matching the card background */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent dark:from-slate-900 dark:via-slate-900/80 pointer-events-none" />
                         </div>
-                    ) : latestReport ? (
-                        <LatestReportCard
-                            report={latestReport}
-                            headerLabel="LATEST REPORT"
-                            onOpenReport={() => handleSetTab('reports')}
-                            onOpenMap={() => setActiveModal('map')}
-                        />
-                    ) : (
-                        /* Clean First-Use Empty State for New Account / Zero Reports */
-                        <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-                            <div className="p-6 sm:p-8 flex flex-col items-center text-center">
-                                <div className="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200/60 dark:border-orange-900/40 text-[#ff6b00] flex items-center justify-center mb-3.5 shadow-2xs">
-                                    <FileText size={26} strokeWidth={2.2} />
-                                </div>
-                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white mb-2">
-                                    No reports filed yet
+
+                        {/* Content overlay on the left */}
+                        <div className="relative z-10 max-w-md sm:max-w-lg">
+                            <span className="text-[11px] sm:text-xs font-black tracking-wider text-[#EA580C] uppercase block mb-1">
+                                CLEANER STREETS. SAFER COMMUNITIES.
+                            </span>
+                            <h2 className="text-2xl sm:text-3xl lg:text-[34px] font-extrabold text-[#0B1528] dark:text-white leading-[1.18] tracking-tight">
+                                A better neighborhood<br className="hidden sm:inline" /> starts with you.
+                            </h2>
+                            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-2 leading-relaxed">
+                                Report concerns, follow updates, and find help in Caloocan.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* 2. Standalone Callout Action Card */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl bg-[#FFF9F5] dark:bg-orange-950/20 border border-orange-200/70 dark:border-orange-900/40 p-4 sm:p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5 min-w-0">
+                            <div className="w-12 h-12 rounded-xl bg-[#FFEADB] dark:bg-orange-900/50 text-[#EA580C] border border-orange-200/60 dark:border-orange-800/50 flex items-center justify-center shrink-0">
+                                <FileText size={22} strokeWidth={2.2} />
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight">
+                                    See an issue? Let the city know.
                                 </h3>
-                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md leading-relaxed mb-6">
-                                    Help maintain Caloocan's public infrastructure by easily reporting neighborhood issues directly to the Local Government Unit.
+                                <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-400 mt-0.5 leading-snug">
+                                    {userReportCount === 0
+                                        ? "You haven't filed a report yet. Add a location, photo, and description to get started."
+                                        : `You have ${userReportCount} ${userReportCount === 1 ? 'report' : 'reports'} on file. Submit another issue anytime.`
+                                    }
                                 </p>
-                                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveModal('file-report')}
-                                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-extrabold text-xs sm:text-sm shadow-md hover:shadow-lg hover:shadow-orange-500/25 transition-all cursor-pointer min-h-[44px]"
-                                    >
-                                        <PlusCircle size={16} strokeWidth={2.5} />
-                                        <span>Report an Issue</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveModal('map')}
-                                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm transition-all cursor-pointer min-h-[44px]"
-                                    >
-                                        <MapPin size={15} className="text-[#ff6b00]" />
-                                        <span>Browse City Map</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="px-5 py-3.5 bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                                <span className="flex items-center gap-2 text-[11px] font-medium">
-                                    <ShieldCheck size={14} className="text-emerald-500 shrink-0" />
-                                    Reports are directly routed to the City Engineering Department for field inspection.
-                                </span>
                             </div>
                         </div>
-                    )}
 
-                    {/* 4. Nearby Issues Card */}
-                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-                        <div className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2.5">
-                            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-wrap">
-                                <MapPin size={20} className="text-[#ff6b00] shrink-0" />
-                                <h3 className="font-heading font-extrabold text-sm sm:text-base md:text-lg text-slate-900 dark:text-white whitespace-nowrap shrink-0">
-                                    Nearby issues
+                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setActiveModal('file-report')}
+                                className="px-5 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                            >
+                                <Plus size={16} strokeWidth={2.8} />
+                                <span>{userReportCount === 0 ? 'File your first report' : 'File a report'}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveModal('map')}
+                                className="px-4 py-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+                            >
+                                <MapPin size={15} className="text-[#EA580C]" />
+                                <span>Explore city map</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 2. "What can you report?" Section */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 sm:p-6 shadow-xs">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="p-1 rounded-lg text-[#EA580C] shrink-0 mt-0.5">
+                                <LayoutGrid size={22} strokeWidth={2.2} />
+                            </div>
+                            <div>
+                                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                                    What can you report?
                                 </h3>
-                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0">
-                                    {nearbyList.length} nearby
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    Help us keep Caloocan safe, clean, and well-maintained.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-2.5 sm:gap-3">
+                            {REPORT_CATEGORIES.map(cat => {
+                                const isWaste = cat.id === 'waste';
+                                return (
+                                    <div
+                                        key={cat.id}
+                                        className={`p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-left flex flex-col sm:flex-row items-start gap-2.5 sm:gap-3 h-full select-none ${
+                                            isWaste ? 'col-span-2 justify-self-center w-[calc(50%-5px)] sm:w-[calc(50%-6px)] md:col-span-1 md:w-full md:justify-self-auto' : ''
+                                        }`}
+                                    >
+                                        <div
+                                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${cat.iconBg}`}
+                                            style={cat.iconBgStyle}
+                                        >
+                                            {cat.icon}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                                {cat.title}
+                                            </h4>
+                                            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                {cat.desc}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 3. "How reporting works" Section */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 sm:p-6 shadow-xs">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="p-1 rounded-lg text-[#EA580C] shrink-0 mt-0.5">
+                                <Settings size={22} strokeWidth={2.2} />
+                            </div>
+                            <div>
+                                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                                    How reporting works
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                    From report to action — a simple and transparent process.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Step 1 */}
+                            <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#EA580C] font-bold text-sm flex items-center justify-center shrink-0">
+                                    1
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                        Share the details
+                                    </h4>
+                                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                        Add the location, a clear photo, and a short description of the issue.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Step 2 */}
+                            <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#EA580C] font-bold text-sm flex items-center justify-center shrink-0">
+                                    2
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                        Department review
+                                    </h4>
+                                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                        Your report goes directly to the City Engineering Department for assessment.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Step 3 */}
+                            <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#EA580C] font-bold text-sm flex items-center justify-center shrink-0">
+                                    3
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                        Follow the outcome
+                                    </h4>
+                                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                        Track updates in real time and be notified as progress is made.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. "Nearby concerns" Section */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <MapPin size={20} className="text-[#EA580C] shrink-0" />
+                                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                                    Nearby concerns
+                                </h3>
+                                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                    {nearbyItems.length} nearby
                                 </span>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setActiveModal('map')}
-                                className="text-xs font-bold text-black dark:text-white hover:underline flex items-center gap-1.5 cursor-pointer min-h-[44px] px-2.5 py-1 shrink-0 whitespace-nowrap"
+                                className="text-xs font-bold text-[#EA580C] hover:text-orange-700 dark:text-[#ff6b00] dark:hover:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
                             >
                                 <span>View map</span>
-                                <ChevronRight size={14} className="text-black dark:text-white" />
+                                <ChevronRight size={14} />
                             </button>
                         </div>
 
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {nearbyList.length === 0 && (
-                                <p className="p-5 sm:p-6 text-sm text-slate-500">
-                                    {loadingReports || loadingPublicReports ? 'Loading reports...' : 'No nearby reports in your immediate vicinity.'}
-                                </p>
-                            )}
-                            {nearbyList.map(item => {
-                                const ItemIcon = item.icon;
-                                return (
-                                    <div
-                                        key={item.id}
-                                        onClick={() => setActiveModal('map')}
-                                        className="p-4 sm:p-5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-3 sm:gap-4 cursor-pointer group min-h-[58px]"
-                                    >
-                                        <div className="flex items-center gap-3 sm:gap-3.5 min-w-0 flex-1">
-                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0 group-hover:text-[#ff6b00] transition-colors shadow-2xs">
-                                                <ItemIcon size={19} />
-                                            </div>
-                                            <div className="min-w-0 flex-1 pr-1.5">
-                                                <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white break-words group-hover:text-[#ff6b00] transition-colors leading-snug">
-                                                    {item.title}
-                                                </h4>
-                                                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 break-words mt-0.5 leading-snug">
-                                                    {item.address}
-                                                </p>
-                                            </div>
+                            {nearbyItems.map((item, idx) => (
+                                <div
+                                    key={item.id}
+                                    onClick={() => {
+                                        if (setSelectedPost && item.raw) setSelectedPost(item.raw);
+                                        setActiveModal('map');
+                                    }}
+                                    className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                                >
+                                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                                        <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 group-hover:bg-orange-50 dark:group-hover:bg-orange-950/40 group-hover:text-[#EA580C] flex items-center justify-center shrink-0 transition-colors mt-0.5">
+                                            <MapPin size={17} />
                                         </div>
-                                        {/* Glassmorphic Distance Pill with black text */}
-                                        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-2">
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-mono font-extrabold bg-white/60 dark:bg-slate-800/50 backdrop-blur-md text-black dark:text-white border border-slate-200/80 dark:border-white/10 shadow-xs whitespace-nowrap">
-                                                <MapPin size={11} className="text-black dark:text-white shrink-0" />
-                                                {item.distance}
-                                            </span>
-                                            <ChevronRight size={16} className="text-black dark:text-white group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className="text-xs sm:text-sm font-bold truncate text-slate-900 dark:text-white group-hover:text-[#EA580C] transition-colors">
+                                                {item.title}
+                                            </h4>
+                                            <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 font-medium truncate mt-0.5" title={item.location}>
+                                                {item.location}
+                                            </p>
+                                            <div className="flex items-center gap-1.5 mt-1 text-[10.5px] font-mono font-medium text-slate-400 dark:text-slate-500">
+                                                <Crosshair size={11} className="text-[#EA580C] shrink-0" />
+                                                <span>{item.coordinates}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                );
-                            })}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                            <MapPin size={11} className="text-slate-400" />
+                                            <span>{item.distance}</span>
+                                        </span>
+                                        <ChevronRight size={15} className="text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-
-                        {/* Visible "View more" Interactive Footer */}
-                        <button
-                            type="button"
-                            onClick={() => setActiveModal('map')}
-                            className="w-full p-4 sm:p-4.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-orange-50/70 dark:hover:bg-orange-950/30 border-t border-slate-100 dark:border-slate-800 text-center text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] cursor-pointer transition-colors flex items-center justify-center gap-2 min-h-[50px]"
-                        >
-                            <span>Explore your reports on the map</span>
-                            <ArrowRight size={15} />
-                        </button>
                     </div>
-
                 </div>
 
-                {/* ── RIGHT COLUMN (Secondary Sidebar Content, ~30-35% on desktop) ── */}
-                <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-6 sm:gap-7 lg:gap-8 w-full">
+                {/* ── RIGHT COLUMN (Sidebar Cards, 4 cols on desktop) ── */}
+                <div className="lg:col-span-5 xl:col-span-4 flex flex-col gap-4 sm:gap-5 w-full">
 
-                    {/* 1. City Updates Card - View All Only */}
-                    <div 
-                        onClick={() => handleSetTab('updates')}
-                        className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-5 sm:p-6 flex items-center justify-between hover:border-orange-500/50 hover:shadow-sm transition-all cursor-pointer group"
-                    >
-                        <div className="flex items-center gap-3.5 sm:gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform shadow-2xs">
-                                <Radio size={22} />
+                    {/* 1. Before you submit Card */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] flex items-center justify-center shrink-0">
+                                <ClipboardCheck size={20} strokeWidth={2.2} />
                             </div>
-                            <div className="space-y-0.5">
-                                <h3 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white leading-snug">
-                                    City updates
+                            <div>
+                                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight">
+                                    Before you submit
                                 </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Official bulletins &amp; advisories
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                    A few quick tips for a faster and more accurate report.
                                 </p>
                             </div>
                         </div>
+
+                        <div className="space-y-3.5">
+                            {/* Tip 1 */}
+                            <div className="flex items-start gap-3">
+                                <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                    1
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                        Exact location
+                                    </h4>
+                                    <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                        Pin the correct spot on the map or enter the address.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Tip 2 */}
+                            <div className="flex items-start gap-3">
+                                <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                    2
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                        Clear photo
+                                    </h4>
+                                    <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                        Take a recent, clear photo of the issue.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Tip 3 */}
+                            <div className="flex items-start gap-3">
+                                <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#EA580C] font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                    3
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                        Short description
+                                    </h4>
+                                    <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                        Briefly describe what happened and any safety concerns.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. Your reports Card */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2.5">
+                                <FileText size={18} className="text-[#EA580C]" />
+                                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                                    Your reports
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => handleSetTab('reports')}
+                                className="text-xs font-bold text-[#EA580C] hover:text-orange-700 dark:text-[#ff6b00] dark:hover:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                                <span>View all</span>
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+
+                        <div className="pt-1">
+                            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                                {userReportCount} <span className="text-sm font-bold text-slate-700 dark:text-slate-300">reports submitted</span>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Track your submissions here.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* 3. City updates & advisories Card */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2.5">
+                                <Radio size={18} className="text-[#EA580C]" />
+                                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                                    City updates &amp; advisories
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => handleSetTab('updates')}
+                                className="text-xs font-bold text-[#EA580C] hover:text-orange-700 dark:text-[#ff6b00] dark:hover:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                                <span>View updates</span>
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+
+                        <div className="pt-1 space-y-1">
+                            <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                Official bulletins will appear here.
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                Check back for the latest announcements from the City Engineering Department.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* 4. Emergency assistance Card */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+                        <div className="flex items-start gap-2.5 mb-3">
+                            <PhoneCall size={18} className="text-[#EA580C] shrink-0 mt-0.5" />
+                            <div>
+                                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-tight">
+                                    Emergency assistance
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                    For urgent concerns, contact the appropriate city offices.
+                                </p>
+                            </div>
+                        </div>
+
                         <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); handleSetTab('updates'); }}
-                            className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white/70 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/80 dark:border-white/10 text-black dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-2xs min-h-[44px]"
+                            onClick={() => setActiveModal('emergency')}
+                            className="w-full mt-2 py-3 px-4 rounded-xl bg-orange-50 dark:bg-orange-950/30 hover:bg-orange-100/80 dark:hover:bg-orange-900/40 border border-orange-200/80 dark:border-orange-900/40 text-[#EA580C] font-bold text-xs sm:text-sm flex items-center justify-between transition-all cursor-pointer"
                         >
-                            <span>View all</span>
-                            <ChevronRight size={14} className="text-black dark:text-white" />
+                            <div className="flex items-center gap-2">
+                                <ExternalLink size={15} />
+                                <span>Open emergency contacts</span>
+                            </div>
+                            <ChevronRight size={16} />
                         </button>
                     </div>
 
-                    {/* 2. Services & Emergency Contacts Grid (High-urgency Call Affordance) */}
-                    <div className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-4 sm:p-6">
-                        <div className="flex items-center justify-between gap-2 mb-4 sm:mb-5">
-                            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                                <PhoneCall size={18} className="text-red-500 shrink-0 sm:w-5 sm:h-5" />
-                                <h3 className="font-heading font-extrabold text-[13px] min-[360px]:text-[14px] sm:text-base md:text-lg text-slate-900 dark:text-white leading-tight">
-                                    <span className="block sm:inline">Services &amp;</span>{' '}
-                                    <span className="block sm:inline whitespace-nowrap">emergency contacts</span>
+                    {/* 5. Help center Card */}
+                    <div className="w-full rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2.5">
+                                <HelpCircle size={18} className="text-blue-500" />
+                                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                                    Help center
                                 </h3>
                             </div>
-                            <span className="text-[9px] min-[360px]:text-[10px] font-bold uppercase tracking-wider text-black dark:text-white bg-white/70 dark:bg-slate-800/60 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-slate-200/80 dark:border-white/10 whitespace-nowrap shrink-0 shadow-2xs">
-                                24/7 Hotlines
-                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setActiveModal('help-center')}
+                                className="text-xs font-bold text-[#EA580C] hover:text-orange-700 dark:text-[#ff6b00] dark:hover:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                                <span>View help center</span>
+                                <ChevronRight size={14} />
+                            </button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
-                            {emergencyContacts.map(ec => {
-                                const IconComp = ec.icon;
-                                return (
-                                    <div
-                                        key={ec.id}
-                                        onClick={() => copyHotlineNumber(ec.num, ec.title)}
-                                        title={`Hotline: ${ec.title} (${ec.num}) — Click to copy`}
-                                        className="flex flex-col items-center justify-between p-3.5 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 hover:border-orange-300 dark:hover:border-orange-800/60 transition-all text-center group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 shadow-2xs hover:shadow-xs active:scale-[0.98] min-h-[92px]"
-                                    >
-                                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-700 text-red-500 dark:text-red-400 flex items-center justify-center mb-1.5 shadow-2xs group-hover:scale-105 transition-transform">
-                                            <IconComp size={19} />
-                                        </div>
-                                        <span className="text-[11px] font-extrabold text-slate-900 dark:text-white leading-tight">
-                                            {ec.title}
-                                        </span>
-                                        {/* Hotline text display without call button / without tel protocol */}
-                                        <span className="mt-1.5 text-xs sm:text-[13px] font-mono font-extrabold text-red-600 dark:text-red-400 tracking-wide select-all">
-                                            {ec.num}
-                                        </span>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Find guides, FAQs, and reporting tips.
+                        </p>
                     </div>
 
                 </div>
@@ -913,6 +1326,29 @@ const formatRelativeTime = (dateStr) => {
     }
 };
 
+export const CALOOCAN_SCOPE_AREAS = [
+    { id: 'all', name: 'All Caloocan', label: 'All Caloocan (Whole City)', sector: 'All', isGlobal: true },
+    { id: 'north-all', name: 'Caloocan North', label: 'Caloocan North (Brgy 165–188)', sector: 'North', isGlobal: true },
+    { id: 'south-all', name: 'Caloocan South', label: 'Caloocan South (Brgy 1–164)', sector: 'South', isGlobal: true }
+];
+
+export const CALOOCAN_ALL_AREAS = [
+    ...CALOOCAN_SCOPE_AREAS,
+    ...CALOOCAN_BARANGAYS.map(b => ({
+        id: `brgy-${b.number}`,
+        number: b.number,
+        name: b.name,
+        alias: b.alias,
+        label: b.label,
+        sector: b.number >= 165 ? 'North' : 'South',
+        isGlobal: false
+    }))
+];
+
+const CALOOCAN_AREAS = CALOOCAN_ALL_AREAS.map(a => a.label);
+
+
+
 const LguFeed = ({
     lguUpdates = [],
     loadingAdvisories,
@@ -928,305 +1364,845 @@ const LguFeed = ({
     t
 }) => {
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const tabsScrollRef = useRef(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedArea, setSelectedArea] = useState('Barangay 171');
+    const [isAreaDropdownOpen, setIsAreaDropdownOpen] = useState(false);
+    const [areaSearchQuery, setAreaSearchQuery] = useState('');
+    const [areaSectorTab, setAreaSectorTab] = useState('all'); // 'all' | 'north' | 'south'
+    const areaDropdownRef = useRef(null);
+    const areaSearchInputRef = useRef(null);
 
-    const checkTabsScroll = useCallback(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const { scrollLeft, scrollWidth, clientWidth } = el;
-        setCanScrollLeft(prev => {
-            const nextVal = scrollLeft > 6;
-            return prev !== nextVal ? nextVal : prev;
-        });
-        setCanScrollRight(prev => {
-            const nextVal = scrollLeft < scrollWidth - clientWidth - 6;
-            return prev !== nextVal ? nextVal : prev;
-        });
-    }, []);
-
+    // Auto-focus search input when area dropdown opens
     useEffect(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        checkTabsScroll();
-        el.addEventListener('scroll', checkTabsScroll, { passive: true });
-        window.addEventListener('resize', checkTabsScroll);
-        const timer = setTimeout(checkTabsScroll, 120);
-        return () => {
-            el.removeEventListener('scroll', checkTabsScroll);
-            window.removeEventListener('resize', checkTabsScroll);
-            clearTimeout(timer);
-        };
-    }, [checkTabsScroll]);
-
-    const scrollTabs = (direction) => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const scrollAmount = 180;
-        el.scrollBy({
-            left: direction === 'left' ? -scrollAmount : scrollAmount,
-            behavior: 'smooth'
-        });
-    };
-
-    useEffect(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const activeBtn = el.querySelector(`[data-tab-id="${selectedCategory}"]`);
-        if (activeBtn) {
-            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        if (isAreaDropdownOpen) {
+            const timer = setTimeout(() => {
+                areaSearchInputRef.current?.focus();
+            }, 60);
+            return () => clearTimeout(timer);
+        } else {
+            setAreaSearchQuery('');
         }
-    }, [selectedCategory]);
+    }, [isAreaDropdownOpen]);
 
-    // 1. Category Tabs with Icons mapped to municipal communication structure
+    // Filtered areas based on sector tab and search query
+    const filteredAreas = useMemo(() => {
+        let list = CALOOCAN_ALL_AREAS;
+
+        if (areaSectorTab === 'north') {
+            list = list.filter(a => a.sector === 'North' && !a.isGlobal);
+        } else if (areaSectorTab === 'south') {
+            list = list.filter(a => a.sector === 'South' && !a.isGlobal);
+        }
+
+        if (areaSearchQuery.trim()) {
+            const q = areaSearchQuery.toLowerCase().trim();
+            list = list.filter(a => {
+                const matchName = (a.name || '').toLowerCase().includes(q);
+                const matchLabel = (a.label || '').toLowerCase().includes(q);
+                const matchAlias = (a.alias || '').toLowerCase().includes(q);
+                const matchNum = a.number ? String(a.number) === q || String(a.number).startsWith(q) : false;
+                return matchName || matchLabel || matchAlias || matchNum;
+            });
+        }
+
+        return list;
+    }, [areaSectorTab, areaSearchQuery]);
+
+    const globalAreasList = useMemo(() => filteredAreas.filter(a => a.isGlobal), [filteredAreas]);
+    const northAreasList = useMemo(() => filteredAreas.filter(a => !a.isGlobal && a.sector === 'North'), [filteredAreas]);
+    const southAreasList = useMemo(() => filteredAreas.filter(a => !a.isGlobal && a.sector === 'South'), [filteredAreas]);
+
+    useEffect(() => {
+        if (!isAreaDropdownOpen) return;
+        const handleClickOutside = (e) => {
+            if (areaDropdownRef.current && !areaDropdownRef.current.contains(e.target)) {
+                setIsAreaDropdownOpen(false);
+            }
+        };
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setIsAreaDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isAreaDropdownOpen]);
+
+    // Merge live updates with sample advisories
+    const allNotices = useMemo(() => {
+        if (!lguUpdates || lguUpdates.length === 0) {
+            return [];
+        }
+
+        // Normalize live updates
+        const normalizedLive = lguUpdates.map((u, i) => {
+            const cat = (u.category || '').toLowerCase();
+            const dept = (u.department || '').toLowerCase();
+            const isUtil = cat.includes('util') || dept.includes('maynilad') || dept.includes('meralco');
+            const isRoad = cat.includes('road') || cat.includes('infra') || dept.includes('engineering');
+
+            return {
+                id: u.id || u.advisory_id || `live-${i}`,
+                advisory_id: u.announcement_id || u.id,
+                type: isUtil ? 'service_interruption' : (isRoad ? 'scheduled_works' : 'advisory'),
+                category: isUtil ? 'Utilities' : (isRoad ? 'Roadworks' : (cat.includes('event') ? 'Events' : 'Advisories')),
+                department: u.department || 'City Government of Caloocan',
+                source: u.department || 'City Government of Caloocan',
+                title: u.title || 'Municipal Advisory',
+                description: u.description || '',
+                time: u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
+                location: u.barangay || 'Citywide',
+                barangay: u.barangay || 'Citywide',
+                published: u.created_at ? `Published ${new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'Recent',
+                image_url: u.image_url || null,
+                has_image: !!u.image_url,
+                theme: isUtil ? 'amber' : (isRoad ? 'sky' : 'amber'),
+                status_label: isUtil ? 'Service interruption' : (isRoad ? 'Scheduled works' : 'Advisories'),
+                cta_primary: isRoad ? 'View details' : 'Read full notice',
+                cta_secondary: isRoad ? 'View location' : 'Affected areas'
+            };
+        });
+
+        // Combine sample notices at top, then live notices
+        return normalizedLive;
+    }, [lguUpdates]);
+
+    // Category Tabs definition matching target design
     const categoryTabs = [
-        { id: 'all', label: 'All Updates', icon: Radio, matchKeys: [] },
-        { id: 'Advisories', label: 'Advisories', icon: ShieldAlert, matchKeys: ['advisory', 'advisories', 'safety', 'emergency', 'weather'] },
-        { id: 'Infrastructure', label: 'Infrastructure', icon: Wrench, matchKeys: ['public works', 'infrastructure', 'road', 'drainage', 'bridge', 'construction', 'repair'] },
-        { id: 'Utilities', label: 'Utilities', icon: Zap, matchKeys: ['utilities', 'utility', 'water', 'power', 'electric', 'telecom', 'maynilad', 'meralco'] },
-        { id: 'Events', label: 'Events', icon: Calendar, matchKeys: ['event', 'events', 'civic', 'community', 'townhall', 'activity'] },
+        { id: 'all', label: 'All', icon: null },
+        { id: 'utilities', label: 'Utilities', icon: Droplets, color: 'text-blue-500' },
+        { id: 'roadworks', label: 'Roadworks', icon: RoadIcon, color: 'text-amber-500' },
+        { id: 'advisories', label: 'Advisories', icon: Megaphone, color: 'text-rose-500' },
+        { id: 'events', label: 'Events', icon: Calendar, color: 'text-emerald-500' },
     ];
 
-    const filteredUpdates = lguUpdates.filter(update => {
-        if (selectedCategory === 'all') return true;
-        const tab = categoryTabs.find(t => t.id === selectedCategory);
-        if (!tab || !tab.matchKeys) return true;
-        const cat = (update.category || '').toLowerCase();
-        const dept = (update.department || '').toLowerCase();
-        const title = (update.title || '').toLowerCase();
-        return tab.matchKeys.some(k => cat.includes(k) || dept.includes(k) || title.includes(k));
-    });
+    // Filtered notices
+    const filteredNotices = useMemo(() => {
+        return allNotices.filter(notice => {
+            // Category filter
+            if (selectedCategory !== 'all') {
+                const c = (notice.category || '').toLowerCase();
+                if (selectedCategory === 'utilities' && !c.includes('util')) return false;
+                if (selectedCategory === 'roadworks' && !c.includes('road') && !c.includes('infra')) return false;
+                if (selectedCategory === 'advisories' && !c.includes('advis')) return false;
+                if (selectedCategory === 'events' && !c.includes('event')) return false;
+            }
 
-    const isUtilityProvider = (dept = '') => {
-        const d = dept.toLowerCase();
-        return ['maynilad', 'meralco', 'manila water', 'pldt', 'globe', 'converge', 'utility'].some(k => d.includes(k));
-    };
+            // Search query filter
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase().trim();
+                const matchTitle = (notice.title || '').toLowerCase().includes(q);
+                const matchDesc = (notice.description || '').toLowerCase().includes(q);
+                const matchDept = (notice.department || '').toLowerCase().includes(q);
+                const matchLoc = (notice.location || '').toLowerCase().includes(q);
+                const matchReason = (notice.reason || '').toLowerCase().includes(q);
+                if (!matchTitle && !matchDesc && !matchDept && !matchLoc && !matchReason) return false;
+            }
 
+            return true;
+        });
+    }, [allNotices, selectedCategory, searchQuery]);
 
+    const areaNoticesCount = useMemo(() => {
+        return allNotices.filter(n => {
+            if (selectedArea === 'All Caloocan' || selectedArea.startsWith('All Caloocan')) return true;
+            const b = (n.barangay || '').toLowerCase();
+            const l = (n.location || '').toLowerCase();
+            const s = selectedArea.toLowerCase();
+
+            // Caloocan North sector scope
+            if (s.includes('caloocan north') || s.includes('north caloocan')) {
+                const matchNum = b.match(/(?:^|\D)(16[5-9]|17[0-9]|18[0-8])(?:\D|$)/);
+                return !!matchNum || b.includes('north') || l.includes('north');
+            }
+            // Caloocan South sector scope
+            if (s.includes('caloocan south') || s.includes('south caloocan')) {
+                const matchNum = b.match(/(?:^|\D)([1-9]|[1-9][0-9]|1[0-5][0-9]|16[0-4])(?:\D|$)/);
+                return (!!matchNum && !b.includes('north')) || b.includes('south') || l.includes('south');
+            }
+
+            // Extract specific barangay number
+            const numMatch = s.match(/(?:barangay|brgy)\s*(\d+)/i);
+            if (numMatch) {
+                const brgyNum = numMatch[1];
+                const re = new RegExp('(?:barangay|brgy|bgy)[^0-9]*' + brgyNum + '(?![0-9])|(?:^|[^0-9])' + brgyNum + '(?:[^0-9]|$)', 'i');
+                if (re.test(b) || re.test(l)) {
+                    return true;
+                }
+            }
+            return b.includes(s) || l.includes(s);
+        }).length;
+    }, [allNotices, selectedArea]);
 
     return (
-        <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full space-y-6">
-            {/* ── Page Header: Title & Purpose ── */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="w-full space-y-6"
+        >
+            {/* ── Top Header Row ── */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1528] dark:text-white tracking-tight">
                         City Updates &amp; Advisories
-                    </h2>
-                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Municipal advisories, public utility alerts, and engineering notices across Caloocan.
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Plan ahead with notices that matter to your area.
                     </p>
                 </div>
             </div>
 
-            {/* ── Category Chips: 48px tall tap targets, horizontal scroll with smooth chevrons and fade affordances (consistent with Report History) ── */}
-            <div className="relative flex items-center min-w-0 max-w-full w-full">
-                {/* Left Scroll Chevron (<) */}
-                <button
-                    type="button"
-                    onClick={() => scrollTabs('left')}
-                    disabled={!canScrollLeft}
-                    aria-label="Scroll categories left"
-                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 mr-1 sm:mr-1.5 ${
-                        canScrollLeft
-                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
-                            : 'hidden'
-                    }`}
-                >
-                    <ChevronLeft size={16} strokeWidth={2.5} />
-                </button>
-
-                {/* Scroll Container with Fade Overlays */}
-                <div className="relative min-w-0 flex-1 overflow-hidden">
-                    {/* Left Trailing Edge Fade */}
-                    <div
-                        className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
-                            canScrollLeft ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        aria-hidden="true"
+            {/* ── Search Input & Area Dropdown Controls Row ── */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+                <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search notices, locations or keywords.."
+                        className="w-full h-11 sm:h-12 pl-10 pr-9 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/20 transition-all shadow-2xs"
                     />
-
-                    {/* Scrollable Track */}
-                    <div
-                        ref={tabsScrollRef}
-                        className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5 w-full"
-                    >
-                        {categoryTabs.map(tab => {
-                            const count = tab.id === 'all'
-                                ? lguUpdates.length
-                                : lguUpdates.filter(u => {
-                                    const cat = (u.category || '').toLowerCase();
-                                    const dept = (u.department || '').toLowerCase();
-                                    const title = (u.title || '').toLowerCase();
-                                    return tab.matchKeys.some(k => cat.includes(k) || dept.includes(k) || title.includes(k));
-                                }).length;
-
-                            const isActive = selectedCategory === tab.id;
-
-                            return (
-                                <button
-                                    key={tab.id}
-                                    data-tab-id={tab.id}
-                                    type="button"
-                                    onClick={() => setSelectedCategory(tab.id)}
-                                    aria-pressed={isActive}
-                                    className={`h-12 min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
-                                        isActive
-                                            ? 'bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold shadow-sm'
-                                            : 'bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'
-                                    }`}
-                                >
-                                    <span className={isActive ? 'text-white' : ''}>{tab.label}</span>
-                                    <span
-                                        className={`px-1.5 py-0.5 rounded-full text-[11px] font-mono font-bold leading-none transition-colors ${
-                                            isActive
-                                                ? 'bg-black/20 text-white'
-                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                                        }`}
-                                    >
-                                        {count}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Right Trailing Edge Fade */}
-                    <div
-                        className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
-                            canScrollRight ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        aria-hidden="true"
-                    />
+                    {searchQuery && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
                 </div>
 
-                {/* Right Scroll Chevron Button (only visible when scrollable) */}
-                <button
-                    type="button"
-                    onClick={() => scrollTabs('right')}
-                    disabled={!canScrollRight}
-                    aria-label="Scroll categories right"
-                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 ml-1 sm:ml-1.5 ${
-                        canScrollRight
-                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
-                            : 'hidden'
-                    }`}
-                >
-                    <ChevronRight size={16} strokeWidth={2.5} />
-                </button>
-            </div>
-
-            {/* ── Updates Feed: 2-Column Grid on Desktop (lg:grid-cols-2), 1-Column on Mobile/Tablet ── */}
-            {loadingAdvisories ? (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
-                    <Loader2 className="animate-spin text-orange-500" size={32} />
-                    <span className="text-xs sm:text-sm font-medium">{t('Synchronizing Live Advisories...')}</span>
-                </div>
-            ) : advisoriesError ? (
-                <div role="alert" className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl border border-rose-200 dark:border-rose-900/60 p-6 max-w-xl mx-auto">
-                    <AlertTriangle className="mx-auto mb-3 text-rose-600 dark:text-rose-400" size={36} />
-                    <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">Advisories could not be loaded</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">The feed is temporarily unavailable. Please try again shortly.</p>
+                {/* Custom Area / Barangay Dropdown List */}
+                <div className="relative shrink-0 w-full sm:w-auto" ref={areaDropdownRef}>
                     <button
                         type="button"
-                        onClick={onRetryAdvisories}
-                        className="mt-4 min-h-11 rounded-xl bg-[#B9380B] px-4 py-2 text-xs font-bold text-white hover:bg-[#9F2F09] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 cursor-pointer"
+                        onClick={() => setIsAreaDropdownOpen(!isAreaDropdownOpen)}
+                        aria-haspopup="listbox"
+                        aria-expanded={isAreaDropdownOpen}
+                        className={`w-full sm:w-auto h-11 sm:h-12 px-4 bg-white dark:bg-slate-900 border rounded-xl text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between sm:justify-start gap-2.5 shadow-2xs transition-all cursor-pointer select-none ${
+                            isAreaDropdownOpen
+                                ? 'border-[#EA580C] ring-2 ring-[#EA580C]/20 shadow-xs'
+                                : 'border-slate-200/90 dark:border-slate-800 hover:border-[#EA580C]/60 hover:bg-slate-50 dark:hover:bg-slate-800'
+                        }`}
                     >
-                        Try again
+                        <div className="flex items-center gap-2 truncate">
+                            <MapPin size={16} className={`shrink-0 transition-colors ${isAreaDropdownOpen ? 'text-[#EA580C]' : 'text-[#0B1528] dark:text-white'}`} />
+                            <span className="truncate">{selectedArea}</span>
+                        </div>
+                        <ChevronDown
+                            size={14}
+                            className={`text-slate-400 ml-1 shrink-0 transition-transform duration-200 ${isAreaDropdownOpen ? 'rotate-180 text-[#EA580C]' : ''}`}
+                        />
                     </button>
-                </div>
-            ) : filteredUpdates.length === 0 ? (
-                <div className="text-center text-slate-400 py-20 bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 p-8 max-w-xl mx-auto">
-                    <History className="mx-auto mb-3 opacity-20 text-orange-500" size={48} aria-hidden="true" />
-                    <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">No updates in this category</p>
-                    <p className="text-xs text-slate-500 mt-1">Check back later or select "All Updates" to view other notices.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-                    {filteredUpdates.map((update, idx) => {
-                        const isUtility = isUtilityProvider(update.department);
 
-                        return (
+                    <AnimatePresence>
+                        {isAreaDropdownOpen && (
                             <motion.div
-                                initial={{ opacity: 0, y: 15 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                key={update.id || update.advisory_id || idx}
-                                className="flex flex-col justify-between h-full bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all"
+                                initial={{ opacity: 0, y: -4, scale: 0.97 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                                transition={{ duration: 0.15, ease: 'easeOut' }}
+                                role="listbox"
+                                className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-full sm:w-80 md:w-96 bg-white dark:bg-[#0C1528] border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xl shadow-slate-900/15 dark:shadow-black/70 z-50 overflow-hidden flex flex-col"
                             >
-                                <div className="space-y-3">
-                                    {/* Card Header: Source & Timestamp */}
-                                    <div className="flex items-center justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                                                isUtility
-                                                    ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800/60'
-                                                    : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800/60'
-                                            }`}>
-                                                {getIconForCategory(update.category)}
-                                            </div>
-                                            <div className="min-w-0">
-                                                <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-[15px] block truncate">
-                                                    {update.department}
+                                {/* Header + Search + Sector Tabs */}
+                                <div className="p-3 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-xs">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                            Select Area / Barangay
+                                        </span>
+                                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                            {filteredAreas.length} {filteredAreas.length === 1 ? 'area' : 'areas'}
+                                        </span>
+                                    </div>
+
+                                    {/* Search Input */}
+                                    <div className="relative">
+                                        <Search
+                                            size={14}
+                                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none"
+                                        />
+                                        <input
+                                            ref={areaSearchInputRef}
+                                            type="text"
+                                            value={areaSearchQuery}
+                                            onChange={(e) => setAreaSearchQuery(e.target.value)}
+                                            placeholder="Search barangay (e.g. 171, Camarin, Sangandaan)..."
+                                            className="w-full pl-8 pr-7 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all"
+                                        />
+                                        {areaSearchQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setAreaSearchQuery('')}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full cursor-pointer"
+                                                aria-label="Clear area search"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Sector Filter Tabs */}
+                                    <div className="grid grid-cols-3 gap-1.5 mt-2.5">
+                                        {[
+                                            { id: 'all', label: 'All', count: 188 },
+                                            { id: 'north', label: 'North', count: 24 },
+                                            { id: 'south', label: 'South', count: 164 }
+                                        ].map(tab => (
+                                            <button
+                                                key={tab.id}
+                                                type="button"
+                                                onClick={() => setAreaSectorTab(tab.id)}
+                                                className={`py-1.5 px-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                                                    areaSectorTab === tab.id
+                                                        ? 'bg-[#EA580C] text-white shadow-2xs'
+                                                        : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/60'
+                                                }`}
+                                            >
+                                                <span>{tab.label}</span>
+                                                <span className={`text-[9px] font-mono px-1 rounded ${areaSectorTab === tab.id ? 'bg-white/20 text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                    {tab.count}
                                                 </span>
-                                                <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-                                                    {formatRelativeTime(update.created_at) || 'Recent'}
-                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Scrollable List of Barangays and Areas */}
+                                <div className="max-h-72 overflow-y-auto p-1.5 space-y-1.5 divide-y divide-slate-100 dark:divide-slate-800/60">
+                                    {/* Global / Citywide Options */}
+                                    {globalAreasList.length > 0 && (
+                                        <div className="pt-1 pb-1 first:pt-0">
+                                            <div className="px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                                                City & Sector Scopes
+                                            </div>
+                                            <div className="space-y-0.5 mt-0.5">
+                                                {globalAreasList.map(area => {
+                                                    const isSelected = selectedArea === area.label || selectedArea === area.name;
+                                                    return (
+                                                        <button
+                                                            key={area.id}
+                                                            type="button"
+                                                            role="option"
+                                                            aria-selected={isSelected}
+                                                            onClick={() => {
+                                                                setSelectedArea(area.name);
+                                                                setIsAreaDropdownOpen(false);
+                                                                setAreaSearchQuery('');
+                                                            }}
+                                                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                                                                isSelected
+                                                                    ? 'bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] dark:text-orange-400 font-bold border border-orange-200/80 dark:border-orange-900/50 shadow-2xs'
+                                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 border border-transparent'
+                                                            }`}
+                                                        >
+                                                            <span className="truncate">{area.label}</span>
+                                                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+                                                                    Scope
+                                                                </span>
+                                                                {isSelected && (
+                                                                    <div className="w-4 h-4 rounded-full bg-[#EA580C]/10 text-[#EA580C] flex items-center justify-center shrink-0">
+                                                                        <Check size={11} strokeWidth={3} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
+                                    )}
+
+                                    {/* North Caloocan Barangays (165-188) */}
+                                    {northAreasList.length > 0 && (
+                                        <div className="pt-1.5 pb-1 first:pt-0">
+                                            <div className="px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+                                                <span>North Caloocan ({northAreasList.length})</span>
+                                                <span className="text-[8px] font-mono opacity-80">Brgy 165–188</span>
+                                            </div>
+                                            <div className="space-y-0.5 mt-0.5">
+                                                {northAreasList.map(area => {
+                                                    const isSelected = selectedArea === area.label ||
+                                                                       selectedArea === area.name ||
+                                                                       (area.number && (selectedArea === `Barangay ${area.number}` || selectedArea.startsWith(`Barangay ${area.number} `)));
+                                                    return (
+                                                        <button
+                                                            key={area.id}
+                                                            type="button"
+                                                            role="option"
+                                                            aria-selected={isSelected}
+                                                            onClick={() => {
+                                                                setSelectedArea(area.label);
+                                                                setIsAreaDropdownOpen(false);
+                                                                setAreaSearchQuery('');
+                                                            }}
+                                                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                                                                isSelected
+                                                                    ? 'bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] dark:text-orange-400 font-bold border border-orange-200/80 dark:border-orange-900/50 shadow-2xs'
+                                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 border border-transparent'
+                                                            }`}
+                                                        >
+                                                            <span className="truncate">{area.label}</span>
+                                                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/50">
+                                                                    North
+                                                                </span>
+                                                                {isSelected && (
+                                                                    <div className="w-4 h-4 rounded-full bg-[#EA580C]/10 text-[#EA580C] flex items-center justify-center shrink-0">
+                                                                        <Check size={11} strokeWidth={3} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* South Caloocan Barangays (1-164) */}
+                                    {southAreasList.length > 0 && (
+                                        <div className="pt-1.5 pb-1 first:pt-0">
+                                            <div className="px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-sky-600 dark:text-sky-400 flex items-center justify-between">
+                                                <span>South Caloocan ({southAreasList.length})</span>
+                                                <span className="text-[8px] font-mono opacity-80">Brgy 1–164</span>
+                                            </div>
+                                            <div className="space-y-0.5 mt-0.5">
+                                                {southAreasList.map(area => {
+                                                    const isSelected = selectedArea === area.label ||
+                                                                       selectedArea === area.name ||
+                                                                       (area.number && (selectedArea === `Barangay ${area.number}` || selectedArea.startsWith(`Barangay ${area.number} `)));
+                                                    return (
+                                                        <button
+                                                            key={area.id}
+                                                            type="button"
+                                                            role="option"
+                                                            aria-selected={isSelected}
+                                                            onClick={() => {
+                                                                setSelectedArea(area.label);
+                                                                setIsAreaDropdownOpen(false);
+                                                                setAreaSearchQuery('');
+                                                            }}
+                                                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                                                                isSelected
+                                                                    ? 'bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] dark:text-orange-400 font-bold border border-orange-200/80 dark:border-orange-900/50 shadow-2xs'
+                                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 border border-transparent'
+                                                            }`}
+                                                        >
+                                                            <span className="truncate">{area.label}</span>
+                                                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded font-medium bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/50">
+                                                                    South
+                                                                </span>
+                                                                {isSelected && (
+                                                                    <div className="w-4 h-4 rounded-full bg-[#EA580C]/10 text-[#EA580C] flex items-center justify-center shrink-0">
+                                                                        <Check size={11} strokeWidth={3} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Empty Search Results */}
+                                    {filteredAreas.length === 0 && (
+                                        <div className="py-8 px-4 text-center">
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                                No barangay found
+                                            </p>
+                                            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                                                No matching barangay for &quot;{areaSearchQuery}&quot;. Try searching by number (e.g. &quot;171&quot;) or area name.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAreaSearchQuery('');
+                                                    setAreaSectorTab('all');
+                                                }}
+                                                className="mt-3 px-3 py-1 text-[11px] font-bold text-[#EA580C] hover:underline cursor-pointer"
+                                            >
+                                                Reset search filter
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {/* ── Category Filter Tabs ── */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 -mx-4 px-4 sm:mx-0 sm:px-0">
+                {categoryTabs.map(tab => {
+                    const isActive = selectedCategory === tab.id;
+                    const IconComponent = tab.icon;
+
+                    return (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setSelectedCategory(tab.id)}
+                            className={`h-10 px-4 sm:px-5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 ${
+                                isActive
+                                    ? 'bg-[#EA580C] text-white shadow-xs'
+                                    : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs'
+                            }`}
+                        >
+                            {IconComponent && (
+                                <IconComponent
+                                    size={14}
+                                    className={isActive ? 'text-white' : (tab.color || 'text-slate-500')}
+                                />
+                            )}
+                            <span>{tab.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* ── Main 2-Column Content Grid ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                {/* ── Left Column: Notices List (Span 2) ── */}
+                <div className="lg:col-span-2 space-y-5">
+                    {/* Area Notice Count Banner Card */}
+                    <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center justify-between gap-3">
+                        <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-[#0B1528] dark:text-white flex items-center justify-center shrink-0 mt-0.5">
+                                <MapPin size={17} strokeWidth={2.4} />
+                            </div>
+                            <div className="min-w-0">
+                                <h2 className="text-sm sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                                    {selectedArea}
+                                </h2>
+                                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                                    {areaNoticesCount} {areaNoticesCount === 1 ? 'notice' : 'notices'} in your area
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsAreaDropdownOpen(true);
+                                areaDropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }}
+                            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-sky-50 dark:bg-slate-800 hover:bg-sky-100 dark:hover:bg-slate-700 border border-sky-100 dark:border-slate-700 text-sky-700 dark:text-sky-300 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                        >
+                            <ArrowRightLeft size={13} />
+                            <span>Change area</span>
+                        </button>
+                    </div>
+
+                    {/* Notices Stream */}
+                    {filteredNotices.length === 0 ? (
+                        <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800">
+                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                No notices found for your filters.
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                Try adjusting your search query or selecting &quot;All&quot; categories.
+                            </p>
+                        </div>
+                    ) : (
+                        filteredNotices.map((notice) => {
+                            const isServiceInterruption = notice.type === 'service_interruption' || notice.theme === 'amber';
+                            const isScheduledWorks = notice.type === 'scheduled_works' || notice.theme === 'sky';
+
+                            // Card Styling
+                            let cardBg = 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800';
+                            let iconBg = 'bg-orange-100 dark:bg-orange-950/50 text-[#EA580C]';
+                            let badgeStyle = 'bg-[#FFEDD5] dark:bg-amber-900/60 text-[#C2410C] dark:text-amber-300 border border-[#FDBA74]/60';
+
+                            if (isServiceInterruption) {
+                                cardBg = 'bg-[#FFFBF5] dark:bg-amber-950/15 border border-[#FED7AA]/80 dark:border-amber-900/40';
+                                iconBg = 'bg-[#FFEDD5] dark:bg-amber-900/50 text-[#EA580C]';
+                                badgeStyle = 'bg-[#FFEDD5] dark:bg-amber-900/60 text-[#C2410C] dark:text-amber-300 border border-[#FDBA74]/60';
+                            } else if (isScheduledWorks) {
+                                cardBg = 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800';
+                                iconBg = 'bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300';
+                                badgeStyle = 'bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200/80';
+                            } else if (notice.theme === 'emerald') {
+                                cardBg = 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800';
+                                iconBg = 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300';
+                                badgeStyle = 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80';
+                            }
+
+                            return (
+                                <div
+                                    key={notice.id || notice.advisory_id}
+                                    className={`p-4 sm:p-6 rounded-2xl ${cardBg} shadow-xs space-y-3.5 sm:space-y-4 transition-all hover:border-slate-300 dark:hover:border-slate-700`}
+                                >
+                                    {/* Top Bar: Icon + Badge and Source */}
+                                    <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+                                        <div className="flex items-center gap-2 sm:gap-3">
+                                            <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full ${iconBg} flex items-center justify-center shrink-0`}>
+                                                {isServiceInterruption ? (
+                                                    <Droplets size={19} className="text-[#EA580C]" />
+                                                ) : isScheduledWorks ? (
+                                                    <RoadIcon size={18} className="text-sky-700 dark:text-sky-300" />
+                                                ) : notice.theme === 'emerald' ? (
+                                                    <CheckCircle2 size={18} className="text-emerald-700 dark:text-emerald-300" />
+                                                ) : (
+                                                    <Megaphone size={18} className="text-rose-600" />
+                                                )}
+                                            </div>
+
+                                            <span className={`px-2.5 py-1 sm:px-3 sm:py-1 rounded-full text-[11px] sm:text-xs font-bold ${badgeStyle}`}>
+                                                {notice.status_label || notice.category}
+                                            </span>
+                                        </div>
+
+                                        <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 shrink-0 ml-auto sm:ml-0">
+                                            Source: {notice.source || notice.department}
+                                        </span>
                                     </div>
 
                                     {/* Title & Description */}
                                     <div>
-                                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2 leading-snug">
-                                            {update.title}
+                                        <h3 className="text-base sm:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                                            {notice.title}
                                         </h3>
-                                        <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed line-clamp-4">
-                                            {update.description}
+                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                                            {notice.description}
                                         </p>
                                     </div>
 
-                                    {/* Robust Image Display with onError fallback */}
-                                    {update.has_image && update.image_url && (
-                                        <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/50">
-                                            <img
-                                                src={update.image_url}
-                                                alt={update.title || "Advisory attachment"}
-                                                className="w-full max-h-[300px] object-cover"
-                                                onError={(e) => {
-                                                    e.currentTarget.parentElement.style.display = 'none';
-                                                }}
-                                            />
+                                    {/* Content Detail Grid */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 pt-1">
+                                        {/* Left Meta Sub-col */}
+                                        <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                                            <div className="flex items-center gap-2">
+                                                <Calendar size={14} className="text-slate-400 shrink-0" />
+                                                <span className="font-semibold text-slate-800 dark:text-slate-200">{notice.time}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <MapPin size={14} className="text-slate-400 shrink-0" />
+                                                <span>{notice.location}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <FileText size={14} className="text-slate-400 shrink-0" />
+                                                <span className="text-slate-500 dark:text-slate-400">{notice.published}</span>
+                                            </div>
+
+                                            {/* Photo thumbnail if present in scheduled works */}
+                                            {notice.has_image && notice.image_url && (
+                                                <div className="pt-2">
+                                                    <img
+                                                        src={notice.image_url}
+                                                        alt={notice.title}
+                                                        className="w-40 sm:w-48 h-24 sm:h-28 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shadow-2xs"
+                                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
 
-                                {/* Card Footer: Traceable Bulletin Reference & Clear CTA */}
-                                <div className="mt-4 pt-3 flex flex-wrap items-center justify-between border-t border-slate-100 dark:border-slate-800/80 gap-2">
-                                    <span
-                                        className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/70 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700/60"
-                                        title="Cite this reference code when contacting city dispatch or LGU hotlines"
-                                    >
-                                        {update.advisory_id || update.id ? (
-                                            <>Bulletin Ref: <strong className="text-slate-700 dark:text-slate-200">{update.advisory_id || update.id}</strong></>
-                                        ) : (
-                                            <strong className="text-slate-700 dark:text-slate-200">Reference unavailable</strong>
-                                        )}
-                                    </span>
+                                        {/* Right Guidance Sub-col */}
+                                        <div className="space-y-2.5 sm:space-y-3 text-xs text-slate-600 dark:text-slate-300">
+                                            {notice.reason && (
+                                                <div>
+                                                    <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                                        <Wrench size={13} className="text-slate-500 shrink-0" />
+                                                        <span>Reason</span>
+                                                    </div>
+                                                    <p className="text-slate-500 dark:text-slate-400 mt-0.5 ml-4.5">
+                                                        {notice.reason}
+                                                    </p>
+                                                </div>
+                                            )}
 
-                                    <button
-                                        type="button"
-                                        onClick={() => { setSelectedPost(update); setActiveModal('post-details'); }}
-                                        className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#ff6b00] hover:text-[#e66000] cursor-pointer transition-colors min-h-[44px] py-1"
-                                    >
-                                        <span>Read Full Advisory</span>
-                                        <ChevronRight size={15} />
-                                    </button>
+                                            {notice.expected_impact && (
+                                                <div>
+                                                    <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                                        <Car size={14} className="text-slate-500 shrink-0" />
+                                                        <span>Expected impact</span>
+                                                    </div>
+                                                    <p className="text-slate-500 dark:text-slate-400 mt-0.5 ml-5">
+                                                        {notice.expected_impact}
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {notice.what_you_can_do && notice.what_you_can_do.length > 0 && (
+                                                <div>
+                                                    <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                                        <Lightbulb size={13} className="text-amber-500 shrink-0" />
+                                                        <span>What you can do</span>
+                                                    </div>
+                                                    <div className="text-slate-500 dark:text-slate-400 mt-0.5 ml-4.5 space-y-0.5">
+                                                        {notice.what_you_can_do.map((item, i) => (
+                                                            <p key={i}>{item}</p>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {notice.note && (
+                                                <div>
+                                                    <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                                        <Info size={13} className="text-slate-400 shrink-0" />
+                                                        <span>Note</span>
+                                                    </div>
+                                                    <p className="text-slate-500 dark:text-slate-400 mt-0.5 ml-4.5">
+                                                        {notice.note}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons Row */}
+                                    <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (setSelectedPost) setSelectedPost(notice);
+                                                if (setActiveModal) setActiveModal('post-details');
+                                            }}
+                                            className="w-full sm:w-auto px-3 sm:px-5 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer text-center"
+                                        >
+                                            <span>{notice.cta_primary || 'Read full notice'}</span>
+                                            <ArrowRight size={14} className="shrink-0" />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (setSelectedPost) setSelectedPost(notice);
+                                                if (setActiveModal) setActiveModal('map');
+                                            }}
+                                            className="w-full sm:w-auto px-3 sm:px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer text-center"
+                                        >
+                                            <MapPin size={14} className="text-slate-500 dark:text-slate-400 shrink-0" />
+                                            <span>{notice.cta_secondary || 'Affected areas'}</span>
+                                        </button>
+                                    </div>
                                 </div>
-                            </motion.div>
-                        );
-                    })}
+                            );
+                        })
+                    )}
                 </div>
-            )}
+
+                {/* ── Right Column: Information & Assistance Widgets (Span 1) ── */}
+                <div className="space-y-5">
+                    {/* Widget 1: Your Area */}
+                    <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
+                        <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                            Your area
+                        </div>
+                        <div className="flex items-center justify-between gap-3 mt-2">
+                            <div className="flex items-center gap-2">
+                                <MapPin size={18} className="text-[#EA580C] shrink-0" />
+                                <span className="font-bold text-slate-900 dark:text-white text-base">
+                                    {selectedArea}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsAreaDropdownOpen(true);
+                                    areaDropdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-sky-50 dark:bg-slate-800 hover:bg-sky-100 dark:hover:bg-slate-700 border border-sky-100 dark:border-slate-700 text-sky-700 dark:text-sky-300 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                            >
+                                <ArrowRightLeft size={13} />
+                                <span>Change area</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Widget 2: Notice Status Guide */}
+                    <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-4">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                            Notice status guide
+                        </h3>
+
+                        <div className="space-y-3">
+                            {/* Service Interruption */}
+                            <div className="p-3 rounded-xl bg-[#FFF7ED] dark:bg-amber-950/20 border border-[#FED7AA]/60 dark:border-amber-900/30">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#FFEDD5] text-[#C2410C]">
+                                    <Droplets size={12} className="text-[#C2410C]" />
+                                    <span>Service interruption</span>
+                                </span>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-snug">
+                                    Temporary disruption to a service (e.g. water, power).
+                                </p>
+                            </div>
+
+                            {/* Scheduled Works */}
+                            <div className="p-3 rounded-xl bg-[#F0F9FF] dark:bg-sky-950/20 border border-[#BAE6FD]/60 dark:border-sky-900/30">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-800">
+                                    <RoadIcon size={12} className="text-sky-800" />
+                                    <span>Scheduled works</span>
+                                </span>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-snug">
+                                    Planned construction or maintenance activities.
+                                </p>
+                            </div>
+
+                            {/* Completed */}
+                            <div className="p-3 rounded-xl bg-[#F0FDF4] dark:bg-emerald-950/20 border border-[#BBF7D0]/60 dark:border-emerald-900/30">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                                    <CheckCircle2 size={12} className="text-emerald-700" />
+                                    <span>Completed</span>
+                                </span>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-snug">
+                                    Previously announced activity that has been completed.
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setSelectedCategory('all')}
+                            className="w-full pt-1 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-orange-600 hover:text-orange-700 dark:text-orange-500 transition-colors cursor-pointer"
+                        >
+                            <Clock size={14} />
+                            <span>View past notices</span>
+                            <ArrowRight size={13} />
+                        </button>
+                    </div>
+
+                    {/* Widget 3: Report a Concern */}
+                    <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-4">
+                        <div className="flex items-start gap-3">
+                            <Cone size={28} className="text-orange-500 shrink-0 mt-0.5" strokeWidth={2.2} />
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
+                                    Report a concern
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                    See an urgent issue in your area? Let us know so our team can look into it.
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (setActiveModal) setActiveModal('file-report');
+                                else if (handleSetTab) handleSetTab('reports');
+                            }}
+                            className="w-full py-3 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-98 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                        >
+                            <span>Report a concern</span>
+                            <ArrowRight size={15} />
+                        </button>
+                    </div>
+                </div>
+            </div>
         </motion.div>
     );
 };
@@ -1839,14 +2815,165 @@ const ReportCardSkeleton = () => (
     </div>
 );
 
+const CIVIC_ISSUE_CATEGORIES = [
+    'Roads & bridges',
+    'Drainage & flooding',
+    'Street lighting',
+    'Water supply',
+    'Public safety hazards',
+    'Traffic & road signs',
+    'Public facilities',
+    'Electrical wiring',
+    'Waste management'
+];
+
+const matchesCivicCategory = (reportCat, targetCat) => {
+    if (!targetCat || targetCat === 'All categories') return true;
+    if (!reportCat) return false;
+
+    const r = reportCat.trim().toLowerCase();
+    const t = targetCat.trim().toLowerCase();
+
+    if (r === t) return true;
+
+    if (t === 'roads & bridges') {
+        return (r.includes('road') || r.includes('bridge') || r.includes('pothole') || r.includes('asphalt') || r.includes('pavement')) && !r.includes('sign') && !r.includes('traffic');
+    }
+    if (t === 'drainage & flooding') {
+        return r.includes('drain') || r.includes('flood') || r.includes('canal') || r.includes('sewer') || r.includes('waterway');
+    }
+    if (t === 'street lighting') {
+        return (r.includes('light') || r.includes('lamp') || r.includes('streetlight')) && !r.includes('traffic');
+    }
+    if (t === 'water supply') {
+        return (r.includes('water') && !r.includes('waterway')) || r.includes('leak') || r.includes('pipe') || r.includes('pressure');
+    }
+    if (t === 'public safety hazards') {
+        return r.includes('safety') || r.includes('hazard') || r.includes('manhole') || r.includes('unstable') || r.includes('tree');
+    }
+    if (t === 'traffic & road signs') {
+        return r.includes('traffic') || r.includes('sign') || r.includes('signal') || r.includes('marking');
+    }
+    if (t === 'public facilities') {
+        return r.includes('facility') || r.includes('facilities') || r.includes('building') || r.includes('park') || r.includes('civic') || r.includes('ground');
+    }
+    if (t === 'electrical wiring') {
+        return r.includes('electric') || r.includes('wiring') || r.includes('cable') || r.includes('wire') || r.includes('power');
+    }
+    if (t === 'waste management') {
+        return r.includes('waste') || r.includes('garbage') || r.includes('trash') || r.includes('basura') || r.includes('dump') || r.includes('litter');
+    }
+
+    return false;
+};
+
 const getCategoryIconComponent = (category) => {
     const cat = (category || '').toLowerCase();
-    if (cat.includes('water') || cat.includes('drain') || cat.includes('flood') || cat.includes('pipe') || cat.includes('leak')) return Droplets;
-    if (cat.includes('power') || cat.includes('light') || cat.includes('electric') || cat.includes('wire')) return Zap;
-    if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole') || cat.includes('pavement')) return HardHat;
-    if (cat.includes('traffic') || cat.includes('sign') || cat.includes('hazard') || cat.includes('safety')) return ShieldAlert;
-    return Wrench;
+    if (cat.includes('waste') || cat.includes('garbage') || cat.includes('trash') || cat.includes('basura') || cat.includes('dump') || cat.includes('litter')) return Trash2;
+    if (cat.includes('drain') || cat.includes('flood')) return Waves;
+    if (cat.includes('water') || cat.includes('pipe') || cat.includes('leak')) return Droplets;
+    if (cat.includes('light') || cat.includes('lamp') || cat.includes('streetlight')) return Lightbulb;
+    if (cat.includes('electric') || cat.includes('wire') || cat.includes('cable')) return Zap;
+    if (cat.includes('sign') || cat.includes('signal') || cat.includes('traffic')) return Signpost;
+    if (cat.includes('facilit') || cat.includes('building') || cat.includes('park') || cat.includes('landmark')) return Building2;
+    if (cat.includes('hazard') || cat.includes('safety')) return AlertTriangle;
+    if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole') || cat.includes('pavement')) return RoadIcon;
+    return RoadIcon;
 };
+
+const SAMPLE_REPORTS_LIST = [
+    {
+        id: 'sample-1',
+        ticket_id: 'PUL-2026-2635',
+        title: 'Reported public safety hazard',
+        category: 'Public Safety & Hazards',
+        status: 'rejected',
+        subdivision: 'Celina Homes 3',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        latitude: 14.7518,
+        longitude: 121.0269,
+        created_at: '2026-10-26T10:30:00Z',
+        updated_at: '2026-10-27T08:15:00Z',
+        attachments_count: 1,
+        image_url: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=600&q=80',
+        department_title: 'Not accepted after review.',
+        department_message: "Open the report to read the department's reason."
+    },
+    {
+        id: 'sample-2',
+        ticket_id: 'PUL-2026-1697',
+        title: 'Streetlight not working',
+        category: 'Power & Street Lighting',
+        status: 'pending',
+        subdivision: 'Congressional Village',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        latitude: 14.7485,
+        longitude: 121.0312,
+        created_at: '2026-10-25T14:15:00Z',
+        updated_at: '2026-10-25T14:20:00Z',
+        attachments_count: 1,
+        image_url: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=600&q=80',
+        department_title: 'Received by the department.',
+        department_message: 'No action needed while under review.'
+    },
+    {
+        id: 'sample-3',
+        ticket_id: 'PUL-2026-1681',
+        title: 'Damaged road surface',
+        category: 'Roads & Bridges',
+        status: 'pending',
+        subdivision: 'Rainbow Village',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        latitude: 14.7392,
+        longitude: 121.0280,
+        created_at: '2026-10-23T08:45:00Z',
+        updated_at: '2026-10-24T09:10:00Z',
+        attachments_count: 1,
+        stage: 'Stage 4 of 5',
+        image_url: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80',
+        department_title: 'Received by the department.',
+        department_message: 'No action needed while under review.'
+    },
+    {
+        id: 'sample-4',
+        ticket_id: 'PUL-2026-4745',
+        title: 'Water leak on sidewalk',
+        category: 'Water Supply & Distribution',
+        status: 'pending',
+        subdivision: 'Camarin Commercial Ctr',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        latitude: 14.7541,
+        longitude: 121.0395,
+        created_at: '2026-10-21T16:20:00Z',
+        updated_at: '2026-10-22T11:30:00Z',
+        attachments_count: 1,
+        image_url: 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=600&q=80',
+        department_title: 'Received by the department.',
+        department_message: 'No action needed while under review.'
+    },
+    {
+        id: 'sample-5',
+        ticket_id: 'PUL-2026-1633',
+        title: 'Reported civic concern',
+        category: 'Public Buildings & Facilities',
+        status: 'pending',
+        subdivision: 'Bagumbong',
+        barangay: 'Barangay 171',
+        location_string: 'Barangay 171, Caloocan City',
+        latitude: 14.7430,
+        longitude: 121.0348,
+        created_at: '2026-10-18T11:10:00Z',
+        updated_at: '2026-10-19T13:45:00Z',
+        attachments_count: 1,
+        image_url: 'https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=600&q=80',
+        department_title: 'Received by the department.',
+        department_message: 'No action needed while under review.'
+    }
+];
 
 const MyReports = ({
     userReports = [],
@@ -1862,394 +2989,1309 @@ const MyReports = ({
     t
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [expandedReportId, setExpandedReportId] = useState(null);
-    const [reportHistoryPage, setReportHistoryPage] = useState(1);
-
-    const tabsScrollRef = useRef(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
-
-    const checkTabsScroll = useCallback(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const { scrollLeft, scrollWidth, clientWidth } = el;
-        setCanScrollLeft(scrollLeft > 6);
-        setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 6);
-    }, []);
+    const [selectedCategory, setSelectedCategory] = useState('All categories');
+    const [selectedDateFilter, setSelectedDateFilter] = useState('All dates');
+    const [sortOrder, setSortOrder] = useState('newest'); // 'newest' | 'oldest'
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 6;
+    const [openFaq, setOpenFaq] = useState(null);
+    const [previewSampleData, setPreviewSampleData] = useState(false);
+    const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
+    const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+    const catDropdownRef = useRef(null);
+    const dateDropdownRef = useRef(null);
 
     useEffect(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        checkTabsScroll();
-        el.addEventListener('scroll', checkTabsScroll, { passive: true });
-        window.addEventListener('resize', checkTabsScroll);
-        const timer = setTimeout(checkTabsScroll, 120);
-        return () => {
-            el.removeEventListener('scroll', checkTabsScroll);
-            window.removeEventListener('resize', checkTabsScroll);
-            clearTimeout(timer);
+        if (!isCatDropdownOpen && !isDateDropdownOpen) return;
+        const handleClickOutside = (e) => {
+            if (catDropdownRef.current && !catDropdownRef.current.contains(e.target)) {
+                setIsCatDropdownOpen(false);
+            }
+            if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target)) {
+                setIsDateDropdownOpen(false);
+            }
         };
-    }, [checkTabsScroll]);
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setIsCatDropdownOpen(false);
+                setIsDateDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isCatDropdownOpen, isDateDropdownOpen]);
 
-    const scrollTabs = (direction) => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const scrollAmount = 180;
-        el.scrollBy({
-            left: direction === 'left' ? -scrollAmount : scrollAmount,
-            behavior: 'smooth'
+    // Determine data source (live reports take precedence; fallback to sample demo reports only when preview requested)
+    const hasLiveReports = userReports && userReports.length > 0;
+    const isPopulated = hasLiveReports || previewSampleData;
+    const baseReports = hasLiveReports ? userReports : (previewSampleData ? SAMPLE_REPORTS_LIST : []);
+
+    // Available categories for dropdown (Strictly matching the 8 civic issue categories from official scope)
+    const categoriesList = useMemo(() => [
+        'All categories',
+        ...CIVIC_ISSUE_CATEGORIES
+    ], []);
+
+    // Available dates for dropdown
+    const datesList = useMemo(() => {
+        const set = new Set();
+        baseReports.forEach(r => {
+            const d = r.created_at ? new Date(r.created_at) : new Date();
+            const str = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            set.add(str);
         });
-    };
+        return ['All dates', ...Array.from(set)];
+    }, [baseReports]);
 
+    // Stat metric counts across the base list
+    const totalCount = baseReports.length;
+    const awaitingReviewCount = useMemo(() => {
+        return baseReports.filter(r => ['pending', 'unverified', 'received', 'under_review'].includes((r.status || '').toLowerCase())).length;
+    }, [baseReports]);
+    const inProgressCount = useMemo(() => {
+        return baseReports.filter(r => ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes((r.status || '').toLowerCase())).length;
+    }, [baseReports]);
+    const resolvedCount = useMemo(() => {
+        return baseReports.filter(r => ['resolved', 'completed', 'fixed'].includes((r.status || '').toLowerCase())).length;
+    }, [baseReports]);
+    const rejectedCount = useMemo(() => {
+        return baseReports.filter(r => ['rejected', 'declined', 'invalid', 'spam'].includes((r.status || '').toLowerCase())).length;
+    }, [baseReports]);
+
+    // Filtered reports
+    const filteredReports = useMemo(() => {
+        return baseReports.filter(r => {
+            // Status Tab Filter
+            const s = (r.status || '').toLowerCase();
+            if (reportStatusFilter === 'pending' || reportStatusFilter === 'awaiting_review') {
+                if (!['pending', 'unverified', 'received', 'under_review'].includes(s)) return false;
+            } else if (reportStatusFilter === 'in_progress') {
+                if (!['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(s)) return false;
+            } else if (reportStatusFilter === 'resolved') {
+                if (!['resolved', 'completed', 'fixed'].includes(s)) return false;
+            } else if (reportStatusFilter === 'rejected') {
+                if (!['rejected', 'declined', 'invalid', 'spam'].includes(s)) return false;
+            }
+
+            // Category Filter (Accurately matches against official civic issue categories)
+            if (selectedCategory !== 'All categories') {
+                const cat = r.category || r.ai_category;
+                if (!matchesCivicCategory(cat, selectedCategory)) return false;
+            }
+
+            // Date Filter
+            if (selectedDateFilter !== 'All dates') {
+                const d = r.created_at ? new Date(r.created_at) : new Date();
+                const m = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                if (m !== selectedDateFilter) return false;
+            }
+
+            // Text search
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase().trim();
+                const matchId = (r.ticket_id || '').toLowerCase().includes(q);
+                const matchCat = (r.category || r.ai_category || '').toLowerCase().includes(q);
+                const matchLoc = (r.location_string || r.barangay || '').toLowerCase().includes(q);
+                const matchTitle = (r.title || '').toLowerCase().includes(q);
+                if (!matchId && !matchCat && !matchLoc && !matchTitle) return false;
+            }
+
+            return true;
+        }).sort((a, b) => {
+            const dateA = new Date(a.created_at || 0).getTime();
+            const dateB = new Date(b.created_at || 0).getTime();
+            return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+        });
+    }, [baseReports, reportStatusFilter, selectedCategory, selectedDateFilter, searchQuery, sortOrder]);
+
+    // Reset pagination when any filter changes
     useEffect(() => {
-        const el = tabsScrollRef.current;
-        if (!el) return;
-        const activeBtn = el.querySelector(`[data-filter-id="${reportStatusFilter}"]`);
-        if (activeBtn) {
-            activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
-    }, [reportStatusFilter]);
+        setCurrentPage(1);
+    }, [searchQuery, selectedCategory, selectedDateFilter, reportStatusFilter, sortOrder]);
 
-    // Auto-collapse expanded report card when switching status tabs or searching
-    useEffect(() => {
-        setExpandedReportId(null);
-    }, [reportStatusFilter, searchQuery]);
+    // 5 Reports per page pagination
+    const totalReportsCount = filteredReports.length;
+    const totalPages = Math.max(1, Math.ceil(totalReportsCount / ITEMS_PER_PAGE));
+    const validPage = Math.min(Math.max(1, currentPage), totalPages);
+    const startIndex = (validPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalReportsCount);
+    const paginatedReports = useMemo(() => {
+        return filteredReports.slice(startIndex, endIndex);
+    }, [filteredReports, startIndex, endIndex]);
 
-    const filterOptions = [
-        { id: 'all', label: 'All reports' },
-        { id: 'pending', label: 'Pending' },
-        { id: 'in_progress', label: 'In Progress' },
-        { id: 'resolved', label: 'Resolved' },
-        { id: 'rejected', label: 'Rejected' },
-        { id: 'cancelled', label: 'Cancelled' }
+    const statusPillOptions = [
+        { id: 'all', label: 'All', count: totalCount, icon: null },
+        { id: 'pending', label: 'Awaiting review', count: awaitingReviewCount, icon: Clock, color: 'text-amber-500' },
+        { id: 'in_progress', label: 'In progress', count: inProgressCount, icon: Wrench, color: 'text-sky-500' },
+        { id: 'resolved', label: 'Resolved', count: resolvedCount, icon: CheckCircle2, color: 'text-emerald-500' },
+        { id: 'rejected', label: 'Rejected', count: rejectedCount, icon: XCircle, color: 'text-rose-500' }
     ];
 
-    // Combined filtering: tab filter + in-page text search
-    const filteredReports = userReports.filter(r => {
-        // Tab Status Filter
-        if (reportStatusFilter === 'in_progress') {
-            if (!['dispatched', 'approved_internal', 'in_progress'].includes(r.status)) return false;
-        } else if (reportStatusFilter === 'pending') {
-            if (!['pending', 'unverified', 'received'].includes(r.status)) return false;
-        } else if (reportStatusFilter !== 'all') {
-            if (r.status !== reportStatusFilter) return false;
+    const getCategoryIcon = (categoryStr) => {
+        const cat = (categoryStr || '').toLowerCase();
+        if (cat.includes('safety') || cat.includes('hazard')) return <AlertTriangle size={13} className="text-rose-500 shrink-0" />;
+        if (cat.includes('light')) return <Lightbulb size={13} className="text-amber-500 shrink-0" />;
+        if (cat.includes('water') || cat.includes('leak')) return <Droplets size={13} className="text-blue-500 shrink-0" />;
+        if (cat.includes('drain') || cat.includes('flood')) return <Waves size={13} className="text-cyan-500 shrink-0" />;
+        if (cat.includes('electric') || cat.includes('wire')) return <Zap size={13} className="text-amber-500 shrink-0" />;
+        if (cat.includes('traffic') || cat.includes('sign')) return <Signpost size={13} className="text-orange-500 shrink-0" />;
+        if (cat.includes('facilit') || cat.includes('building') || cat.includes('park') || cat.includes('hall')) return <Building2 size={13} className="text-indigo-500 shrink-0" />;
+        if (cat.includes('road') || cat.includes('pothole') || cat.includes('asphalt') || cat.includes('infrastructure')) return <Wrench size={13} className="text-slate-500 shrink-0" />;
+        return <Wrench size={13} className="text-slate-500 shrink-0" />;
+    };
+
+    const getReportDisplayTitle = (report) => {
+        if (report.title && report.title.trim() && !report.title.toLowerCase().includes('civic infrastructure concern')) {
+            return report.title;
         }
-
-        // In-page Text Search Filter
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase().trim();
-            const matchId = (r.ticket_id || '').toLowerCase().includes(q);
-            const matchCat = (r.category || r.ai_category || '').toLowerCase().includes(q);
-            const matchLoc = (r.location_string || '').toLowerCase().includes(q);
-            const matchDesc = (r.description || r.notes || '').toLowerCase().includes(q);
-            return matchId || matchCat || matchLoc || matchDesc;
-        }
-
-        return true;
-    });
-
-    // Pagination: 5 reports per page
-    const REPORTS_PER_PAGE = 5;
-    const totalReportPages = Math.max(1, Math.ceil(filteredReports.length / REPORTS_PER_PAGE));
-    const activeReportPage = Math.min(reportHistoryPage, totalReportPages);
-
-    useEffect(() => {
-        setReportHistoryPage(1);
-    }, [reportStatusFilter, searchQuery]);
-
-    const paginatedReports = useMemo(() => {
-        const start = (activeReportPage - 1) * REPORTS_PER_PAGE;
-        return filteredReports.slice(start, start + REPORTS_PER_PAGE);
-    }, [filteredReports, activeReportPage]);
-
-    // Group filtered reports by Month Heading ("August 2026", "April 2026")
-    const groupedReports = useMemo(() => {
-        const groups = {};
-        paginatedReports.forEach((report) => {
-            const dateObj = report.created_at ? new Date(report.created_at) : new Date();
-            const monthYear = dateObj.toLocaleDateString('en-US', {
-                month: 'long',
-                year: 'numeric'
-            });
-            if (!groups[monthYear]) {
-                groups[monthYear] = [];
+        if (report.description && report.description.trim()) {
+            const firstSentence = report.description.split('.')[0].trim();
+            if (firstSentence.length > 5 && firstSentence.length < 50) {
+                return firstSentence.charAt(0).toUpperCase() + firstSentence.slice(1);
             }
-            groups[monthYear].push(report);
-        });
+        }
+        const cat = (report.category || report.ai_category || '').toLowerCase();
+        if (cat.includes('safety') || cat.includes('hazard')) return 'Reported public safety hazard';
+        if (cat.includes('light')) return 'Streetlight not working';
+        if (cat.includes('road') || cat.includes('pothole') || cat.includes('asphalt') || cat.includes('infrastructure')) return 'Damaged road surface';
+        if (cat.includes('water') || cat.includes('leak')) return 'Water leak on sidewalk';
+        if (cat.includes('drain') || cat.includes('flood')) return 'Clogged roadside drain';
+        if (cat.includes('electric') || cat.includes('wire')) return 'Exposed electrical wiring';
+        if (cat.includes('traffic') || cat.includes('sign')) return 'Damaged traffic and road sign';
+        return 'Reported civic concern';
+    };
 
-        // Return ordered array of { monthYear, reports }
-        return Object.entries(groups).map(([monthYear, reports]) => ({
-            monthYear,
-            reports
-        }));
-    }, [paginatedReports]);
+    const getReportThumbnail = (report) => {
+        if (report.media_urls && report.media_urls.length > 0 && report.media_urls[0]) {
+            return report.media_urls[0];
+        }
+        if (report.image_url) return report.image_url;
+        if (report.photos && report.photos.length > 0 && report.photos[0]) {
+            return report.photos[0];
+        }
+        if (report.image) return report.image;
+
+        const cat = (report.category || report.ai_category || '').toLowerCase();
+        if (cat.includes('safety') || cat.includes('hazard')) {
+            return 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80';
+        }
+        if (cat.includes('light')) {
+            return 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=400&q=80';
+        }
+        if (cat.includes('road') || cat.includes('pothole') || cat.includes('asphalt') || cat.includes('infrastructure')) {
+            return 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=400&q=80';
+        }
+        if (cat.includes('water') || cat.includes('leak')) {
+            return 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=400&q=80';
+        }
+        if (cat.includes('drain') || cat.includes('flood')) {
+            return 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80';
+        }
+        if (cat.includes('electric') || cat.includes('wire')) {
+            return 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?auto=format&fit=crop&w=400&q=80';
+        }
+        if (cat.includes('sign') || cat.includes('traffic')) {
+            return 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=400&q=80';
+        }
+        return 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80';
+    };
+
+    const getReportDisplayCategory = (report) => {
+        const raw = (report.category || report.ai_category || '').toLowerCase();
+        if (raw.includes('safety') || raw.includes('hazard')) return 'Public Safety & Hazards';
+        if (raw.includes('light') || raw.includes('power') || raw.includes('electric')) return 'Power & Street Lighting';
+        if (raw.includes('road') || raw.includes('bridge') || raw.includes('pothole') || raw.includes('asphalt')) return 'Roads & Bridges';
+        if (raw.includes('water') || raw.includes('leak')) return 'Water Supply & Distribution';
+        if (raw.includes('drain') || raw.includes('flood')) return 'Drainage & Flooding';
+        if (raw.includes('facilit') || raw.includes('building') || raw.includes('hall')) return 'Public Buildings & Facilities';
+        if (raw.includes('traffic') || raw.includes('sign')) return 'Traffic & Road Signs';
+        return report.category || report.ai_category || 'Civic Infrastructure';
+    };
+
+    const getLocationString = (report) => {
+        if (report.barangay) {
+            const brgy = report.barangay.toLowerCase().includes('barangay')
+                ? report.barangay
+                : `Barangay ${report.barangay}`;
+            return `${brgy}, Caloocan City`;
+        }
+        if (report.location_string) {
+            const match = report.location_string.match(/(Barangay\s+\w+)/i);
+            if (match) return `${match[1]}, Caloocan City`;
+            return report.location_string;
+        }
+        return 'Barangay 171, Caloocan City';
+    };
+
+    const getDepartmentNotice = (report, status) => {
+        if (report.department_title && report.department_message) {
+            return {
+                title: report.department_title,
+                message: report.department_message
+            };
+        }
+
+        if (['rejected', 'declined', 'invalid', 'spam'].includes(status)) {
+            return {
+                title: 'Not accepted after review.',
+                message: report.rejection_reason || report.department_note || "Open the report to read the department's reason."
+            };
+        }
+
+        if (['pending', 'unverified', 'received', 'under_review'].includes(status)) {
+            return {
+                title: 'Received by the department.',
+                message: report.department_note || 'No action needed while under review.'
+            };
+        }
+
+        if (['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(status)) {
+            const stageText = report.stage || 'Stage 4 of 5';
+            return {
+                title: 'Department work is in progress.',
+                message: report.department_note || `Follow this report for updates. ${stageText}`
+            };
+        }
+
+        if (['resolved', 'completed', 'fixed'].includes(status)) {
+            return {
+                title: 'Marked resolved.',
+                message: report.department_note || 'Review the completion update.'
+            };
+        }
+
+        return {
+            title: 'Received by the department.',
+            message: report.department_note || 'Waiting for review.'
+        };
+    };
 
     return (
         <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full space-y-4 max-w-2xl mx-auto"
+            className="w-full space-y-6"
         >
-            {/* Header: Title 24px bold + one soft gray line "Track your submitted reports." */}
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Report History
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                    Track your submitted reports.
-                </p>
-            </div>
+            {/* Top Header Row */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1528] dark:text-white tracking-tight">
+                        My Reports
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Submit a concern, follow its progress, and review the city&apos;s response.
+                    </p>
+                </div>
 
-            {/* Search: Full-width rounded field (0.875rem radius, 3rem tall, existing card fill & 1px border) */}
-            <div className="relative w-full">
-                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
-                <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by ID or location"
-                    className="w-full h-12 min-h-[3rem] pl-11 pr-10 text-sm bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 rounded-[0.875rem] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#ff6b00] focus:ring-[3px] focus:ring-[#ff6b00]/20 transition-all shadow-2xs"
-                />
-                {searchQuery && (
+                <div className="flex items-center gap-2.5 shrink-0">
                     <button
                         type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                        aria-label="Clear search query"
+                        onClick={() => handleSetModal('file-report')}
+                        className="px-5 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer"
                     >
-                        <X size={16} />
+                        <Plus size={16} strokeWidth={2.8} />
+                        <span>New report</span>
                     </button>
-                )}
+                </div>
             </div>
 
-            {/* Filter chips: 48px tall tap targets, horizontal scroll with smooth chevrons and fade affordances */}
-            <div className="relative flex items-center min-w-0 max-w-full w-full">
-                {/* Left Scroll Chevron (<) */}
-                <button
-                    type="button"
-                    onClick={() => scrollTabs('left')}
-                    disabled={!canScrollLeft}
-                    aria-label="Scroll filter options left"
-                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 mr-1 sm:mr-1.5 ${
-                        canScrollLeft
-                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
-                            : 'hidden'
-                    }`}
-                >
-                    <ChevronLeft size={16} strokeWidth={2.5} />
-                </button>
+            {/* 4 Stats Metrics Cards Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                {/* Total Reports */}
+                <div className="p-3 sm:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex items-center gap-2.5 sm:gap-3.5">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0">
+                        <FileText size={17} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+                            Total
+                        </div>
+                        <div className="text-lg sm:text-2xl font-bold text-[#0B1528] dark:text-white leading-tight font-mono">
+                            {totalCount}
+                        </div>
+                    </div>
+                </div>
 
-                {/* Scrollable Track with Edge Fades */}
-                <div className="relative min-w-0 flex-1 overflow-hidden">
-                    {/* Left Trailing Edge Fade */}
-                    <div
-                        className={`absolute left-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-r from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
-                            canScrollLeft ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        aria-hidden="true"
-                    />
+                {/* Awaiting Review */}
+                <div className="p-3 sm:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex items-center gap-2.5 sm:gap-3.5">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-orange-50 dark:bg-orange-950/40 text-orange-500 flex items-center justify-center shrink-0">
+                        <Clock size={17} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+                            Awaiting review
+                        </div>
+                        <div className="text-lg sm:text-2xl font-bold text-[#0B1528] dark:text-white leading-tight font-mono">
+                            {awaitingReviewCount}
+                        </div>
+                    </div>
+                </div>
 
-                    <div
-                        ref={tabsScrollRef}
-                        className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5 w-full"
-                    >
-                        {filterOptions.map((opt) => {
-                            const count = opt.id === 'all'
-                                ? userReports.length
-                                : userReports.filter(r => {
-                                    if (opt.id === 'in_progress') return ['dispatched', 'approved_internal', 'in_progress'].includes(r.status);
-                                    if (opt.id === 'pending') return ['pending', 'unverified', 'received'].includes(r.status);
-                                    return r.status === opt.id;
-                                }).length;
+                {/* In Progress */}
+                <div className="p-3 sm:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex items-center gap-2.5 sm:gap-3.5">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-500 flex items-center justify-center shrink-0">
+                        <Settings size={17} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+                            In progress
+                        </div>
+                        <div className="text-lg sm:text-2xl font-bold text-[#0B1528] dark:text-white leading-tight font-mono">
+                            {inProgressCount}
+                        </div>
+                    </div>
+                </div>
 
-                            const isSelected = reportStatusFilter === opt.id;
+                {/* Resolved */}
+                <div className="p-3 sm:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex items-center gap-2.5 sm:gap-3.5">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 flex items-center justify-center shrink-0">
+                        <CheckCircle2 size={17} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0">
+                        <div className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+                            Resolved
+                        </div>
+                        <div className="text-lg sm:text-2xl font-bold text-[#0B1528] dark:text-white leading-tight font-mono">
+                            {resolvedCount}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
+            {!isPopulated ? (
+                /* Empty State matching Civic Aperture / media_1793035273112_74fac838.jpg */
+                <div className="space-y-6">
+                    {/* 2-Column Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                        {/* Left Column (Span 2) */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Card 1: Your first report starts here */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 sm:p-7 shadow-xs relative overflow-hidden">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                    <div className="max-w-md">
+                                        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                                            Your first report starts here
+                                        </h2>
+                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-2 leading-relaxed">
+                                            You haven&apos;t submitted a report yet. Share a local infrastructure concern and track updates in this space.
+                                        </p>
+                                        <div className="flex flex-wrap items-center gap-4 mt-5">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSetModal('file-report')}
+                                                className="px-4 py-2.5 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+                                            >
+                                                <Plus size={16} strokeWidth={2.8} />
+                                                <span>Create your first report</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSetModal('map')}
+                                                className="text-xs sm:text-sm font-semibold text-orange-600 dark:text-orange-500 hover:text-orange-700 dark:hover:text-orange-400 flex items-center gap-1.5 transition-colors cursor-pointer"
+                                            >
+                                                <span>Explore nearby concerns</span>
+                                                <ArrowRight size={14} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPreviewSampleData(true)}
+                                                className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 flex items-center gap-1.5 transition-colors cursor-pointer"
+                                            >
+                                                <Eye size={14} />
+                                                <span>Preview sample reports</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Graphic Illustration */}
+                                    <div className="flex justify-center md:justify-end shrink-0">
+                                        <svg width="190" height="135" viewBox="0 0 220 150" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 drop-shadow-xs">
+                                            <path d="M120 20 H200 M100 50 H210 M110 80 H210 M130 110 H200" stroke="#E2E8F0" strokeWidth="1.5" strokeDasharray="3 3" />
+                                            <path d="M130 20 V120 M165 15 V125 M200 20 V115" stroke="#E2E8F0" strokeWidth="1.5" strokeDasharray="3 3" />
+                                            <path d="M140 100 C 155 90, 150 65, 175 52" stroke="#F97316" strokeWidth="2" strokeDasharray="3 3" />
+                                            <circle cx="140" cy="100" r="3" fill="#F97316" />
+                                            <g filter="drop-shadow(0 4px 6px rgba(0,0,0,0.05))">
+                                                <path d="M25 20 C25 15 28 12 33 12 H100 L125 37 V115 C125 120 122 123 117 123 H33 C28 123 25 120 25 115 Z" fill="#FFFFFF" stroke="#CBD5E1" strokeWidth="1.5" />
+                                                <path d="M100 12 V32 C100 35 102 37 105 37 H125" fill="#F1F5F9" stroke="#CBD5E1" strokeWidth="1.5" />
+                                                <rect x="38" y="32" width="35" height="4" rx="2" fill="#94A3B8" />
+                                                <rect x="38" y="44" width="70" height="3" rx="1.5" fill="#E2E8F0" />
+                                                <rect x="38" y="53" width="60" height="3" rx="1.5" fill="#E2E8F0" />
+                                                <rect x="38" y="62" width="65" height="3" rx="1.5" fill="#E2E8F0" />
+                                                <rect x="38" y="71" width="45" height="3" rx="1.5" fill="#E2E8F0" />
+                                            </g>
+                                            <g filter="drop-shadow(0 6px 10px rgba(0,0,0,0.08))">
+                                                <rect x="15" y="75" width="68" height="52" rx="6" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="1.5" />
+                                                <rect x="20" y="80" width="58" height="42" rx="4" fill="#F8FAFC" />
+                                                <circle cx="62" cy="90" r="4" fill="#FDBA74" />
+                                                <path d="M22 120 L36 98 L50 120 Z" fill="#93C5FD" />
+                                                <path d="M42 120 L58 92 L76 120 Z" fill="#60A5FA" opacity="0.9" />
+                                            </g>
+                                            <g filter="drop-shadow(0 6px 8px rgba(234,88,12,0.3))">
+                                                <path d="M175 32 C167 32 161 38 161 46 C161 56 175 70 175 70 C175 70 189 56 189 46 C189 38 183 32 175 32 Z" fill="#EA580C" />
+                                                <circle cx="175" cy="45" r="4.5" fill="#FFFFFF" />
+                                            </g>
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                {/* Bottom 3 feature items */}
+                                <div className="border-t border-slate-100 dark:border-slate-800/80 pt-6 mt-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 mt-0.5">
+                                            <BarChart2 size={16} strokeWidth={2.2} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Track status
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                See how your report progresses from review to resolution.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 mt-0.5">
+                                            <MessageSquare size={16} strokeWidth={2.2} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Read department feedback
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                View updates and responses from the Engineering Department.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 mt-0.5">
+                                            <Paperclip size={16} strokeWidth={2.2} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Review your attachments
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                Check the photos and files you submitted with your report.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card 2: How your report moves forward */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 sm:p-7 shadow-xs">
+                                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight mb-6">
+                                    How your report moves forward
+                                </h2>
+
+                                <div className="relative">
+                                    {/* Connecting Line */}
+                                    <div className="hidden sm:block absolute top-4.5 left-10 right-10 h-0.5 bg-slate-200 dark:bg-slate-800 -z-0" />
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-6 sm:gap-2 relative z-10">
+                                        {/* Step 1 */}
+                                        <div className="flex sm:flex-col items-center sm:text-center gap-3 sm:gap-2">
+                                            <div className="w-9 h-9 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center shadow-2xs shrink-0">
+                                                <FileText size={16} strokeWidth={2.2} />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white">Received</div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight sm:max-w-[120px]">
+                                                    Your report is submitted and recorded in the system.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Step 2 */}
+                                        <div className="flex sm:flex-col items-center sm:text-center gap-3 sm:gap-2">
+                                            <div className="w-9 h-9 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center shadow-2xs shrink-0">
+                                                <Search size={16} strokeWidth={2.2} />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white">Verified</div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight sm:max-w-[120px]">
+                                                    We check the details and attachments.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Step 3 */}
+                                        <div className="flex sm:flex-col items-center sm:text-center gap-3 sm:gap-2">
+                                            <div className="w-9 h-9 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center shadow-2xs shrink-0">
+                                                <Users size={16} strokeWidth={2.2} />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white">Assigned</div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight sm:max-w-[120px]">
+                                                    Your report is endorsed to the proper team.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Step 4 */}
+                                        <div className="flex sm:flex-col items-center sm:text-center gap-3 sm:gap-2">
+                                            <div className="w-9 h-9 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center shadow-2xs shrink-0">
+                                                <Settings size={16} strokeWidth={2.2} />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white">In progress</div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight sm:max-w-[120px]">
+                                                    The team works on the concern.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Step 5 */}
+                                        <div className="flex sm:flex-col items-center sm:text-center gap-3 sm:gap-2">
+                                            <div className="w-9 h-9 rounded-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 flex items-center justify-center shadow-2xs shrink-0">
+                                                <Check size={16} strokeWidth={2.5} />
+                                            </div>
+                                            <div>
+                                                <div className="text-xs font-bold text-slate-900 dark:text-white">Resolved</div>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-tight sm:max-w-[120px]">
+                                                    The concern is addressed and the report is closed.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Info Notice Box */}
+                                <div className="mt-6 px-4 py-3 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-900/40 flex items-center gap-2.5 text-xs text-sky-800 dark:text-sky-300">
+                                    <Info size={16} className="text-sky-600 dark:text-sky-400 shrink-0" />
+                                    <span>Reports may also be rejected or cancelled. Check the report for the reason.</span>
+                                </div>
+                            </div>
+
+                            {/* Card 3: What you'll see after submitting */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 sm:p-7 shadow-xs">
+                                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight mb-5">
+                                    What you&apos;ll see after submitting
+                                </h2>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
+                                            <FileText size={16} strokeWidth={2.2} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Report summary
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                Category, location, date, and attached photos.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
+                                            <MessageSquare size={16} strokeWidth={2.2} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Latest update
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                Current status and department feedback.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0 mt-0.5">
+                                            <List size={16} strokeWidth={2.2} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Next steps
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                                Any information or action needed from you.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column */}
+                        <div className="space-y-6">
+                            {/* Card 1: Prepare a helpful report */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 shadow-xs">
+                                <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4">
+                                    Prepare a helpful report
+                                </h2>
+                                <div className="space-y-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                            1
+                                        </div>
+                                        <div>
+                                            <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Exact location
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Use a map pin or a clear landmark.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                            2
+                                        </div>
+                                        <div>
+                                            <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Clear photo
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Show the concern safely and clearly.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                            3
+                                        </div>
+                                        <div>
+                                            <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                                Short description
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Tell us what happened and when.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Common report categories */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 shadow-xs">
+                                <h2 className="text-base font-bold text-slate-900 dark:text-white mb-4">
+                                    Common report categories
+                                </h2>
+                                <div className="flex flex-wrap gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSetModal('file-report')}
+                                        className="px-3.5 py-2.5 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-sky-100 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer"
+                                    >
+                                        <Signpost size={14} className="text-sky-600 dark:text-sky-400" />
+                                        <span>Roads &amp; bridges</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSetModal('file-report')}
+                                        className="px-3.5 py-2.5 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-sky-100 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer"
+                                    >
+                                        <Waves size={14} className="text-sky-600 dark:text-sky-400" />
+                                        <span>Drainage</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSetModal('file-report')}
+                                        className="px-3.5 py-2.5 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-sky-100 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer"
+                                    >
+                                        <Lightbulb size={14} className="text-amber-500" />
+                                        <span>Street lighting</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSetModal('file-report')}
+                                        className="px-3.5 py-2.5 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-sky-100 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer"
+                                    >
+                                        <Droplets size={14} className="text-blue-500" />
+                                        <span>Water supply</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSetModal('file-report')}
+                                        className="px-3.5 py-2.5 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-sky-100 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer"
+                                    >
+                                        <AlertTriangle size={14} className="text-rose-500" />
+                                        <span>Safety hazards</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Card 3: Need help? */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 shadow-xs">
+                                <div className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 flex items-center justify-center mb-3">
+                                    <BookOpen size={18} strokeWidth={2.2} />
+                                </div>
+                                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Need help?
+                                </h2>
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                                    Learn how to submit a detailed and effective report with photos and a clear description.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetModal('reporting-guide')}
+                                    className="text-xs font-bold text-orange-600 dark:text-orange-500 hover:text-orange-700 dark:hover:text-orange-400 flex items-center gap-1 mt-3 cursor-pointer transition-colors"
+                                >
+                                    <span>Read reporting guide</span>
+                                    <ArrowRight size={13} />
+                                </button>
+                                <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3 mt-4 text-[11px] text-slate-400 dark:text-slate-500">
+                                    For urgent danger, use emergency contacts.
+                                </div>
+                            </div>
+
+                            {/* Card 4: Your privacy matters */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 shadow-xs">
+                                <div className="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 flex items-center justify-center mb-3">
+                                    <Shield size={18} strokeWidth={2.2} />
+                                </div>
+                                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                                    Your privacy matters
+                                </h2>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                    Avoid including unnecessary personal information in descriptions or photos.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom Full-Width Section: Questions about your reports? */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 sm:p-7 shadow-xs">
+                        <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-3 tracking-tight">
+                            Questions about your reports?
+                        </h2>
+
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                            {/* Q1 */}
+                            <div className="py-3.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenFaq(openFaq === 0 ? null : 0)}
+                                    className="w-full flex items-center justify-between text-left gap-4 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 transition-colors cursor-pointer"
+                                >
+                                    <span>Where can I find my report ID?</span>
+                                    <ChevronDown
+                                        size={16}
+                                        className={`text-slate-400 transition-transform duration-200 shrink-0 ${openFaq === 0 ? 'rotate-180 text-orange-600' : ''}`}
+                                    />
+                                </button>
+                                {openFaq === 0 && (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed pl-1">
+                                        Every submitted report receives a unique tracking ID (e.g., ENG-2026-0842) displayed at the top of your report card and in your email/SMS confirmation.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Q2 */}
+                            <div className="py-3.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenFaq(openFaq === 1 ? null : 1)}
+                                    className="w-full flex items-center justify-between text-left gap-4 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 transition-colors cursor-pointer"
+                                >
+                                    <span>How do I check updates?</span>
+                                    <ChevronDown
+                                        size={16}
+                                        className={`text-slate-400 transition-transform duration-200 shrink-0 ${openFaq === 1 ? 'rotate-180 text-orange-600' : ''}`}
+                                    />
+                                </button>
+                                {openFaq === 1 && (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed pl-1">
+                                        You can check updates directly from this page once submitted. The city engineering team posts real-time status changes, notes, and photos as work progresses.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Q3 */}
+                            <div className="py-3.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenFaq(openFaq === 2 ? null : 2)}
+                                    className="w-full flex items-center justify-between text-left gap-4 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 transition-colors cursor-pointer"
+                                >
+                                    <span>What if my report is rejected?</span>
+                                    <ChevronDown
+                                        size={16}
+                                        className={`text-slate-400 transition-transform duration-200 shrink-0 ${openFaq === 2 ? 'rotate-180 text-orange-600' : ''}`}
+                                    />
+                                </button>
+                                {openFaq === 2 && (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed pl-1">
+                                        If a report is outside city jurisdiction, duplicated, or lacks sufficient information, officials will leave a specific reason. You can review the feedback and submit an updated report.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                /* Populated State with Toolbar + Cards */
+                <>
+                    {/* Filter Toolbar: Search + Category + Date Dropdowns */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+                        {/* Search Field */}
+                        <div className="relative flex-1 min-w-0">
+                            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search by ID, category, or location..."
+                                className="w-full h-10 pl-9 pr-8 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/20 transition-all shadow-2xs"
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Dropdowns Row: 2-column on mobile, inline on sm+ */}
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-2.5 shrink-0">
+                            {/* Custom Categories Dropdown */}
+                            <div className="relative w-full sm:w-auto" ref={catDropdownRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsCatDropdownOpen(!isCatDropdownOpen);
+                                        setIsDateDropdownOpen(false);
+                                    }}
+                                    aria-haspopup="listbox"
+                                    aria-expanded={isCatDropdownOpen}
+                                    className={`w-full sm:w-auto h-10 px-3 sm:px-3.5 bg-white dark:bg-slate-900 border rounded-xl text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-between gap-2 transition-all shadow-2xs cursor-pointer select-none ${
+                                        isCatDropdownOpen
+                                            ? 'border-[#EA580C] ring-2 ring-[#EA580C]/20 shadow-xs'
+                                            : 'border-slate-200/90 dark:border-slate-800 hover:border-[#EA580C]/60 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <span className="truncate max-w-[100px] sm:max-w-[150px]">{selectedCategory}</span>
+                                    <ChevronDown
+                                        size={14}
+                                        className={`text-slate-400 transition-transform duration-200 shrink-0 ${isCatDropdownOpen ? 'rotate-180 text-[#EA580C]' : ''}`}
+                                    />
+                                </button>
+
+                                <AnimatePresence>
+                                    {isCatDropdownOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                                            role="listbox"
+                                            className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-[calc(100vw-2.5rem)] max-w-[280px] sm:w-64 max-h-72 overflow-y-auto bg-white dark:bg-[#0C1528] border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl shadow-slate-900/10 dark:shadow-black/60 p-1.5 z-50"
+                                        >
+                                            <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 mb-1">
+                                                <span>Filter by Category</span>
+                                                <span className="text-[9px] font-mono text-slate-400 font-normal">{categoriesList.length}</span>
+                                            </div>
+                                            {categoriesList.map(cat => {
+                                                const isSelected = selectedCategory === cat;
+                                                const CatIcon = cat === 'All categories' ? Layers : getCategoryIconComponent(cat);
+                                                return (
+                                                    <button
+                                                        key={cat}
+                                                        type="button"
+                                                        role="option"
+                                                        aria-selected={isSelected}
+                                                        onClick={() => {
+                                                            setSelectedCategory(cat);
+                                                            setIsCatDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                                                            isSelected
+                                                                ? 'bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] dark:text-orange-400 font-bold border border-orange-200/80 dark:border-orange-900/50 shadow-2xs'
+                                                                : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 font-medium border border-transparent'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                                                isSelected
+                                                                    ? 'bg-[#EA580C]/10 text-[#EA580C] dark:text-orange-400'
+                                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                                            }`}>
+                                                                <CatIcon size={13} strokeWidth={2.2} />
+                                                            </div>
+                                                            <span className="truncate">{cat}</span>
+                                                        </div>
+                                                        {isSelected && (
+                                                            <div className="w-4 h-4 rounded-full bg-[#EA580C]/10 text-[#EA580C] flex items-center justify-center shrink-0 ml-2">
+                                                                <Check size={11} strokeWidth={3} />
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            {/* Custom Date Dropdown */}
+                            <div className="relative w-full sm:w-auto" ref={dateDropdownRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsDateDropdownOpen(!isDateDropdownOpen);
+                                        setIsCatDropdownOpen(false);
+                                    }}
+                                    aria-haspopup="listbox"
+                                    aria-expanded={isDateDropdownOpen}
+                                    className={`w-full sm:w-auto h-10 px-3 sm:px-3.5 bg-white dark:bg-slate-900 border rounded-xl text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-between gap-2 transition-all shadow-2xs cursor-pointer select-none ${
+                                        isDateDropdownOpen
+                                            ? 'border-[#EA580C] ring-2 ring-[#EA580C]/20 shadow-xs'
+                                            : 'border-slate-200/90 dark:border-slate-800 hover:border-[#EA580C]/60 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                        <Calendar size={13} className="text-slate-400 shrink-0" />
+                                        <span className="truncate max-w-[85px] sm:max-w-[135px]">{selectedDateFilter}</span>
+                                    </div>
+                                    <ChevronDown
+                                        size={14}
+                                        className={`text-slate-400 transition-transform duration-200 shrink-0 ${isDateDropdownOpen ? 'rotate-180 text-[#EA580C]' : ''}`}
+                                    />
+                                </button>
+
+                                <AnimatePresence>
+                                    {isDateDropdownOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                                            role="listbox"
+                                            className="absolute right-0 top-full mt-1.5 w-[calc(100vw-2.5rem)] max-w-[240px] sm:w-56 max-h-60 overflow-y-auto bg-white dark:bg-[#0C1528] border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl shadow-slate-900/10 dark:shadow-black/60 p-1.5 z-50"
+                                        >
+                                            <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 mb-1">
+                                                <span>Filter by Date</span>
+                                                <span className="text-[9px] font-mono text-slate-400 font-normal">{datesList.length}</span>
+                                            </div>
+                                            {datesList.map(d => {
+                                                const isSelected = selectedDateFilter === d;
+                                                return (
+                                                    <button
+                                                        key={d}
+                                                        type="button"
+                                                        role="option"
+                                                        aria-selected={isSelected}
+                                                        onClick={() => {
+                                                            setSelectedDateFilter(d);
+                                                            setIsDateDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                                                            isSelected
+                                                                ? 'bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] dark:text-orange-400 font-bold border border-orange-200/80 dark:border-orange-900/50 shadow-2xs'
+                                                                : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 font-medium border border-transparent'
+                                                        }`}
+                                                    >
+                                                        <span className="truncate">{d}</span>
+                                                        {isSelected && (
+                                                            <div className="w-4 h-4 rounded-full bg-[#EA580C]/10 text-[#EA580C] flex items-center justify-center shrink-0 ml-2">
+                                                                <Check size={11} strokeWidth={3} />
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Status Filter Tabs */}
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 -mx-4 px-4 sm:mx-0 sm:px-0">
+                        {statusPillOptions.map((opt) => {
+                            const isSelected = (reportStatusFilter === opt.id) || (opt.id === 'all' && (!reportStatusFilter || reportStatusFilter === 'all'));
+                            const IconComponent = opt.icon;
                             return (
                                 <button
                                     key={opt.id}
-                                    data-filter-id={opt.id}
                                     type="button"
                                     onClick={() => setReportStatusFilter(opt.id)}
-                                    aria-pressed={isSelected}
-                                    className={`h-12 min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
+                                    className={`group h-10 px-4 sm:px-5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer select-none shrink-0 ${
                                         isSelected
-                                            ? 'bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold shadow-sm'
-                                            : 'bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-900 dark:hover:text-white'
+                                            ? 'bg-[#EA580C] text-white shadow-xs'
+                                            : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs'
                                     }`}
                                 >
-                                    <span className={isSelected ? 'text-white' : ''}>{opt.label}</span>
+                                    {IconComponent && (
+                                        <IconComponent
+                                            size={14}
+                                            className={isSelected ? 'text-white' : (opt.color || 'text-slate-500')}
+                                        />
+                                    )}
+                                    <span>{opt.label}</span>
                                     <span
-                                        className={`px-1.5 py-0.5 rounded-full text-[11px] font-mono font-bold leading-none transition-colors ${
+                                        className={`px-1.5 py-0.5 rounded-md text-[11px] font-mono font-bold transition-colors ${
                                             isSelected
-                                                ? 'bg-black/20 text-white'
-                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                                ? 'bg-white/20 text-white'
+                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-700'
                                         }`}
                                     >
-                                        {count}
+                                        {opt.count}
                                     </span>
                                 </button>
                             );
                         })}
                     </div>
 
-                    {/* Right Trailing Edge Fade */}
-                    <div
-                        className={`absolute right-0 inset-y-0 w-8 z-10 pointer-events-none bg-gradient-to-l from-slate-50/90 dark:from-[#070d1a]/90 to-transparent transition-opacity duration-200 ${
-                            canScrollRight ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        aria-hidden="true"
-                    />
-                </div>
-
-                {/* Right Scroll Chevron (>) */}
-                <button
-                    type="button"
-                    onClick={() => scrollTabs('right')}
-                    disabled={!canScrollRight}
-                    aria-label="Scroll filter options right"
-                    className={`shrink-0 w-8 h-8 rounded-full items-center justify-center transition-all duration-150 z-20 ml-1 sm:ml-1.5 ${
-                        canScrollRight
-                            ? 'flex bg-white dark:bg-[#0c1427] text-slate-700 dark:text-slate-200 shadow-md border border-slate-200 dark:border-slate-800 hover:bg-orange-50 dark:hover:bg-slate-800 hover:text-[#ff6b00] cursor-pointer active:scale-95'
-                            : 'hidden'
-                    }`}
-                >
-                    <ChevronRight size={16} strokeWidth={2.5} />
-                </button>
-            </div>
-
-            {/* List / Loading / Empty States */}
-            <div className="pt-2 space-y-5">
-                {loadingReports ? (
-                    <div className="space-y-3">
-                        <ReportCardSkeleton />
-                        <ReportCardSkeleton />
-                        <ReportCardSkeleton />
+                    {/* Month Heading & Sort Order Row */}
+                    <div className="flex items-center justify-between pt-2 pb-1 border-b border-slate-100 dark:border-slate-800/80">
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                            {selectedDateFilter !== 'All dates' ? selectedDateFilter : 'October 2026'}
+                        </h3>
+                        <button
+                            type="button"
+                            onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors cursor-pointer"
+                        >
+                            <ArrowUpDown size={13} />
+                            <span>Sorted: {sortOrder === 'newest' ? 'Newest first' : 'Oldest first'}</span>
+                        </button>
                     </div>
-                ) : filteredReports.length === 0 ? (
-                    userReports.length === 0 ? (
-                        /* Empty State: "No reports yet." with "Report a problem" button */
-                        <div className="flex flex-col items-center gap-3 py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-[#0c1427]/40">
-                            <div className="w-14 h-14 rounded-2xl bg-orange-500/10 text-[#ff6b00] flex items-center justify-center">
-                                <FileText size={28} strokeWidth={1.75} />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                                    No reports yet.
-                                </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
-                                    You haven't submitted any civic infrastructure reports yet.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => handleSetModal('file-report')}
-                                className="h-12 min-h-[48px] mt-2 px-5 rounded-xl bg-[#ff6b00] hover:bg-[#e66000] text-white font-extrabold text-sm flex items-center gap-2 cursor-pointer shadow-sm transition-all focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                            >
-                                <Plus size={18} strokeWidth={2.5} className="text-white" />
-                                <span className="text-white">Report a problem</span>
-                            </button>
-                        </div>
-                    ) : (
-                        /* No-Match State: "No reports found." with "Clear filters" button */
-                        <div className="flex flex-col items-center gap-3 py-16 px-4 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white/40 dark:bg-[#0c1427]/40">
-                            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
-                                <Search size={26} strokeWidth={1.75} />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                                    No reports found.
-                                </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
-                                    No reports match your active search keyword or filter criteria.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSearchQuery('');
-                                    setReportStatusFilter('all');
-                                }}
-                                className="h-12 min-h-[48px] mt-2 px-5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm flex items-center justify-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                            >
-                                Clear filters
-                            </button>
-                        </div>
-                    )
-                ) : (
-                    /* Month-Grouped Report Cards List */
-                    groupedReports.map(({ monthYear, reports }) => (
-                        <section key={monthYear} className="space-y-2.5">
-                            {/* Month Heading ("August 2026", "April 2026"), 13px semibold, soft gray */}
-                            <h3 className="text-[13px] font-semibold text-slate-500 dark:text-slate-400 px-1 select-none">
-                                {monthYear}
-                            </h3>
 
-                            {/* Reports under this month */}
-                            <div className="space-y-3">
-                                {reports.map((report) => (
-                                    <ReportHistoryCard
-                                        key={report.id}
-                                        report={report}
-                                        categoryIcon={getCategoryIconComponent(report.category || report.ai_category)}
-                                        isExpanded={expandedReportId === report.id}
-                                        onToggle={() => setExpandedReportId(prev => prev === report.id ? null : report.id)}
-                                        onOpenDetails={(rep) => onSelectReportForDetails?.(rep)}
-                                        onOpenMap={(rep) => onOpenMap?.(rep)}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    ))
-                )}
-
-                {/* Pagination Controls (5 per page) */}
-                {filteredReports.length > REPORTS_PER_PAGE && (
-                    <div className="flex items-center justify-between pt-3 pb-1 px-1 border-t border-slate-200/80 dark:border-slate-800/80 text-xs font-semibold text-slate-600 dark:text-slate-400">
-                        <span className="text-[12px] text-slate-500 dark:text-slate-400 font-medium">
-                            Showing {Math.min((activeReportPage - 1) * REPORTS_PER_PAGE + 1, filteredReports.length)}–{Math.min(activeReportPage * REPORTS_PER_PAGE, filteredReports.length)} of {filteredReports.length}
-                        </span>
-
-                        <div className="flex items-center gap-1.5">
-                            <button
-                                type="button"
-                                disabled={activeReportPage <= 1}
-                                onClick={() => {
-                                    setReportHistoryPage(prev => Math.max(1, prev - 1));
-                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                aria-label="Previous page"
-                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                            >
-                                Prev
-                            </button>
-                            <span className="px-2 py-0.5 text-xs font-bold text-slate-800 dark:text-white">
-                                {activeReportPage} / {totalReportPages}
+                    {previewSampleData && !hasLiveReports && (
+                        <div className="p-3.5 rounded-xl bg-orange-50/80 dark:bg-orange-950/30 border border-orange-200/80 dark:border-orange-900/40 flex items-center justify-between text-xs text-orange-900 dark:text-orange-200">
+                            <span className="flex items-center gap-2">
+                                <Info size={15} className="text-orange-600 shrink-0" />
+                                <span>Previewing sample demonstration reports. Submit your own report anytime to track live updates.</span>
                             </span>
                             <button
                                 type="button"
-                                disabled={activeReportPage >= totalReportPages}
-                                onClick={() => {
-                                    setReportHistoryPage(prev => Math.min(totalReportPages, prev + 1));
-                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                aria-label="Next page"
-                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                onClick={() => setPreviewSampleData(false)}
+                                className="font-bold underline hover:text-orange-950 dark:hover:text-white cursor-pointer ml-3 shrink-0"
                             >
-                                Next
+                                Exit preview
                             </button>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )}
 
-            {/* Footer Text under the list: "Total X reports recorded" (14px soft gray) */}
-            {userReports.length > 0 && (
-                <div className="pt-2 pb-8 text-center">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                        Total {userReports.length} reports recorded
-                    </p>
-                </div>
+                    {/* Reports Cards Grid (Image 1 Approved Design: 3-Column Grid Cards) */}
+                    {filteredReports.length === 0 ? (
+                        <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                No reports found matching your selected filters.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+                            {paginatedReports.map((report) => {
+                                const status = (report.status || 'pending').toLowerCase();
+                                const isPending = ['pending', 'unverified', 'received', 'under_review'].includes(status);
+                                const isInProgress = ['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(status);
+                                const isResolved = ['resolved', 'completed', 'fixed'].includes(status);
+                                const isRejected = ['rejected', 'declined', 'invalid', 'spam'].includes(status);
+
+                                const dateStr = report.created_at
+                                    ? new Date(report.created_at).toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          year: 'numeric'
+                                      })
+                                    : new Date().toLocaleDateString('en-US', {
+                                          month: 'short',
+                                          day: 'numeric',
+                                          year: 'numeric'
+                                      });
+
+                                const displayTitle = getReportDisplayTitle(report);
+                                const displayCategory = getReportDisplayCategory(report);
+                                const thumbnailSrc = getReportThumbnail(report);
+                                const attachmentCount = report.attachments_count || (report.media_urls && report.media_urls.length > 0 ? report.media_urls.length : (report.photos && report.photos.length > 0 ? report.photos.length : 1));
+                                const locationStr = getLocationString(report);
+
+                                return (
+                                    <div
+                                        key={report.id || report.ticket_id}
+                                        className="bg-white dark:bg-[#0B1324] border border-slate-200/90 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-xs hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all flex flex-col justify-between group"
+                                    >
+                                        {/* Top Photo Banner */}
+                                        <div className="relative w-full h-44 sm:h-48 overflow-hidden bg-slate-900 shrink-0">
+                                            <img
+                                                src={thumbnailSrc}
+                                                alt={displayTitle}
+                                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                onError={(e) => {
+                                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80';
+                                                }}
+                                            />
+
+                                            {/* Floating Status Pill (Top-Left overlay on photo) */}
+                                            <div className="absolute top-3 left-3 z-10">
+                                                {isRejected ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#ef4444] text-white shadow-md">
+                                                        <XCircle size={13} strokeWidth={2.5} className="text-white shrink-0" />
+                                                        <span>Rejected</span>
+                                                    </span>
+                                                ) : isPending ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-slate-950 shadow-md">
+                                                        <Clock size={13} strokeWidth={2.5} className="text-slate-950 shrink-0" />
+                                                        <span>Awaiting review</span>
+                                                    </span>
+                                                ) : isInProgress ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500 text-white shadow-md">
+                                                        <Settings size={13} strokeWidth={2.2} className="text-white shrink-0" />
+                                                        <span>In progress</span>
+                                                    </span>
+                                                ) : isResolved ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500 text-white shadow-md">
+                                                        <CheckCircle2 size={13} strokeWidth={2.5} className="text-white shrink-0" />
+                                                        <span>Resolved</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-slate-950 shadow-md">
+                                                        <Clock size={13} strokeWidth={2.5} className="text-slate-950 shrink-0" />
+                                                        <span>Awaiting review</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Card Content Body */}
+                                        <div className="p-4 sm:p-5 flex flex-col justify-between flex-1">
+                                            <div>
+                                                {/* Title */}
+                                                <h4 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1" title={displayTitle}>
+                                                    {displayTitle}
+                                                </h4>
+
+                                                {/* Category Subtitle */}
+                                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
+                                                    {displayCategory}
+                                                </p>
+
+                                                {/* Metadata Rows: Ticket ID, Location, Date & Attachment */}
+                                                <div className="mt-3.5 space-y-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                                                    {/* Ticket ID */}
+                                                    <div className="flex items-center gap-2">
+                                                        <FileText size={15} className="text-slate-400 shrink-0" strokeWidth={1.8} />
+                                                        <span className="font-mono">{report.ticket_id || 'PUL-2026-0000'}</span>
+                                                    </div>
+
+                                                    {/* Location */}
+                                                    <div className="flex items-center gap-2">
+                                                        <MapPin size={15} className="text-slate-400 shrink-0" strokeWidth={1.8} />
+                                                        <span className="truncate">{locationStr}</span>
+                                                    </div>
+
+                                                    {/* Date & Attachment */}
+                                                    <div className="flex items-center gap-2 pt-0.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Calendar size={15} className="text-slate-400 shrink-0" strokeWidth={1.8} />
+                                                            <span>{dateStr}</span>
+                                                        </div>
+                                                        <span className="text-slate-300 dark:text-slate-700 select-none">|</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <ImageIcon size={15} className="text-slate-400 shrink-0" strokeWidth={1.8} />
+                                                            <span>{attachmentCount} attachment{attachmentCount > 1 ? 's' : ''}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Action Button: View Details */}
+                                            <button
+                                                type="button"
+                                                onClick={() => onSelectReportForDetails(report)}
+                                                className="w-full mt-5 py-2.5 px-4 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-sm flex items-center justify-center cursor-pointer"
+                                            >
+                                                <span>View details</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Bottom Pagination & Count Controls */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 pb-16 sm:pb-20 border-t border-slate-100 dark:border-slate-800/80 mt-2">
+                        <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                            {totalReportsCount === 0 ? (
+                                <span>Showing 0 of 0 reports</span>
+                            ) : (
+                                <span>
+                                    Showing <span className="font-semibold text-slate-800 dark:text-slate-200">{startIndex + 1}</span> to <span className="font-semibold text-slate-800 dark:text-slate-200">{endIndex}</span> of <span className="font-semibold text-slate-800 dark:text-slate-200">{totalReportsCount}</span> reports
+                                </span>
+                            )}
+                        </div>
+
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-1.5 self-center sm:self-auto select-none">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCurrentPage(prev => Math.max(1, prev - 1));
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    disabled={validPage <= 1}
+                                    className="h-9 px-3 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-[#EA580C] hover:text-[#EA580C] disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                                    aria-label="Previous page"
+                                >
+                                    <ChevronLeft size={14} strokeWidth={2.5} />
+                                    <span>Previous</span>
+                                </button>
+
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                                        const isCurrent = pageNum === validPage;
+                                        return (
+                                            <button
+                                                key={pageNum}
+                                                type="button"
+                                                onClick={() => {
+                                                    setCurrentPage(pageNum);
+                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                }}
+                                                className={`w-9 h-9 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer flex items-center justify-center ${
+                                                    isCurrent
+                                                        ? 'bg-[#EA580C] text-white shadow-xs'
+                                                        : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-[#EA580C] hover:text-[#EA580C] shadow-2xs'
+                                                }`}
+                                                aria-label={`Page ${pageNum}`}
+                                                aria-current={isCurrent ? 'page' : undefined}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    disabled={validPage >= totalPages}
+                                    className="h-9 px-3 rounded-xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:border-[#EA580C] hover:text-[#EA580C] disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                                    aria-label="Next page"
+                                >
+                                    <span>Next</span>
+                                    <ChevronRight size={14} strokeWidth={2.5} />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </>
             )}
         </motion.div>
     );
@@ -2274,7 +4316,7 @@ const ProfileView = ({
     fetchUser
 }) => {
     const navigate = useNavigate();
-    const { theme, changeTheme } = useTheme();
+    const { theme, themeMode = 'system', changeTheme } = useTheme();
     const translationHook = useTranslation();
     const activeI18n = propI18n || translationHook.i18n;
     const isFilipino = Boolean(activeI18n?.language?.startsWith('tl') || activeI18n?.language?.startsWith('fil'));
@@ -2284,6 +4326,28 @@ const ProfileView = ({
             activeI18n.changeLanguage(lang);
         }
     };
+
+    const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+    const langDropdownRef = useRef(null);
+
+    // Close language dropdown on outside click or Escape key
+    useEffect(() => {
+        if (!isLangDropdownOpen) return;
+        const handleClickOutside = (e) => {
+            if (langDropdownRef.current && !langDropdownRef.current.contains(e.target)) {
+                setIsLangDropdownOpen(false);
+            }
+        };
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setIsLangDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isLangDropdownOpen]);
 
     const [internalSubView, setInternalSubView] = useState('settings');
     const activeSubView = propSubView !== undefined ? propSubView : internalSubView;
@@ -2302,29 +4366,7 @@ const ProfileView = ({
     const fileInputRef = useRef(null);
 
     // Settings States & Dialogs
-    const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
-        if (user?.preferences?.notifications_enabled !== undefined) {
-            return Boolean(user.preferences.notifications_enabled);
-        }
-        const saved = localStorage.getItem('pulso_notifications_enabled');
-        return saved !== null ? saved === 'true' : true;
-    });
-
-    const [notificationCategories, setNotificationCategories] = useState(() => {
-        const defaultCats = {
-            reportStatus: true,
-            advisories: true,
-            emergencyAlerts: true
-        };
-        if (user?.preferences?.notification_categories) {
-            return { ...defaultCats, ...user.preferences.notification_categories };
-        }
-        try {
-            const saved = localStorage.getItem('pulso_notification_categories');
-            if (saved) return { ...defaultCats, ...JSON.parse(saved) };
-        } catch (e) {}
-        return defaultCats;
-    });
+    const [notificationsEnabled,setNotificationsEnabled]=useState(user?.preferences?.notifications_enabled!==false);
 
     const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
@@ -2338,21 +4380,8 @@ const ProfileView = ({
     const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
     const [changingPassword, setChangingPassword] = useState(false);
 
-    // Synchronize preferences with user prop changes
-    useEffect(() => {
-        if (user?.preferences?.notifications_enabled !== undefined) {
-            setNotificationsEnabled(Boolean(user.preferences.notifications_enabled));
-        }
-        if (user?.preferences?.notification_categories) {
-            setNotificationCategories(prev => ({ ...prev, ...user.preferences.notification_categories }));
-        }
-    }, [user?.preferences]);
-
     const handleSavePreference = async (key, val) => {
-        const nextPreferences = {
-            ...(user?.preferences || {}),
-            [key]: val
-        };
+        const nextPreferences = { [key]: val };
         if (key === 'notifications_enabled') {
             localStorage.setItem('pulso_notifications_enabled', String(val));
         } else if (key === 'notification_categories') {
@@ -2366,27 +4395,6 @@ const ProfileView = ({
 
         if (handleUpdateProfile) {
             await handleUpdateProfile('preferences', nextPreferences);
-        }
-    };
-
-    const handleToggleMasterNotifications = () => {
-        const nextState = !notificationsEnabled;
-        setNotificationsEnabled(nextState);
-        handleSavePreference('notifications_enabled', nextState);
-        if (showToast) {
-            showToast(nextState ? 'Notifications enabled' : 'Notifications muted');
-        }
-    };
-
-    const handleToggleCategory = (catKey) => {
-        const nextCats = {
-            ...notificationCategories,
-            [catKey]: !notificationCategories[catKey]
-        };
-        setNotificationCategories(nextCats);
-        handleSavePreference('notification_categories', nextCats);
-        if (showToast) {
-            showToast('Notification preference updated');
         }
     };
 
@@ -2685,163 +4693,485 @@ const ProfileView = ({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.15 }}
-                        className="w-full max-w-[640px] mx-auto space-y-5 pb-36 sm:pb-28"
+                        className="w-full space-y-4 sm:space-y-6 pb-28 sm:pb-24"
                     >
-                        {/* Page Header (Title "Settings", no long subtitle) */}
-                        <div className="px-1 pt-1">
-                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                Settings
+                        {/* Page Header */}
+                        <div className="px-0.5 sm:px-1 pt-0 sm:pt-1">
+                            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                                Account &amp; Settings
                             </h2>
+                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                Manage your profile, security, and how you use PULSO.
+                            </p>
                         </div>
 
-                        {/* User Card (top) */}
-                        <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 flex items-center gap-3.5 shadow-xs min-h-[72px]">
-                            <div className="flex items-center gap-3.5 min-w-0">
-                                <div className={`w-13 h-13 rounded-full font-black flex items-center justify-center text-white text-base shadow-sm border border-slate-200 dark:border-slate-700/80 shrink-0 overflow-hidden ${
-                                    user.avatarPhoto
-                                        ? 'bg-slate-100 dark:bg-slate-800'
-                                        : 'bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600'
-                                }`}>
-                                    <UserAvatar
-                                        avatarUrl={user.avatarPhoto}
-                                        updatedAt={user.updatedAt}
-                                        fallbackInitial={user.avatar || 'R'}
-                                        alt={user.fullName || 'Resident'}
-                                    />
+                        {/* Top User Banner Card */}
+                        <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4">
+                            <div className="flex items-center gap-4 min-w-0">
+                                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full font-black flex items-center justify-center text-white text-lg sm:text-2xl shadow-sm bg-[#EA580C] shrink-0 select-none overflow-hidden ring-2 ring-orange-500/20">
+                                    {user.avatarPhoto ? (
+                                        <UserAvatar
+                                            avatarUrl={user.avatarPhoto}
+                                            updatedAt={user.updatedAt}
+                                            fallbackInitial={user.avatar || 'M'}
+                                            alt={user.fullName || 'Resident'}
+                                        />
+                                    ) : (
+                                        (user.name ? user.name[0].toUpperCase() : 'M')
+                                    )}
                                 </div>
 
                                 <div className="min-w-0 text-left">
-                                    <div className="flex items-center gap-1.5">
-                                        <h3 className="font-bold text-slate-900 dark:text-white text-base tracking-tight truncate">
-                                            {user.fullName || 'Resident'}
-                                        </h3>
-                                        <ShieldCheck size={16} className="text-emerald-500 shrink-0" aria-label="Verified resident" />
+                                    <h3 className="font-heading font-extrabold text-slate-900 dark:text-white text-lg sm:text-xl tracking-tight truncate">
+                                        {user.fullName || user.name || 'Marc Alexis'}
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
+                                        {user.email ? user.email.replace(/(.{2})(.*)(?=@)/, '$1••••') : 'marc••••@gmail.com'}
+                                    </p>
+                                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        <MapPin size={14} className="text-slate-400 shrink-0" />
+                                        <span className="truncate">{user.barangay ? `${user.barangay}, Caloocan` : 'Barangay 171, Caloocan'}</span>
                                     </div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
-                                        {user.email || user.phone || 'alexismarcaida@gmail.com'}
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => changeSubView('profile-details')}
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 sm:py-2.5 rounded-xl border border-[#EA580C] text-[#EA580C] hover:bg-orange-50 dark:hover:bg-orange-950/20 text-xs sm:text-sm font-bold transition-colors cursor-pointer shrink-0"
+                            >
+                                <Edit3 size={15} />
+                                <span>Edit profile</span>
+                            </button>
+                        </div>
+
+                        {/* 2-Column Desktop Grid Layout */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+
+                            {/* ── LEFT COLUMN: Account & Preferences (~7 cols) ── */}
+                            <div className="lg:col-span-7 flex flex-col gap-4 sm:gap-6">
+
+                                {/* Card 1: Account */}
+                                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs text-left">
+                                    <h3 className="font-heading font-extrabold text-base text-slate-900 dark:text-white mb-2">
+                                        Account
+                                    </h3>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        <button
+                                            type="button"
+                                            onClick={() => changeSubView('profile-details')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <User size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Personal information
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Name, email, phone number, and address
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => changeSubView('security')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Lock size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Password &amp; security
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Update password and manage session security
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Card 2: Preferences */}
+                                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs text-left">
+                                    <h3 className="font-heading font-extrabold text-base text-slate-900 dark:text-white mb-2">
+                                        Preferences
+                                    </h3>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        {/* Notifications */}
+                                        <button
+                                            type="button"
+                                            onClick={() => changeSubView('notifications')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Bell size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Notifications
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Push and SMS updates about your reports
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-xs font-bold text-[#EA580C]">On</span>
+                                                <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all" />
+                                            </div>
+                                        </button>
+
+                                        {/* Language Selector with Custom Civic Dropdown List */}
+                                        <div className="py-3.5 flex items-center justify-between gap-3 text-left -mx-2 px-2 relative">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Globe size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white">
+                                                        Language
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Current: {isFilipino ? 'Filipino (Tagalog)' : 'English'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Custom Dropdown Trigger & List */}
+                                            <div className="relative shrink-0" ref={langDropdownRef}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
+                                                    aria-haspopup="listbox"
+                                                    aria-expanded={isLangDropdownOpen}
+                                                    className={`h-10 px-3.5 bg-white dark:bg-slate-800 border rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5 transition-all shadow-2xs cursor-pointer select-none ${
+                                                        isLangDropdownOpen
+                                                            ? 'border-[#EA580C] ring-2 ring-[#EA580C]/25 shadow-xs'
+                                                            : 'border-slate-200/90 dark:border-slate-700 hover:border-[#EA580C]/60 hover:bg-slate-50/80 dark:hover:bg-slate-700/60'
+                                                    }`}
+                                                >
+                                                    <div className="w-4.5 h-4.5 rounded-full overflow-hidden shrink-0 shadow-2xs border border-black/10 flex items-center justify-center">
+                                                        {isFilipino ? <FlagPH className="w-full h-full object-cover" /> : <FlagUS className="w-full h-full object-cover" />}
+                                                    </div>
+                                                    <span>{isFilipino ? 'Filipino' : 'English'}</span>
+                                                    <ChevronDown
+                                                        size={14}
+                                                        className={`text-slate-400 transition-transform duration-200 ${isLangDropdownOpen ? 'rotate-180 text-[#EA580C]' : ''}`}
+                                                    />
+                                                </button>
+
+                                                {/* Custom Dropdown List Menu */}
+                                                <AnimatePresence>
+                                                    {isLangDropdownOpen && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                            exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                                                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                                                            role="listbox"
+                                                            aria-label="Select language"
+                                                            className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#0C1528] border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl shadow-slate-900/10 dark:shadow-black/60 p-1.5 z-50 overflow-hidden"
+                                                        >
+                                                            <div className="px-3 py-1.5 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 mb-1">
+                                                                <span>Language Selection</span>
+                                                                <span className="text-[9px] font-mono text-slate-400 font-normal">PULSO</span>
+                                                            </div>
+
+                                                            {/* Option 1: English */}
+                                                            <button
+                                                                type="button"
+                                                                role="option"
+                                                                aria-selected={!isFilipino}
+                                                                onClick={() => {
+                                                                    handleSwitchLanguage('en');
+                                                                    setIsLangDropdownOpen(false);
+                                                                }}
+                                                                className={`w-full px-3 py-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                                                                    !isFilipino
+                                                                        ? 'bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] dark:text-orange-400 font-bold border border-orange-200/80 dark:border-orange-900/50 shadow-2xs'
+                                                                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 font-medium border border-transparent'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 shadow-2xs border border-black/10">
+                                                                        <FlagUS className="w-full h-full object-cover" />
+                                                                    </div>
+                                                                    <div className="text-left">
+                                                                        <div className="leading-tight">English</div>
+                                                                        <div className="text-[10px] font-normal text-slate-400 dark:text-slate-500">English (US)</div>
+                                                                    </div>
+                                                                </div>
+                                                                {!isFilipino && (
+                                                                    <div className="w-5 h-5 rounded-full bg-[#EA580C]/10 text-[#EA580C] flex items-center justify-center shrink-0">
+                                                                        <Check size={12} strokeWidth={3} />
+                                                                    </div>
+                                                                )}
+                                                            </button>
+
+                                                            {/* Option 2: Filipino */}
+                                                            <button
+                                                                type="button"
+                                                                role="option"
+                                                                aria-selected={isFilipino}
+                                                                onClick={() => {
+                                                                    handleSwitchLanguage('tl');
+                                                                    setIsLangDropdownOpen(false);
+                                                                }}
+                                                                className={`w-full px-3 py-2.5 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer mt-1 ${
+                                                                    isFilipino
+                                                                        ? 'bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] dark:text-orange-400 font-bold border border-orange-200/80 dark:border-orange-900/50 shadow-2xs'
+                                                                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/80 font-medium border border-transparent'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                                    <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 shadow-2xs border border-black/10">
+                                                                        <FlagPH className="w-full h-full object-cover" />
+                                                                    </div>
+                                                                    <div className="text-left">
+                                                                        <div className="leading-tight">Filipino</div>
+                                                                        <div className="text-[10px] font-normal text-slate-400 dark:text-slate-500">Tagalog (Salin)</div>
+                                                                    </div>
+                                                                </div>
+                                                                {isFilipino && (
+                                                                    <div className="w-5 h-5 rounded-full bg-[#EA580C]/10 text-[#EA580C] flex items-center justify-center shrink-0">
+                                                                        <Check size={12} strokeWidth={3} />
+                                                                    </div>
+                                                                )}
+                                                            </button>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        </div>
+
+                                        {/* Appearance 3-way Segmented Control */}
+                                        <div className="py-3.5 -mx-2 px-2">
+                                            <div className="flex items-center gap-3.5 min-w-0 mb-3">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Palette size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white">
+                                                        Appearance
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Choose your display style
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-1 sm:p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => changeTheme('light')}
+                                                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                        themeMode === 'light'
+                                                            ? 'bg-white dark:bg-slate-700 text-[#EA580C] dark:text-[#ff6b00] border border-slate-200/80 dark:border-slate-600 shadow-xs'
+                                                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    <Sun size={15} />
+                                                    <span>Light</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => changeTheme('dark')}
+                                                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                        themeMode === 'dark'
+                                                            ? 'bg-white dark:bg-slate-700 text-[#EA580C] dark:text-[#ff6b00] border border-slate-200/80 dark:border-slate-600 shadow-xs'
+                                                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    <Moon size={15} />
+                                                    <span>Dark</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => changeTheme('system')}
+                                                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                                        themeMode === 'system'
+                                                            ? 'bg-white dark:bg-slate-700 text-[#EA580C] dark:text-[#ff6b00] border border-slate-200/80 dark:border-slate-600 shadow-xs'
+                                                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                                                    }`}
+                                                >
+                                                    <Monitor size={15} />
+                                                    <span>System</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 text-left">
+                                        Preferences apply to your account.
                                     </p>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Grouped Sections */}
-                        <div className="w-full space-y-5">
-                            {/* ACCOUNT SECTION */}
-                            <div>
-                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
-                                    Account
-                                </h5>
-                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
-                                    <SettingsRow
-                                        icon={User}
-                                        label="Manage Profile"
-                                        onClick={() => changeSubView('profile-details')}
-                                    />
-                                    <SettingsRow
-                                        icon={Lock}
-                                        label="Password & Security"
-                                        onClick={() => changeSubView('security')}
-                                    />
-                                </div>
-                            </div>
+                            {/* ── RIGHT COLUMN: Help & Support, Privacy & Legal, Sign Out (~5 cols) ── */}
+                            <div className="lg:col-span-5 flex flex-col gap-4 sm:gap-6">
 
-                            {/* PREFERENCES SECTION */}
-                            <div>
-                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
-                                    Preferences
-                                </h5>
-                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
-                                    <SettingsRow
-                                        icon={Bell}
-                                        label="Notifications"
-                                        value={notificationsEnabled ? 'On' : 'Off'}
-                                        onClick={() => changeSubView('notifications')}
-                                    />
-                                    <SettingsRow
-                                        icon={Globe}
-                                        label={isFilipino ? "Tagalog" : "English"}
-                                        isLanguageSwitch={true}
-                                        isChecked={isFilipino}
-                                        onClick={handleToggleLanguage}
-                                        ariaLabel={isFilipino ? "Language: Tagalog" : "Language: English"}
-                                    />
-                                    {/* Accessible screen reader announcement for language changes */}
-                                    <div className="sr-only" aria-live="polite" aria-atomic="true">
-                                        {languageAnnouncement}
+                                {/* Card: Help & support */}
+                                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs text-left">
+                                    <h3 className="font-heading font-extrabold text-base text-slate-900 dark:text-white mb-2">
+                                        Help &amp; support
+                                    </h3>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        {/* Row 1: How PULSO works */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('reporting-guide')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <BookOpen size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        How PULSO works
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Reporting guide.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        {/* Row 2: Help center */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('help-center')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <HelpCircle size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Help center
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Common questions.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        {/* Row 3: Contact support */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsContactModalOpen(true)}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <MessageSquare size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                        Contact support
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        Get help with your account.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
                                     </div>
-                                    <SettingsRow
-                                        icon={theme === 'dark' ? Moon : Sun}
-                                        label={theme === 'dark'
-                                            ? t('dashboard.profile.darkMode', { defaultValue: 'Dark mode' })
-                                            : t('dashboard.profile.lightMode', { defaultValue: 'Light mode' })
-                                        }
-                                        isSwitch={true}
-                                        isChecked={theme === 'dark'}
-                                        onClick={handleToggleDarkMode}
-                                    />
-                                    {/* Accessible screen reader announcement for theme changes */}
-                                    <div className="sr-only" aria-live="polite" aria-atomic="true">
-                                        {themeAnnouncement}
+                                </div>
+
+                                {/* Card: Privacy & legal */}
+                                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs text-left">
+                                    <h3 className="font-heading font-extrabold text-base text-slate-900 dark:text-white mb-2">
+                                        Privacy &amp; legal
+                                    </h3>
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                        {/* Row 1: Privacy policy */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('privacy')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <ShieldCheck size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                    Privacy policy
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        {/* Row 2: Terms of use */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('terms')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <FileText size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                    Terms of use
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
+
+                                        {/* Row 3: Cookie preferences */}
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSetModal('cookies')}
+                                            className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0">
+                                                    <Cookie size={20} strokeWidth={2} />
+                                                </div>
+                                                <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-[#ff6b00] transition-colors">
+                                                    Cookie preferences
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#ff6b00] group-hover:translate-x-0.5 transition-all shrink-0" />
+                                        </button>
                                     </div>
                                 </div>
+
+                                {/* Card: Sign out (Card button) */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsLogoutConfirmOpen(true)}
+                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-xs flex flex-col justify-center gap-1 hover:border-red-300 dark:hover:border-red-900/50 hover:bg-red-50/30 dark:hover:bg-red-950/20 transition-all cursor-pointer text-left group"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <LogOut size={18} className="text-slate-700 dark:text-slate-300 group-hover:text-red-600 transition-colors shrink-0" />
+                                        <span className="font-heading font-extrabold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-red-600 transition-colors">
+                                            Sign out
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 pl-7">
+                                        End your session on this device.
+                                    </p>
+                                </button>
+
                             </div>
 
-                            {/* SUPPORT SECTION */}
-                            <div>
-                                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2">
-                                    Support
-                                </h5>
-                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs">
-                                    <SettingsRow
-                                        icon={HelpCircle}
-                                        label="How PULSO Works"
-                                        onClick={() => navigate('/tutorial?from=profile')}
-                                    />
-                                    <SettingsRow
-                                        icon={PhoneCall}
-                                        label="Contact"
-                                        onClick={() => setIsContactModalOpen(true)}
-                                    />
-                                    <SettingsRow
-                                        icon={Shield}
-                                        label="Privacy Policy"
-                                        onClick={handleOpenPrivacy}
-                                    />
-                                    <SettingsRow
-                                        icon={FileText}
-                                        label="Terms & Conditions"
-                                        onClick={handleOpenTerms}
-                                    />
-                                    <SettingsRow
-                                        icon={Star}
-                                        label="Rate App"
-                                        onClick={() => setIsRateModalOpen(true)}
-                                    />
-                                    <SettingsRow
-                                        icon={Share2}
-                                        label="Share App"
-                                        onClick={handleShareApp}
-                                    />
-                                    <SettingsRow
-                                        icon={Info}
-                                        label="About PULSO"
-                                        value="v2.4.0"
-                                        onClick={() => setIsAboutModalOpen(true)}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* LOGOUT (STANDALONE RED ROW) */}
-                            <div className="pt-1">
-                                <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
-                                    <SettingsRow
-                                        icon={LogOut}
-                                        label="Sign Out"
-                                        isDestructive={true}
-                                        onClick={() => setIsLogoutConfirmOpen(true)}
-                                    />
-                                </div>
-                            </div>
                         </div>
                     </motion.div>
                 )}
@@ -3087,157 +5417,7 @@ const ProfileView = ({
                             </div>
                         </div>
 
-                        {/* Master Switch Card */}
-                        <div className="w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
-                            <div
-                                role="switch"
-                                aria-checked={notificationsEnabled}
-                                tabIndex={0}
-                                onClick={handleToggleMasterNotifications}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        handleToggleMasterNotifications();
-                                    }
-                                }}
-                                className="flex items-center justify-between gap-4 cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl"
-                            >
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                                        Allow Notifications
-                                    </h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                        Master switch for all push and email alerts from PULSO
-                                    </p>
-                                </div>
-                                <div
-                                    className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
-                                        notificationsEnabled ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
-                                    }`}
-                                >
-                                    <div
-                                        className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
-                                            notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
-                                        }`}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Categories Card */}
-                        <div className="w-full space-y-2">
-                            <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
-                                Notification Categories
-                            </h5>
-                            <div className={`w-full bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 shadow-xs transition-opacity ${
-                                !notificationsEnabled ? 'opacity-50 pointer-events-none' : ''
-                            }`}>
-                                {/* 1. Report Status Updates */}
-                                <div
-                                    role="switch"
-                                    aria-checked={notificationCategories.reportStatus}
-                                    tabIndex={0}
-                                    onClick={() => handleToggleCategory('reportStatus')}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            handleToggleCategory('reportStatus');
-                                        }
-                                    }}
-                                    className="w-full min-h-[56px] p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                >
-                                    <div>
-                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                                            Report status updates
-                                        </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Live notifications when your reports are verified, assigned, or resolved
-                                        </p>
-                                    </div>
-                                    <div
-                                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
-                                            notificationCategories.reportStatus ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
-                                                notificationCategories.reportStatus ? 'translate-x-5' : 'translate-x-0'
-                                            }`}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* 2. City Advisories */}
-                                <div
-                                    role="switch"
-                                    aria-checked={notificationCategories.advisories}
-                                    tabIndex={0}
-                                    onClick={() => handleToggleCategory('advisories')}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            handleToggleCategory('advisories');
-                                        }
-                                    }}
-                                    className="w-full min-h-[56px] p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                >
-                                    <div>
-                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                                            City advisories
-                                        </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                            Public works announcements, road re-blocking, and engineering advisories
-                                        </p>
-                                    </div>
-                                    <div
-                                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
-                                            notificationCategories.advisories ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
-                                                notificationCategories.advisories ? 'translate-x-5' : 'translate-x-0'
-                                            }`}
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* 3. Emergency Alerts */}
-                                <div
-                                    role="switch"
-                                    aria-checked={notificationCategories.emergencyAlerts}
-                                    tabIndex={0}
-                                    onClick={() => handleToggleCategory('emergencyAlerts')}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            handleToggleCategory('emergencyAlerts');
-                                        }
-                                    }}
-                                    className="w-full min-h-[56px] p-4 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer select-none outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800"
-                                >
-                                    <div>
-                                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
-                                            Emergency alerts
-                                        </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                            High-priority hazard alerts, storm warnings, and flash flood updates
-                                        </p>
-                                    </div>
-                                    <div
-                                        className={`w-11 h-6 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 ${
-                                            notificationCategories.emergencyAlerts ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-out transform ${
-                                                notificationCategories.emergencyAlerts ? 'translate-x-5' : 'translate-x-0'
-                                            }`}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <ResidentNotificationSettings onSaved={preferences=>setNotificationsEnabled(preferences.enabled)}/>
                     </motion.div>
                 )}
 
@@ -3539,7 +5719,7 @@ const ProfileView = ({
                                                             onChange={(e) => setTempValues({ ...tempValues, phone: e.target.value })}
                                                             autoFocus
                                                             className="flex-1 bg-white dark:bg-slate-900 border border-orange-500 rounded-xl px-4 py-2.5 font-mono text-base sm:text-sm min-h-[44px] font-semibold text-slate-900 dark:text-white outline-none ring-2 ring-orange-500/20"
-                                                            placeholder="e.g. 09171234567"
+                                                            placeholder="e.g. 09XXXXXXXXX"
                                                         />
                                                         <button
                                                             onClick={() => handleSaveField('phone')}
@@ -4664,7 +6844,7 @@ const CATEGORY_META = {
         ],
     },
     'Traffic & Road Signs': {
-        color: 'orange',
+        color: 'purple',
         icon: <Signpost size={20} strokeWidth={1.7} />,
         scope: [
             'Broken or malfunctioning traffic light signals and timers',
@@ -4684,8 +6864,8 @@ const CATEGORY_META = {
         ],
     },
     'Public Buildings & Facilities': {
-        color: 'green',
-        icon: <Landmark size={20} strokeWidth={1.7} />,
+        color: 'indigo',
+        icon: <Building2 size={20} strokeWidth={1.7} />,
         scope: [
             'Construction and maintenance of public school buildings',
             'Barangay health centers and City Hall facility repairs',
@@ -4722,6 +6902,7 @@ const COLOR_MAP = {
     red: { ring: 'ring-red-500', bg: 'bg-red-500/10 dark:bg-red-500/15', dot: 'bg-red-500', text: 'text-red-600 dark:text-red-400', border: 'border-red-400', badge: 'bg-red-500' },
     green: { ring: 'ring-green-500', bg: 'bg-green-500/10 dark:bg-green-500/15', dot: 'bg-green-500', text: 'text-green-600 dark:text-green-400', border: 'border-green-400', badge: 'bg-green-500' },
     purple: { ring: 'ring-purple-500', bg: 'bg-purple-500/10 dark:bg-purple-500/15', dot: 'bg-purple-500', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-400', badge: 'bg-purple-500' },
+    indigo: { ring: 'ring-indigo-500', bg: 'bg-indigo-500/10 dark:bg-indigo-500/15', dot: 'bg-indigo-500', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-400', badge: 'bg-indigo-500' },
 };
 
 const ReportCategoryRadio = ({ value, onChange, options, disabled = false, disabledReason = '' }) => {
@@ -4932,6 +7113,7 @@ const ResidentModals = ({
     handleQuickReportSubmit,
     currentUser,
     setActiveTab,
+    setSelectedReportForDetails,
     setIsAIChatOpen
 }) => {
     const [isListening, setIsListening] = useState(false);
@@ -4939,6 +7121,26 @@ const ResidentModals = ({
     const [isSvFullscreen, setIsSvFullscreen] = useState(false);
     const [currentMapZoom, setCurrentMapZoom] = useState(11);
     const [activeSector, setActiveSector] = useState('all');
+    const [helpSearchQuery, setHelpSearchQuery] = useState('');
+    const [expandedFaqId, setExpandedFaqId] = useState(1);
+    const [dontShowGuideAgain, setDontShowGuideAgain] = useState(() => {
+        try {
+            return localStorage.getItem('pulso_hide_reporting_guide') === 'true';
+        } catch (_) {
+            return false;
+        }
+    });
+
+    const handleToggleGuidePreference = (checked) => {
+        setDontShowGuideAgain(checked);
+        try {
+            if (checked) {
+                localStorage.setItem('pulso_hide_reporting_guide', 'true');
+            } else {
+                localStorage.removeItem('pulso_hide_reporting_guide');
+            }
+        } catch (_) {}
+    };
 
     // Auto-reset fullscreen when Street View closes
     useEffect(() => {
@@ -5139,6 +7341,11 @@ const ResidentModals = ({
                     onTrackReport={(trackingId) => {
                         setActiveTab('reports');
                     }}
+                    onViewExistingReport={(report) => {
+                        setActiveModal(null);
+                        setSelectedReportForDetails(report);
+                        setActiveTab('reports');
+                    }}
                     currentUser={currentUser}
                 />
             )}
@@ -5149,6 +7356,7 @@ const ResidentModals = ({
                     onClose={() => {
                         setActiveModal(isSelectingLocation ? 'file-report' : null);
                         setIsSelectingLocation(false);
+                        if (setSelectedPost) setSelectedPost(null);
                     }}
                     theme={theme}
                     isLoaded={isLoaded}
@@ -5162,6 +7370,7 @@ const ResidentModals = ({
                     requestDeviceLocation={requestDeviceLocation}
                     locationPermissionDenied={locationPermissionDenied}
                     isSelectingLocation={isSelectingLocation}
+                    initialSelectedReport={selectedPost}
                     onOpenReportDetail={(report) => {
                         setSelectedHazard(report);
                         if (report?.isOwnReport) {
@@ -5169,6 +7378,7 @@ const ResidentModals = ({
                             setActiveTab('reports');
                         }
                     }}
+                    onOpenReportForm={() => setActiveModal('file-report')}
                     photoPinIcons={photoPinIcons}
                 />
             )}
@@ -5178,16 +7388,21 @@ const ResidentModals = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto"
+                    className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto"
                     onClick={() => setActiveModal(null)}
                 >
                     <motion.div
-                        initial={{ scale: 0.96, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.96, opacity: 0 }}
-                        className="pointer-events-auto transition-colors w-full max-w-xl flex flex-col my-auto bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90dvh]"
+                        initial={{ y: '100%', opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: '100%', opacity: 0 }}
+                        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                        className="pointer-events-auto transition-colors w-full sm:max-w-xl flex flex-col mt-auto sm:my-auto bg-white dark:bg-slate-900 rounded-t-[28px] sm:rounded-3xl border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[88dvh] sm:max-h-[90dvh] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
                         onClick={e => e.stopPropagation()}
                     >
+                        {/* Mobile Pull Bar / Drag Pill */}
+                        <div className="w-full pt-3 pb-1 flex justify-center sm:hidden shrink-0">
+                            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+                        </div>
                     {activeModal === 'services' && (
                         <div className="p-4 sm:p-6 md:p-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-center mb-6">
@@ -5217,34 +7432,256 @@ const ResidentModals = ({
                             </div>
                         </div>
                     )}
-                    {activeModal === 'knowledge' && (
-                        <div className="p-4 sm:p-6 md:p-8 max-h-[85vh] overflow-y-auto custom-scrollbar">
-                            <div className="flex justify-between items-center mb-6">
-                                <div>
-                                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">Knowledge Base</h3>
-                                    <p className="text-xs sm:text-sm text-slate-500 font-medium">Guides, Tips & Information Hub</p>
-                                </div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
-                            </div>
-                            <div className="space-y-3 sm:space-y-4">
-                                {KNOWLEDGE_BASE_ARTICLES(t).map(article => (
-                                    <button key={article.id} className="w-full p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-orange-500/30 hover:bg-white dark:hover:bg-slate-800 transition-all text-left flex flex-col items-start gap-1">
-                                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">{article.category}</span>
-                                        <h4 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">{article.title}</h4>
-                                        <p className="text-xs sm:text-sm text-slate-500 font-medium">{article.excerpt}</p>
-                                        <div className="mt-2 h-0 w-0 group-hover:w-full border-b border-orange-500 transition-all"></div>
+                    {(activeModal === 'knowledge' || activeModal === 'help-center') && (() => {
+                        const FAQ_ITEMS = [
+                            {
+                                id: 1,
+                                question: 'How do I submit a report?',
+                                answer: 'Choose a category, pin the location, add evidence and details, then review and submit.'
+                            },
+                            {
+                                id: 2,
+                                question: 'Where can I find my report ID?',
+                                answer: "Your report ID is displayed immediately after submission and listed under 'My Reports' in your resident dashboard."
+                            },
+                            {
+                                id: 3,
+                                question: 'What do report statuses mean?',
+                                answer: 'Submitted means received; Under Review means dispatchers are assessing; Dispatched means a field team is assigned; Resolved means work is completed.'
+                            },
+                            {
+                                id: 4,
+                                question: 'Can I update my contact details?',
+                                answer: 'Yes, go to Account Settings from the sidebar or profile menu to update your phone number, email address, and notification preferences.'
+                            }
+                        ];
+
+                        const CATEGORY_CARDS = [
+                            {
+                                id: 'reporting',
+                                icon: <FileText size={22} strokeWidth={2} />,
+                                title: 'Reporting a concern',
+                                desc: 'Learn how to submit a report, add photos and provide details.',
+                                action: () => setActiveModal('reporting-guide')
+                            },
+                            {
+                                id: 'tracking',
+                                icon: <BarChart2 size={22} strokeWidth={2} />,
+                                title: 'Tracking reports',
+                                desc: 'Check the status of your reports and understand what happens next.',
+                                action: () => {
+                                    setActiveModal(null);
+                                    setActiveTab('reports');
+                                }
+                            },
+                            {
+                                id: 'account',
+                                icon: <User size={22} strokeWidth={2} />,
+                                title: 'Account & security',
+                                desc: 'Manage your account, update your details and keep it secure.',
+                                action: () => {
+                                    setActiveModal(null);
+                                    setActiveTab('profile');
+                                }
+                            },
+                            {
+                                id: 'maps',
+                                icon: <MapPin size={22} strokeWidth={2} />,
+                                title: 'Maps & locations',
+                                desc: 'Find, pin and understand locations on the map.',
+                                action: () => setActiveModal('map')
+                            }
+                        ];
+
+                        const query = helpSearchQuery.trim().toLowerCase();
+                        const filteredFaqs = query
+                            ? FAQ_ITEMS.filter(f => f.question.toLowerCase().includes(query) || f.answer.toLowerCase().includes(query))
+                            : FAQ_ITEMS;
+                        const filteredCards = query
+                            ? CATEGORY_CARDS.filter(c => c.title.toLowerCase().includes(query) || c.desc.toLowerCase().includes(query))
+                            : CATEGORY_CARDS;
+
+                        return (
+                            <div className="p-5 sm:p-7 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                                {/* Top Close Button */}
+                                <div className="flex justify-end -mt-1 -mr-1 mb-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveModal(null)}
+                                        className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                        aria-label="Close"
+                                    >
+                                        <X size={18} strokeWidth={2.5} />
                                     </button>
-                                ))}
-                            </div>
-                            <div className="mt-6 p-4 bg-orange-500 text-white rounded-2xl sm:rounded-3xl flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><Info size={18} /></div>
-                                    <div><p className="text-xs sm:text-sm font-bold">Need more help?</p><p className="text-[10px] opacity-80">Message our AI Assistant available 24/7.</p></div>
                                 </div>
-                                <button onClick={() => { setActiveModal(null); setIsAIChatOpen(true); }} className="px-4 py-2 bg-white text-orange-500 rounded-xl sm:rounded-2xl font-black text-xs uppercase shadow-lg shrink-0 cursor-pointer">Chat Support</button>
+
+                                {/* Center Icon Badge */}
+                                <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#EA580C] text-white flex items-center justify-center mx-auto mb-3 shadow-md shadow-orange-500/25">
+                                    <span className="text-2xl sm:text-3xl font-black leading-none select-none">?</span>
+                                </div>
+
+                                {/* Title & Subtitle */}
+                                <h3 className="text-2xl sm:text-[28px] font-bold text-slate-900 dark:text-white text-center leading-tight">
+                                    How can we help?
+                                </h3>
+                                <p className="text-xs sm:text-[13.5px] text-slate-500 dark:text-slate-400 text-center mt-1 mb-4">
+                                    Find answers about reporting and your account.
+                                </p>
+
+                                {/* Search Bar */}
+                                <div className="relative mb-4">
+                                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    <input
+                                        type="text"
+                                        value={helpSearchQuery}
+                                        onChange={(e) => setHelpSearchQuery(e.target.value)}
+                                        placeholder="Search help topics..."
+                                        className="w-full pl-9 pr-8 py-2.5 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#EA580C]/20 focus:border-[#EA580C] transition-all"
+                                    />
+                                    {helpSearchQuery && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setHelpSearchQuery('')}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* 4 Category Cards (2x2 Grid) */}
+                                {filteredCards.length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-5">
+                                        {filteredCards.map((card) => (
+                                            <button
+                                                key={card.id}
+                                                type="button"
+                                                onClick={card.action}
+                                                className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-orange-300 dark:hover:border-orange-900/50 hover:shadow-sm transition-all text-left flex items-start justify-between gap-2.5 group cursor-pointer"
+                                            >
+                                                <div className="flex items-start gap-3 min-w-0">
+                                                    <div className="text-[#EA580C] shrink-0 mt-0.5">
+                                                        {card.icon}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#EA580C] transition-colors leading-snug">
+                                                            {card.title}
+                                                        </h4>
+                                                        <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5 line-clamp-2">
+                                                            {card.desc}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 shrink-0 mt-1" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Frequently Asked Questions Section */}
+                                <div className="mb-4">
+                                    <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mb-2.5">
+                                        Frequently asked questions
+                                    </h4>
+
+                                    {filteredFaqs.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {filteredFaqs.map((faq) => {
+                                                const isExpanded = expandedFaqId === faq.id;
+                                                return (
+                                                    <div
+                                                        key={faq.id}
+                                                        className={`rounded-xl border transition-all ${
+                                                            isExpanded
+                                                                ? 'border-orange-300 dark:border-orange-900/60 bg-[#FFF7ED]/40 dark:bg-orange-950/20'
+                                                                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700'
+                                                        }`}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setExpandedFaqId(isExpanded ? null : faq.id)}
+                                                            className="w-full p-3 sm:p-3.5 flex items-center justify-between gap-3 text-left cursor-pointer"
+                                                        >
+                                                            <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                                                {faq.question}
+                                                            </span>
+                                                            {isExpanded ? (
+                                                                <ChevronUp size={16} className="text-[#EA580C] shrink-0" strokeWidth={2.2} />
+                                                            ) : (
+                                                                <ChevronDown size={16} className="text-slate-400 shrink-0" strokeWidth={2.2} />
+                                                            )}
+                                                        </button>
+
+                                                        {isExpanded && (
+                                                            <div className="px-3 sm:px-3.5 pb-3 sm:pb-3.5 pt-0">
+                                                                <p className="text-xs sm:text-[12.5px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                                                                    {faq.answer}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center">
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                No help topics found matching "{helpSearchQuery}".
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Still Need Help Callout Banner */}
+                                <div className="mt-4 p-3.5 rounded-2xl bg-[#FFF7ED] dark:bg-orange-950/25 border border-[#FFEDD5] dark:border-orange-900/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/40 text-[#EA580C] flex items-center justify-center shrink-0">
+                                            <LifeBuoy size={22} strokeWidth={2.2} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h5 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                                Still need help?
+                                            </h5>
+                                            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                Open the support form to describe your question.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveModal(null);
+                                            if (typeof setIsAIChatOpen === 'function') {
+                                                setIsAIChatOpen(true);
+                                            }
+                                        }}
+                                        className="px-4 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm shadow-sm transition-all shrink-0 cursor-pointer self-start sm:self-auto"
+                                    >
+                                        Contact support
+                                    </button>
+                                </div>
+
+                                {/* Bottom Footer Row */}
+                                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveModal(null)}
+                                        className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    >
+                                        Close
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveModal('reporting-guide')}
+                                        className="text-xs sm:text-sm font-bold text-[#EA580C] hover:text-[#d94e07] flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                        <span>View reporting guide</span>
+                                        <span className="text-sm font-bold">→</span>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {activeModal.startsWith('calling-') && (() => {
                         const hotlineName = activeModal.split('calling-')[1];
@@ -5306,50 +7743,199 @@ const ResidentModals = ({
                     })()}
 
                     {activeModal === 'privacy' && (
-                        <div className="p-5 sm:p-8">
-                            <div className="flex justify-between items-center mb-5">
-                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.privacy', { defaultValue: 'Privacy Policy' })}</h3><p className="text-slate-500 font-medium text-xs">PULSO Data Protection standards</p></div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
+                        <div className="p-5 sm:p-7 max-h-[82vh] overflow-y-auto custom-scrollbar">
+                            {/* Top row: Close button */}
+                            <div className="flex items-center justify-end mb-3">
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
                             </div>
-                            <div className="space-y-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">{t('dashboard.privacy.s1_title', { defaultValue: '1. Information Collection' })}</h4>
-                                    <p>{t('dashboard.privacy.s1_desc', { defaultValue: 'PULSO collects data relevant to infrastructure reporting, including precise GPS coordinates, photographic evidence, and resident account details for verification purposes.' })}</p>
-                                </section>
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">2. Digital Stewardship</h4>
-                                    <p>Your data is stored in encrypted government-grade servers. We do not sell or share citizen data with 3rd party advertising entities.</p>
-                                </section>
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-orange-500/30 underline-offset-4">3. AI Analysis Disclosure</h4>
-                                    <p>Triage automation uses Gemini AI to analyze report photos. No resident facial biometric data is stored or used for surveillance.</p>
-                                </section>
+
+                            {/* Header: Outline Shield + Title & Subtitle */}
+                            <div className="flex items-center gap-3.5 mb-3.5">
+                                <div className="text-[#EA580C] shrink-0">
+                                    <Shield size={34} strokeWidth={1.9} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                        Privacy Policy
+                                    </h3>
+                                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                        Understand how your information is used.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info Banner Callout */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/25 border border-blue-100/90 dark:border-blue-900/30 flex items-center gap-2.5 mb-4">
+                                <Info size={17} className="text-blue-600 dark:text-blue-400 shrink-0" strokeWidth={2.2} />
+                                <p className="text-xs sm:text-[12.5px] text-slate-700 dark:text-slate-200 leading-snug">
+                                    Report information may include your location, photos, and account details.
+                                </p>
+                            </div>
+
+                            {/* 3 Structured Items */}
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                <div className="flex items-start gap-3.5 py-3 first:pt-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <User size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Information you provide
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Location, report descriptions, attachments, and contact details.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <FileText size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            How information is used
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            To review concerns, coordinate follow-up, and provide report updates.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3 last:pb-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Settings size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Automated review
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            If AI assists with review, explain its role and the data involved in the final policy.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footnote & Bottom Action */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal max-w-sm">
+                                    Full data handling details should match the service's actual practices.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveModal(null)}
+                                    className="px-6 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm tracking-wide shadow-sm transition-all shrink-0 self-end sm:self-auto cursor-pointer"
+                                >
+                                    Close
+                                </button>
                             </div>
                         </div>
                     )}
 
                     {activeModal === 'terms' && (
-                        <div className="p-5 sm:p-8">
-                            <div className="flex justify-between items-center mb-5">
-                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.terms', { defaultValue: 'Terms of Service' })}</h3><p className="text-slate-500 font-medium text-xs">Resident User agreement for reporting</p></div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
+                        <div className="p-5 sm:p-7 max-h-[82vh] overflow-y-auto custom-scrollbar">
+                            {/* Top row: Close button */}
+                            <div className="flex items-center justify-end mb-3">
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
                             </div>
-                            <div className="space-y-5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">{t('dashboard.terms.s1_title', { defaultValue: '1. Truthful Reporting' })}</h4>
-                                    <p>{t('dashboard.terms.s1_desc', { defaultValue: 'Residents are accountable for the accuracy of their reports. Submitting false or fake reports may result in account restrictions or suspension.' })}</p>
-                                </section>
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">2. Citizen Conduct</h4>
-                                    <p>Harassment, abusive language, or uploading unrelated media to the engineering portal is strictly prohibited.</p>
-                                </section>
-                                <section>
-                                    <h4 className="font-bold text-slate-900 dark:text-white mb-1.5 underline decoration-blue-500/30 underline-offset-4">3. Jurisdiction</h4>
-                                    <p>PULSO North Caloocan applies only to incidents within the city boundary as defined by the LGU mapping department.</p>
-                                </section>
+
+                            {/* Header: Outline FileText + Title & Subtitle */}
+                            <div className="flex items-center gap-3.5 mb-3.5">
+                                <div className="text-[#EA580C] shrink-0">
+                                    <FileText size={34} strokeWidth={1.9} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                        Terms of Service
+                                    </h3>
+                                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                        Guidelines for using PULSO.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info Banner Callout */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/25 border border-blue-100/90 dark:border-blue-900/30 flex items-center gap-2.5 mb-4">
+                                <Info size={17} className="text-blue-600 dark:text-blue-400 shrink-0" strokeWidth={2.2} />
+                                <p className="text-xs sm:text-[12.5px] text-slate-700 dark:text-slate-200 leading-snug">
+                                    Submit relevant reports and use the service respectfully.
+                                </p>
+                            </div>
+
+                            {/* 3 Structured Items */}
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                <div className="flex items-start gap-3.5 py-3 first:pt-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Edit3 size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Report accurately
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Describe concerns honestly and include relevant evidence.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Users size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Be respectful
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Avoid abusive language and unrelated uploads.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3 last:pb-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <MapPin size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Check service coverage
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Use the published service-area guidance before submitting.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footnote & Bottom Action */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal max-w-sm">
+                                    These guidelines are a summary and should be read together with the full terms of service.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveModal(null)}
+                                    className="px-6 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm tracking-wide shadow-sm transition-all shrink-0 self-end sm:self-auto cursor-pointer"
+                                >
+                                    Close
+                                </button>
                             </div>
                         </div>
                     )}
+
                     {activeModal === 'post-details' && selectedPost && (
                         <div className="flex flex-col h-full max-h-[85vh]">
                             <div className="p-5 sm:p-8 pb-4 shrink-0 border-b border-slate-100 dark:border-slate-800">
@@ -5363,7 +7949,7 @@ const ResidentModals = ({
                                             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">{new Date(selectedPost.created_at).toLocaleDateString()} • Ref: {selectedPost.advisory_id}</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0"><X size={20} /></button>
+                                    <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0 cursor-pointer"><X size={20} /></button>
                                 </div>
                             </div>
                             <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-6">
@@ -5385,20 +7971,463 @@ const ResidentModals = ({
                     )}
 
                     {activeModal === 'cookies' && (
-                        <div className="p-5 sm:p-8">
-                            <div className="flex justify-between items-center mb-5">
-                                <div><h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{t('dashboard.footer.cookie', { defaultValue: 'Cookie Policy' })}</h3><p className="text-slate-500 font-medium text-xs">How we manage your portal session</p></div>
-                                <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} /></button>
+                        <div className="p-5 sm:p-7 max-h-[82vh] overflow-y-auto custom-scrollbar">
+                            {/* Top row: Close button */}
+                            <div className="flex items-center justify-end mb-3">
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
                             </div>
-                            <div className="space-y-4 text-xs sm:text-[13px] text-slate-600 dark:text-slate-400 leading-relaxed overflow-y-auto max-h-[60vh] custom-scrollbar pr-2 sm:pr-4">
-                                <div className="p-3.5 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl mb-4">
-                                    <p className="font-bold text-blue-700 dark:text-blue-400">PULSO uses essential local storage to keep you securely signed in and maintain your theme preferences across sessions.</p>
+
+                            {/* Header: Outline SlidersHorizontal + Title & Subtitle */}
+                            <div className="flex items-center gap-3.5 mb-3.5">
+                                <div className="text-[#EA580C] shrink-0">
+                                    <SlidersHorizontal size={34} strokeWidth={1.9} />
                                 </div>
-                                <ul className="list-disc pl-5 space-y-2">
-                                    <li><strong>Auth Token:</strong> Securely stored to prevent re-login on every page refresh.</li>
-                                    <li><strong>Theme Preference:</strong> Remembers your Light/Dark mode choice.</li>
-                                    <li><strong>Map Cache:</strong> Improves performance when loading local hazard markers.</li>
-                                </ul>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                        Cookies &amp; Local Storage
+                                    </h3>
+                                    <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                        Understand what is stored on your device.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Info Banner Callout (Peach tint) */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-orange-50/80 dark:bg-orange-950/25 border border-orange-100/90 dark:border-orange-900/30 flex items-center gap-2.5 mb-4">
+                                <Info size={17} className="text-[#EA580C] shrink-0" strokeWidth={2.2} />
+                                <p className="text-xs sm:text-[12.5px] text-slate-700 dark:text-slate-200 leading-snug">
+                                    Storage can support sign-in, preferences, and map performance.
+                                </p>
+                            </div>
+
+                            {/* 3 Structured Items */}
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                <div className="flex items-start gap-3.5 py-3 first:pt-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Database size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Session storage
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Supports your signed-in session.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <Monitor size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Appearance preference
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Remembers your display choice.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3.5 py-3 last:pb-1">
+                                    <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-950/30 text-[#EA580C] flex items-center justify-center shrink-0 mt-0.5">
+                                        <MapIcon size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                                            Map cache
+                                        </h4>
+                                        <p className="text-xs sm:text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Helps previously loaded map content load faster.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footnote & Bottom Action */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal max-w-sm">
+                                    These descriptions must be checked against the implemented storage behavior.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveModal(null)}
+                                    className="px-6 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-95 text-white font-bold text-xs sm:text-sm tracking-wide shadow-sm transition-all shrink-0 self-end sm:self-auto cursor-pointer"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeModal === 'reporting-guide' && (
+                        <div className="p-5 sm:p-7 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                            {/* Header: Rounded peach icon box + Title & Subtitle + Close */}
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] dark:bg-orange-950/40 border border-[#FFEDD5] dark:border-orange-900/40 flex items-center justify-center text-[#EA580C] shrink-0">
+                                        <BookOpen size={26} strokeWidth={2.2} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                            How to report a concern
+                                        </h3>
+                                        <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                            A clear report helps the city understand the issue.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
+                            </div>
+
+                            {/* Section Kicker */}
+                            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-3 mb-2 px-0.5">
+                                REPORTING GUIDE
+                            </div>
+
+                            {/* Info Banner: Before you start */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/25 border border-blue-100/90 dark:border-blue-900/30 flex items-center gap-2.5 mb-3.5">
+                                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
+                                    i
+                                </div>
+                                <p className="text-xs sm:text-[12.5px] text-slate-700 dark:text-slate-200 leading-snug">
+                                    <span className="font-bold text-slate-900 dark:text-white">Before you start:</span> have the location, a clear photo, and a short description ready.
+                                </p>
+                            </div>
+
+                            {/* 6 Numbered Steps Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3.5">
+                                {/* Step 1 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        1
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Choose a category
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Select the type of issue that best fits your concern.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 2 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        2
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Pin the location
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Mark the exact spot and add a nearby landmark.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 3 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        3
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Add evidence
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Upload clear photos taken from a safe place.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 4 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        4
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Describe the issue
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Explain what happened and when you noticed it.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 5 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        5
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Confirm your contact details
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Check how the department can reach you.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Step 6 */}
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-[#EA580C] text-white font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-2xs">
+                                        6
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug">
+                                            Review and submit
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                            Check your information before sending the report.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Bottom Footer Row */}
+                            <div className="flex items-center justify-end gap-2 mt-5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveModal(null)}
+                                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveModal('file-report');
+                                    }}
+                                    className="px-4 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                                >
+                                    <Plus size={16} strokeWidth={2.5} />
+                                    <span>Start a report</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeModal === 'emergency' && (
+                        <div className="p-5 sm:p-7 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                            {/* Header: Rounded red/orange icon box + Title & Subtitle + Close button */}
+                            <div className="flex items-start justify-between gap-3 mb-4">
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                                        <PhoneCall size={24} strokeWidth={2.2} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white leading-tight">
+                                            Emergency Contacts &amp; Hotlines
+                                        </h3>
+                                        <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                            24/7 official municipal dispatch &amp; emergency desks for Caloocan City.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setActiveModal(null)}
+                                    className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer"
+                                    aria-label="Close"
+                                >
+                                    <X size={18} strokeWidth={2.5} />
+                                </button>
+                            </div>
+
+                            {/* Life-Safety Alert Box */}
+                            <div className="p-3 sm:p-3.5 rounded-xl bg-red-50/90 dark:bg-red-950/30 border border-red-200/80 dark:border-red-900/50 flex items-start gap-2.5 mb-5">
+                                <ShieldAlert size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                                <p className="text-xs text-red-950 dark:text-red-200 leading-snug">
+                                    <span className="font-bold">Life-threatening danger or active crime?</span> Call <strong>911</strong> (National Emergency Hotline) or contact the <strong>Caloocan Command Center</strong> immediately.
+                                </p>
+                            </div>
+
+                            {/* Section Kicker */}
+                            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 px-0.5">
+                                MUNICIPAL &amp; UTILITY EMERGENCY DESKS
+                            </div>
+
+                            {/* 4 Primary Hotlines Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-5">
+                                {/* Caloocan Command Center */}
+                                <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-red-300 dark:hover:border-red-800/60 transition-all flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                            <div className="w-8 h-8 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
+                                                <ShieldAlert size={16} strokeWidth={2.2} />
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded-full bg-red-100/80 dark:bg-red-950/60 text-[10px] font-mono font-bold text-red-700 dark:text-red-300">
+                                                24/7 Command
+                                            </span>
+                                        </div>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                            Caloocan Rescue &amp; Disaster Command
+                                        </h4>
+                                        <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                                            Citywide disaster response, emergency medical dispatch, flood rescue, and CDRRMO operations.
+                                        </p>
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-2">
+                                        <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                            (02) 8888-2256
+                                        </span>
+                                        <a
+                                            href="tel:0288882256"
+                                            className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                                        >
+                                            <PhoneCall size={12} />
+                                            <span>Call</span>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                {/* City Engineering Maintenance Desk */}
+                                <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-orange-300 dark:hover:border-orange-800/60 transition-all flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                            <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-[#EA580C] flex items-center justify-center shrink-0">
+                                                <Wrench size={16} strokeWidth={2.2} />
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded-full bg-orange-100/80 dark:bg-orange-950/60 text-[10px] font-mono font-bold text-orange-700 dark:text-orange-300">
+                                                Public Works
+                                            </span>
+                                        </div>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                            City Engineering Maintenance Desk
+                                        </h4>
+                                        <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                                            Urgent road cave-ins, exposed electrical conduits, collapsed bridges, and open storm drains.
+                                        </p>
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-2">
+                                        <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                            (02) 8362-0220
+                                        </span>
+                                        <a
+                                            href="tel:0283620220"
+                                            className="px-3 py-1.5 rounded-lg bg-[#EA580C] hover:bg-[#d94e07] text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                                        >
+                                            <PhoneCall size={12} />
+                                            <span>Call</span>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                {/* Maynilad Water Emergency Hotline */}
+                                <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-blue-300 dark:hover:border-blue-800/60 transition-all flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                            <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                                <Droplets size={16} strokeWidth={2.2} />
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded-full bg-blue-100/80 dark:bg-blue-950/60 text-[10px] font-mono font-bold text-blue-700 dark:text-blue-300">
+                                                Water Supply
+                                            </span>
+                                        </div>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                            Maynilad Water Emergency Hotline
+                                        </h4>
+                                        <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                                            Major burst water mains, sudden loss of water pressure, and emergency pipeline leaks.
+                                        </p>
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-2">
+                                        <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                            1626
+                                        </span>
+                                        <a
+                                            href="tel:1626"
+                                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                                        >
+                                            <PhoneCall size={12} />
+                                            <span>Call</span>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                {/* Meralco Power Outages Desk */}
+                                <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-amber-300 dark:hover:border-amber-800/60 transition-all flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                            <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                                <Zap size={16} strokeWidth={2.2} />
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded-full bg-amber-100/80 dark:bg-amber-950/60 text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300">
+                                                Power &amp; Grid
+                                            </span>
+                                        </div>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                            Meralco Emergency &amp; Power Desk
+                                        </h4>
+                                        <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                                            Downed high-voltage electrical wires, sparking transformers, and major area blackouts.
+                                        </p>
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-2">
+                                        <span className="font-mono text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                                            16211
+                                        </span>
+                                        <a
+                                            href="tel:16211"
+                                            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                                        >
+                                            <PhoneCall size={12} />
+                                            <span>Call</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* General City Hall Public Assistance & Action Center */}
+                            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 mb-4">
+                                <div className="flex items-center gap-2.5">
+                                    <Landmark size={18} className="text-slate-500 shrink-0" />
+                                    <div>
+                                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                                            Caloocan City Hall Public Assistance &amp; Action Center
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                            General municipal assistance, citizen inquiries, and city government desk.
+                                        </div>
+                                    </div>
+                                </div>
+                                <a
+                                    href="tel:0282888811"
+                                    className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-[#EA580C] hover:underline shrink-0"
+                                >
+                                    <PhoneCall size={12} />
+                                    <span>(02) 8288-8811</span>
+                                </a>
+                            </div>
+
+                            {/* Footnote & Bottom Action */}
+                            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-normal max-w-sm">
+                                    PULSO is for non-emergency public infrastructure maintenance. For life-threatening emergencies, always dial 911.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveModal(null)}
+                                    className="px-6 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs sm:text-sm tracking-wide shadow-sm transition-all shrink-0 self-end sm:self-auto cursor-pointer"
+                                >
+                                    Close
+                                </button>
                             </div>
                         </div>
                     )}
@@ -5538,8 +8567,10 @@ const ResidentModals = ({
 
 const TopNavigation = ({
     activeTab,
+    activeModal = null,
     handleSetTab,
     handleSetModal,
+    onGoHome,
     isAIChatOpen = false,
     setIsAIChatOpen,
     theme,
@@ -5562,9 +8593,10 @@ const TopNavigation = ({
     userReports = [],
     lguUpdates = [],
     processedHazards = [],
-    setReportStatusFilter = null,
     setSelectedPost,
     setSelectedHazard,
+    setSelectedReportForDetails,
+    setReportStatusFilter,
     token,
     isSearchOpen: controlledIsSearchOpen,
     setIsSearchOpen: controlledSetIsSearchOpen,
@@ -5780,11 +8812,40 @@ const TopNavigation = ({
     const totalResults = matchedActions.length + matchedReports.length + matchedAdvisories.length + matchedKB.length + matchedHotlines.length;
 
     const handleSelectReport = (r) => {
+        if (!r) return;
         saveRecentSearch(r.category || r.ticket_id);
         if (setReportStatusFilter) setReportStatusFilter('all');
+        if (setSelectedReportForDetails) {
+            setSelectedReportForDetails(r);
+        }
         handleSetTab('reports');
         setIsSearchOpen(false);
-        if (showToast) showToast(`Navigating to report: ${r.ticket_id}`);
+        setSearchQuery('');
+        if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        }
+        if (showToast) showToast(`Opened report: ${r.ticket_id}`);
+    };
+
+    const handleSearchKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            if (matchedReports.length > 0) {
+                e.preventDefault();
+                handleSelectReport(matchedReports[0]);
+            } else if (matchedActions.length > 0) {
+                e.preventDefault();
+                matchedActions[0].onClick();
+            } else if (matchedAdvisories.length > 0) {
+                e.preventDefault();
+                handleSelectAdvisory(matchedAdvisories[0]);
+            } else if (matchedKB.length > 0) {
+                e.preventDefault();
+                handleSelectKB(matchedKB[0]);
+            } else if (matchedHotlines.length > 0) {
+                e.preventDefault();
+                handleSelectHotline(matchedHotlines[0]);
+            }
+        }
     };
 
     const handleSelectAdvisory = (adv) => {
@@ -5949,6 +9010,7 @@ const TopNavigation = ({
                                     <button
                                         key={r.id}
                                         type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => handleSelectReport(r)}
                                         className="w-full flex items-center justify-between px-3 min-h-[48px] py-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 text-left transition-colors group cursor-pointer"
                                     >
@@ -6086,7 +9148,28 @@ const TopNavigation = ({
 
     const isHomeTab = activeTab === 'overview' || activeTab === 'home';
 
+    // Synchronize browser URL (?tab=...) with activeTab so page reload preserves the exact current view
+    useEffect(() => {
+        try {
+            const url = new URL(window.location.href);
+            if (activeTab === 'overview' || activeTab === 'home') {
+                if (url.searchParams.has('tab')) {
+                    url.searchParams.delete('tab');
+                    window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+                }
+            } else {
+                if (url.searchParams.get('tab') !== activeTab) {
+                    url.searchParams.set('tab', activeTab);
+                    window.history.replaceState(null, '', url.pathname + url.search);
+                }
+            }
+        } catch (_) {}
+    }, [activeTab]);
+
     const getScreenTitle = () => {
+        if (activeModal === 'map') {
+            return t('dashboard.sidebar.communityMap', { defaultValue: 'Community map' });
+        }
         if (isHomeTab) {
             return t('dashboard.topNav.headline', { defaultValue: 'Your city, your reports' });
         }
@@ -6199,8 +9282,18 @@ const TopNavigation = ({
 
     const isHeaderlessTab = activeTab === 'reports' || activeTab === 'updates' || activeTab === 'profile' || activeTab === 'account';
 
+    const handleNavGoHome = () => {
+        setIsSearchOpen(false);
+        setSearchQuery('');
+        if (onGoHome) {
+            onGoHome();
+        } else if (handleSetTab) {
+            handleSetTab('overview');
+        }
+    };
+
     return (
-        <header className={`${isHeaderlessTab ? 'hidden md:block' : ''} app-header-landmark shrink-0 sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800`}>
+        <header className={`${isHeaderlessTab ? 'hidden md:block' : ''} app-header-landmark shrink-0 sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800`}>
             {/* Background 60% Navy Overlay on mobile when search is open: strictly starts below full header */}
             <AnimatePresence>
                 {isSearchOpen && (
@@ -6245,6 +9338,8 @@ const TopNavigation = ({
                     userMenuItems={userMenuItems}
                     handleLogout={handleLogout}
                     handleSetTab={handleSetTab}
+                    onGoHome={handleNavGoHome}
+                    onSearchKeyDown={handleSearchKeyDown}
                     t={t}
                 />
             ) : (
@@ -6270,8 +9365,11 @@ const TopNavigation = ({
                     userMenuItems={userMenuItems}
                     avatarInitials={avatarInitials}
                     handleSetTab={handleSetTab}
+                    onGoHome={handleNavGoHome}
+                    onSearchKeyDown={handleSearchKeyDown}
                     t={t}
                     hideMobileHeader={isHeaderlessTab}
+                    showSearch={false}
                 />
             )}
         </header>
@@ -6284,8 +9382,10 @@ export default function ResidentDashboard() {
     const navigate = useNavigate();
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
     const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+
     const [claimModalInitialTicket, setClaimModalInitialTicket] = useState('');
     const [claimModalInitialToken, setClaimModalInitialToken] = useState('');
+
 
     // Contextual Claim Modal States & URL Parameter Deep-linking
     useEffect(() => {
@@ -6307,9 +9407,20 @@ export default function ResidentDashboard() {
         }
     }, []);
     const [activeModal, setActiveModal] = useState(null); // 'file-report', 'post-details'
+    const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
     const [zoomedImage, setZoomedImage] = useState(null);
     const [reportToCancel, setReportToCancel] = useState(null);
     const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
+
+    // Close mobile "More" menu on Escape key
+    useEffect(() => {
+        if (!isMoreMenuOpen) return;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setIsMoreMenuOpen(false);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isMoreMenuOpen]);
 
     // Centralized modal cleanup: Ensures all report form states are reset whenever any modal is closed
     // (Handles X button, Cancel button, and Backdrop clicks)
@@ -6436,7 +9547,40 @@ export default function ResidentDashboard() {
     const tabScrollPositionsRef = useRef({});
     const [accountSubView, setAccountSubView] = useState('settings'); // 'settings' | 'profile-details'
 
+    const handleGoHome = () => {
+        setIsMoreMenuOpen(false);
+        if (activeModal) {
+            setActiveModal(null);
+        }
+        if (setSelectedPost) setSelectedPost(null);
+        if (setSelectedHazard) setSelectedHazard(null);
+        setIsAIChatOpen(false);
+        setAccountSubView('settings');
+        setActiveTab('overview');
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('tab');
+            window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+        } catch (_) {}
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        if (mainScrollRef.current) {
+            mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+            mainScrollRef.current.scrollTop = 0;
+        }
+    };
+
     const handleSetTab = (tab) => {
+        setIsMoreMenuOpen(false);
+        if (tab === 'map') {
+            handleSetModal('map');
+            return;
+        }
+        if (tab === 'overview' || tab === 'home') {
+            handleGoHome();
+            return;
+        }
         if (tab === activeTab) {
             // If already on profile/settings, reset to top-level settings overview and scroll to top
             if (tab === 'profile' || tab === 'settings' || tab === 'account') {
@@ -6466,7 +9610,21 @@ export default function ResidentDashboard() {
             setAccountSubView('settings');
             tabScrollPositionsRef.current[tab] = 0;
         }
+        if (activeModal === 'map') {
+            setActiveModal(null);
+        }
         setActiveTab(tab);
+
+        // Synchronize browser URL query param immediately
+        try {
+            const url = new URL(window.location.href);
+            if (tab === 'overview' || tab === 'home') {
+                url.searchParams.delete('tab');
+            } else {
+                url.searchParams.set('tab', tab);
+            }
+            window.history.replaceState(null, '', url.pathname + (url.search ? url.search : ''));
+        } catch (_) {}
 
         // Always default to top (0) for profile settings
         const targetScrollY = (tab === 'profile' || tab === 'settings') ? 0 : (tabScrollPositionsRef.current[tab] || 0);
@@ -6485,6 +9643,7 @@ export default function ResidentDashboard() {
     const fileInputRef = React.useRef(null);
 
     const handleSetModal = (modal) => {
+        setIsMoreMenuOpen(false);
         if (modal === 'file-report') {
             setSelectedImage(null);
             setReportNotes('');
@@ -6681,6 +9840,12 @@ export default function ResidentDashboard() {
     const [loadingReports, setLoadingReports] = useState(true);
     const [reportStatusFilter, setReportStatusFilter] = useState('all');
     const [selectedReportForDetails, setSelectedReportForDetails] = useState(null);
+    useEffect(() => {
+        const id = new URLSearchParams(window.location.search).get('reportId');
+        if (!id || !userReports.length) return;
+        const report = userReports.find(r => String(r.id) === id);
+        if (report) { setSelectedReportForDetails(report); setActiveTab('reports'); }
+    }, [userReports]);
 
     const handleLogout = () => {
         clearAuthSession();
@@ -6729,6 +9894,18 @@ export default function ResidentDashboard() {
     }, []);
 
     const [publicReports, setPublicReports] = useState([]);
+
+    const allAvailableReports = useMemo(() => {
+        const map = new Map();
+        (userReports || []).forEach(r => {
+            if (r && (r.id || r.ticket_id)) map.set(r.ticket_id || r.id, r);
+        });
+        (publicReports || []).forEach(r => {
+            const key = r.ticket_id || r.id;
+            if (key && !map.has(key)) map.set(key, r);
+        });
+        return Array.from(map.values());
+    }, [userReports, publicReports]);
     const [loadingPublicReports, setLoadingPublicReports] = useState(true);
 
     const fetchPublicReports = useCallback(async () => {
@@ -6802,7 +9979,7 @@ export default function ResidentDashboard() {
         return dedupeFetch('advisories', async () => {
             setLoadingAdvisories(prev => (prev ? prev : true));
             try {
-                const res = await apiFetch('/api/advisories');
+                const res = await apiFetch('/api/announcements?limit=50');
                 if (res.ok && Array.isArray(res.data)) {
                     setAdvisoriesError(null);
                     setLguUpdates(prev => {
@@ -6810,7 +9987,7 @@ export default function ResidentDashboard() {
                             const unchanged = prev.every((p, i) => p.id === res.data[i]?.id && p.updated_at === res.data[i]?.updated_at);
                             if (unchanged) return prev;
                         }
-                        return res.data;
+                        return res.data.map(item => residentPublication(item));
                     });
                 } else {
                     if (res.isServerUnreachable) {
@@ -6845,6 +10022,13 @@ export default function ResidentDashboard() {
     };
 
     const handleNotificationClick = async (notif) => {
+        if (/^\/updates\/\d+$/.test(notif.target_url || '') || /^\/dashboard\?tab=reports&reportId=\d+$/.test(notif.target_url || '')) {
+            if (!notif.is_read) {
+                try { await apiFetch(`/api/notifications/${notif.id}/read`, { method: 'PATCH' }); } catch { /* Reading the update remains available. */ }
+            }
+            navigate(notif.target_url);
+            return;
+        }
         if (!notif.is_read) {
             // Immediate optimistic update: badge decrements by 1 instantly
             setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
@@ -6874,6 +10058,65 @@ export default function ResidentDashboard() {
         }
         setShowNotifications(false);
     };
+
+    const syncOfflineReports = useCallback(async () => {
+        if (!navigator.onLine) return;
+        try {
+            const rawQueue = localStorage.getItem('pulso_offline_reports');
+            if (!rawQueue) return;
+            const queue = JSON.parse(rawQueue);
+            if (!Array.isArray(queue) || queue.length === 0) return;
+
+            const authToken = token || getAuthToken();
+            const remaining = [];
+            let syncedCount = 0;
+
+            for (const item of queue) {
+                try {
+                    const formData = new FormData();
+                    formData.append('category', item.category || 'Roads & Bridges');
+                    formData.append('description', item.description || 'Citizen report from PULSO app.');
+                    if (item.lat != null && !isNaN(item.lat)) formData.append('lat', String(item.lat));
+                    if (item.lng != null && !isNaN(item.lng)) formData.append('lng', String(item.lng));
+                    if (item.location_string) formData.append('location_string', item.location_string);
+                    if (item.location_barangay) {
+                        formData.append('location_barangay', item.location_barangay.replace(/^Barangay\s*/i, ''));
+                    }
+
+                    const res = await fetch(`${API_BASE_URL}/api/reports`, {
+                        method: 'POST',
+                        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
+                        body: formData
+                    });
+
+                    if (res.ok) {
+                        syncedCount++;
+                        // Update state item to clear is_offline_pending flag
+                        setUserReports(prev =>
+                            Array.isArray(prev)
+                                ? prev.map(p => p.id === item.id ? { ...p, is_offline_pending: false, is_offline_draft: false } : p)
+                                : prev
+                        );
+                    } else if (res.status >= 500 || res.status === 502 || res.status === 503 || res.status === 504) {
+                        remaining.push(item);
+                    }
+                } catch (_) {
+                    remaining.push(item);
+                }
+            }
+
+            if (remaining.length > 0) {
+                localStorage.setItem('pulso_offline_reports', JSON.stringify(remaining));
+            } else {
+                localStorage.removeItem('pulso_offline_reports');
+            }
+
+            if (syncedCount > 0) {
+                showToast(`Synchronized ${syncedCount} offline report(s) with City Engineering.`);
+                if (currentUser?.id) fetchUserReports(currentUser.id);
+            }
+        } catch (_) {}
+    }, [token, currentUser?.id, fetchUserReports, showToast]);
 
     const loadData = useCallback(async () => {
         if (isFetchingDataRef.current) return;
@@ -6938,6 +10181,7 @@ export default function ResidentDashboard() {
                 setRetryCountdown(null);
                 retryAttemptRef.current = 0;
                 setLastUpdatedTime(new Date());
+                syncOfflineReports();
             }
         } catch (err) {
             console.error("PULSO: Error in loadData sequence:", err);
@@ -6972,6 +10216,7 @@ export default function ResidentDashboard() {
             const healthy = await checkServerHealth(4000);
             if (healthy) {
                 loadData();
+                syncOfflineReports();
             }
         };
 
@@ -7077,7 +10322,7 @@ export default function ResidentDashboard() {
 
         // Overwrite color for Public Facilities
         if (isPublicFacility) {
-            color = isSelected ? '#16a34a' : '#22c55e';
+            color = isSelected ? '#4338ca' : '#6366f1';
         } else if (cat.includes('traffic') || cat.includes('sign')) {
             color = isSelected ? '#0891b2' : '#06b6d4';
         } else if (cat.includes('other')) {
@@ -7190,6 +10435,7 @@ export default function ResidentDashboard() {
 
             const formattedTicket = formatTicketId(r.ticket_id, r.id);
             return {
+                ...r,
                 id: r.id || `report-${formattedTicket}`,
                 ticket_id: formattedTicket,
                 lat,
@@ -7202,8 +10448,16 @@ export default function ResidentDashboard() {
                 ai_category: r.ai_category || '',
                 tags: r.tags || '',
                 status: (r.status || 'pending').toLowerCase(),
-                location: r.location_string || 'Caloocan City',
+                location: r.location_string || r.barangay || 'Caloocan City',
+                location_string: r.location_string || (r.barangay ? `${r.barangay}, Caloocan City` : 'Caloocan City'),
+                barangay: r.barangay || r.location_barangay || '',
+                created_at: r.created_at || r.submitted_at || r.created_date || null,
+                updated_at: r.updated_at || r.updated_date || r.created_at || r.submitted_at || null,
                 image: image,
+                photo_url: image,
+                image_url: image,
+                photos: image ? [image] : [],
+                media_urls: image ? [image] : [],
                 ai_urgency: r.ai_urgency || r.urgency,
                 isOwnReport: Boolean(r.isOwnReport)
             };
@@ -7694,19 +10948,7 @@ export default function ResidentDashboard() {
                 return;
             }
 
-            // 3. Burn standardized PULSO Evidence Photo Watermark onto uploaded photo
-            try {
-                const watermarkedFile = await watermarkEvidenceFile(file, {
-                    location: reportLocation,
-                    structuredAddress: structuredAddress,
-                    locationAddress: locationAddress,
-                    timestamp: new Date()
-                });
-                setSelectedImage(URL.createObjectURL(watermarkedFile));
-            } catch (err) {
-                console.error("Watermark processing error:", err);
-                setSelectedImage(URL.createObjectURL(file));
-            }
+            setSelectedImage(URL.createObjectURL(file));
             setAiFeedback(null);
         }
     };
@@ -7982,6 +11224,11 @@ export default function ResidentDashboard() {
             showToast('Please describe the issue in Additional Notes (minimum 10 characters) when "Others" is selected.', 'warning');
             return;
         }
+        const reportNotesProfanity = validateProfanity(reportNotes);
+        if (reportNotesProfanity.hasProfanity) {
+            showToast(reportNotesProfanity.message || 'Please remove inappropriate words from your notes.', 'error');
+            return;
+        }
         if (!selectedImage) {
             showToast('Please capture photo evidence of the infrastructure issue before submitting.', 'error');
             return;
@@ -8008,6 +11255,18 @@ export default function ResidentDashboard() {
         const trackingNumbers = [];
         const authToken = token || getAuthToken();
 
+        // Profanity & inappropriate words guard
+        const notesProfanity = validateProfanity(notes, 'notes');
+        if (notesProfanity.hasProfanity) {
+            throw new Error(notesProfanity.message || 'Inappropriate or profane language is not allowed in report notes.');
+        }
+        if (othersDescription) {
+            const othersProfanity = validateProfanity(othersDescription, 'description');
+            if (othersProfanity.hasProfanity) {
+                throw new Error(othersProfanity.message || 'Inappropriate or profane language is not allowed.');
+            }
+        }
+
         let fullDescription = notes || '';
         const extraLocDetails = [];
         if (locationDetails?.subdivision) extraLocDetails.push(`Subd: ${locationDetails.subdivision}`);
@@ -8032,15 +11291,21 @@ export default function ResidentDashboard() {
         const repBarangay = barangay || structuredAddress?.barangay || (repLoc?.lat && repLoc?.lng ? findBarangayByCoordinates(repLoc.lat, repLoc.lng)?.name : 'Barangay 171');
         const repAddress = address || locationAddress || `${repBarangay}, Caloocan City`;
 
+        let hasOfflineQueued = false;
+
         for (const cat of catsToSubmit) {
-            const formData = new FormData();
-            formData.append('category', cat);
-            const desc = cat === 'Others' && othersDescription
+            let desc = cat === 'Others' && othersDescription
                 ? (fullDescription ? `${othersDescription} - ${fullDescription}` : othersDescription)
                 : (fullDescription || 'Citizen report from PULSO app.');
+            if (desc.trim().length < 10) {
+                desc = `${desc.trim()} (Citizen report from PULSO)`;
+            }
+
+            const formData = new FormData();
+            formData.append('category', cat);
             formData.append('description', desc);
-            if (repLoc?.lat) formData.append('lat', repLoc.lat);
-            if (repLoc?.lng) formData.append('lng', repLoc.lng);
+            if (repLoc?.lat != null && !isNaN(repLoc.lat)) formData.append('lat', String(repLoc.lat));
+            if (repLoc?.lng != null && !isNaN(repLoc.lng)) formData.append('lng', String(repLoc.lng));
             formData.append('location_string', repAddress);
             if (repBarangay) {
                 formData.append('location_barangay', repBarangay.replace(/^Barangay\s*/i, ''));
@@ -8052,33 +11317,160 @@ export default function ResidentDashboard() {
                 formData.append('photo_captured_at', photoCapturedAt);
             }
 
-            const response = await fetch(`${API_BASE_URL}/api/reports`, {
-                method: 'POST',
-                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
-                body: formData
-            });
+            let submittedSuccessfully = false;
 
-            if (response.ok) {
-                const data = await response.json();
-                const ticketId = data.ticket_id || data.tracking_number || `#PUL-${new Date().getFullYear()}-${data.id || Math.floor(1000 + Math.random() * 9000)}`;
+            // Attempt online submission if browser is online
+            if (navigator.onLine) {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/reports`, {
+                        method: 'POST',
+                        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json().catch(() => ({}));
+                        const ticketId = data.ticket_id || data.tracking_number || `#PUL-${new Date().getFullYear()}-${data.id || Math.floor(1000 + Math.random() * 9000)}`;
+                        trackingNumbers.push(ticketId);
+                        submittedSuccessfully = true;
+
+                        // Add live report to userReports state
+                        const liveReport = {
+                            id: data.id || Date.now(),
+                            ticket_id: ticketId,
+                            tracking_number: ticketId,
+                            category: cat,
+                            description: desc,
+                            status: data.status || 'unverified',
+                            location_string: repAddress,
+                            location_barangay: repBarangay,
+                            lat: repLoc?.lat ? Number(repLoc.lat) : 14.7566,
+                            lng: repLoc?.lng ? Number(repLoc.lng) : 121.0450,
+                            created_at: data.created_at || new Date().toISOString(),
+                            image_url: data.image_url || photo || null,
+                            urgency: data.urgency || 'medium'
+                        };
+                        setUserReports(prev => [liveReport, ...(Array.isArray(prev) ? prev : [])]);
+                    } else if (response.status >= 500 || response.status === 502 || response.status === 503 || response.status === 504) {
+                        // City Engineering server is unavailable or proxy cannot connect -> trigger graceful offline queue
+                        console.warn(`PULSO: Server returned HTTP ${response.status}. Queueing report offline.`);
+                    } else if (response.status === 409) {
+                        // 409 Conflict: A report for this category at this location is already being processed
+                        const errorData = await response.json().catch(() => ({}));
+                        const canonicalTicket = response.headers.get('x-canonical-ticket-id') || response.headers.get('X-Canonical-Ticket-ID');
+                        const canonicalId = response.headers.get('x-canonical-report-id') || response.headers.get('X-Canonical-Report-ID');
+
+                        // Find matching report in local publicReports or userReports
+                        const allReports = [...(userReports || []), ...(publicReports || [])];
+                        let matched = allReports.find(r =>
+                            (canonicalTicket && (r.ticket_id === canonicalTicket || formatTicketId(r.ticket_id, r.id) === formatTicketId(canonicalTicket))) ||
+                            (canonicalId && String(r.id) === String(canonicalId)) ||
+                            (r.category === cat && repLoc?.lat && repLoc?.lng && getDistance(repLoc, { lat: r.lat || r.location_lat, lng: r.lng || r.location_lng }) <= 35)
+                        );
+
+                        const formattedCanonTicket = canonicalTicket
+                            ? formatTicketId(canonicalTicket)
+                            : (matched?.ticket_id ? formatTicketId(matched.ticket_id, matched.id) : `#PUL-${new Date().getFullYear()}-4717`);
+
+                        const existingReportObj = matched ? {
+                            ...matched,
+                            ticket_id: formatTicketId(matched.ticket_id, matched.id),
+                            status: matched.status || 'in_progress',
+                            category: cat
+                        } : {
+                            id: canonicalId || Date.now(),
+                            ticket_id: formattedCanonTicket,
+                            category: cat,
+                            title: `Civic Concern - ${formattedCanonTicket}`,
+                            status: 'in_progress',
+                            location_string: repAddress,
+                            location_barangay: repBarangay,
+                            lat: repLoc?.lat ? Number(repLoc.lat) : 14.7566,
+                            lng: repLoc?.lng ? Number(repLoc.lng) : 121.0450,
+                            created_at: new Date().toISOString(),
+                            department_title: 'Report is active and being processed by City Engineering.',
+                            description: `An active case for ${cat} at this location is currently in progress with LGU engineering crew.`
+                        };
+
+                        const err = new Error(errorData.detail || errorData.message || `A report for '${cat}' at this exact location is already being processed.`);
+                        err.status = 409;
+                        err.isDuplicate = true;
+                        err.canonicalTicket = formattedCanonTicket;
+                        err.existingReport = existingReportObj;
+                        throw err;
+                    } else {
+                        // 4xx validation error
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(errorData.detail || errorData.message || `Server rejected report submission (HTTP ${response.status})`);
+                    }
+                } catch (netErr) {
+                    if (netErr.message && !netErr.message.includes('fetch') && !netErr.message.includes('NetworkError') && !netErr.message.includes('Failed to fetch')) {
+                        throw netErr;
+                    }
+                    console.warn('PULSO: Network error during report submit, queueing offline:', netErr);
+                }
+            }
+
+            // If not submitted online (due to offline state, server 503, or network failure), queue offline
+            if (!submittedSuccessfully) {
+                hasOfflineQueued = true;
+                const year = new Date().getFullYear();
+                const offlineId = `offline-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+                const ticketId = `#PUL-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
                 trackingNumbers.push(ticketId);
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Failed to submit report');
+
+                const offlineReport = {
+                    id: offlineId,
+                    ticket_id: ticketId,
+                    tracking_number: ticketId,
+                    category: cat,
+                    description: desc,
+                    status: 'unverified',
+                    is_offline_draft: true,
+                    is_offline_pending: true,
+                    location_string: repAddress,
+                    location_barangay: repBarangay,
+                    lat: repLoc?.lat ? Number(repLoc.lat) : 14.7566,
+                    lng: repLoc?.lng ? Number(repLoc.lng) : 121.0450,
+                    created_at: new Date().toISOString(),
+                    image_url: photo || null,
+                    urgency: 'medium',
+                    submitted_by: currentUser?.id || null
+                };
+
+                // Add to state so user sees it right away in "My Reports"
+                setUserReports(prev => [offlineReport, ...(Array.isArray(prev) ? prev : [])]);
+
+                // Store in localStorage for automatic sync when server is reachable
+                try {
+                    const existingQueue = JSON.parse(localStorage.getItem('pulso_offline_reports') || '[]');
+                    existingQueue.unshift(offlineReport);
+                    localStorage.setItem('pulso_offline_reports', JSON.stringify(existingQueue.slice(0, 50)));
+                } catch (storageErr) {
+                    console.warn('PULSO: Could not save offline report queue to localStorage', storageErr);
+                }
             }
         }
 
-        if (currentUser?.id) {
-            fetchUserReports(currentUser.id);
+        if (hasOfflineQueued) {
+            showToast(
+                trackingNumbers.length > 1
+                    ? `${trackingNumbers.length} reports queued offline. Will sync when server is reachable.`
+                    : 'Report queued offline. Will sync when server is reachable.',
+                'info'
+            );
+        } else {
+            if (currentUser?.id) {
+                fetchUserReports(currentUser.id);
+            }
+            showToast(
+                trackingNumbers.length > 1
+                    ? `${trackingNumbers.length} reports submitted successfully!`
+                    : 'Report submitted successfully!'
+            );
         }
 
-        showToast(
-            trackingNumbers.length > 1
-                ? `${trackingNumbers.length} reports submitted successfully!`
-                : 'Report submitted successfully!'
-        );
-
-        return { success: true, trackingNumbers };
+        return { success: true, trackingNumbers, isOfflineQueued: hasOfflineQueued };
     };
 
     const actuallySubmitReport = async () => {
@@ -8639,6 +12031,7 @@ export default function ResidentDashboard() {
 
             {/* Render Overlay Modals */}
             <ResidentModals
+                setSelectedReportForDetails={setSelectedReportForDetails}
                 activeModal={activeModal}
                 setActiveModal={setActiveModal}
                 t={t}
@@ -8717,17 +12110,23 @@ export default function ResidentDashboard() {
                 handleQuickReportSubmit={handleQuickReportSubmit}
                 currentUser={currentUser}
                 setActiveTab={setActiveTab}
+                setIsAIChatOpen={setIsAIChatOpen}
             />
 
             {activeModal === 'all-notifications' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setActiveModal(null)}>
+                <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setActiveModal(null)}>
                     <motion.div
-                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                        initial={{ y: '100%', opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: '100%', opacity: 0 }}
+                        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+                        className="w-full sm:max-w-2xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-[28px] sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[88dvh] sm:max-h-[90dvh] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
                     >
+                        {/* Mobile Pull Bar / Drag Pill */}
+                        <div className="w-full pt-3 pb-1 flex justify-center sm:hidden shrink-0">
+                            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+                        </div>
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                             <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
                                 <Bell className="text-orange-500" /> {t('All Notifications', { defaultValue: 'All Notifications' })}
@@ -8807,8 +12206,10 @@ export default function ResidentDashboard() {
             {/* Top Navigation */}
             <TopNavigation
                 activeTab={activeTab}
+                activeModal={activeModal}
                 handleSetTab={handleSetTab}
                 handleSetModal={handleSetModal}
+                onGoHome={handleGoHome}
                 isAIChatOpen={isAIChatOpen}
                 setIsAIChatOpen={setIsAIChatOpen}
                 theme={theme}
@@ -8828,12 +12229,13 @@ export default function ResidentDashboard() {
                 showToast={showToast}
                 i18n={i18n}
                 t={t}
-                userReports={userReports}
+                userReports={allAvailableReports}
                 lguUpdates={lguUpdates}
                 processedHazards={processedHazards}
-                setReportStatusFilter={setReportStatusFilter}
                 setSelectedPost={setSelectedPost}
                 setSelectedHazard={setSelectedHazard}
+                setSelectedReportForDetails={setSelectedReportForDetails}
+                setReportStatusFilter={setReportStatusFilter}
                 token={token}
                 isSearchOpen={isHeaderSearchOpen}
                 setIsSearchOpen={setIsHeaderSearchOpen}
@@ -8842,21 +12244,24 @@ export default function ResidentDashboard() {
             {/* Main Layout Grid (Responsive 2-Column Content + Sticky Side Nav) */}
             <main ref={mainScrollRef} className="flex-1 w-full flex flex-col relative">
 
-                <div className="max-w-[1700px] mx-auto w-full px-0 sm:px-4 flex flex-col lg:flex-row flex-1 items-start">
+                <div className="w-full px-0 flex flex-col lg:flex-row flex-1 items-start">
 
-                    {/* Persistent Desktop Left Side Navigation Rail (≥1024px) - Follows when scrolling */}
-                    <aside className="w-60 xl:w-64 shrink-0 hidden lg:block sticky top-14 sm:top-16 h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] overflow-y-auto custom-scrollbar border-r border-slate-200/80 dark:border-slate-800 self-start z-30">
-                        <LeftSidebar
-                            user={user}
-                            activeTab={activeTab}
-                            handleSetTab={handleSetTab}
-                            handleSetModal={handleSetModal}
-                            handleLogout={handleLogout}
-                            t={t}
-                            unreadCount={unreadCount}
-                            unreadBadgeText={unreadBadgeText}
-                        />
-                    </aside>
+                    {/* Persistent Desktop Left Side Navigation Rail (≥1024px) - Follows when scrolling (Hidden when on Map page) */}
+                    {activeModal !== 'map' && (
+                        <aside className="shrink-0 hidden lg:block sticky top-14 sm:top-16 h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-4rem)] overflow-hidden border-r border-slate-200/80 dark:border-slate-800 self-start z-30 w-64 xl:w-72">
+                            <LeftSidebar
+                                user={user}
+                                activeTab={activeTab}
+                                activeModal={activeModal}
+                                handleSetTab={handleSetTab}
+                                handleSetModal={handleSetModal}
+                                handleLogout={handleLogout}
+                                t={t}
+                                unreadCount={unreadCount}
+                                unreadBadgeText={unreadBadgeText}
+                            />
+                        </aside>
+                    )}
 
                     {/* Content switcher based on tabs */}
                     <div className="flex-1 min-w-0 w-full">
@@ -8872,6 +12277,7 @@ export default function ResidentDashboard() {
                                 handleSetTab={handleSetTab}
                                 setActiveModal={handleSetModal}
                                 setSelectedPost={setSelectedPost}
+                                setReportCategory={setReportCategory}
                                 t={t}
                             />
                         )}
@@ -8923,7 +12329,7 @@ export default function ResidentDashboard() {
                         )}
 
                         {activeTab === 'updates' && (
-                            <div className="w-full max-w-[1440px] mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
+                            <div className="w-full max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
                                 <h1 className="sr-only">{t('dashboard.sidebar.updates', { defaultValue: 'Updates' })}</h1>
                                 <LguFeed
                                     lguUpdates={lguUpdates}
@@ -8943,7 +12349,7 @@ export default function ResidentDashboard() {
                         )}
 
                         {activeTab === 'profile' && (
-                            <div className="w-full max-w-4xl mx-auto pb-32 lg:pb-8 pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
+                            <div className="w-full max-w-5xl xl:max-w-6xl mx-auto pb-28 sm:pb-32 lg:pb-8 pt-3 sm:pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-6 px-3 sm:px-[clamp(1rem,5vw,1.25rem)] lg:px-6">
                                 <h1 className="sr-only">{t('dashboard.sidebar.account', { defaultValue: 'Account' })}</h1>
                                 <ProfileView
                                     user={user}
@@ -8983,64 +12389,228 @@ export default function ResidentDashboard() {
                 </div>
             </main>
 
-            {/* ── Mobile Bottom Navigation Bar (Hidden when Nearby Issues Map, Wizard or Report Details is open) ── */}
-            {(activeModal !== 'map' && activeModal !== 'file-report' && !selectedReportForDetails) && (
-                <nav
-                    className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
-                    style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-                >
-                    {navItems.map((item) => {
-                        if (item.id === 'report') {
+            {/* ── Mobile Bottom Navigation Bar & More Pop-up Menu ── */}
+            {(activeModal !== 'file-report' && !selectedReportForDetails) && (
+                <>
+                    {/* ── Mobile "More" Pop-up Menu Modal / Bottom Sheet ── */}
+                    <AnimatePresence>
+                        {isMoreMenuOpen && (
+                            <>
+                                {/* Backdrop - Clean, unblurred dim overlay */}
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.15 }}
+                                    onClick={() => setIsMoreMenuOpen(false)}
+                                    className="lg:hidden fixed inset-0 z-50 bg-slate-900/25 dark:bg-black/45"
+                                    aria-hidden="true"
+                                />
+
+                                {/* Pop-up Menu Card - Docked to right side and flush against bottom nav */}
+                                <motion.div
+                                    initial={{ opacity: 0, y: 14, x: 8 }}
+                                    animate={{ opacity: 1, y: 0, x: 0 }}
+                                    exit={{ opacity: 0, y: 14, x: 8 }}
+                                    transition={{ type: 'spring', damping: 28, stiffness: 380 }}
+                                    className="lg:hidden fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] right-0 z-[55] w-80 max-w-[calc(100vw-0.75rem)] bg-white dark:bg-slate-900 border-t border-l border-r-0 border-b-0 border-slate-200/90 dark:border-slate-800 shadow-[-8px_-6px_25px_rgba(0,0,0,0.15)] dark:shadow-[-8px_-6px_25px_rgba(0,0,0,0.4)] rounded-tl-2xl rounded-tr-none rounded-b-none p-3.5 overflow-hidden"
+                                    role="dialog"
+                                    aria-label="More navigation options"
+                                >
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-100 dark:border-slate-800/80">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                                            More Options
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsMoreMenuOpen(false)}
+                                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                            aria-label="Close menu"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+
+                                    {/* Menu Items */}
+                                    <div className="space-y-1.5" role="menu">
+                                        {/* AI Assistant Option */}
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setIsMoreMenuOpen(false);
+                                                setIsAIChatOpen(true);
+                                            }}
+                                            className={`w-full flex items-center gap-3.5 p-3 rounded-xl transition-all text-left cursor-pointer group ${
+                                                isAIChatOpen
+                                                    ? 'bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/50 text-[#EA580C]'
+                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/70 text-slate-900 dark:text-slate-100 border border-transparent'
+                                            }`}
+                                        >
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                                                isAIChatOpen
+                                                    ? 'bg-[#EA580C] text-white shadow-xs'
+                                                    : 'bg-orange-50 dark:bg-orange-950/50 text-[#ff6b00] group-hover:scale-105'
+                                            }`}>
+                                                <PulseAIIcon size={24} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold truncate flex items-center gap-1.5">
+                                                    <span>AI Assistant</span>
+                                                    {isAIChatOpen && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/60 text-[#EA580C] font-semibold">
+                                                            Active
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 dark:text-slate-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                                        </button>
+
+                                        {/* Map Option */}
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setIsMoreMenuOpen(false);
+                                                handleSetModal('map');
+                                            }}
+                                            className={`w-full flex items-center gap-3.5 p-3 rounded-xl transition-all text-left cursor-pointer group ${
+                                                activeModal === 'map'
+                                                    ? 'bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/50 text-[#EA580C]'
+                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/70 text-slate-900 dark:text-slate-100 border border-transparent'
+                                            }`}
+                                        >
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                                                activeModal === 'map'
+                                                    ? 'bg-[#EA580C] text-white shadow-xs'
+                                                    : 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 group-hover:scale-105'
+                                            }`}>
+                                                <MapIcon size={20} strokeWidth={2.2} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold truncate flex items-center gap-1.5">
+                                                    <span>Barangay Map</span>
+                                                    {activeModal === 'map' && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/60 text-[#EA580C] font-semibold">
+                                                            Active
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 dark:text-slate-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                                        </button>
+
+                                        {/* Account Option */}
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setIsMoreMenuOpen(false);
+                                                if (activeModal === 'map') setActiveModal(null);
+                                                handleSetTab('profile');
+                                            }}
+                                            className={`w-full flex items-center gap-3.5 p-3 rounded-xl transition-all text-left cursor-pointer group ${
+                                                activeTab === 'profile' && activeModal !== 'map'
+                                                    ? 'bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-900/50 text-[#EA580C]'
+                                                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/70 text-slate-900 dark:text-slate-100 border border-transparent'
+                                            }`}
+                                        >
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all ${
+                                                activeTab === 'profile' && activeModal !== 'map'
+                                                    ? 'bg-[#EA580C] text-white shadow-xs'
+                                                    : 'bg-orange-50 dark:bg-orange-950/50 text-[#EA580C] group-hover:scale-105'
+                                            }`}>
+                                                <User size={20} strokeWidth={2.2} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-bold truncate flex items-center gap-1.5">
+                                                    <span>Account & Profile</span>
+                                                    {activeTab === 'profile' && activeModal !== 'map' && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/60 text-[#EA580C] font-semibold">
+                                                            Active
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <ChevronRight size={18} className="text-slate-400 dark:text-slate-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>
+
+                    <nav
+                        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
+                        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+                    >
+                        {navItems.map((item) => {
+                            if (item.id === 'report') {
+                                return (
+                                    <button
+                                        key="report"
+                                        type="button"
+                                        onClick={() => handleSetModal('file-report')}
+                                        className="flex flex-col items-center justify-center -mt-1 sm:-mt-1.5 px-2 sm:px-3 group focus:outline-none cursor-pointer shrink-0"
+                                        aria-label="Report an issue"
+                                    >
+                                        <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white shadow-md shadow-orange-500/25 flex items-center justify-center border-[3px] border-white dark:border-slate-900 transition-all group-hover:scale-105">
+                                            <Plus size={24} strokeWidth={2.8} />
+                                        </div>
+                                    </button>
+                                );
+                            }
+
+                            const isMoreItem = item.id === 'more';
+                            const isActive = isMoreItem
+                                ? (isMoreMenuOpen || activeModal === 'map' || activeTab === 'profile')
+                                : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map' && activeTab !== 'profile';
+                            const showBadge = item.id === 'updates' && unreadCount > 0;
                             return (
                                 <button
-                                    key="report"
-                                    type="button"
-                                    onClick={() => handleSetModal('file-report')}
-                                    className="flex flex-col items-center justify-center -mt-1 sm:-mt-1.5 px-2 sm:px-3 group focus:outline-none cursor-pointer shrink-0"
-                                    aria-label="Report an issue"
+                                    key={item.id}
+                                    onClick={() => {
+                                        if (isMoreItem) {
+                                            setIsMoreMenuOpen(prev => !prev);
+                                        } else {
+                                            setIsMoreMenuOpen(false);
+                                            handleSetTab(item.id);
+                                        }
+                                    }}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    aria-expanded={isMoreItem ? isMoreMenuOpen : undefined}
+                                    aria-haspopup={isMoreItem ? 'dialog' : undefined}
+                                    className={`flex flex-col items-center justify-center flex-1 py-1 px-1 sm:px-2 min-h-[48px] rounded-xl transition-all duration-200 relative group active:scale-95 cursor-pointer ${
+                                        isActive
+                                            ? 'text-[#D95700] dark:text-[#FF6B00] font-bold'
+                                            : 'text-[#5B6B88] dark:text-[#9AA8C7] hover:text-slate-900 dark:hover:text-slate-200'
+                                    }`}
                                 >
-                                    <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-[#ff6b00] hover:bg-[#e65c00] active:scale-95 text-white shadow-md shadow-orange-500/25 flex items-center justify-center border-[3px] border-white dark:border-slate-900 transition-all group-hover:scale-105">
-                                        <Plus size={24} strokeWidth={2.8} />
+                                    <div className="relative flex items-center justify-center">
+                                        {React.cloneElement(item.icon, {
+                                            size: 21,
+                                            'aria-hidden': 'true',
+                                            className: `transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110 text-[#D95700] dark:text-[#FF6B00]' : 'text-[#5B6B88] dark:text-[#9AA8C7]'}`
+                                        })}
+                                        {showBadge && (
+                                            <span
+                                                className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#f05a00] text-white text-[9px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none tabular-nums shadow-xs"
+                                                aria-label={`${unreadCount} unread`}
+                                            >
+                                                {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
+                                            </span>
+                                        )}
                                     </div>
+                                    <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-[#D95700] dark:text-[#FF6B00]' : 'font-medium text-[#5B6B88] dark:text-[#9AA8C7]'}`}>
+                                        {item.label}
+                                    </span>
                                 </button>
                             );
-                        }
-
-                        const isActive = (item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id;
-                        const showBadge = item.id === 'updates' && unreadCount > 0;
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => handleSetTab(item.id)}
-                                aria-current={isActive ? 'page' : undefined}
-                                className={`flex flex-col items-center justify-center flex-1 py-1 px-1 sm:px-2 min-h-[48px] rounded-xl transition-all duration-200 relative group active:scale-95 cursor-pointer ${
-                                    isActive
-                                        ? 'text-[#D95700] dark:text-[#FF6B00] font-bold'
-                                        : 'text-[#5B6B88] dark:text-[#9AA8C7] hover:text-slate-900 dark:hover:text-slate-200'
-                                }`}
-                            >
-                                <div className="relative flex items-center justify-center">
-                                    {React.cloneElement(item.icon, {
-                                        size: 21,
-                                        'aria-hidden': 'true',
-                                        className: `transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110 text-[#D95700] dark:text-[#FF6B00]' : 'text-[#5B6B88] dark:text-[#9AA8C7]'}`
-                                    })}
-                                    {showBadge && (
-                                        <span
-                                            className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#f05a00] text-white text-[9px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none tabular-nums shadow-xs"
-                                            aria-label={`${unreadCount} unread`}
-                                        >
-                                            {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
-                                        </span>
-                                    )}
-                                </div>
-                                <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-[#D95700] dark:text-[#FF6B00]' : 'font-medium text-[#5B6B88] dark:text-[#9AA8C7]'}`}>
-                                    {item.label}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </nav>
+                        })}
+                    </nav>
+                </>
             )}
 
             {/* ── Unified PULSEAI Assistant Window (Resident Role) ── */}
@@ -9053,7 +12623,7 @@ export default function ResidentDashboard() {
 
             {/* ── Floating AI FAB Button (Website / Desktop only, removed on mobile and hidden on map) ── */}
             {(activeModal !== 'map' && activeModal !== 'file-report') && (
-                <div className="fixed bottom-8 right-6 z-[60] hidden md:block">
+                <div className="fixed bottom-3 sm:bottom-4 right-6 z-[60] hidden md:block">
                     <motion.button
                         onClick={() => setIsAIChatOpen(!isAIChatOpen)}
                         whileHover={{ scale: 1.05 }}
@@ -9072,7 +12642,7 @@ export default function ResidentDashboard() {
                                 />
                             )}
                         </AnimatePresence>
-                        {isAIChatOpen ? <X size={20} /> : <Brain size={22} />}
+                        {isAIChatOpen ? <X size={22} className="text-white" /> : <PulseAIIcon size={36} />}
                     </motion.button>
                 </div>
             )}

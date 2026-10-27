@@ -55,20 +55,80 @@ import philsys_router                   # PhilSys Check Authentication (PSA)
 import predictive_router                # Predictive Maintenance Engine
 import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
+import report_review_router
+import external_referrals
 import pulseai_router                    # PULSEAI Persistent Chat & History Engine
+import government_assistant
 from database import get_db
 import spatial_router                    # PostGIS Spatial Queries & GeoEngine
 import admin_router                      # Staff, Residents, Settings & Governance
 from services.spatial_service import PUBLIC_REPORT_STATUSES
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
-from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter
+from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter, availability_check_limiter
+from utils.contact_normalizer import normalize_email, normalize_phone_number, mask_email, mask_phone_number
+
+from contextlib import asynccontextmanager
+import asyncio
+
+
+@asynccontextmanager
+async def application_lifespan(app):
+    stop = asyncio.Event()
+    def initialize_reference_layers():
+        from map_reference import sync_reference_layers
+        with database.SessionLocal() as db:
+            sync_reference_layers(db)
+    try:
+        await asyncio.to_thread(initialize_reference_layers)
+    except Exception:
+        logging.getLogger(__name__).exception('Map reference initialization failed; map boundaries will report unavailable.')
+    def process_notifications():
+        from outbox_worker import deliver_pending
+        from report_review import route_waiting
+        with database.SessionLocal() as db:
+            route_waiting(db)
+            deliver_pending(db)
+    async def notification_loop():
+        while not stop.is_set():
+            try:
+                await asyncio.to_thread(process_notifications)
+            except Exception:
+                logging.getLogger(__name__).exception('Notification processing failed; the next batch will retry.')
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=2)
+            except asyncio.TimeoutError:
+                pass
+    async def email_loop():
+        from notification_delivery import deliver_email
+        from referral_transport import deliver_referrals
+        while not stop.is_set():
+            try:
+                await asyncio.to_thread(deliver_email,limit=5)
+                await asyncio.to_thread(deliver_referrals,limit=3)
+            except Exception:
+                logging.getLogger(__name__).exception('Email notification processing failed; outcomes remain recorded for review.')
+            try:await asyncio.wait_for(stop.wait(),timeout=5)
+            except asyncio.TimeoutError:pass
+    worker = asyncio.create_task(notification_loop())
+    email_worker=asyncio.create_task(email_loop())
+    try:
+        yield
+    finally:
+        stop.set()
+        await worker
+        await email_worker
+
 
 app = FastAPI(
+    lifespan=application_lifespan,
     title="pulso-backend",
     description="City services platform for North Caloocan citizens.",
     version="2.0.0"
 )
+app.include_router(report_review_router.router)
+app.include_router(external_referrals.router)
+
 
 # ---------------------------------------------------------------------------
 # Static File Serving (for report images & assets)
@@ -132,6 +192,12 @@ async def get_caloocan_border(sector: Optional[str] = Query(None)):
                            if f.get("properties", {}).get("sector") == sector]
     
     return data
+
+
+@app.get('/api/geo/map-reference')
+def map_reference_geometry(db: Session = Depends(get_db)):
+    from map_reference import reference_geojson
+    return reference_geojson(db)
 
 @app.get("/api/download/resident-app")
 async def download_resident_app():
@@ -334,6 +400,11 @@ async def verify_recaptcha(token: str):
 
 # gov_router imports get_current_user directly from auth.py
 app.include_router(gov_router.router)
+import project_workspace
+app.include_router(project_workspace.router)
+import notification_delivery
+app.include_router(notification_delivery.router)
+app.include_router(notification_delivery.ops_router)
 # AI Analytics & Intelligence Engine
 app.include_router(analytics_router.router)
 # PhilSys Check Authentication (PSA National ID Verification)
@@ -347,6 +418,7 @@ app.include_router(announcements_router.router)
 app.include_router(announcements_router.public_router)
 # PULSEAI Persistent Chat & History Module
 app.include_router(pulseai_router.router)
+app.include_router(government_assistant.router)
 # PostGIS Spatial Engine (Reverse geocoding, Nearby, Viewport GeoJSON, Hotspots, Duplicates)
 app.include_router(spatial_router.router)
 # Administrative & Governance Engine (Staff, Residents, System Settings, Audit)
@@ -604,7 +676,7 @@ async def google_auth(
         if resident.is_verified:
             access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = auth.create_access_token(
-                data={"sub": resident.email}, expires_delta=access_token_expires
+                data={"sub": resident.email, "sv": resident.access_version or 0}, expires_delta=access_token_expires
             )
             return {
                 "status": "authenticated",
@@ -708,7 +780,29 @@ async def google_complete_verification(
     if req.full_name:
         resident.full_name = req.full_name.strip()
     if req.phone_number:
-        resident.phone_number = req.phone_number.strip()
+        clean_phone = req.phone_number.strip()
+        norm_phone = normalize_phone_number(clean_phone)
+        if norm_phone:
+            # Check for conflict against other verified residents
+            phone_conflict = db.query(models.Resident).filter(
+                models.Resident.id != resident.id,
+                models.Resident.is_verified == True,
+                or_(
+                    models.Resident.normalized_phone_number == norm_phone,
+                    models.Resident.phone_number == clean_phone,
+                    models.Resident.phone_number == norm_phone
+                )
+            ).first()
+            if phone_conflict:
+                raise HTTPException(
+                    status_code=400,
+                    detail="This mobile number is already registered by another account. Please use a different number."
+                )
+            resident.normalized_phone_number = norm_phone
+        resident.phone_number = clean_phone
+
+    if not getattr(resident, "normalized_email", None):
+        resident.normalized_email = normalize_email(resident.email)
     if req.address:
         resident.address = req.address.strip()
 
@@ -753,7 +847,7 @@ async def google_complete_verification(
     if resident.is_verified:
         access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = auth.create_access_token(
-            data={"sub": resident.email}, expires_delta=access_token_expires
+            data={"sub": resident.email, "sv": resident.access_version or 0}, expires_delta=access_token_expires
         )
         return {
             "status": "verified",
@@ -787,76 +881,100 @@ async def google_complete_verification(
         }
 
 
+def format_resident_name(full_name: Optional[str]) -> str:
+    """Format full name into First name + Last name for personalized SMS greetings."""
+    if not full_name:
+        return "Resident"
+    name = full_name.strip()
+    if "," in name:
+        parts = [p.strip() for p in name.split(",", 1)]
+        last_name = parts[0]
+        first_part = parts[1]
+        first_tokens = [t for t in first_part.split() if not (len(t) <= 2 and t.endswith('.'))]
+        first_name = " ".join(first_tokens) if first_tokens else first_part
+        return f"{first_name} {last_name}".strip()
+    return name
+
+
+def send_resident_confirmation(resident, code):
+    """Return provider acceptance; preserve the persisted, expiring HMAC code."""
+    name = format_resident_name(resident.full_name)
+    ref = f"PC-{secrets.token_hex(4).upper()}"
+    try:
+        email_sent = bool(send_otp_email(resident.email, code, 'Verification', ref_id=ref, name=name))
+    except Exception:
+        email_sent = False
+    # A supplied phone number is not yet an independently verified recovery channel.
+    # Do not send an email-account confirmation secret to an unverified phone.
+    return email_sent
+
+
+from pydantic import Field
+
+
+class CheckAvailabilityRequest(BaseModel):
+    email: Optional[str] = Field(None, max_length=254)
+    mobile: Optional[str] = Field(None, max_length=40)
+
+
+@app.post("/api/auth/check-availability")
+async def check_availability(req: CheckAvailabilityRequest, request: Request, db: Session = Depends(get_db)):
+    availability_check_limiter.check(request)
+    from resident_contacts import conflicts
+    email_taken, phone_taken = conflicts(db, req.email, req.mobile)
+    return dict(email_available=not email_taken,
+        email_message="This email is already registered. Try logging in, or use a different email." if email_taken else "",
+        mobile_available=not phone_taken,
+        mobile_message="This mobile number is already registered. Try logging in, or use a different number." if phone_taken else "")
+
+
 @app.post("/api/auth/register", response_model=schemas.ResidentResponse)
-def register_user(user: schemas.ResidentCreate, db: Session = Depends(get_db)):
-    # Enforce lowercase and remove trailing spaces added by mobile keyboards
-    user.email = user.email.strip().lower()
-
-    # STRICT EMAIL VALIDATION: Reject place-holders or obvious fake emails
+def register_user(user: schemas.ResidentCreate, request: Request, db: Session = Depends(get_db)):
+    auth_limiter.check(request)
     import re
-    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-    if not re.match(email_regex, user.email):
-        raise HTTPException(status_code=400, detail="Invalid email format. Please provide a real email.")
-    
-    # Block obviously fake domains
-    blocked_domains = ["example.com", "email.com", "test.com", "fake.com", "mailinator.com", "tempmail.com"]
-    if any(domain in user.email for domain in blocked_domains):
-        raise HTTPException(status_code=400, detail="Please use a valid, official email account.")
-
-    db_user = crud.get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Generate 6-digit code
-    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-    
-    user_data = user.model_dump()
-    user_data["password"] = auth.get_password_hash(user_data["password"])
-    
-    # Remove 'barangay' which is a property with no setter to prevent AttributeError
-    brgy_str = user_data.pop("barangay", None)
-    if brgy_str and str(brgy_str).isdigit() and not user_data.get("barangay_id"):
-        user_data["barangay_id"] = int(brgy_str)
-    
-    # Determine initial KYC level based on ID tier and verification mode
-    id_tier = user_data.get("id_tier")
-    id_type = user_data.get("id_type")
-    ver_mode = user_data.get("verification_mode")
-    if id_tier == "primary":
-        if id_type == "philsys":
-            kyc_level = "Gold (PhilSys Verified)"
-        else:
-            kyc_level = "Silver (Primary ID Verified)"
-    elif id_tier == "secondary":
-        if ver_mode == "second_id":
-            kyc_level = "Silver (Dual Secondary Verified)"
-        else:
-            kyc_level = "Silver (Secondary ID Verified)"
+    import resident_accounts
+    from resident_contacts import ensure_available, normalize_resident
+    from sqlalchemy.exc import IntegrityError
+    user.email = user.email.strip().lower()
+    if not re.fullmatch(r"[a-zA-Z0-9_.+\-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", user.email):
+        raise HTTPException(422, "Please provide a valid email address.")
+    if len(user.password) < 8 or len(user.password.encode('utf-8')) > 72:
+        raise HTTPException(422, "Use a password of at least 8 characters and at most 72 UTF-8 bytes.")
+    ensure_available(db, user.email, user.phone_number)
+    existing = db.query(models.Resident).filter(func.lower(models.Resident.email) == user.email).with_for_update().first()
+    if existing and (existing.is_verified or not existing.is_active or existing.status not in (None, 'active', 'pending')):
+        raise HTTPException(409, "This account already exists. Use sign-in or contact PULSO administration.")
+    if existing and existing.email_code_sent_at and existing.email_code_sent_at > resident_accounts.now() - timedelta(seconds=60):
+        raise HTTPException(429, "A code was recently requested. Wait one minute before retrying.")
+    fields = user.model_dump(exclude={'password'})
+    barangay_label = fields.pop('barangay', None)
+    if not fields.get('barangay_id') and barangay_label:
+        from report_review import routing_area
+        from types import SimpleNamespace
+        area = routing_area(db, SimpleNamespace(barangay_id=None, location_barangay=barangay_label))
+        if area:
+            fields['barangay_id'], fields['district_id'] = area.id, area.district_id
+    if existing:
+        target_user = existing
+        for key, value in fields.items():
+            setattr(target_user, key, value)
+        target_user.password_hash = auth.get_password_hash(user.password)
     else:
-        kyc_level = "Bronze (Self-Signed)"
-
-    # Create user as unverified (awaiting OTP verification)
-    new_user = models.Resident(
-        **{k: v for k, v in user_data.items() if k != "password"},
-        password_hash=user_data["password"],
-        verification_code=code,
-        kyc_level=kyc_level,
-        is_verified=False
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # Send email
-    if not send_otp_email(new_user.email, code, "Verification"):
-        # We created the user, but couldn't send the email.
-        # In a real system, you might want to rollback, but let's at least tell the user.
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User created but failed to send verification email. Please use 'Resend Code' on the login screen."
-        )
-    
-    return new_user
+        target_user = models.Resident(**fields, password_hash=auth.get_password_hash(user.password),
+            kyc_level="Bronze (Self-Signed)", is_verified=False)
+        db.add(target_user)
+    normalize_resident(target_user)
+    try:
+        db.flush()
+        code = resident_accounts.prepare_code(target_user)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "These contact details are already registered. Try signing in.")
+    db.refresh(target_user)
+    if not send_resident_confirmation(target_user, code):
+        raise HTTPException(503, "Registration saved, but the verification code could not be sent. Use Resend Code on the verification screen.")
+    return target_user
 
 
 
@@ -874,11 +992,9 @@ async def login(
     db: Session = Depends(get_db)
 ):
     import logging
-    logging.warning(f"LOGIN DEBUG: username={form_data.username}, password_length={len(form_data.password)}")
     
     # 1. Verify basic credentials first (to determine if we should challenge with reCAPTCHA)
     candidate_users = crud.get_users_by_identifier(db, identifier=form_data.username)
-    logging.warning(f"LOGIN DEBUG: candidate_users count = {len(candidate_users)}")
     if not candidate_users:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -923,6 +1039,8 @@ async def login(
             detail="Account not verified. Please check your email for the verification code.",
         )
 
+    if not user.is_active:
+        raise HTTPException(403, 'This account is inactive. Contact your administrator.')
     # 4. Check suspension status (Officials and Residents)
     if getattr(user, "is_suspended", False) or getattr(user, "status", "active") == "suspended":
         msg = "Account suspended by administration. Please contact City Engineering Administration." if getattr(user, "role", "") == "resident" else "Account suspended by administration. Please contact your department head."
@@ -934,7 +1052,7 @@ async def login(
     from datetime import timedelta
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": user.email, "sv": user.access_version or 0}, expires_delta=access_token_expires
     )
     return {
         "access_token": access_token,
@@ -952,47 +1070,39 @@ async def login(
             "created_at": user.created_at,
             "updated_at": getattr(user, "updated_at", None),
             "capabilities": user.capabilities,
+            "account_type": "staff" if isinstance(user,models.Official) else "resident",
             "access_level": getattr(getattr(user, "role_ref", None), "access_level", None)
         }
     }
 
 @app.post("/api/auth/verify-registration")
+@app.post("/api/auth/verify-code")
 def verify_registration(req: VerificationRequest, db: Session = Depends(get_db)):
-    email = req.email.strip().lower()
-    user = crud.get_user_by_email(db, email=email)
+    raw_email = req.email.strip().lower()
+    norm_email = normalize_email(raw_email)
+    user = db.query(models.Resident).filter(
+        or_(
+            models.Resident.normalized_email == norm_email,
+            func.lower(models.Resident.email) == raw_email
+        )
+    ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Clean the code (remove spaces if user copied "552 108")
-    cleaned_code = req.code.replace(" ", "") if req.code else ""
-    
-    # REMOVED 123456 bypass for production-grade security synchronization
-    if user.verification_code != cleaned_code:
-        raise HTTPException(status_code=400, detail="Invalid verification code")
-        
-    user.is_verified = True
-    user.verification_code = None  # Clear the code after use
-    db.commit()
-    return {"status": "success", "message": "Account verified"}
+    if user.role != 'resident': raise HTTPException(404, 'Resident account not found.')
+    import resident_accounts
+    return resident_accounts.accept_code(db,user,req.code or '')
+
 
 @app.post("/api/auth/resend-code")
-def resend_code(req: VerificationRequest, db: Session = Depends(get_db)):
-    email = req.email.strip().lower()
-    user = crud.get_user_by_email(db, email=email)
-    if not user or user.role != "resident":
-        raise HTTPException(status_code=404, detail="Resident account not found")
-        
-    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-    user.verification_code = code
-    db.commit()
-    
-    if not send_otp_email(user.email, code, "Verification"):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send verification code. Please check server logs."
-        )
-        
-    return {"status": "success", "message": "Official verification code resent."}
+def resend_code(req: VerificationRequest, request: Request, db: Session = Depends(get_db)):
+    auth_limiter.check(request)
+    user = crud.get_resident_by_email(db, email=req.email.strip().lower())
+    if not user:
+        raise HTTPException(404, 'Resident account not found.')
+    import resident_accounts
+    return resident_accounts.send_confirmation(db, user, lambda email, code, kind: send_resident_confirmation(user, code))
+
 
 
 
@@ -1023,7 +1133,7 @@ class VerifyPhoneOTPRequest(BaseModel):
     phone_number: str
     code: str
 
-def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id: Optional[str] = None):
+def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id: Optional[str] = None, name: Optional[str] = None):
     """
     Sends the official branding PULSO OTP email.
     Handles registration 'Verification', password 'Recovery', and '2-Step Verification' flows.
@@ -1036,12 +1146,39 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
         print(f"[MAIL ERROR] SMTP credentials missing in .env. Cannot send {type} email to {to_email}")
         return False
 
+    from html import escape
+    greeting_recipient = escape(name.strip()) if name and name.strip() else "Resident"
+
     if "2-step" in type.lower() or "2fa" in type.lower():
         title = "Two-Factor Security Notice"
+        body_instruction = (
+            f'<div style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 auto 16px auto; text-align: left;">'
+            f'<p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a; font-size: 15px;">Hello {greeting_recipient},</p>'
+            f'<p style="margin: 0; color: #475569;">'
+            f'A sign-in request was detected for your account. Please use the One-Time Password (OTP) below to complete your 2-step verification:'
+            f'</p>'
+            f'</div>'
+        )
     elif type == "Verification":
         title = "Official Verification Notice"
+        body_instruction = (
+            f'<div style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 auto 16px auto; text-align: left;">'
+            f'<p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a; font-size: 15px;">Hello {greeting_recipient},</p>'
+            f'<p style="margin: 0; color: #475569;">'
+            f'Thank you for registering with PULSO Caloocan. Please use the One-Time Password (OTP) below to verify your account and complete your registration:'
+            f'</p>'
+            f'</div>'
+        )
     else:
         title = "Password Recovery Notice"
+        body_instruction = (
+            f'<div style="font-size: 14px; color: #334155; line-height: 1.6; margin: 0 auto 16px auto; text-align: left;">'
+            f'<p style="margin: 0 0 10px 0; font-weight: 700; color: #0f172a; font-size: 15px;">Hello {greeting_recipient},</p>'
+            f'<p style="margin: 0; color: #475569;">'
+            f'We received a request to reset your password. Please use the One-Time Password (OTP) below to verify your account and set a new password:'
+            f'</p>'
+            f'</div>'
+        )
     
     # Format OTP as X X X   X X X (e.g. 1 1 0   9 1 7)
     formatted_otp = f"{code[0]}&nbsp;{code[1]}&nbsp;{code[2]}&nbsp;&nbsp;&nbsp;&nbsp;{code[3]}&nbsp;{code[4]}&nbsp;{code[5]}"
@@ -1145,7 +1282,7 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
     <body style="margin: 0; padding: 0; background-color: #f1f5f9;">
         <!-- Preheader hidden snippet for mobile notification previews -->
         <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
-            Your PULSO security code is {code}. Valid for 30 minutes.
+            Your PULSO security code is {code}. Valid for 10 minutes.
         </div>
 
         <table role="presentation" class="wrapper" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -1168,10 +1305,7 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
                         <!-- Body Content -->
                         <tr>
                             <td class="content-pad" style="padding: 24px 32px 36px 32px; text-align: center;">
-                                <div style="font-size: 13px; color: #475569; line-height: 1.6; margin: 0 auto 16px auto;">
-                                    This serves as an automated notification to secure your digital access.<br>
-                                    To complete the <strong>Credential Validation Process</strong>, please utilize the One-Time Password (OTP) provided below.
-                                </div>
+                                {body_instruction}
 
                                 <!-- OTP Box (Continuous digits without disruptive middle gap) -->
                                 <div class="otp-container">
@@ -1179,9 +1313,8 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
                                 </div>
 
                                 <!-- Validity Section -->
-                                <div style="font-size: 11px; color: #64748b; line-height: 1.6; margin-top: 18px; text-align: center;">
-                                    <strong>VALIDITY PERIOD:</strong> This authorization code is valid for exactly <strong>thirty (30) minutes</strong> from the time of issuance.<br>
-                                    If the code expires, a new request must be generated.
+                                <div style="font-size: 12px; color: #64748b; line-height: 1.6; margin-top: 18px; text-align: center;">
+                                    This code is only good for 10 minutes. If you run out of time, just ask for a new one.
                                 </div>
 
                                 <!-- Security Advisory Box -->
@@ -1227,7 +1360,7 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
         msg['X-Priority'] = '1'
         
         ref_text = f"\nReference: {ref_id}" if ref_id else ""
-        msg.attach(MIMEText(f"Your PULSO security code is: {code}{ref_text}\nExpires in 30 minutes.", 'plain'))
+        msg.attach(MIMEText(f"Your PULSO security code is: {code}{ref_text}\nValid for 10 minutes.", 'plain'))
         msg.attach(MIMEText(email_html, 'html'))
         
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
@@ -1248,13 +1381,15 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
 
 @app.post("/api/auth/forgot-password")
 async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    """Generates a 6-digit reset code and sends the official security email."""
+    """Send an expiring recovery code through the confirmed email channel."""
     email = req.email.strip().lower()
     user = crud.get_user_by_email(db, email=email)
     if not user:
         # For security, don't reveal if the email is registered
         return {"message": "If this email is registered, a security code will be sent."}
     
+    if isinstance(user,models.Official):
+        raise HTTPException(409,'Use the staff sign-in recovery request or a recovery link supplied by your administrator.')
     if not user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1263,48 +1398,66 @@ async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_
     
     code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
     ref_id = f"PC-{random.randint(10000, 99999)}"
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     
-    # Store or update the token record
-    reset_token = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.email == email).first()
-    if reset_token:
-        reset_token.token = code
-        reset_token.expires_at = expires_at
-        reset_token.used = False
-    else:
-        reset_token = models.PasswordResetToken(
-            email=email,
-            token=code,
-            expires_at=expires_at
-        )
-        db.add(reset_token)
-    
+    # Invalidate all prior tokens for this email so old codes are strictly voided
+    db.query(models.PasswordResetToken).filter(
+        models.PasswordResetToken.email == email
+    ).delete(synchronize_session=False)
+
+    reset_token = models.PasswordResetToken(
+        email=email,
+        token=code,
+        expires_at=expires_at,
+        used=False
+    )
+    db.add(reset_token)
     db.commit()
-    
-    if not send_otp_email(req.email, code, "Recovery", ref_id=ref_id):
+
+    # Format greeting: First name + Last name
+    greeting_name = format_resident_name(getattr(user, "full_name", None))
+    phone_number = getattr(user, "phone_number", None)
+
+
+    sms_dispatched = False
+
+    # Also dispatch email notification as channel parity / backup
+    email_dispatched = False
+    try:
+        email_dispatched = send_otp_email(req.email, code, "Recovery", ref_id=ref_id, name=greeting_name)
+    except Exception as em_err:
+        print(f"[MAIL ERROR] Failed to dispatch verification email: {em_err}")
+
+    if not sms_dispatched and not email_dispatched:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Credential synchronization failed: Unable to dispatch security email."
+            detail="Unable to send the verification email. Please try again later."
         )
-    
+
+    phone_hint = None
+
     return {
         "message": "Reset code sent successfully.",
-        "reference_id": ref_id
+        "reference_id": ref_id,
+        "phone_hint": phone_hint,
+        "sms_sent": sms_dispatched
     }
 
 @app.post("/api/auth/verify-reset-code")
 async def verify_reset_code(req: VerifyResetCodeRequest, db: Session = Depends(get_db)):
     """Verifies that the provided 6-digit sync code is valid and active."""
     email = req.email.strip().lower()
-    cleaned_code = req.code.replace(" ", "")
-    reset_token = db.query(models.PasswordResetToken).filter(
+    import re
+    cleaned_code = re.sub(r"\D", "", req.code)
+    # Only validate against the single latest active token
+    latest_token = db.query(models.PasswordResetToken).filter(
         models.PasswordResetToken.email == email,
-        models.PasswordResetToken.token == cleaned_code,
         models.PasswordResetToken.used == False
-    ).first()
+    ).order_by(models.PasswordResetToken.id.desc()).first()
     
-    if not reset_token:
-        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
+    if not latest_token or latest_token.token != cleaned_code:
+        raise HTTPException(status_code=400, detail="Incorrect code. Please check and try again.")
+    reset_token = latest_token
 
     # Explicitly compare aware UTC datetimes to ensure registry synchronization
     current_time = datetime.now(timezone.utc)
@@ -1321,18 +1474,18 @@ async def verify_reset_code(req: VerifyResetCodeRequest, db: Session = Depends(g
 async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     """Verifies the 6-digit code and updates the user's password."""
     email = req.email.strip().lower()
-    # Clean the code (remove spaces if user copied "319 472")
-    cleaned_code = req.code.replace(" ", "")
+    import re
+    cleaned_code = re.sub(r"\D", "", req.code)
 
-    # Find the token
-    reset_token = db.query(models.PasswordResetToken).filter(
+    # Find and validate ONLY against the single latest active token
+    latest_token = db.query(models.PasswordResetToken).filter(
         models.PasswordResetToken.email == email,
-        models.PasswordResetToken.token == cleaned_code,
         models.PasswordResetToken.used == False
-    ).first()
+    ).order_by(models.PasswordResetToken.id.desc()).first()
     
-    if not reset_token:
-        raise HTTPException(status_code=400, detail="Identity synchronization failed: Invalid code.")
+    if not latest_token or latest_token.token != cleaned_code:
+        raise HTTPException(status_code=400, detail="Incorrect code. Please check and try again.")
+    reset_token = latest_token
 
     # Explicitly compare aware UTC datetimes for credential update validation
     current_time = datetime.now(timezone.utc)
@@ -1348,8 +1501,16 @@ async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db
     if not user:
         raise HTTPException(status_code=404, detail="Subject not found in registry.")
     
+    if isinstance(user,models.Official):
+        raise HTTPException(409,'Use the staff recovery link supplied by your administrator.')
+    if not user.is_verified:
+        from resident_contacts import ensure_available, normalize_resident
+        ensure_available(db, user.email, user.phone_number, exclude_id=user.id)
+        normalize_resident(user)
+    if isinstance(user, models.Official):
+        raise HTTPException(409, "Use the staff recovery link supplied by your administrator.")
     user.password_hash = auth.get_password_hash(req.new_password)
-    user.is_verified = True  # Resetting password via email token is proof of ownership
+    user.is_verified = True  # Resident email recovery confirms ownership
     reset_token.used = True  # Mark as used
     
     db.commit()
@@ -1557,7 +1718,7 @@ async def verify_phone_otp(req: VerifyPhoneOTPRequest, db: Session = Depends(get
     # Generate JWT
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": user.email, "sv": user.access_version or 0}, expires_delta=access_token_expires
     )
 
     return {
@@ -1597,11 +1758,14 @@ def list_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("manager"))
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """List all users. Manager only."""
     # Only managers can list residents (for now, we'll focus on residents)
-    users = db.query(models.Resident).offset(skip).limit(limit).all()
+    import staff_accounts
+    from government_access import scoped_residents
+    staff_accounts.require_action(current_user,'residents_view')
+    users = scoped_residents(db.query(models.Resident),current_user).offset(skip).limit(min(max(limit,1),100)).all()
     return users
 
 @app.get("/api/users/{user_id}", response_model=schemas.UserResponse)
@@ -1610,14 +1774,9 @@ def get_user(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
-    if current_user.id != user_id and not hasattr(current_user, 'role_id'): # simplistic check, improved legacy
-        if getattr(current_user, 'role', None) not in ["dispatcher", "manager", "admin"]:
-            raise HTTPException(status_code=403, detail="Not authorized to access this user")
-    
-    db_user = crud.get_user(db, user_id=user_id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+    if current_user.id != user_id:
+        raise HTTPException(403,'Use the authorized administration workspace to inspect other accounts.')
+    return current_user
 
 @app.patch("/api/users/{user_id}", response_model=schemas.UserResponse)
 def update_user(
@@ -1627,11 +1786,48 @@ def update_user(
     current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     if current_user.id != user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to modify this user")
-    db_user = crud.update_user(db, user_id=user_id, user_update=user_update)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+        raise HTTPException(403,'Not authorized to modify this user')
+    changes=user_update.model_dump(exclude_unset=True)
+    if 'full_name' in changes:
+        if not isinstance(changes['full_name'],str) or len(changes['full_name'].strip())<2:
+            raise HTTPException(422,'Enter a full name of at least two characters.')
+        changes['full_name']=changes['full_name'].strip()
+    if 'barangay' in changes:
+        if isinstance(current_user,models.Official):
+            current_user.barangay=changes['barangay']
+        elif changes['barangay']:
+            area=db.query(models.Barangay).filter(func.lower(models.Barangay.name)==str(changes['barangay']).lower()).first()
+            if not area: raise HTTPException(422,'Choose an existing barangay.')
+            changes['barangay_id']=area.id
+            changes['district_id']=area.district_id
+
+    allowed={'full_name','phone_number','address','avatar_url'} if isinstance(current_user,models.Official) else {'full_name','phone_number','address','avatar_url','preferences','barangay_id','district_id'}
+    if 'email' in changes and changes['email'] != current_user.email:
+        raise HTTPException(409,'Changing a sign-in email requires a verified account recovery workflow.')
+    unsupported=set(changes)-allowed-{'email','barangay'}
+    if unsupported:
+        raise HTTPException(422,'This profile cannot update: '+', '.join(sorted(unsupported)))
+    if isinstance(current_user,models.Resident) and 'preferences' in changes:
+        proposed=changes['preferences']
+        if not isinstance(proposed,dict):raise HTTPException(422,'Preferences must be an object.')
+        protected={'notifications_enabled','notification_categories','notification_channels'}
+        existing=current_user.preferences or {}
+        if any(proposed.get(key)!=existing.get(key) for key in protected if key in proposed):
+            raise HTTPException(409,'Save notification settings through the dedicated notification preferences form.')
+        changes['preferences']={**existing,**{key:value for key,value in proposed.items() if key not in protected}}
+    if isinstance(current_user, models.Resident) and 'phone_number' in changes:
+        from resident_contacts import ensure_available
+        ensure_available(db, current_user.email, changes['phone_number'], exclude_id=current_user.id)
+    for key,value in changes.items():
+        if key in allowed: setattr(current_user,key,value)
+    if isinstance(current_user, models.Resident):
+        from resident_contacts import normalize_resident
+        normalize_resident(current_user)
+    if isinstance(current_user,models.Official):
+        from staff_accounts import audit
+        audit(db,current_user,'Staff profile updated',{'target_id':current_user.id,'fields':sorted(changes)})
+    db.commit();db.refresh(current_user)
+    return current_user
 
 # ---------------------------------------------------------------------------
 # Reports
@@ -1659,16 +1855,37 @@ def get_report_stats(
 @app.get("/api/reports", response_model=List[schemas.ReportResponse])
 def read_reports(
     skip: int = 0,
-    limit: int = 200,
+    limit: int = Query(200, ge=1, le=1000),
     status: Optional[str] = None,
+    ids: Optional[str] = None,
+    asset_id: Optional[str] = None,
+    overview: Optional[str] = None,
+    area: Optional[str] = None,
+    priority: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role(*gov_router.DISPATCH_ROLES))
+    current_user: Union[models.Official, models.Resident] = Depends(require_role(*gov_router.GOV_ROLES))
 ):
     """
     Returns a listing of all city reports with status filtering.
     Restricted to city officials for operational dispatching.
     """
-    query = db.query(models.Report)
+    from government_access import scoped_reports
+    if overview is not None:
+        from operations_workspace import overview_report_query
+        query = overview_report_query(db, current_user, overview, area, priority)
+    else:
+        query = scoped_reports(db.query(models.Report), current_user)
+        if current_user.role in gov_router.FIELD_SELF_ROLES:
+            query = query.filter(models.Report.id.in_(db.query(gov_models.WorkOrder.report_id).filter(gov_models.WorkOrder.assigned_to_id == current_user.id)))
+    if ids is not None:
+        parts = ids.split(',') if ids else []
+        if len(parts) > 1000 or any(not p.isdigit() for p in parts):
+            raise HTTPException(422, 'Report selection must contain at most 1000 numeric report IDs.')
+        query = query.filter(models.Report.id.in_([int(p) for p in parts]))
+    if asset_id is not None:
+        query = query.filter(models.Report.id.in_(
+            db.query(gov_models.WorkOrder.report_id).filter(gov_models.WorkOrder.asset_id == asset_id, gov_models.WorkOrder.report_id.isnot(None))
+        ))
     if status and status.strip().lower() != "all":
         if "," in status:
             statuses = [s.strip().lower() for s in status.split(",")]
@@ -1989,6 +2206,7 @@ def read_report_timeline(
 async def analyze_report_only(
     description: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
     current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
@@ -1999,7 +2217,8 @@ async def analyze_report_only(
     if image:
         image_bytes = await image.read()
     
-    ai_analysis = gemini_service.analyze_report(description or "", image_data=image_bytes)
+    import system_settings
+    ai_analysis = system_settings.report_analysis(db,description or "",image_data=image_bytes)
     return ai_analysis
 
 @app.post("/api/reports", response_model=schemas.ReportResponse, status_code=status.HTTP_201_CREATED)
@@ -2013,7 +2232,7 @@ async def create_new_report(
     location_barangay: Optional[str] = Form(None),
     contact_email: Optional[str] = Form(None),
     contact_phone: Optional[str] = Form(None),
-    submission_source: Optional[str] = Form("web_guest"),
+    submission_source: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
@@ -2023,8 +2242,9 @@ async def create_new_report(
     Executes rate limiting, boundary enforcement, spatial duplicate check, magic byte validation,
     multi-modal Gemini AI triage, cryptographic token generation, and DB persistence.
     """
-    # 0. Rate limiting check
-    report_submission_limiter.check(request)
+    # 0. Rate limiting check (per-account for authenticated residents, per-IP for guest submissions)
+    user_id_str = f"resident_{current_user.id}" if current_user and hasattr(current_user, "id") else None
+    report_submission_limiter.check(request, identifier=user_id_str)
 
     # 1. Payload validation
     text_fields = (
@@ -2103,7 +2323,8 @@ async def create_new_report(
         image_url = f"/api/uploads/reports/{unique_filename}"
 
     # 5. Advanced Multi-Modal AI Triage (Gemini 1.5 Flash)
-    ai_analysis = gemini_service.analyze_report(clean_desc, image_data=image_bytes)
+    import system_settings
+    ai_analysis = system_settings.report_analysis(db,clean_desc,image_data=image_bytes)
     if ai_analysis and ai_analysis.get("is_inappropriate"):
         reason = ai_analysis.get("rejection_reason", "Inappropriate content detected.")
         raise HTTPException(
@@ -2720,7 +2941,7 @@ def update_report_status(
     if_match: Optional[str] = Header(None, alias="If-Match"),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "system_admin", "admin"))
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """Legacy verification command; other transitions use their dedicated routes."""
     status = status_update.status or status_update.targetStatus
@@ -2733,6 +2954,10 @@ def update_report_status(
     report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    from government_access import require_report_scope
+    require_report_scope(db, current_user, report)
+    import report_review
+    report_review.require_decision(db,current_user,report,'review')
     if hasattr(current_user, "id") and getattr(current_user, "role", None) != "resident":
         receipt = command_integrity.find_receipt(
             db, actor_id=current_user.id, operation="report_verify",
@@ -2786,6 +3011,8 @@ def reject_report(
     report = crud.get_report(db, report_id=report_id, for_update=True)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+    from government_access import require_report_scope
+    require_report_scope(db, current_user, report)
     receipt = command_integrity.find_receipt(
         db, actor_id=current_user.id, operation="report_reject",
         report_id=report_id, key=key, digest=digest,
@@ -2877,61 +3104,27 @@ def read_advisories(
     return internal
 
 @app.post("/api/advisories", response_model=schemas.AdvisoryResponse)
-def create_advisory_route(
-    advisory: schemas.AdvisoryCreate,
-    db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("manager", "dispatcher"))
-):
-    return crud.create_advisory(db=db, advisory=advisory)
+def create_advisory_route(advisory: schemas.AdvisoryCreate,db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    from government_access import require
+    require(current_user,'announcements','create')
+    raise HTTPException(410, 'Create an advisory draft through /api/gov/announcements for review and publication.')
 
 @app.delete("/api/advisories/{advisory_id}")
-def delete_advisory(
-    advisory_id: int,
-    db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("manager"))
-):
-    """Delete an advisory. Manager only."""
-    success = crud.delete_advisory(db, advisory_id=advisory_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Advisory not found")
-    return {"message": f"Advisory {advisory_id} deleted successfully"}
+def delete_advisory(advisory_id: int,db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    from government_access import require
+    require(current_user,'announcements','withdraw')
+    raise HTTPException(410, 'Use governed publication withdrawal. Permanent advisory deletion is retired.')
 
 @app.post("/api/advisories/generate/{report_id}")
-async def generate_ai_advisory(
-    report_id: int,
-    db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager"))
-):
-    """
-    Dispatcher-only: Triggers AI to draft a public advisory based on a validated report.
-    Returns a JSON draft (title, body, priority).
-    """
-    db_report = crud.get_report(db, report_id=report_id)
-    if not db_report:
-        raise HTTPException(status_code=404, detail="Report not found")
-        
-    import json
-    import logging
-    logger = logging.getLogger(__name__)
-    ai_meta = {}
-    if db_report.ai_metadata:
-        try:
-            ai_meta = json.loads(db_report.ai_metadata)
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse ai_metadata for report {report_id}: {e}")
-        
-    report_data = {
-        "category": db_report.category,
-        "ai_summary": ai_meta.get("smart_summary", db_report.description),
-        "location_string": db_report.location_string,
-        "severity_score": db_report.severity_score
-    }
-    
-    draft = gemini_service.generate_advisory_content(report_data)
-    if not draft:
-        raise HTTPException(status_code=500, detail="AI generation failed.")
-        
-    return draft
+async def generate_ai_advisory(report_id: int,db: Session=Depends(get_db),current_user=Depends(get_current_user)):
+    from government_access import require
+    from report_review_router import get_report
+    require(current_user,'announcements','create')
+    report=get_report(db,current_user,report_id)
+    draft=gemini_service.generate_advisory_content(dict(category=report.category,ai_summary=report.ai_summary or report.description,location_string=report.location_string,severity_score=report.severity_score))
+    if not isinstance(draft,dict) or not draft:
+        raise HTTPException(503,'Draft assistance is unavailable. Write an advisory in Updates instead.')
+    return {**draft,'source_report_id':report.id,'review_required':True,'published':False}
 
 # ---------------------------------------------------------------------------
 # Notifications
@@ -3043,9 +3236,16 @@ def change_password(
     if req.current_password == req.new_password:
         raise HTTPException(status_code=400, detail="New password cannot be the same as the current password")
     
+    if isinstance(current_user,models.Official):
+        if len(req.new_password)<12 or len(req.new_password.encode('utf-8'))>72:
+            raise HTTPException(422,'Use a password of at least 12 characters and at most 72 UTF-8 bytes.')
+        current_user.access_version += 1
+        from staff_accounts import revoke_tokens,audit
+        revoke_tokens(db,current_user)
+        audit(db,current_user,'Staff password changed',{'target_id':current_user.id,'method':'current_password'})
     current_user.password_hash = auth.get_password_hash(req.new_password)
     db.commit()
-    return {"message": "Password updated successfully"}
+    return {"message": "Password updated successfully", "reauthentication_required": isinstance(current_user,models.Official)}
 
 # ---------------------------------------------------------------------------
 # City News & Announcements Endpoints (with In-Memory TTL Caching)
@@ -3090,104 +3290,33 @@ def read_news(
 
 @app.post("/api/news", response_model=schemas.NewsItemResponse)
 async def create_news_item(
-    category: str = Form(...),
-    headline: str = Form(...),
-    excerpt: str = Form(...),
-    priority: str = Form("normal"),
-    barangay: Optional[str] = Form(None),
-    source_url: Optional[str] = Form(None),
-    posted_by: Optional[str] = Form(None),
-    image: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db)
+    category: str = Form(...), headline: str = Form(...), excerpt: str = Form(...),
+    priority: str = Form("normal"), barangay: Optional[str] = Form(None),
+    source_url: Optional[str] = Form(None), posted_by: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None), db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    """
-    Staff / Admin write endpoint for City News.
-    Validates image size (max 5MB) and type, saves image,
-    inserts record, and invalidates public cache.
-    """
-    image_url = None
-    if image and image.filename:
-        allowed_types = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
-        if image.content_type not in allowed_types:
-            raise HTTPException(status_code=400, detail="Invalid image format. Allowed formats: JPG, PNG, WEBP.")
-            
-        content = await image.read()
-        if len(content) > 5 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit.")
-            
-        ext = os.path.splitext(image.filename)[1] or ".jpg"
-        filename = f"news_{secrets.token_hex(6)}{ext}"
-        filepath = os.path.join(NEWS_UPLOAD_DIR, filename)
-        
-        with open(filepath, "wb") as f:
-            f.write(content)
-            
-        image_url = f"/api/uploads/news/{filename}"
-        
-    news_create = schemas.NewsItemCreate(
-        category=category,
-        headline=headline,
-        excerpt=excerpt,
-        priority=priority,
-        barangay=barangay,
-        source_url=source_url,
-        image_url=image_url
-    )
-    
-    author = posted_by or "City Engineering Department"
-    item = crud.create_news(db, news_create, image_url=image_url, posted_by=author)
-    invalidate_news_cache()
-    return item
+    from government_access import require
+    require(current_user,'announcements','create')
+    raise HTTPException(410, 'Create a reviewed news draft through /api/gov/announcements. Direct public publication is retired.')
 
 @app.put("/api/news/{news_id}", response_model=schemas.NewsItemResponse)
 async def update_news_item(
-    news_id: int,
-    category: Optional[str] = Form(None),
-    headline: Optional[str] = Form(None),
-    excerpt: Optional[str] = Form(None),
-    priority: Optional[str] = Form(None),
-    barangay: Optional[str] = Form(None),
-    source_url: Optional[str] = Form(None),
-    image: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db)
+    news_id: int, category: Optional[str] = Form(None), headline: Optional[str] = Form(None),
+    excerpt: Optional[str] = Form(None), priority: Optional[str] = Form(None),
+    barangay: Optional[str] = Form(None), source_url: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None), db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
 ):
-    image_url = None
-    if image and image.filename:
-        allowed_types = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
-        if image.content_type not in allowed_types:
-            raise HTTPException(status_code=400, detail="Invalid image format. Allowed formats: JPG, PNG, WEBP.")
-        content = await image.read()
-        if len(content) > 5 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit.")
-        ext = os.path.splitext(image.filename)[1] or ".jpg"
-        filename = f"news_{secrets.token_hex(6)}{ext}"
-        filepath = os.path.join(NEWS_UPLOAD_DIR, filename)
-        with open(filepath, "wb") as f:
-            f.write(content)
-        image_url = f"/api/uploads/news/{filename}"
-        
-    update_data = schemas.NewsItemUpdate(
-        category=category,
-        headline=headline,
-        excerpt=excerpt,
-        priority=priority,
-        barangay=barangay,
-        source_url=source_url,
-        image_url=image_url
-    )
-    item = crud.update_news(db, news_id, update_data, image_url=image_url)
-    if not item:
-        raise HTTPException(status_code=404, detail="News item not found")
-    invalidate_news_cache()
-    return item
+    from government_access import require
+    require(current_user,'announcements','edit')
+    raise HTTPException(410, 'Use reviewed publication corrections through /api/gov/announcements. Legacy news cannot be overwritten through this endpoint.')
 
 @app.delete("/api/news/{news_id}")
-def delete_news_item(news_id: int, db: Session = Depends(get_db)):
-    success = crud.delete_news(db, news_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="News item not found")
-    invalidate_news_cache()
-    return {"message": f"News item {news_id} deleted successfully"}
+def delete_news_item(news_id: int, db: Session = Depends(get_db),current_user=Depends(get_current_user)):
+    from government_access import require
+    require(current_user,'announcements','withdraw')
+    raise HTTPException(410, 'Use governed publication withdrawal. Permanent deletion of public news is retired.')
 
 # ---------------------------------------------------------------------------
 # Entry Point

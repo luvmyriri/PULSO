@@ -616,14 +616,7 @@ const CAMERA_ADDRESS_PRESETS = {
  * - Live pass/fail Quick Checks verifying all UX & accessibility rules.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export default function DevAppPreviewPage() {
-  // 1. Authorization guard: Dev build or Gov/Admin accounts only
-  const isDev = Boolean(import.meta.env.DEV);
-  const user = getAuthUser();
-  const isAdmin = Boolean(
-    user && ['super_admin', 'city_engineer', 'asst_city_engineer', 'admin_officer', 'admin_clerk'].includes(user.role)
-  );
-
+function DevAppPreviewContent() {
   // 2. Isolated Test States (never written to real localStorage)
   const [simulateInstalled, setSimulateInstalled] = useState(true);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
@@ -1018,6 +1011,8 @@ export default function DevAppPreviewPage() {
 
     const currentMeta = screenHeadings[testStep] || { heading: '', words: 0 };
     const headingWordsPass = currentMeta.words <= 5;
+    const skipOnThisScreen = testStep >= 1 && testStep <= 4;
+    const backArrowOnThisScreen = testStep >= 2;
 
     return [
       {
@@ -1351,11 +1346,6 @@ export default function DevAppPreviewPage() {
     ];
   }, [testStep, screenSize, scrollCheckPassed, previewIsDark, fontLoaded, previewTarget, headerActiveTab, headerUserType, headerUnreadCount, splashSimulateMode]);
 
-  // Authorization guard (placed after all hooks to comply with React Rules of Hooks)
-  if (!isDev && !isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
   return (
     <div className="min-h-screen w-full bg-[#040711] text-slate-100 font-sans p-4 sm:p-6 lg:p-8">
       {/* ── TOP HEADER & SAFETY NOTICE ── */}
@@ -1585,7 +1575,7 @@ export default function DevAppPreviewPage() {
               style={{
                 '--bg-scrim-rgb': previewIsDark ? '11, 17, 32' : '245, 249, 255'
               }}
-              className={`w-full h-full rounded-[34px] overflow-hidden relative flex flex-col ${previewIsDark ? 'dark bg-[#080D19]' : 'bg-[#EAF2FF]'
+              className={`w-full h-full rounded-[34px] overflow-hidden relative flex flex-col ${previewIsDark ? 'dark bg-slate-950' : 'bg-slate-100'
                 }`}
             >
               {/* CASE 0: Loading Screen Preview (Wordmark & Traveling Pulse Line) */}
@@ -2433,23 +2423,25 @@ export default function DevAppPreviewPage() {
               )}
 
               {/* CASE G: Nearby Issues Fullscreen Map & Draggable Bottom Sheet */}
-              <div className={`relative w-full h-full overflow-hidden ${previewTarget === 'map' ? 'block' : 'hidden'}`}>
-                <NearbyIssuesMapModal
-                  isOpen={true}
-                  standalone={true}
-                  theme={previewIsDark ? 'dark' : 'light'}
-                  reports={SAMPLE_MAP_REPORTS}
-                  reportLocation={mapSimulateLocation ? { lat: 14.7566, lng: 121.0450 } : null}
-                  locationPermissionDenied={!mapSimulateLocation}
-                  initialSheetPosition={mapSheetPosition}
-                  onClose={() => {
-                    addLog('Back button tapped in Nearby Issues Map.');
-                  }}
-                  onOpenReportDetail={(report) => {
-                    addLog(`Opened details for report: ${report.title}`);
-                  }}
-                />
-              </div>
+              {previewTarget === 'map' && (
+                <div className="relative w-full h-full overflow-hidden block">
+                  <NearbyIssuesMapModal
+                    isOpen={true}
+                    standalone={true}
+                    theme={previewIsDark ? 'dark' : 'light'}
+                    reports={SAMPLE_MAP_REPORTS}
+                    reportLocation={mapSimulateLocation ? { lat: 14.7566, lng: 121.0450 } : null}
+                    locationPermissionDenied={!mapSimulateLocation}
+                    initialSheetPosition={mapSheetPosition}
+                    onClose={() => {
+                      addLog('Back button tapped in Nearby Issues Map.');
+                    }}
+                    onOpenReportDetail={(report) => {
+                      addLog(`Opened details for report: ${report.title}`);
+                    }}
+                  />
+                </div>
+              )}
 
               {/* CASE G2: Map Report Popup Direct Showcase (Pin + Tether + Bottom Card) */}
               {previewTarget === 'popup' && (
@@ -2570,7 +2562,7 @@ export default function DevAppPreviewPage() {
                     onClose={() => {
                       addLog('Quick Report closed.');
                     }}
-                    onSubmitReport={async ({ categories }) => {
+                    onSubmitReport={async ({ categories, notes }) => {
                       addLog(`Report submitted for ${categories.length} issue(s): ${categories.join(', ')}`);
                       return {
                         trackingNumbers: categories.map((_, i) => `#PUL-2026-523${1 + i}`)
@@ -2612,7 +2604,7 @@ export default function DevAppPreviewPage() {
                       addLog('Camera closed via round X button.');
                       setPreviewTarget('report');
                     }}
-                    onCapture={(file) => {
+                    onCapture={(file, aiData) => {
                       addLog(`Photo accepted & confirmed: ${file?.name || 'captured.jpg'} (${cameraPhotoRatio})`);
                     }}
                     onPickFromGallery={() => {
@@ -2884,7 +2876,7 @@ export default function DevAppPreviewPage() {
                   setPreviewTarget('report');
                   try {
                     localStorage.removeItem('pulso_quick_report_draft_v2');
-                  } catch { /* ignore */ }
+                  } catch (e) {}
                   setReportPreviewKey((k) => k + 1);
                   addLog('Reset Quick Report to pristine Step 1 (Photo).');
                 }}
@@ -4697,4 +4689,21 @@ export default function DevAppPreviewPage() {
       </div>
     </div>
   );
+}
+
+export default function DevAppPreviewPage() {
+  // 1. Authorization guard: Dev build or Gov/Admin accounts only
+  const isDev = Boolean(import.meta.env.DEV);
+  const user = getAuthUser();
+  const isAdmin = Boolean(
+    user && ['super_admin', 'city_engineer', 'asst_city_engineer', 'admin_officer', 'admin_clerk'].includes(user.role)
+  );
+
+  // If unauthorized in production, route away to root
+  if (!isDev && !isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+
+return <DevAppPreviewContent/>;
 }

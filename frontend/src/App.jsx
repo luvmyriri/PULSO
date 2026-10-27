@@ -1,5 +1,11 @@
+import GovNotificationDeliveryPage from './pages/GovNotificationDeliveryPage';
+import GovFinancialHistoryPage from './pages/GovFinancialHistoryPage';
+import GovAccountPage from './pages/GovAccountPage';
+import GovAssistant from './components/government/GovAssistant';
+import { GovAssistantProvider } from './components/government/GovAssistantHost';
+import StaffPasswordPage from './pages/StaffPasswordPage';
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { GoogleMapsProvider } from './contexts/GoogleMapsContext';
 
@@ -17,12 +23,14 @@ import DevAppPreviewPage from './pages/DevAppPreviewPage';
 import GovDivisionPage   from './pages/GovDivisionPage';
 import PositionDashboard from './pages/PositionDashboard';
 import OboInspectionsPage from './pages/OboInspectionsPage';
-import DispatcherDashboard from './pages/DispatcherDashboard';
+import GovReportsMapPage from './pages/GovReportsMapPage';
 import GovProjectsPage   from './pages/GovProjectsPage';
 import GovAnalyticsPage  from './pages/GovAnalyticsPage';
 import GovReportsDashboard from './pages/GovReportsDashboard';
 import GovBiDashboard      from './pages/GovBiDashboard';
 import GovTodayPage        from './pages/GovTodayPage';
+import GovOverviewPage     from './pages/GovOverviewPage';
+import GovModuleGate       from './components/government/GovModuleGate';
 import CitizenReportsPage  from './pages/CitizenReportsPage';
 import GovReportDetailPage from './pages/GovReportDetailPage';
 import WorkOrdersPage      from './pages/WorkOrdersPage';
@@ -30,6 +38,7 @@ import GovAssetsPage       from './pages/GovAssetsPage';
 import GovAssetDetailPage  from './pages/GovAssetDetailPage';
 import GovAnnouncementsPage from './pages/GovAnnouncementsPage';
 import GovAnnouncementEditor from './pages/GovAnnouncementEditor';
+import PublicUpdatesPage from './pages/PublicUpdatesPage';
 import GovernmentWorkspaceRoute from './pages/GovernmentWorkspaceRoute';
 import ProtectedRoute, {
     GOV_ROLES,
@@ -57,9 +66,21 @@ const SeniorOnly = ({ children }) => <ProtectedRoute allowedRoles={SENIOR_ROLES}
 const InspOnly   = ({ children }) => <ProtectedRoute allowedRoles={INSPECTOR_ROLES}>{children}</ProtectedRoute>;
 const FieldOnly  = ({ children }) => <ProtectedRoute allowedRoles={FIELD_ROLES}>{children}</ProtectedRoute>;
 const ProcOnly   = ({ children }) => <ProtectedRoute allowedRoles={PROCUREMENT_ROLES}>{children}</ProtectedRoute>;
-const AdminOnly  = ({ children }) => <ProtectedRoute allowedRoles={[...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer']}>{children}</ProtectedRoute>;
+const AdminOnly  = ({ children }) => <ProtectedRoute allowedRoles={null} requiredPermission={{module:'admin',action:'view'}}>{children}</ProtectedRoute>;
 const DispatchOp = ({ children }) => <ProtectedRoute allowedRoles={['admin_clerk', 'dispatcher', ...SENIOR_ROLES, ...FIELD_ROLES]}>{children}</ProtectedRoute>;
 const OBOOnly    = ({ children }) => <ProtectedRoute allowedRoles={['admin_clerk', 'records_officer', ...INSPECTOR_ROLES]}>{children}</ProtectedRoute>;
+
+function DeliveryBookmark() {
+    const [params]=useSearchParams();
+    const next=new URLSearchParams(params);
+    const view=next.get('view');
+    if(['design','analysis'].includes(view)) next.set('view','planning');
+    else if(view==='surveys') next.set('view','assessment');
+    else if(['procurement','quantities','estimation'].includes(view)) return <Navigate to={`/gov/financial-history?${next}`} replace/>;
+    else if(!['all','open','assessment','planning','waiting','for_review','completed','historical'].includes(view)) next.delete('view');
+    next.delete('tab');
+    return <Navigate to={`/gov/projects?${next}`} replace/>;
+}
 
 // Resident = non-gov account
 const ResidentOnly = ({ children }) => (
@@ -78,6 +99,7 @@ function App() {
             <GoogleMapsProvider>
                 <BrowserRouter>
                 <ErrorBoundary>
+                    <GovAssistantProvider>
                     <Routes>
                         {/* ── PUBLIC RESIDENT ROUTES ─────────────────────────── */}
                         <Route path="/"               element={<ResidentSurface><Landing /></ResidentSurface>} />
@@ -86,10 +108,14 @@ function App() {
                         <Route path="/report"         element={<ResidentSurface><ReportWizardPage /></ResidentSurface>} />
                         <Route path="/report/success" element={<ResidentSurface><ReportSuccessPage /></ResidentSurface>} />
                         <Route path="/track"          element={<ResidentSurface><PublicTrackPage /></ResidentSurface>} />
+                        <Route path="/updates" element={<PublicUpdatesPage />} />
+                        <Route path="/updates/:updateId" element={<PublicUpdatesPage />} />
                         <Route path="/login"          element={<ResidentSurface><Login /></ResidentSurface>} />
                         <Route path="/register"       element={<ResidentSurface><Register /></ResidentSurface>} />
                         <Route path="/reset-password" element={<ResidentSurface><ResetPassword /></ResidentSurface>} />
                         <Route path="/gov"            element={<GovLanding />} />
+                        <Route path="/gov/activate" element={<StaffPasswordPage />} />
+                        <Route path="/gov/account" element={<ProtectedRoute governmentOnly><GovAccountPage /></ProtectedRoute>} />
 
                         {/* ── TEST-ONLY APP PREVIEW ─────────────────────────── */}
                         <Route path="/dev/app-preview" element={<DevAppPreviewPage />} />
@@ -100,15 +126,21 @@ function App() {
                             <ResidentOnly><ResidentSurface><ResidentDashboard /></ResidentSurface></ResidentOnly>
                         } />
 
-                        {/* ── GOVERNMENT — UNIVERSAL LANDING (First navbar menu) ── */}
+                        {/* ── GOVERNMENT — UNIFIED MY WORK LANDING ── */}
                         <Route path="/gov/dashboard" element={
-                            <GovOnly><GovBiDashboard /></GovOnly>
+                            <GovOnly><GovTodayPage /></GovOnly>
                         } />
                         <Route path="/gov/my-dashboard" element={
-                            <GovOnly><GovBiDashboard /></GovOnly>
+                            <GovOnly><GovTodayPage /></GovOnly>
+                        } />
+                        <Route path="/gov/my-work" element={
+                            <GovOnly><GovTodayPage /></GovOnly>
                         } />
                         <Route path="/gov/today" element={
                             <GovOnly><GovTodayPage /></GovOnly>
+                        } />
+                        <Route path="/gov/overview" element={
+                            <GovOnly><GovOverviewPage /></GovOnly>
                         } />
 
                         {/* Consolidated government workspaces */}
@@ -116,7 +148,7 @@ function App() {
                             <GovOnly><GovernmentWorkspaceRoute workspace="operations" /></GovOnly>
                         } />
                         <Route path="/gov/records-workspace" element={
-                            <GovOnly><GovernmentWorkspaceRoute workspace="records" /></GovOnly>
+                            <GovOnly><GovModuleGate module="records"><GovernmentWorkspaceRoute workspace="records" /></GovModuleGate></GovOnly>
                         } />
                         <Route path="/gov/insights" element={
                             <GovOnly><GovernmentWorkspaceRoute workspace="insights" /></GovOnly>
@@ -141,7 +173,7 @@ function App() {
                             <DispatchOp><Navigate to="/gov/operations?view=dispatch" replace /></DispatchOp>
                         } />
                         <Route path="/gov/map" element={
-                            <DispatchOp><DispatcherDashboard /></DispatchOp>
+                            <GovOnly><GovReportsMapPage /></GovOnly>
                         } />
                         <Route path="/gov/position-queue" element={
                             <GovOnly><PositionDashboard /></GovOnly>
@@ -168,6 +200,7 @@ function App() {
                             <GovOnly><GovAssetDetailPage /></GovOnly>
                         } />
 
+                        <Route path="/gov/notification-deliveries" element={<GovOnly><GovNotificationDeliveryPage/></GovOnly>}/>
                         {/* Governed Updates & Announcements */}
                         <Route path="/gov/announcements" element={
                             <GovOnly><GovAnnouncementsPage /></GovOnly>
@@ -181,8 +214,9 @@ function App() {
 
                         {/* Keep delivery bookmarks on the server-backed project registry. */}
                         <Route path="/gov/delivery" element={
-                            <GovOnly><Navigate to="/gov/projects" replace /></GovOnly>
+                            <GovOnly><DeliveryBookmark /></GovOnly>
                         } />
+                        <Route path="/gov/financial-history" element={<GovOnly><GovFinancialHistoryPage/></GovOnly>}/>
 
                         {/* Legacy planning links preserve bookmarks and open the matching workspace view */}
                         <Route path="/gov/projects" element={
@@ -275,27 +309,29 @@ function App() {
                             <AdminOnly><Navigate to="/gov/administration?view=settings&tab=settings" replace /></AdminOnly>
                         } />
 
-                        {/* Analytics Intelligence BI Engine — government staff & dispatchers */}
+                        {/* Service Insights & Maintenance Review — all gov staff */}
                         <Route path="/gov/analytics" element={
-                            <GovOnly><GovAnalyticsPage /></GovOnly>
+                            <GovOnly><GovernmentWorkspaceRoute workspace="insights" /></GovOnly>
                         } />
                         <Route path="/gov/bi" element={
-                            <GovOnly><Navigate to="/gov/analytics" replace /></GovOnly>
+                            <GovOnly><Navigate to="/gov/insights?view=analytics&tab=analytics" replace /></GovOnly>
                         } />
 
                         {/* Predictive Maintenance Engine — all gov staff */}
                         <Route path="/gov/predictive" element={
-                            <GovOnly><Navigate to="/gov/insights?view=predictive" replace /></GovOnly>
+                            <GovOnly><Navigate to="/gov/insights?view=predictive&tab=predictive" replace /></GovOnly>
                         } />
 
                         {/* Tactical Advisories — all gov staff */}
                         <Route path="/gov/advisories" element={
-                            <GovOnly><Navigate to="/gov/operations?view=updates" replace /></GovOnly>
+                            <GovOnly><Navigate to="/gov/announcements" replace /></GovOnly>
                         } />
 
                         {/* ── 404 FALLBACK ────────────────────────────────────── */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
+                    <GovAssistant />
+                    </GovAssistantProvider>
                 </ErrorBoundary>
 
                 <ScrollToTop />

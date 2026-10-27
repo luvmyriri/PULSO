@@ -1,0 +1,100 @@
+{
+  "schema_read_only": {
+    "outbox_events": true,
+    "announcements": true,
+    "budget_disclosures": false,
+    "announcement_report_associations": false
+  },
+  "date": "2026-10-23",
+  "checks": {
+    "existing_access_regression": "30 passed; 43 warnings",
+    "isolated_defect_probes": "12 defects reproduced; characterization, not acceptance",
+    "frontend_build": "passed"
+  },
+  "target": "uncommitted working tree",
+  "files": [
+    {
+      "path": "backend/announcements_router.py",
+      "sha256": "309D559D33CB2DF3685EE772637E7158462603E40412D9856494A6A6CF09239C"
+    },
+    {
+      "path": "backend/database.py",
+      "sha256": "6FCEFC4290C0E406758CE4EC86F3FA3505A30FADF4ED1B892F50D8D41809A8FF"
+    },
+    {
+      "path": "backend/gov_crud.py",
+      "sha256": "087076DE794775D1BCFA3D835951EAB5C75AB524E8A7505C86599C98BB2DC81F"
+    },
+    {
+      "path": "backend/gov_models.py",
+      "sha256": "6A4728027CC42AC73B2490E63BB091D94987CED0B990432CDEF3421092DBA888"
+    },
+    {
+      "path": "backend/gov_router.py",
+      "sha256": "40FC7E8F907B39D4824FA0A414555F73862DE2918C6978288ED78404F0ABFBEE"
+    },
+    {
+      "path": "backend/gov_schemas.py",
+      "sha256": "1131BD6B16FD7ACB466BF01BD744CAA0FCE7F577CC78F14B6B1631EE004AD87E"
+    },
+    {
+      "path": "backend/models.py",
+      "sha256": "7F1CC29762F97489DB8448F207F1169A6E89D9EFB31AE28483FB1216C59D41E2"
+    },
+    {
+      "path": "backend/predictive_router.py",
+      "sha256": "1E6EEB6F3B7B001B4858C4021C1E03C32040EAF13F41C3B08A5893DD4D69C944"
+    },
+    {
+      "path": "backend/roles_service.py",
+      "sha256": "EEF1ADD226ADB61446082954DB14A0AC528B9F53EF0CA7FE592AD2E240877DC3"
+    },
+    {
+      "path": "frontend/src/App.jsx",
+      "sha256": "B71D12DE82E94FF1DD9E0012587D0264A915ACC3F66F0D5480902063D68AD586"
+    },
+    {
+      "path": "frontend/src/components/GovSidebar.jsx",
+      "sha256": "14083AAEEE70385BA9672AC5930953C3284AD0ED2665B91AEDDDC6336AF22FC1"
+    },
+    {
+      "path": "frontend/src/components/PredictiveMaintenance.jsx",
+      "sha256": "E2364D556B7F1DF4E2D21F6523B726FD8B12D238DB1A1E70F0129AE59986AB07"
+    },
+    {
+      "path": "frontend/src/components/governmentWorkspaceConfig.js",
+      "sha256": "E7F2FFE135175ABFFFC82DF8DFD4DFA321C6B7553C240331E412C96C368D5A90"
+    },
+    {
+      "path": "frontend/src/pages/DispatcherDashboard.jsx",
+      "sha256": "26B216781DFFBEB273CC4AFFE22E192C921874EB9AC44BDA8EABB558482F3A94"
+    },
+    {
+      "path": "frontend/src/pages/GovAnalyticsPage.jsx",
+      "sha256": "F6785F10D12E76E94C89F3F6C7144D04F7B57D71645A9C0FB0C85ABBF73B0140"
+    },
+    {
+      "path": "frontend/src/pages/GovAnnouncementEditor.jsx",
+      "sha256": "FB224CD6C609FA1543A47681E0A79431449ED6DAA15917345A8E5AAF5AF98EEC"
+    },
+    {
+      "path": "frontend/src/pages/GovAnnouncementsPage.jsx",
+      "sha256": "D0B9A89254E5C3BCE1EC4CF254BF62E1C676D2E0EB561314501D50135A14D588"
+    },
+    {
+      "path": "frontend/src/pages/GovReportsDashboard.jsx",
+      "sha256": "F32FB1FCC93809AD09DC94A7E21D497A18844EB8908CA9DD1E4EC4FA2D58CF61"
+    },
+    {
+      "path": "frontend/src/pages/GovTodayPage.jsx",
+      "sha256": "389EDB4038415C44CF63B543C500A521A7D3A2B49315F030928712BF97B0A121"
+    },
+    {
+      "path": "frontend/src/pages/GovernmentWorkspaceRoute.jsx",
+      "sha256": "3D1A1A630304EA2E3BD3CD3F6DC079D041021D5C1F8E56EF38B68B9D2D4F0850"
+    }
+  ],
+  "scope": "review only",
+  "git_base": "2c823d063bc7343e30b05349635be4cbf67c4f7c",
+  "product_code_edited_by_reviewer": false
+}

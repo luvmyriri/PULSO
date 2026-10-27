@@ -3,6 +3,7 @@ import { Search, Bell, X } from 'lucide-react';
 import Branding from './Branding';
 import UserMenu from './UserMenu';
 import NotificationDropdown from './NotificationDropdown';
+import ThemeToggle from './ThemeToggle';
 
 /**
  * BrandHeader Component
@@ -45,8 +46,10 @@ export default function BrandHeader({
     userMenuItems = [],
     avatarInitials = 'ME',
     handleSetTab,
+    onGoHome,
     t = (k, o) => o?.defaultValue || k,
     hideMobileHeader = false,
+    showSearch = false,
     className = ''
 }) {
     const desktopSearchInputRef = useRef(null);
@@ -70,7 +73,17 @@ export default function BrandHeader({
             {/* ── MOBILE BRAND HEADER (< 768px: Seal + Brand Line + Title only, right side empty) ── */}
             {!hideMobileHeader && (
                 <div className="flex md:hidden w-full px-[clamp(1rem,5vw,1.25rem)] pt-[max(env(safe-area-inset-top,0px),12px)] pb-3">
-                    <div className="flex items-center gap-3 w-full min-h-[48px]">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            if (onGoHome) onGoHome();
+                            else if (handleSetTab) handleSetTab('overview');
+                        }}
+                        className="flex items-center gap-3 w-full min-h-[48px] text-left cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl transition-opacity active:scale-[0.99]"
+                        aria-label="PULSO home, Caloocan City Engineering Department"
+                        title="Go to Home"
+                    >
                         {/* Municipal Seal (2.5rem / 40px) */}
                         <img
                             src="/city-engineering-logo.png"
@@ -88,21 +101,23 @@ export default function BrandHeader({
                                 {screenTitle}
                             </h1>
                         </div>
-                    </div>
+                    </button>
                 </div>
             )}
 
             {/* ── DESKTOP BRAND HEADER (≥ 768px: Official municipal bar intact) ── */}
-            <div className="hidden md:flex max-w-[1600px] mx-auto px-4 lg:px-6 relative items-center justify-between gap-4 md:gap-6 h-14 sm:h-16 py-1 sm:py-0">
+            <div className="hidden md:flex w-full px-4 lg:px-6 relative items-center justify-between gap-4 md:gap-6 h-14 sm:h-16 py-1 sm:py-0">
                 {/* Brand Block */}
-                <div className={`items-center shrink-0 min-w-0 ${isSearchOpen ? 'hidden md:flex' : 'flex'}`}>
+                <div className={`items-center shrink-0 min-w-0 ${showSearch && isSearchOpen ? 'hidden md:flex' : 'flex'}`}>
                     <a
                         href="/dashboard"
                         onClick={(e) => {
                             e.preventDefault();
-                            if (handleSetTab) handleSetTab('overview');
+                            if (onGoHome) onGoHome();
+                            else if (handleSetTab) handleSetTab('overview');
                         }}
-                        className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl cursor-pointer min-w-0"
+                        className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl cursor-pointer min-w-0 transition-opacity hover:opacity-90 active:scale-[0.99]"
+                        title="Go to Home"
                         aria-label="PULSO home, Caloocan City Engineering Department"
                     >
                         <Branding showText={true} />
@@ -110,6 +125,7 @@ export default function BrandHeader({
                 </div>
 
                 {/* Search Bar */}
+                {showSearch ? (
                 <div
                     role="search"
                     ref={desktopSearchRef}
@@ -170,8 +186,14 @@ export default function BrandHeader({
                     )}
                 </div>
 
-                {/* Actions: Notifications + User Menu */}
-                <div className="flex items-center gap-2 shrink-0">
+
+                ) : (
+                    <div className="flex-1" />
+                )}
+
+                {/* Actions: Theme Mode Toggle + Notifications + User Menu */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                    <ThemeToggle />
                     <button
                         ref={desktopBellRef}
                         type="button"

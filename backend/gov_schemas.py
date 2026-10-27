@@ -3,8 +3,10 @@ gov_schemas.py — Pydantic Schemas for Government-Side Modules
 City Engineering Office, Caloocan City — PULSO System
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field, ConfigDict, model_validator
+from typing import Optional, List, Dict, Any, Literal
+from decimal import Decimal
+from urllib.parse import urlparse
 from datetime import datetime, date
 
 
@@ -49,12 +51,18 @@ class WorkOrderUpdate(BaseModel):
     notes: Optional[str] = None
     citizen_feedback: Optional[str] = None
 
+
+class WorkOrderAssignment(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    assigned_to_id: int
+    reason: str = Field(min_length=10, max_length=2000)
+
 class WorkOrderResponse(BaseModel):
     id: int
     wo_number: str
     report_id: Optional[int] = None
     project_id: Optional[int] = None
-    assigned_by_id: int
+    assigned_by_id: Optional[int] = None
     assigned_to_id: Optional[int] = None
     title: str
     description: Optional[str] = None
@@ -297,6 +305,10 @@ class ProjectRequestCreate(BaseModel):
     category: Optional[str] = "new_construction"
 
 class ProjectRequestUpdate(BaseModel):
+    expected_version: Optional[int] = Field(None,ge=0)
+    reason: Optional[str] = Field(None,min_length=10,max_length=2000)
+    document_id: Optional[int] = None
+    next_review_at: Optional[datetime] = None
     title: Optional[str] = None
     description: Optional[str] = None
     status: Optional[str] = None
@@ -315,6 +327,12 @@ class ProjectRequestUpdate(BaseModel):
     category: Optional[str] = None
 
 class ProjectRequestResponse(BaseModel):
+    coordination_version: int = 0
+    coordination_started_at: Optional[datetime] = None
+    legacy_status: Optional[str] = None
+    next_review_at: Optional[datetime] = None
+    certificate_reference: Optional[str] = None
+    certificate_document_id: Optional[int] = None
     id: int
     proj_number: str
     title: str
@@ -327,7 +345,7 @@ class ProjectRequestResponse(BaseModel):
     location_lng: Optional[float] = None
     status: str
     current_phase: Optional[int] = 1
-    estimated_cost: float = 0.0
+    estimated_cost: Optional[float] = None
     is_emergency: bool = False
     procurement_modality: str
     category: str
@@ -362,11 +380,19 @@ class ProjectRequestResponse(BaseModel):
 class ProjectStatusUpdate(BaseModel):
     """Payload to advance project phase or status (e.g. issuing FQA certificate)."""
     notes: Optional[str] = None
+    expected_version: Optional[int] = Field(None,ge=0)
+    reference: Optional[str] = None
+    office: Optional[str] = None
+    document_id: Optional[int] = None
 
 
 class CertificateOfCompletionIssue(BaseModel):
     """Body for Assistant City Engineer to issue a Certificate of Completion."""
     notes: Optional[str] = None
+    expected_version: Optional[int] = Field(None,ge=0)
+    reference: Optional[str] = None
+    office: Optional[str] = None
+    document_id: Optional[int] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -386,17 +412,20 @@ class OBOInspectionCreate(BaseModel):
     source_report_id: Optional[int] = None
 
 class OBOInspectionUpdate(BaseModel):
-    status: Optional[str] = None
+    status: Optional[Literal['application_received', 'technical_review', 'inspection_scheduled', 'inspection_complete', 'notice_issued', 're_inspection_scheduled', 'permit_issued', 'cleared']] = None
     assigned_inspector_id: Optional[int] = None
     inspection_date: Optional[datetime] = None
     findings: Optional[str] = None
     is_compliant: Optional[bool] = None
     violation_details: Optional[str] = None
     payment_verified: Optional[bool] = None
+    notes: Optional[str] = Field(None, max_length=4000)
+    decision_reference: Optional[str] = Field(None, max_length=500)
 
 class OBOTechnicalReviewUpdate(BaseModel):
-    department: str # arch, civil, elec, sani, mech
-    status: str     # approved, rejected
+    department: Literal['arch', 'civil', 'elec', 'sani', 'mech']
+    status: Literal['approved', 'rejected']
+    remarks: str = Field(min_length=10, max_length=4000)
 
 class OBOAppealUpdate(BaseModel):
     appeal_evidence_url: str
@@ -571,9 +600,15 @@ class SystemRoleBase(BaseModel):
     access_level: str = "staff"
 
 class SystemRoleCreate(SystemRoleBase):
-    pass
+    name: str = Field(pattern=r'^[a-z][a-z0-9_]{1,63}$')
+    reason: str = Field(min_length=10,max_length=2000)
+    expected_capabilities: Optional[Dict[str,Any]] = None
 
 class SystemRoleResponse(SystemRoleBase):
+    # Historical roles mix action grants with typed metadata. Preserve these
+    # values on reads; do not convert boolean metadata into wildcard authority.
+    capabilities: Dict[str,Any]
+    label: Optional[str] = None
     id: int
     created_at: datetime
     is_template: bool
@@ -626,16 +661,23 @@ class AssetBase(BaseModel):
     gps_coordinates: Optional[Dict[str, Any]] = None
     material_type: Optional[str] = None
     date_completed: Optional[date] = None
-    design_life: int = 20
+    design_life: Optional[int] = Field(None, ge=1, le=500)
     original_contractor: Optional[str] = None
     barangay: Optional[str] = None
     barangay_id: Optional[int] = None
-    condition_score: Optional[float] = 100.0
+    condition_score: Optional[float] = Field(None, ge=0, le=100)
     status: Optional[str] = "operational"
 
 
 class AssetCreate(AssetBase):
     asset_id: Optional[str] = None
+
+
+class AssetConditionAssessment(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    condition_score: float = Field(ge=0, le=100)
+    expected_condition_score: Optional[float] = Field(..., ge=0, le=100)
+    notes: str = Field(min_length=10, max_length=2000)
 
 
 class AssetUpdate(BaseModel):
@@ -676,6 +718,7 @@ class AssetResponse(AssetBase):
 
 
 class AssetDetailResponse(AssetResponse):
+    condition_assessments: List[Dict[str, Any]] = Field(default_factory=list)
     deterioration_velocity: float = 0.0
     flood_risk_level: Optional[str] = "Low"
     soil_subsidence: Optional[float] = 0.0
@@ -685,6 +728,7 @@ class AssetDetailResponse(AssetResponse):
 
 
 class CategoryConditionBreakdown(BaseModel):
+    unknown: int = 0
     good: int = 0
     fair: int = 0
     poor: int = 0
@@ -694,14 +738,14 @@ class CategoryConditionBreakdown(BaseModel):
 class CategoryStats(BaseModel):
     category_name: str
     total_count: int
-    avg_condition_score: float
+    avg_condition_score: Optional[float] = None
     condition_breakdown: CategoryConditionBreakdown
     active_work_orders: int
 
 
 class AssetStatsResponse(BaseModel):
     total_assets: int
-    overall_avg_condition: float
+    overall_avg_condition: Optional[float] = None
     total_critical_assets: int
     total_active_work_orders: int
     categories: Dict[str, CategoryStats]
@@ -795,9 +839,17 @@ class OperationsLeadershipMetrics(BaseModel):
     resolved_in_period: int
 
 
+class InitialReviewTarget(BaseModel):
+    due_at: datetime
+    hours: int
+    overdue: bool
+    measured_from: Literal['submission']
+
+
 class OperationsTriageItem(BaseModel):
+    review_target: Optional[InitialReviewTarget] = None
     id: int
-    entity_type: str  # "report" | "work_order"
+    entity_type: str  # "report" | "work_order" | "announcement" | "asset_review"
     ticket_id: str
     title: str
     category: str
@@ -807,6 +859,12 @@ class OperationsTriageItem(BaseModel):
     time_in_state: str
     action_url: str
     recommended_action: str
+    task_bucket: Optional[str] = "needs_my_review"  # "assigned_to_me" | "needs_my_review" | "waiting_on_others" | "recently_completed"
+    assigned_to_id: Optional[int] = None
+    assigned_to_name: Optional[str] = None
+    why_in_inbox: Optional[str] = None
+    work_bundle: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
 
 class SectorMetric(BaseModel):
@@ -832,23 +890,164 @@ class TeamCapacityItem(BaseModel):
 
 
 class GovOperationsTodayResponse(BaseModel):
+    routing_enabled: Optional[bool] = None
+    can_route_reports: bool = False
     timestamp: datetime
-    metrics: OperationsLeadershipMetrics
+    metrics: Optional[OperationsLeadershipMetrics] = None
     needs_attention: List[OperationsTriageItem]
-    sector_summary: SectorSummary
-    team_capacity: List[TeamCapacityItem]
+    sector_summary: Optional[SectorSummary] = None
+    team_capacity: List[TeamCapacityItem] = []
+    user_role: Optional[str] = None
+    user_display_name: Optional[str] = None
+    work_bundles: List[Dict[str, Any]] = []
+    inbox_counts: Dict[str, int] = {}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Governed Announcements & Public Notices
+# Governed Announcements, Report Associations & Budget Disclosures
 # ─────────────────────────────────────────────────────────────────────────────
+
+class AnnouncementReportAssociationCreate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    report_id: int
+    expected_version: Optional[int] = None
+    association_type: Literal['candidate', 'contextual_relevance', 'confirmed_coverage', 'rejected', 'revoked'] = Field(
+        "candidate",
+        description="candidate | contextual_relevance | confirmed_coverage | rejected | revoked"
+    )
+    basis_reason: Optional[str] = None
+
+    @model_validator(mode='after')
+    def reviewed_reason(self):
+        if self.association_type != 'candidate' and len((self.basis_reason or '').strip()) < 10:
+            raise ValueError('Record a review reason of at least 10 characters for this report relationship.')
+        return self
+
+
+class AnnouncementReportAssociationUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    expected_version: int
+    association_type: str = Field(
+        ...,
+        description="candidate | contextual_relevance | confirmed_coverage | rejected | revoked"
+    )
+    basis_reason: Optional[str] = None
+    revoked_reason: Optional[str] = None
+
+
+class AnnouncementReportAssociationResponse(BaseModel):
+    id: int
+    announcement_id: int
+    report_id: int
+    ticket_id: Optional[str] = None
+    report_title: Optional[str] = None
+    report_category: Optional[str] = None
+    report_barangay: Optional[str] = None
+    report_status: Optional[str] = None
+    association_type: str
+    basis_reason: Optional[str] = None
+    created_by_id: Optional[int] = None
+    reviewed_by_id: Optional[int] = None
+    reviewed_by_name: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    revoked_by_id: Optional[int] = None
+    revoked_by_name: Optional[str] = None
+    revoked_at: Optional[datetime] = None
+    revoked_reason: Optional[str] = None
+    notified_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BudgetDisclosureInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    expected_version: Optional[int] = None
+    publication_format: Optional[str] = Field("announcement", description="announcement | advisory | news")
+    amount: Optional[Decimal] = Field(None, ge=0, max_digits=18, decimal_places=2, allow_inf_nan=False, description="Null when no budget amount is disclosed")
+    currency: str = Field("PHP", description="ISO currency code")
+    amount_type: Literal['approved_budget_for_contract', 'contract_award_amount', 'allocated_project_budget', 'maintenance_allocation', 'not_disclosed'] = Field(
+        "not_disclosed",
+        description="approved_budget_for_contract | contract_award_amount | allocated_project_budget | maintenance_allocation | not_disclosed"
+    )
+    source_label: Optional[str] = None
+    source_url: Optional[str] = None
+    official_bidding_url: Optional[str] = "https://caloocancity.gov.ph/invitation-to-bid/"
+    source_date: Optional[date] = None
+    fiscal_period: Optional[str] = None
+    issuing_office: Optional[str] = "City Engineering Department"
+    scope_caveat: Optional[str] = None
+    review_state: Literal['draft'] = 'draft'
+    project_id: Optional[int] = None
+    work_order_id: Optional[int] = None
+
+    @model_validator(mode='after')
+    def source_required(self):
+        if self.amount is not None:
+            if self.amount_type == 'not_disclosed' or not (self.source_label or '').strip() or not self.source_url or not self.source_date:
+                raise ValueError('A numeric disclosure needs an amount type, source label, original document URL, and source date.')
+        elif self.amount_type != 'not_disclosed':
+            raise ValueError('Use not_disclosed when no amount is supplied.')
+        for url in (self.source_url, self.official_bidding_url):
+            if url and (urlparse(url).scheme not in ('https', 'http') or not urlparse(url).hostname):
+                raise ValueError('Source links must be complete HTTP or HTTPS URLs.')
+        if self.official_bidding_url and urlparse(self.official_bidding_url).hostname not in {'caloocancity.gov.ph', 'www.caloocancity.gov.ph'}:
+            raise ValueError('The official bidding link must point to the Caloocan City website.')
+        return self
+
+
+class BudgetDisclosureResponse(BaseModel):
+    id: int
+    disclosure_id: str
+    announcement_id: Optional[int] = None
+    project_id: Optional[int] = None
+    work_order_id: Optional[int] = None
+    version: int = 1
+    publication_format: str = "announcement"
+    amount: Optional[Decimal] = None
+    currency: str = "PHP"
+    amount_type: str = "not_disclosed"
+    source_label: Optional[str] = None
+    source_url: Optional[str] = None
+    official_bidding_url: Optional[str] = None
+    source_date: Optional[date] = None
+    fiscal_period: Optional[str] = None
+    issuing_office: Optional[str] = None
+    scope_caveat: Optional[str] = None
+    review_state: str = "draft"
+    entered_by_id: Optional[int] = None
+    entered_by_name: Optional[str] = None
+    reviewed_by_id: Optional[int] = None
+    reviewed_by_name: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PublicationDetails(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    summary_en: str = Field('', max_length=600)
+    summary_fil: str = Field('', max_length=600)
+    issuing_office: str = Field('', max_length=200)
+    effective_from: Optional[datetime] = None
+    effective_until: Optional[datetime] = None
+    action_en: str = Field('', max_length=2000)
+    action_fil: str = Field('', max_length=2000)
+
 
 class AnnouncementBase(BaseModel):
+    publication_details: PublicationDetails = Field(default_factory=PublicationDetails)
+    model_config = ConfigDict(extra='forbid')
     title_en: str = Field(..., min_length=3, max_length=255, description="English announcement headline")
     title_fil: Optional[str] = Field(None, max_length=255, description="Filipino headline translation")
     content_en: str = Field(..., min_length=10, description="Full English announcement text")
     content_fil: Optional[str] = Field(None, description="Full Filipino announcement text")
-    category: str = Field("general_notice", description="Category: planned_works, service_interruption, progress_update, work_completed, general_notice, advisory")
+    category: str = Field("general_notice", description="Category: planned_works, service_interruption, progress_update, work_completed, general_notice, advisory, news_release")
+    publication_format: Optional[str] = Field("announcement", description="Format: announcement | advisory | news")
     priority: str = Field("normal", description="Priority: normal, urgent, emergency")
     target_audience: str = Field("public", description="Audience: public, district, barangay, staff")
     target_districts: Optional[List[str]] = Field(default_factory=list, description="Target districts")
@@ -866,15 +1065,20 @@ class AnnouncementBase(BaseModel):
 
 
 class AnnouncementCreate(AnnouncementBase):
-    pass
+    budget_disclosure: Optional[BudgetDisclosureInput] = None
+    report_associations_input: Optional[List[AnnouncementReportAssociationCreate]] = None
 
 
 class AnnouncementUpdate(BaseModel):
+    publication_details: Optional[PublicationDetails] = None
+    model_config = ConfigDict(extra='forbid')
+    expected_version: int
     title_en: Optional[str] = Field(None, min_length=3, max_length=255)
     title_fil: Optional[str] = Field(None, max_length=255)
     content_en: Optional[str] = Field(None, min_length=10)
     content_fil: Optional[str] = None
     category: Optional[str] = None
+    publication_format: Optional[str] = None
     priority: Optional[str] = None
     target_audience: Optional[str] = None
     target_districts: Optional[List[str]] = None
@@ -889,9 +1093,13 @@ class AnnouncementUpdate(BaseModel):
     source_project_id: Optional[int] = None
     source_asset_id: Optional[str] = None
     image_url: Optional[str] = None
+    budget_disclosure: Optional[BudgetDisclosureInput] = None
+    report_associations_input: Optional[List[AnnouncementReportAssociationCreate]] = None
 
 
 class AnnouncementStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    expected_version: int
     status: str = Field(..., description="Target status: draft, in_review, approved, scheduled, published, expired, withdrawn")
     scheduled_at: Optional[datetime] = Field(None, description="Mandatory when status transitions to 'scheduled'")
     withdrawal_reason: Optional[str] = Field(None, description="Mandatory when status transitions to 'withdrawn'")
@@ -899,6 +1107,8 @@ class AnnouncementStatusUpdate(BaseModel):
 
 
 class AnnouncementCorrectionCreate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    expected_version: int
     correction_summary: str = Field(..., min_length=5, description="Publicly visible summary of correction")
     reason: str = Field(..., min_length=5, description="Operational reason")
     updated_title_en: Optional[str] = None
@@ -940,9 +1150,14 @@ class AnnouncementDeliveryResponse(BaseModel):
 
 
 class AnnouncementResponse(AnnouncementBase):
+    attachments: List[Dict[str, Any]] = Field(default_factory=list)
     id: int
     announcement_id: str
     status: str
+    content_version: int = 1
+    approved_version: Optional[int] = None
+    published_version: Optional[int] = None
+    allowed_actions: List[str] = []
     author_id: int
     author_name: Optional[str] = None
     reviewer_id: Optional[int] = None
@@ -961,6 +1176,11 @@ class AnnouncementResponse(AnnouncementBase):
     corrections_count: int = 0
     corrections: List[AnnouncementCorrectionResponse] = []
     deliveries: List[AnnouncementDeliveryResponse] = []
+    budget_disclosure: Optional[BudgetDisclosureResponse] = None
+    report_associations: List[AnnouncementReportAssociationResponse] = []
+    confirmed_reports_count: int = 0
+    contextual_reports_count: int = 0
+    candidate_reports_count: int = 0
 
     class Config:
         from_attributes = True

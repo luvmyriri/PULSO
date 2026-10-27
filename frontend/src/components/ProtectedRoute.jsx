@@ -139,7 +139,7 @@ const UnauthorizedPage = ({ userRole, allowedRoles }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // ProtectedRoute gate
 // ─────────────────────────────────────────────────────────────────────────────
-const ProtectedRoute = ({ children, allowedRoles = null, requiredPermission = null }) => {
+const ProtectedRoute = ({ children, allowedRoles = null, requiredPermission = null, governmentOnly = false }) => {
     const location = useLocation();
 
     // Read auth state
@@ -148,10 +148,12 @@ const ProtectedRoute = ({ children, allowedRoles = null, requiredPermission = nu
 
     // Not authenticated → to login or gov portal depending on allowedRoles
     if (!token || !user) {
-        const isGovRoute = allowedRoles !== null && !allowedRoles.includes('resident');
+        const isGovRoute = location.pathname.startsWith('/gov') || allowedRoles !== null && !allowedRoles.includes('resident');
         const redirectPath = isGovRoute ? '/gov' : '/login';
         return <Navigate to={redirectPath} state={{ from: location }} replace />;
     }
+
+    if (governmentOnly && user.role === 'resident') return <UnauthorizedPage userRole={user.role} allowedRoles={GOV_ROLES} />;
 
     // Role check — if allowedRoles is null, any authenticated user is OK
     if (allowedRoles !== null && !allowedRoles.includes(user.role)) {
@@ -163,7 +165,9 @@ const ProtectedRoute = ({ children, allowedRoles = null, requiredPermission = nu
         return <UnauthorizedPage userRole={user.role} allowedRoles={null} />; // Or a specialized "No Capability" page
     }
 
-    return children;
+    return location.pathname.startsWith('/gov') || governmentOnly
+        ? <div className="gov-experience">{children}</div>
+        : children;
 };
 
 export default ProtectedRoute;

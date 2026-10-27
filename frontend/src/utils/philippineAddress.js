@@ -64,7 +64,7 @@ export const CALOOCAN_BARANGAYS = Array.from({ length: 188 }, (_, i) => {
         number: num,
         name: `Barangay ${num}`,
         alias: alias || '',
-        label: alias ? `Barangay ${num} (${alias})` : `Barangay ${num}`
+        label: `Barangay ${num}`
     };
 });
 
@@ -72,7 +72,7 @@ export const CALOOCAN_NORTH_BARANGAYS_DETAILED = CALOOCAN_BARANGAYS
     .filter(b => b.number >= 165 && b.number <= 188)
     .map(b => ({
         value: `Brgy. ${b.number}`,
-        label: b.alias ? `Brgy. ${b.number} (${b.alias})` : `Brgy. ${b.number}`,
+        label: `Brgy. ${b.number}`,
         group: 'North Caloocan (District 3)',
         description: `District 3 · ${b.alias || 'North Caloocan'}`
     }));
@@ -81,7 +81,7 @@ export const CALOOCAN_SOUTH_BARANGAYS_DETAILED = CALOOCAN_BARANGAYS
     .filter(b => b.number >= 1 && b.number <= 164)
     .map(b => ({
         value: `Brgy. ${b.number}`,
-        label: b.alias ? `Brgy. ${b.number} (${b.alias})` : `Brgy. ${b.number}`,
+        label: `Brgy. ${b.number}`,
         group: 'South Caloocan (Districts 1 & 2)',
         description: `Districts 1 & 2 · ${b.alias || 'South Caloocan'}`
     }));

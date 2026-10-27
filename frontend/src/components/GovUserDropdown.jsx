@@ -26,7 +26,7 @@ export default function GovUserDropdown({ currentUser }) {
     };
 
     const handleAccountClick = () => {
-        navigate('/gov/administration?view=staff');
+        navigate('/gov/account');
     };
 
     const items = [

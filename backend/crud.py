@@ -37,6 +37,10 @@ def _append_timeline(
         project_id=project_id,
     )
     db.add(entry)
+    db.flush()
+    if report_id and is_public:
+        from report_notifications import enqueue_report_update
+        enqueue_report_update(db, report_id, entry.id)
     # commit deferred to caller
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -382,6 +386,9 @@ def create_report(
             new_ticket_id = models.generate_ticket_id()
             db_report = models.Report(**report_data, resident_id=resident_id, ticket_id=new_ticket_id)
             db.add(db_report)
+            db.flush()
+            from report_review import auto_route
+            auto_route(db, db_report)
             db.commit()
             db.refresh(db_report)
             
@@ -473,39 +480,8 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
                 user.trust_score = max(0, min(100, user.trust_score))
                 db.add(user)
         
-        # Notification messages for each status transition
-        ticket = db_report.ticket_id or f"PUL-{datetime.now().year}-{db_report.id:04d}"
-        status_messages = {
-            "pending_approval": (
-                "Report Verified",
-                f"Your report {ticket} has been verified by the Command Center and is pending engineering approval."
-            ),
-            "approved_internal": (
-                "Report Approved",
-                f"Good news! Your report {ticket} has been approved and is ready for dispatch."
-            ),
-            "dispatched": (
-                "Team Dispatched",
-                f"A field team has been dispatched for your report {ticket}. They are on the way."
-            ),
-            "resolved": (
-                "Report Resolved",
-                f"Your report {ticket} has been resolved. Thank you for making North Caloocan better!"
-            ),
-            "rejected": (
-                "Report Rejected",
-                f"Your report {ticket} could not be verified and has been rejected. If this was an error, please re-submit with clearer details."
-            ),
-        }
-        
-        if status in status_messages:
-            title, message = status_messages[status]
-            if db_report.resident_id is not None:
-                db.add(gov_models.OutboxEvent(
-                    event_key=f"report-status:{timeline_entry.id}:resident:{db_report.resident_id}",
-                    event_type="resident_in_app_notification",
-                    payload={"resident_id": db_report.resident_id, "title": title, "message": message},
-                ))
+        from report_notifications import enqueue_report_update
+        enqueue_report_update(db, db_report.id, timeline_entry.id)
 
         # 4. Integration Hook: Automated Asset Resolution & Archival
         if status == "resolved":

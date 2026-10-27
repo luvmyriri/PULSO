@@ -1,3 +1,4 @@
+import { adminAllows, ADMIN_VIEWS } from '../utils/adminAccess';
 import {
     BarChart3,
     ClipboardCheck,
@@ -27,7 +28,7 @@ export const GOVERNMENT_WORKSPACES = {
         label: 'Service operations',
         path: '/gov/operations',
         views: [
-            { key: 'dispatch', label: 'Dispatch & Map', icon: Map, roles: GOV_ROLES },
+            { key: 'dispatch', label: 'Reports map', icon: Map, roles: GOV_ROLES },
             { key: 'reports', label: 'Reports Queue', icon: Inbox, roles: GOV_ROLES },
             { key: 'work-orders', label: 'Work Orders', icon: Wrench, roles: GOV_ROLES },
             { key: 'closed', label: 'Closed Reports', icon: ClipboardCheck, roles: GOV_ROLES },
@@ -45,12 +46,11 @@ export const GOVERNMENT_WORKSPACES = {
         ],
     },
     insights: {
-        label: 'Insights & Analytics',
+        label: 'Report analysis and maintenance',
         path: '/gov/insights',
         views: [
-            { key: 'overview', label: 'Operational Overview', icon: Gauge, roles: GOV_ROLES },
-            { key: 'analytics', label: 'Analytics & GIS Heatmap', icon: BarChart3, roles: GOV_ROLES },
-            { key: 'predictive', label: 'Predictive Maintenance', icon: ShieldCheck, roles: GOV_ROLES },
+            { key: 'analytics', label: 'Report analysis', icon: BarChart3, roles: GOV_ROLES },
+            { key: 'predictive', label: 'Predictive maintenance', icon: ShieldCheck, roles: GOV_ROLES },
         ],
     },
     administration: {
@@ -61,6 +61,7 @@ export const GOVERNMENT_WORKSPACES = {
             { key: 'residents', label: 'Resident Accounts', icon: Users, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
             { key: 'settings', label: 'System Settings', icon: Settings, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
             { key: 'automated-ai', label: 'Automated & AI Tools', icon: Bot, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
+            { key: 'audit', label: 'Activity log', icon: History },
         ],
     },
 };
@@ -82,6 +83,7 @@ export function getAvailableWorkspaceViews(workspace, currentUser) {
     const isMasterAdmin = role === 'system_admin' || role === 'city_engineer' || role === 'asst_city_engineer';
 
     return definition.views.filter((view) => {
+        if (workspace === 'administration') return adminAllows(user,ADMIN_VIEWS.find(item=>item.value===view.key)?.action||'unsupported');
         if (isMasterAdmin) return true;
         if (view.roles && !view.roles.includes(role)) return false;
         if (view.permission && !checkPermission(user, view.permission[0], view.permission[1])) return false;

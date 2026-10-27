@@ -1,10 +1,30 @@
-import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { X, Search, CheckCircle2, Clock, AlertCircle, MapPin, ArrowRight } from 'lucide-react';
 
 export default function TrackReportModal({ isOpen, onClose }) {
   const [ticketInput, setTicketInput] = useState('');
   const [searched, setSearched] = useState(false);
   const [result, setResult] = useState(null);
+
+  // Lock body scroll and notify components (e.g. ScrollToTop) when modal is active
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      window.dispatchEvent(new CustomEvent('pulso:updates-modal-active', { detail: { active: true } }));
+      document.body.setAttribute('data-updates-modal-active', 'true');
+    } else {
+      document.body.style.overflow = '';
+      window.dispatchEvent(new CustomEvent('pulso:updates-modal-active', { detail: { active: false } }));
+      document.body.removeAttribute('data-updates-modal-active');
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      window.dispatchEvent(new CustomEvent('pulso:updates-modal-active', { detail: { active: false } }));
+      document.body.removeAttribute('data-updates-modal-active');
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -40,22 +60,28 @@ export default function TrackReportModal({ isOpen, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="track-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs"
+      className="fixed inset-0 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
     >
-      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 overflow-hidden">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-2xl shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-6 overflow-y-auto max-h-[88vh] sm:max-h-[90vh] animate-in slide-in-from-bottom duration-300 sm:duration-200 sm:slide-in-from-bottom-0 sm:zoom-in-95"
+      >
+        {/* Mobile Drag Indicator Handle */}
+        <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 mx-auto mb-4 sm:hidden" />
         
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg transition-colors cursor-pointer z-10"
           aria-label="Close tracking modal"
         >
           <X size={18} />
         </button>
 
         {/* Header */}
-        <div className="text-left mb-5">
+        <div className="text-left mb-5 pr-8 sm:pr-0">
           <h3 id="track-modal-title" className="font-heading font-bold text-xl text-slate-900 dark:text-white">
             Track your report
           </h3>
@@ -83,9 +109,9 @@ export default function TrackReportModal({ isOpen, onClose }) {
 
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white font-bold text-xs font-heading uppercase tracking-wider transition-colors shadow-xs"
+            className="w-full py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white font-bold text-xs font-heading uppercase tracking-wider transition-colors shadow-xs cursor-pointer"
           >
-            Check Live Status
+            Check Status
           </button>
         </form>
 
@@ -135,13 +161,13 @@ export default function TrackReportModal({ isOpen, onClose }) {
             </div>
 
             <div className="pt-2">
-              <a
-                href="/login"
+              <Link
+                to="/login"
                 className="w-full flex items-center justify-center gap-1.5 text-xs font-bold text-[#ff6b00] hover:underline"
               >
                 <span>Sign in for full history &amp; photos</span>
                 <ArrowRight size={13} />
-              </a>
+              </Link>
             </div>
           </div>
         )}
@@ -157,11 +183,6 @@ export default function TrackReportModal({ isOpen, onClose }) {
             </p>
           </div>
         )}
-
-        {/* Footer info */}
-        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 text-center">
-          Need help finding your ticket? Call <strong className="text-slate-600 dark:text-slate-300">(02) 8362-0220</strong>
-        </div>
 
       </div>
     </div>

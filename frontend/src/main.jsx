@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/inter'
 import './index.css'
 import App from './App.jsx'
+import './styles/government-surfaces.css'
 import './i18n'
 
 // Filter out known external third-party deprecation warnings (e.g. @react-google-maps/api Marker deprecation)

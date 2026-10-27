@@ -14,6 +14,8 @@ import gov_schemas
 import gov_router
 import main
 import models
+import gov_models as gm
+from tests.test_government_workspace import context
 
 
 class _Query:
@@ -94,22 +96,15 @@ def test_status_and_role_paths_have_distinct_handlers():
     assert paths["/api/gov/users/{user_id}/role"] is gov_router.update_user_role
 
 
-def test_user_status_change_commits_once_with_audit(monkeypatch):
-    actor = models.Official(id=10, role="system_admin", email="admin@example.test")
-    target = models.Resident(id=11, email="resident@example.test", is_active=True)
-    db = _UsersDB(resident=target)
-    audits = []
-    monkeypatch.setattr(gov_router.gov_crud, "_append_audit", lambda *_args, **kwargs: audits.append(kwargs))
-    result = gov_router.update_user_status(
-        user_id=11,
-        payload=gov_router.UserStatusPayload(action="deactivate", reason="Account review"),
-        db=db,
-        current_user=actor,
-    )
-    assert not target.is_active
-    assert db.commits == 1
-    assert len(audits) == 1
-    assert "deactivated" in result["message"]
+def test_user_status_change_commits_once_with_audit(context):
+    client,sessions,tokens=context
+    body=dict(action='deactivate',reason='FAKE documented account review',expected_version=0)
+    result=client.patch('/api/gov/users/100/status',json=body,headers=tokens['platform'])
+    assert result.status_code==200,result.text
+    assert client.patch('/api/gov/users/100/status',json=body,headers=tokens['platform']).status_code==409
+    with sessions() as db:
+        assert not db.get(models.Resident,100).is_active
+        assert db.query(gm.AuditLog).filter_by(action='Resident account access changed').count()==1
 
 
 def test_document_registry_requires_staff_and_records_capability(monkeypatch):
@@ -314,20 +309,20 @@ def test_budget_approval_shortcut_is_closed():
     assert error.value.status_code == 409
 
 
-def test_project_certificate_shortcuts_are_closed_until_evidence_review():
-    actor = models.Official(id=7, role="manager")
-    with pytest.raises(HTTPException) as direct_error:
-        gov_router.issue_certificate(
-            proj_id=15, payload=gov_schemas.CertificateOfCompletionIssue(notes="Final audit"),
-            db=SimpleNamespace(), current_user=actor,
-        )
-    assert direct_error.value.status_code == 409
-    with pytest.raises(HTTPException) as fqa_error:
-        gov_router.issue_fqa_certificate(
-            project_id=15, payload=gov_schemas.ProjectStatusUpdate(notes="Final audit"),
-            db=SimpleNamespace(), current_user=actor,
-        )
-    assert fqa_error.value.status_code == 409
+def test_project_certificate_shortcuts_are_closed_until_evidence_review(context):
+    from datetime import datetime,timezone
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.add(gm.ProjectRequest(id=15,proj_number='FAKE-PROJECT-15',title='FAKE completed project',status='completed',coordination_started_at=datetime.now(timezone.utc),district_id=1))
+        db.commit()
+    for path in ['/api/gov/projects/15/certificate','/api/gov/projects/15/issue-certificate']:
+        missing=client.post(path,json={'notes':'FAKE certificate request'},headers=tokens['chief'])
+        assert missing.status_code==409,missing.text
+        no_proof=client.post(path,json={'notes':'FAKE certificate request','expected_version':0,'reference':'FAKE cert ref','office':'FAKE office'},headers=tokens['chief'])
+        assert no_proof.status_code==422,no_proof.text
+    with sessions() as db:
+        assert not db.get(gm.ProjectRequest,15).certificate_issued
+        assert db.get(gm.ProjectRequest,15).certificate_reference is None
 
 
 def test_generic_report_status_route_only_accepts_verification(monkeypatch):

@@ -1,127 +1,211 @@
+import { API_BASE_URL } from '../utils/apiBase';
+import { useGovernmentData } from '../utils/governmentApi';
 import React, { useState, useRef, useEffect } from 'react';
 import {
-    ChevronLeft,
     Copy,
     Check,
     MapPin,
     Maximize2,
-    ChevronDown,
-    Trash2,
-    RotateCcw,
-    AlertTriangle,
     X,
-    FileText
+    XCircle,
+    CheckCircle2,
+    FileText,
+    Clock,
+    Wrench,
+    HelpCircle,
+    ArrowLeft,
+    ExternalLink,
+    Image as ImageIcon,
+    BookOpen,
+    AlertTriangle
 } from 'lucide-react';
-import ReportStatusPill from './ReportStatusPill';
-import { REPORT_WORKFLOW_STEPS, getReportWorkflowIndex } from '../utils/reportWorkflow';
-import { cleanResidentAddress } from './ReportHistoryCard';
-import { API_BASE_URL } from '../utils/apiBase';
+import { GoogleMap } from '@react-google-maps/api';
+import { useGoogleMaps } from '../contexts/GoogleMapsContext';
+import { encodeOpenLocationCode } from '../utils/philippineAddress';
+
+const OLC_CHARSET = '23456789CFGHJMPQRVWX';
+
+function decodePlusCode(code) {
+    if (!code || typeof code !== 'string') return null;
+    const match = code.match(/([23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4})/i);
+    if (!match) return null;
+    let clean = match[1].toUpperCase();
+    const plusIdx = clean.indexOf('+');
+    if (plusIdx === -1) return null;
+
+    if (plusIdx === 4) {
+        clean = '7Q63' + clean;
+    }
+    if (clean.indexOf('+') !== 8) return null;
+
+    const codeDigits = clean.replace('+', '');
+    let latVal = 0;
+    let lngVal = 0;
+    const resolutions = [20, 1, 0.05, 0.0025, 0.000125];
+
+    for (let i = 0; i < 5 && i * 2 < codeDigits.length; i++) {
+        const r = resolutions[i];
+        const latIdx = OLC_CHARSET.indexOf(codeDigits[i * 2]);
+        const lngIdx = OLC_CHARSET.indexOf(codeDigits[i * 2 + 1]);
+        if (latIdx === -1 || lngIdx === -1) break;
+        latVal += latIdx * r;
+        lngVal += lngIdx * r;
+    }
+
+    const lat = latVal - 90 + 0.000125 / 2;
+    const lng = lngVal - 180 + 0.000125 / 2;
+    return { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
+}
 
 /**
  * ReportDetailView
- * ─────────────────────────────────────────────────────────────────────────────
- * Redesigned full-screen Report Details layout matching Problem 3:
- * - Header row: 48px round back button, 20px bold tracking number, soft gray subline
- *   "[Date] · Submitted", 48px outlined "Copy" button with "Copied" alert.
- * - Photo: Large 4:3 rounded photo with top-left status pill, 48px round expand button
- *   at bottom-right opening fullscreen modal with pinch/zoom & close button.
- * - Progress Card: "Progress" / "Step X of 5", 5-step joined circles matching
- *   dashboard's LatestReportCard (filled orange w/ check for done, orange ring w/ dot
- *   for current, soft gray for upcoming, labels max 2 lines).
- * - Location Card (inset card): 40px pin tile, 14px bold address + soft gray subline,
- *   48px Map button (no Plus Codes or coordinates).
- * - "What was reported" card: 14px description with 1.5 line height, 4-line clamp,
- *   "Show more" / "Show less" toggle, full text always in sr-only.
- * - Staff update timeline / notes (if present) in matching card style.
- * - Bottom action: Full-width outlined danger button "Withdraw report" (trash/undo icon)
- *   shown only when retracting is allowed. Tapping opens role="alertdialog" modal
- *   "Withdraw this report?" with "Keep report" and "Withdraw" buttons.
+ * -----------------------------------------------------------------------------
+ * Pixel-accurate implementation of the Civic Aperture Report Details layout
+ * matching target design (media_1793041157229_86aa8ffd.jpg):
+ * - Top Breadcrumb: Back to My Reports / PUL-2026-XXXX
+ * - Category Header: Bold title + Ticket ID · Date + Sample report pill + Copy report ID button
+ * - Full-width Status Callout Banner (Rejected, Awaiting review, In progress, Resolved)
+ * - 2-Column Responsive Grid (Span 2 Left / Span 1 Right):
+ *   - Left: Department feedback, Submitted evidence, Report information
+ *   - Right: Location (with Celina Homes 3 map graphic), Report activity timeline, Need clarification?
  */
-export default function ReportDetailView({
+function ReportDetailViewContent({
     report,
     onBack,
     onOpenMap,
-    onWithdrawReport,
     setZoomedImage
 }) {
+
     const [isCopied, setIsCopied] = useState(false);
-    const [isDescExpanded, setIsDescExpanded] = useState(false);
-    const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
     const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
-    const [announcement, setAnnouncement] = useState('');
-    const [imgLoadFailed, setImgLoadFailed] = useState(false);
+    const [showHelpModal, setShowHelpModal] = useState(false);
 
     const containerRef = useRef(null);
+    const [imageFailed, setImageFailed] = useState(false);
+    const activity = useGovernmentData(Number.isInteger(Number(report.id)) && !report.is_sample ? `/api/reports/${report.id}/timeline` : null);
+    const events = activity.data || report.public_timeline || report.timeline || [];
+    useEffect(() => { setImageFailed(false); }, [report.id, report.image_url]);
 
-    // Default to top whenever Report Details is opened or a new report is loaded
     useEffect(() => {
         if (typeof window !== 'undefined') {
             window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         }
-        if (containerRef.current) {
-            containerRef.current.scrollTop = 0;
-            // Also reset scroll on closest scrollable parent (phone simulator or dashboard container)
-            let parent = containerRef.current.parentElement;
-            while (parent) {
-                if (parent.scrollTop > 0) {
-                    parent.scrollTop = 0;
-                }
-                parent = parent.parentElement;
-            }
-        }
     }, [report?.id, report?.ticket_id]);
 
-    if (!report) return null;
+    const ticketId = report.ticket_id || `Report ${report.id}`;
+    const categoryName = report.category || report.ai_category || 'Public Safety & Hazards';
 
-    const ticketId = report.ticket_id || `PUL-2026-${String(report.id || '').padStart(4, '0')}`;
-    const categoryName = report.category || report.ai_category || 'Civic Infrastructure';
-
-    // Format date: "Oct 16, 2026"
+    // Format date e.g. "Oct 27, 2026"
     const formattedDate = report.created_at
         ? new Date(report.created_at).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        })
-        : 'Recently';
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+          })
+        : 'Date not recorded';
 
-    // Clean address (no plus codes or raw GPS)
-    const rawAddress = report.location_string || report.address || report.barangay || 'Caloocan City';
-    const displayAddress = cleanResidentAddress(rawAddress) || report.barangay || 'Caloocan City';
-    const barangaySubline = report.barangay
-        ? (report.barangay.toLowerCase().startsWith('barangay') || report.barangay.toLowerCase().startsWith('brgy')
-            ? `${report.barangay}, Caloocan City`
-            : `Barangay ${report.barangay}, Caloocan City`)
-        : 'Caloocan City';
+    // Robust Geotag Coordinate Resolution Waterfall:
+    // 1. Direct coordinate fields (latitude / lat / coordinates / location / geometry)
+    let resolvedLat = null;
+    let resolvedLng = null;
 
-    // Image URL resolution: match ResidentDashboard pattern `${API_BASE_URL}${report.image_url}`
-    const rawImageUrl = report.image_url || report.photo_url || null;
-    const imageUrl = rawImageUrl
-        ? (rawImageUrl.startsWith('http://') || rawImageUrl.startsWith('https://') || rawImageUrl.startsWith('data:')
-            ? rawImageUrl
-            : `${API_BASE_URL}${rawImageUrl.startsWith('/') ? '' : '/'}${rawImageUrl}`)
-        : null;
+    const candidateLat =
+        report.location_lat ??
+        report.latitude ??
+        report.lat ??
+        report.coords?.latitude ??
+        report.coords?.lat ??
+        report.coordinates?.lat ??
+        report.location?.lat ??
+        (Array.isArray(report.geometry?.coordinates) ? report.geometry.coordinates[1] : null);
 
-    // Progress Workflow calculation
-    const rawStatus = (report.status || '').toLowerCase().trim();
-    const isResolved = ['resolved', 'resolved fixed', 'completed', 'fixed', 'closed'].includes(rawStatus) || rawStatus.includes('resolv');
-    const stepIdx = getReportWorkflowIndex(report.status);
-    const currentStepIndex = stepIdx >= 0 ? stepIdx : 0;
-    const stepNumber = currentStepIndex + 1;
-    const totalSteps = REPORT_WORKFLOW_STEPS.length; // 5
+    const candidateLng =
+        report.location_lng ??
+        report.longitude ??
+        report.lng ??
+        report.coords?.longitude ??
+        report.coords?.lng ??
+        report.coordinates?.lng ??
+        report.location?.lng ??
+        (Array.isArray(report.geometry?.coordinates) ? report.geometry.coordinates[0] : null);
 
-    // Retract / Withdraw availability (Pending / Unverified only)
-    const canWithdraw = ['pending', 'unverified', 'received'].includes(rawStatus) || rawStatus.startsWith('pend');
+    const numLat = candidateLat !== null && candidateLat !== undefined && candidateLat !== '' ? Number(candidateLat) : NaN;
+    const numLng = candidateLng !== null && candidateLng !== undefined && candidateLng !== '' ? Number(candidateLng) : NaN;
 
-    // Description text
-    const descriptionText = report.description || report.notes || 'No additional details provided with this report.';
+    if (!isNaN(numLat) && !isNaN(numLng) && !(numLat === 0 && numLng === 0) && numLat >= 4 && numLat <= 22 && numLng >= 116 && numLng <= 127) {
+        resolvedLat = numLat;
+        resolvedLng = numLng;
+    }
+
+    // 2. Decode from plus_code, location_string or address if explicit lat/lng was missing
+    if (resolvedLat == null) {
+        const decodedFromPlusCode = decodePlusCode(report.plus_code || report.location_string || report.address);
+        if (decodedFromPlusCode) {
+            resolvedLat = decodedFromPlusCode.lat;
+            resolvedLng = decodedFromPlusCode.lng;
+        }
+    }
+
+    const reportLat = resolvedLat;
+    const reportLng = resolvedLng;
+    const isValidCoordinate = Number.isFinite(reportLat) && Number.isFinite(reportLng);
+    const coordDisplay = isValidCoordinate ? `${reportLat.toFixed(6)}, ${reportLng.toFixed(6)}` : 'Coordinates not recorded';
+    const cleanShortPlusCode = isValidCoordinate ? encodeOpenLocationCode(reportLat, reportLng, true) : '';
+    const rawAddress = report.location_string || report.address || report.location_barangay || report.barangay || 'Location not recorded';
+    const locationAccuracyMeters = report.accuracy_m > 0 ? Math.round(report.accuracy_m) : null;
+
+    // Google Maps SDK context
+    const { isLoaded: isMapsLoaded } = useGoogleMaps();
+
+    // Primary evidence photo
+    const imageSource = report.image_url || report.media_urls?.[0] || report.photos?.[0] || null;
+    const evidencePhotoUrl = imageSource?.startsWith('/') ? `${API_BASE_URL}${imageSource}` : imageSource;
+    const rawStatus = (report.status || 'Not recorded').toLowerCase().trim();
+    const isRejected = ['rejected', 'declined', 'invalid', 'spam'].includes(rawStatus);
+    const isResolved = ['resolved', 'closed'].includes(rawStatus);
+    const isInProgress = ['in_progress', 'dispatched'].includes(rawStatus);
+
+    // Status Banner Content & Styles (Minimal Civic Aperture style)
+    let bannerStyle = 'bg-rose-50/70 dark:bg-rose-950/20 border-rose-200/80 dark:border-rose-900/40';
+    let bannerIcon = <XCircle size={16} className="text-rose-600 dark:text-rose-400 shrink-0" />;
+    let bannerTitle = 'This report was not accepted';
+    let bannerSubtitle = "Review the department's feedback before deciding what to do next.";
+    let bannerTitleColor = 'text-rose-950 dark:text-rose-100';
+    let bannerSubtitleColor = 'text-rose-800/80 dark:text-rose-300/80';
+
+    if (isResolved) {
+        bannerStyle = 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200/80 dark:border-emerald-900/40';
+        bannerIcon = <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />;
+        bannerTitle = 'This report has been resolved';
+        bannerSubtitle = 'The department has recorded this concern as resolved.';
+        bannerTitleColor = 'text-emerald-950 dark:text-emerald-100';
+        bannerSubtitleColor = 'text-emerald-800/80 dark:text-emerald-300/80';
+    } else if (isInProgress) {
+        bannerStyle = 'bg-blue-50/70 dark:bg-blue-950/20 border-blue-200/80 dark:border-blue-900/40';
+        bannerIcon = <Clock size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />;
+        bannerTitle = 'Department work is in progress';
+        bannerSubtitle = 'The department has recorded work in progress on this concern.';
+        bannerTitleColor = 'text-blue-950 dark:text-blue-100';
+        bannerSubtitleColor = 'text-blue-800/80 dark:text-blue-300/80';
+    } else if (!isRejected) {
+        bannerStyle = 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/40';
+        bannerIcon = <Clock size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />;
+        bannerTitle = 'This report is awaiting review';
+        bannerSubtitle = 'Received by the department. No action needed while under review.';
+        bannerTitleColor = 'text-amber-950 dark:text-amber-100';
+        bannerSubtitleColor = 'text-amber-800/80 dark:text-amber-300/80';
+    }
+
+    if (!isRejected && !isResolved && !isInProgress && !['pending', 'received', 'unverified'].includes(rawStatus)) {
+        bannerTitle = `Report status: ${rawStatus.replaceAll('_', ' ')}`;
+        bannerSubtitle = rawStatus === 'needs_information' ? 'The department needs more information. Review the activity below.' : 'See the recorded department activity below.';
+    }
 
     // Copy Ticket ID
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(ticketId);
             setIsCopied(true);
-            setAnnouncement(`Copied tracking number ${ticketId} to clipboard.`);
             setTimeout(() => setIsCopied(false), 2200);
         } catch {
             setIsCopied(true);
@@ -130,365 +214,225 @@ export default function ReportDetailView({
     };
 
     // Full photo zoom trigger
-    const handlePhotoExpand = () => {
-        if (setZoomedImage && imageUrl) {
-            setZoomedImage(imageUrl);
+    const handlePhotoExpand = (targetUrl) => {
+        const u = targetUrl || evidencePhotoUrl;
+        if (setZoomedImage && u) {
+            setZoomedImage(u);
         } else {
             setIsPhotoModalOpen(true);
         }
-        setAnnouncement('Opened photo full screen.');
     };
 
     return (
-        <div ref={containerRef} className="w-full bg-slate-50/50 dark:bg-[#070d1a] text-slate-900 dark:text-slate-100 pb-4 select-none">
-            {/* Screen Reader Live Region for Announcements */}
-            <div className="sr-only" role="status" aria-live="polite">
-                {announcement}
+        <div ref={containerRef} className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 select-none">
+            {/* ── 1. Top Breadcrumb Row ── */}
+            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
+                <button
+                    type="button"
+                    onClick={onBack}
+                    className="text-black dark:text-white hover:text-slate-700 dark:hover:text-slate-200 font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                    <ArrowLeft size={15} />
+                    <span>Back to My Reports</span>
+                </button>
+                <span className="text-slate-300 dark:text-slate-700" aria-hidden="true">/</span>
+                <span className="font-mono text-slate-500 dark:text-slate-400">
+                    {ticketId}
+                </span>
+            </nav>
+
+            {/* ── 2. Title & Action Row ── */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1528] dark:text-white tracking-tight leading-tight">
+                        {categoryName}
+                    </h1>
+                    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                        <span className="font-mono">{ticketId}</span>
+                        <span>·</span>
+                        <span>Submitted {formattedDate}</span>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-2xs transition-all cursor-pointer self-start sm:self-auto shrink-0"
+                >
+                    {isCopied ? (
+                        <>
+                            <Check size={15} className="text-emerald-600" />
+                            <span className="text-emerald-600">Copied</span>
+                        </>
+                    ) : (
+                        <>
+                            <Copy size={15} className="text-slate-500 dark:text-slate-400" />
+                            <span>Copy report ID</span>
+                        </>
+                    )}
+                </button>
             </div>
 
-            {/* ── Fixed Header Row ── */}
-            <header className="sticky top-0 z-30 w-full bg-white/95 dark:bg-[#0c1427]/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 py-3 sm:px-6 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
-                <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-                    {/* Left: 3rem (48px) Round Back Button */}
-                    <button
-                        type="button"
-                        onClick={onBack}
-                        aria-label="Back to report history"
-                        className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                    >
-                        <ChevronLeft size={22} strokeWidth={2.5} className="mr-0.5" />
-                    </button>
-
-                    {/* Middle: 20px bold tracking number + "[Date] · Submitted" */}
-                    <div className="min-w-0 flex-1 text-center sm:text-left">
-                        <h1 className="font-heading font-extrabold text-lg sm:text-xl text-slate-900 dark:text-white tracking-tight [font-variant-numeric:tabular-nums] leading-tight truncate">
-                            {ticketId}
-                        </h1>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-none mt-0.5">
-                            {formattedDate} · Submitted
-                        </p>
-                    </div>
-
-                    {/* Right: 48px tall Outlined "Copy" button */}
-                    <button
-                        type="button"
-                        onClick={handleCopy}
-                        aria-label={`Copy tracking number ${ticketId}`}
-                        className={`min-h-[48px] px-3.5 sm:px-4 rounded-xl border text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] active:scale-[0.98] ${
-                            isCopied
-                                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-                        }`}
-                    >
-                        {isCopied ? (
-                            <>
-                                <Check size={16} strokeWidth={2.5} />
-                                <span>Copied</span>
-                            </>
-                        ) : (
-                            <>
-                                <Copy size={16} strokeWidth={2} />
-                                <span>Copy</span>
-                            </>
-                        )}
-                    </button>
+            {/* ── 3. Minimal Status Banner ── */}
+            <div className={`py-2.5 px-3.5 sm:px-4 rounded-xl border flex items-center gap-2.5 transition-all ${bannerStyle}`}>
+                <div className="shrink-0 flex items-center">
+                    {bannerIcon}
                 </div>
-            </header>
-
-            {/* ── Main Scrollable Body ── */}
-            <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-3 space-y-3 pb-2">
-                {/* ── 1. PHOTO CARD (Real photo ratio 4:3 / 16:9 / 1:1, Status Pill top-left, 48px Expand button bottom-right) ── */}
-                <div className="relative w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm max-h-[260px] sm:max-h-[320px] flex items-center justify-center">
-                    {imageUrl && !imgLoadFailed ? (
-                        <img
-                            src={imageUrl}
-                            alt={`${categoryName} photo proof`}
-                            onError={() => setImgLoadFailed(true)}
-                            className="w-full h-auto max-h-[260px] sm:max-h-[320px] object-contain"
-                        />
-                    ) : (
-                        <div className="w-full h-full min-h-[180px] flex flex-col items-center justify-center text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-850 p-6 text-center">
-                            <FileText size={40} strokeWidth={1.5} className="mb-2 text-slate-400" />
-                            <p className="text-sm font-semibold">{categoryName}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">No photo attached to this report</p>
-                        </div>
-                    )}
-
-                    {/* Top-Left: Status Pill */}
-                    <div className="absolute top-3 left-3 z-10">
-                        <ReportStatusPill status={report.status} className="shadow-md backdrop-blur-md" />
-                    </div>
-
-                    {/* Bottom-Right: 3rem (48px) Round Expand Button */}
-                    {imageUrl && (
-                        <button
-                            type="button"
-                            onClick={handlePhotoExpand}
-                            aria-label="Expand photo to full screen"
-                            className="absolute bottom-3 right-3 z-10 w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-slate-950/75 hover:bg-slate-950 text-white flex items-center justify-center backdrop-blur-md shadow-lg transition-transform active:scale-95 cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                        >
-                            <Maximize2 size={20} strokeWidth={2.25} />
-                        </button>
-                    )}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 min-w-0">
+                    <span className={`font-bold text-xs sm:text-sm leading-tight shrink-0 ${bannerTitleColor}`}>
+                        {bannerTitle}
+                    </span>
+                    <span className="hidden sm:inline opacity-40 select-none">•</span>
+                    <span className={`text-xs leading-normal truncate ${bannerSubtitleColor}`}>
+                        {bannerSubtitle}
+                    </span>
                 </div>
+            </div>
 
-                {/* ── 2. PROGRESS CARD (5 Steps joined by lines) ── */}
-                <section
-                    aria-label="Progress status"
-                    className="w-full rounded-2xl bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs space-y-3"
-                >
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                        <h2 className="font-heading font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
-                            Progress
-                        </h2>
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
-                            Step {stepNumber} of {totalSteps}
-                        </span>
-                    </div>
+            {/* ── 4. Main 2-Column Responsive Grid ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 items-start">
+                {/* ── Left Column: Feedback, Evidence, Information (Span 2) ── */}
+                <div className="lg:col-span-2 space-y-5">
 
-                    {/* 5-Step Connected Timeline */}
-                    <ol className="flex items-start justify-between w-full relative pt-1 pb-1">
-                        {REPORT_WORKFLOW_STEPS.map((step, idx) => {
-                            const isDone = idx < currentStepIndex || (isResolved && idx <= totalSteps - 1);
-                            const isCurrent = idx === currentStepIndex && !isResolved;
-                            const isUpcoming = idx > currentStepIndex && !isResolved;
-
-                            return (
-                                <li
-                                    key={step.id}
-                                    className="flex-1 flex flex-col items-center relative text-center min-w-0"
-                                    aria-current={isCurrent ? 'step' : undefined}
-                                >
-                                    {/* Thin connecting line segment behind dots */}
-                                    {idx < totalSteps - 1 && (
-                                        <div
-                                            className="absolute top-[14px] left-1/2 w-full h-[2px] pointer-events-none z-0"
-                                            aria-hidden="true"
-                                        >
-                                            <div
-                                                className={`h-full transition-colors duration-200 ${
-                                                    idx < currentStepIndex || isResolved
-                                                        ? (isResolved ? 'bg-emerald-500' : 'bg-[#ff6b00]')
-                                                        : 'bg-slate-200 dark:bg-slate-700/80'
-                                                }`}
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Dot Node */}
-                                    <div
-                                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 z-10 transition-transform ${
-                                            isDone
-                                                ? (isResolved ? 'bg-emerald-500 text-white' : 'bg-[#ff6b00] text-white')
-                                                : isCurrent
-                                                ? 'border-2 border-[#ff6b00] bg-white dark:bg-[#0c1427]'
-                                                : 'border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0c1427]'
-                                        }`}
-                                    >
-                                        {isDone && (
-                                            <Check size={14} strokeWidth={3} className="text-white" />
-                                        )}
-                                        {isCurrent && (
-                                            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[#ff6b00]" />
-                                        )}
-                                    </div>
-
-                                    {/* Step Label (max 2 lines) */}
-                                    <span
-                                        className={`w-full text-center mt-2 px-0.5 leading-tight text-[11px] sm:text-xs line-clamp-2 break-words ${
-                                            isDone
-                                                ? 'font-semibold text-slate-900 dark:text-white'
-                                                : isCurrent
-                                                ? 'font-bold text-[#B83A00] dark:text-[#ff6b00]'
-                                                : 'font-medium text-slate-400 dark:text-slate-500'
-                                        }`}
-                                    >
-                                        {step.label}
-                                    </span>
-                                </li>
-                            );
-                        })}
-                    </ol>
-                </section>
-
-                {/* ── 3. LOCATION CARD (Inset card with Pin tile, readable address, 48px Map button) ── */}
-                <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onOpenMap?.(report)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onOpenMap?.(report);
-                        }
-                    }}
-                    aria-label={`Incident location: ${displayAddress}. Open in map.`}
-                    className="w-full rounded-2xl bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 p-3 sm:p-3.5 flex items-center justify-between gap-3 text-left transition-colors hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                >
-                    {/* Left: 40px rounded square tile with orange pin */}
-                    <div className="w-10 h-10 rounded-xl bg-orange-500/12 dark:bg-orange-500/15 flex items-center justify-center shrink-0">
-                        <MapPin size={20} className="text-[#ff6b00]" />
-                    </div>
-
-                    {/* Middle: Readable Address 14px bold + soft gray second line (no Plus Codes or coordinates, fully wrapped) */}
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug break-words">
-                            {displayAddress}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-normal break-words">
-                            {barangaySubline}
-                        </p>
-                    </div>
-
-                    {/* Right: 48px tall Map button */}
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenMap?.(report);
-                        }}
-                        aria-label="View on municipal map"
-                        className="h-12 min-h-[48px] px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/70 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 transition-colors flex items-center justify-center shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
-                    >
-                        Map
-                    </button>
-                </div>
-
-                {/* ── 4. WHAT WAS REPORTED CARD (4-line clamp, Show more / Show less toggle) ── */}
-                <section
-                    aria-label="What was reported"
-                    className="w-full rounded-2xl bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs space-y-2"
-                >
-                    <h2 className="font-heading font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
-                        What was reported
-                    </h2>
-
-                    {/* Full text always accessible to screen readers */}
-                    <div className="sr-only">
-                        {descriptionText}
-                    </div>
-
-                    {/* Visual description with 4-line clamp toggle */}
-                    <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                        <p className={isDescExpanded ? 'break-words' : 'line-clamp-4 break-words'}>
-                            {descriptionText}
-                        </p>
-
-                        {descriptionText.length > 140 && (
-                            <button
-                                type="button"
-                                onClick={() => setIsDescExpanded(!isDescExpanded)}
-                                className="mt-2 text-xs font-bold text-[#ff6b00] hover:underline cursor-pointer flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded"
-                            >
-                                <span>{isDescExpanded ? 'Show less' : 'Show more'}</span>
-                                <ChevronDown
-                                    size={14}
-                                    className={`transition-transform duration-150 ${isDescExpanded ? 'rotate-180' : ''}`}
-                                />
+                    <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-3">
+                        <h2 className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white"><ImageIcon size={18}/>Submitted evidence</h2>
+                        {evidencePhotoUrl && !imageFailed ? <>
+                            <button type="button" onClick={() => handlePhotoExpand(evidencePhotoUrl)} className="block w-full max-w-md rounded-xl overflow-hidden focus-visible:outline-3 focus-visible:outline-blue-600 focus-visible:outline-offset-4">
+                                <img src={evidencePhotoUrl} alt={`Submitted evidence for ${categoryName}`} className="w-full h-52 sm:h-56 object-contain" onError={() => setImageFailed(true)}/>
                             </button>
-                        )}
-                    </div>
-                </section>
-
-                {/* ── 5. STAFF UPDATE TIMELINE / RESIDENT NOTES (Preserve if present) ── */}
-                {((report.updates && report.updates.length > 0) || report.resolution_notes || report.staff_notes) && (
-                    <section
-                        aria-label="Staff updates and timeline"
-                        className="w-full rounded-2xl bg-white dark:bg-[#0c1427] border border-slate-200/90 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs space-y-3"
-                    >
-                        <h2 className="font-heading font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
-                            Staff updates
-                        </h2>
-                        {report.resolution_notes && (
-                            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs sm:text-sm text-emerald-900 dark:text-emerald-200">
-                                <span className="font-bold block mb-1">Resolution Summary:</span>
-                                {report.resolution_notes}
-                            </div>
-                        )}
-                        {report.staff_notes && !report.resolution_notes && (
-                            <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
-                                {report.staff_notes}
-                            </div>
-                        )}
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Submitted image · Select to enlarge</p>
+                        </> : <p className="text-sm text-slate-600 dark:text-slate-300">{imageFailed ? 'The submitted image could not be loaded.' : 'No image was attached to this report.'}</p>}
                     </section>
-                )}
 
-                {/* ── 6. BOTTOM ACTION: Full-Width Outlined Danger "Withdraw report" ── */}
-                {canWithdraw && (
-                    <div className="pt-1 pb-1">
+                    {/* Block 3: Report information */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
+                        <div className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white">
+                            <FileText size={18} className="text-[#0B1528] dark:text-white" />
+                            <span>Report information</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start pt-1">
+                            <div className="sm:col-span-3">
+                                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                                    Category
+                                </span>
+                                <span className="text-sm font-bold text-slate-900 dark:text-white mt-1 block">
+                                    {categoryName}
+                                </span>
+                            </div>
+
+                            <div className="sm:col-span-3">
+                                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                                    Submitted
+                                </span>
+                                <span className="text-sm font-bold text-slate-900 dark:text-white mt-1 block">
+                                    {formattedDate}
+                                </span>
+                            </div>
+
+                            <div className="hidden sm:flex sm:col-span-1 self-stretch items-center justify-center">
+                                <div className="w-px h-10 bg-slate-200 dark:bg-slate-800 mx-auto" />
+                            </div>
+
+                            <div className="sm:col-span-5">
+                                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                                    Description
+                                </span>
+                                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                                    {report.description || 'Original report description appears here.'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Right Column: Location, Activity, Help (Span 1) ── */}
+                <div className="space-y-5">
+                    <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-3.5">
+                        <h2 className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white"><MapPin size={18}/>Location</h2>
+                        <p className="text-sm text-slate-700 dark:text-slate-200 break-words">{rawAddress}</p>
+                        {isValidCoordinate ? <>
+                            {isMapsLoaded && <div className="h-48 rounded-xl overflow-hidden" aria-label="Reported location map">
+                                <GoogleMap center={{lat:reportLat,lng:reportLng}} zoom={16} mapContainerClassName="w-full h-full" options={{disableDefaultUI:true,gestureHandling:'none',keyboardShortcuts:false,clickableIcons:false}}/>
+                            </div>}
+                            <p className="text-xs font-mono text-slate-600 dark:text-slate-300">{coordDisplay}{cleanShortPlusCode ? ` · ${cleanShortPlusCode}` : ''}</p>
+                            {locationAccuracyMeters && <p className="text-xs text-slate-600 dark:text-slate-300">Recorded accuracy: ±{locationAccuracyMeters} m</p>}
+                            <button type="button" onClick={() => onOpenMap ? onOpenMap({...report,lat:reportLat,lng:reportLng}) : window.open(`https://www.google.com/maps?q=${reportLat},${reportLng}`, '_blank', 'noopener,noreferrer')} className="min-h-11 w-full px-4 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-sm focus-visible:outline-3 focus-visible:outline-blue-600">View on map</button>
+                        </> : <p className="text-xs text-slate-600 dark:text-slate-300">Coordinates not recorded. The address above remains available.</p>}
+                    </section>
+                    <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
+                        <h2 className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white"><Clock size={18}/>Report activity</h2>
+                        {activity.loading ? <p role="status">Loading report activity…</p> : activity.error ? <div role="alert"><p>Report activity could not be loaded.</p><button type="button" onClick={activity.reload} className="min-h-11 underline">Try again</button></div> : !events.length ? <p className="text-sm text-slate-600 dark:text-slate-300">No public activity has been recorded yet.</p> : <ol className="divide-y divide-slate-200 dark:divide-slate-800">
+                            {events.map((event,index) => <li key={event.id || index} className="py-3 space-y-1"><p className="font-semibold text-sm">{event.label || event.stage || event.status?.replaceAll('_',' ')}</p>{event.note && <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{event.note}</p>}<time className="text-xs text-slate-500 dark:text-slate-400">{event.created_at || event.timestamp ? new Date(event.created_at || event.timestamp).toLocaleString() : 'Time not recorded'}</time></li>)}
+                        </ol>}
+                    </section>
+
+                    {/* Block 6: Need clarification? */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-3.5">
+                        <div className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white">
+                            <HelpCircle size={18} className="text-[#0B1528] dark:text-white" />
+                            <span>Need clarification?</span>
+                        </div>
+
+                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                            Reference <strong className="text-slate-800 dark:text-slate-200 font-mono">{ticketId}</strong> when contacting support.
+                        </p>
+
                         <button
                             type="button"
-                            onClick={() => setIsWithdrawModalOpen(true)}
-                            aria-label={`Withdraw report ${ticketId}`}
-                            className="w-full h-12 min-h-[48px] rounded-xl border border-rose-300 dark:border-rose-900/70 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-100/60 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-rose-500 active:scale-[0.99]"
+                            onClick={() => setShowHelpModal(true)}
+                            className="w-full py-2.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-2xs transition-colors cursor-pointer"
                         >
-                            <Trash2 size={16} strokeWidth={2.25} />
-                            <span>Withdraw report</span>
+                            <BookOpen size={14} className="text-slate-600 dark:text-slate-300" />
+                            <span>Open help center</span>
                         </button>
                     </div>
-                )}
-            </main>
-
-            {/* ── Retract / Withdraw Confirmation Alert Dialog (Traps Focus, role="alertdialog") ── */}
-            {isWithdrawModalOpen && (
-                <div
-                    className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4"
-                    role="alertdialog"
-                    aria-modal="true"
-                    aria-labelledby="withdraw-dialog-title"
-                    aria-describedby="withdraw-dialog-desc"
-                    onClick={() => setIsWithdrawModalOpen(false)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') setIsWithdrawModalOpen(false);
-                    }}
-                >
-                    <div
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-full max-w-sm rounded-3xl bg-white dark:bg-[#0c1427] border border-slate-200 dark:border-slate-800 p-6 text-center space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
-                    >
-                        {/* Danger Icon Badge */}
-                        <div className="w-14 h-14 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mx-auto shadow-xs">
-                            <AlertTriangle size={28} strokeWidth={2} />
-                        </div>
-
-                        {/* Title & Description */}
-                        <div>
-                            <h3 id="withdraw-dialog-title" className="font-heading font-extrabold text-lg text-slate-900 dark:text-white">
-                                Withdraw this report?
-                            </h3>
-                            <p id="withdraw-dialog-desc" className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
-                                Are you sure you want to withdraw <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{ticketId}</span>? This will cancel city engineering inspection for this issue.
-                            </p>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="grid grid-cols-2 gap-2.5 pt-2">
+                </div>
+            </div>
+{/* ── Help Center Information Modal ── */}
+            {showHelpModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full shadow-xl space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <BookOpen size={18} className="text-orange-600" />
+                                <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                                    Report Help &amp; FAQs
+                                </h3>
+                            </div>
                             <button
                                 type="button"
-                                autoFocus
-                                onClick={() => setIsWithdrawModalOpen(false)}
-                                className="h-12 min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                                onClick={() => setShowHelpModal(false)}
+                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
                             >
-                                Keep report
+                                <X size={16} />
                             </button>
+                        </div>
+                        <div className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-h-64 overflow-y-auto">
+                            <div>
+                                <strong className="text-slate-900 dark:text-white block">Why do reports get rejected?</strong>
+                                Reports are marked not accepted if they fall outside city jurisdiction, lack sufficient photo evidence, or duplicate existing work orders.
+                            </div>
+                            <div>
+                                <strong className="text-slate-900 dark:text-white block">Can I submit an updated report?</strong>
+                                Yes. You can create a new report anytime with clearer photos and detailed location notes.
+                            </div>
+                        </div>
+                        <div className="flex justify-end pt-2">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setIsWithdrawModalOpen(false);
-                                    onWithdrawReport?.(report);
-                                }}
-                                className="h-12 min-h-[48px] rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center cursor-pointer transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                                onClick={() => setShowHelpModal(false)}
+                                className="px-4 py-2 rounded-xl bg-[#EA580C] hover:bg-[#d94e07] text-white text-xs font-bold transition-all cursor-pointer"
                             >
-                                Withdraw
+                                Close
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ── Standalone Photo Zoom Modal (if setZoomedImage not provided) ── */}
-            {isPhotoModalOpen && imageUrl && (
+            {/* ── Standalone Photo Zoom Modal ── */}
+            {isPhotoModalOpen && evidencePhotoUrl && (
                 <div
                     className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4"
                     role="dialog"
@@ -500,12 +444,12 @@ export default function ReportDetailView({
                         type="button"
                         onClick={() => setIsPhotoModalOpen(false)}
                         aria-label="Close photo preview"
-                        className="absolute top-4 right-4 w-12 h-12 min-w-[48px] min-h-[48px] rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                        className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
                     >
                         <X size={24} />
                     </button>
                     <img
-                        src={imageUrl}
+                        src={evidencePhotoUrl}
                         alt={`${categoryName} full view`}
                         className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
                     />
@@ -513,4 +457,8 @@ export default function ReportDetailView({
             )}
         </div>
     );
+}
+
+export default function ReportDetailView(props) {
+    return props.report ? <ReportDetailViewContent {...props}/> : null;
 }

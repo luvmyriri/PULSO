@@ -1,0 +1,18 @@
+{
+  "purpose": "Map presentation reference; does not replace jurisdiction enforcement geometry.",
+  "accuracy": "Existing repository datasets; not certified survey boundaries.",
+  "files": {
+    "north.geojson": {
+      "repository_source": "frontend/public/data/boundaries/caloocan-north.geojson",
+      "sha256": "900c5d2169819783fa856373574b257c9273e062b7b2606bd724064db61879d7"
+    },
+    "south.geojson": {
+      "repository_source": "frontend/public/data/boundaries/caloocan-south.geojson",
+      "sha256": "a94f7858a6b19e039df84a4a8fc51bf02759c4ff72f32eb99e4c2ef11dce80c5"
+    },
+    "barangays.geojson": {
+      "repository_source": "backend/caloocan_border.json",
+      "sha256": "bb18d8abd95f1715991ce13d301c22037319cdca3ad648192d158dbf1c673983"
+    }
+  }
+}

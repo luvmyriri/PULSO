@@ -7,11 +7,14 @@ import { isInstalledApp } from '../utils/appContext';
 
 export default function ScrollToTop() {
     const [isVisible, setIsVisible] = useState(false);
+    const [isUpdatesModalActive, setIsUpdatesModalActive] = useState(false);
     const location = useLocation();
 
-    // Hide on resident dashboard, government portals, auth pages, tutorial, dev preview, and installed app
+    // Hide on resident dashboard, government portals, auth pages, tutorial, dev preview, installed app, and when updates details modal is active
     const isHidden = 
         isInstalledApp() ||
+        isUpdatesModalActive ||
+        location.pathname.startsWith('/report') ||
         location.pathname.startsWith('/dashboard') ||
         location.pathname.startsWith('/gov') ||
         location.pathname.startsWith('/management') ||
@@ -23,7 +26,27 @@ export default function ScrollToTop() {
         location.pathname.startsWith('/dev');
 
     useEffect(() => {
+        const handleModalState = (e) => {
+            setIsUpdatesModalActive(Boolean(e.detail?.active));
+        };
+        window.addEventListener('pulso:updates-modal-active', handleModalState);
+
+        // Check if modal was already opened before mount
+        if (typeof document !== 'undefined' && document.body.getAttribute('data-updates-modal-active') === 'true') {
+            setIsUpdatesModalActive(true);
+        }
+
+        return () => {
+            window.removeEventListener('pulso:updates-modal-active', handleModalState);
+        };
+    }, []);
+
+    useEffect(() => {
         const toggleVisibility = () => {
+            if (document.body.getAttribute('data-updates-modal-active') === 'true') {
+                setIsVisible(false);
+                return;
+            }
             if (window.scrollY > 300) {
                 setIsVisible(true);
             } else {
@@ -46,7 +69,7 @@ export default function ScrollToTop() {
 
     return (
         <AnimatePresence>
-            {isVisible && (
+            {isVisible && !isUpdatesModalActive && (
                 <motion.button
                     initial={{ opacity: 0, scale: 0.6, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}

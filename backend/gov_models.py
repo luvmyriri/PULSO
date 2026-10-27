@@ -14,7 +14,7 @@ Covers:
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime,
-    Float, ForeignKey, Text, Enum, JSON, Date, UniqueConstraint
+    Float, ForeignKey, Text, Enum, JSON, Date, UniqueConstraint, Numeric
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -318,6 +318,22 @@ class OutboxEvent(Base):
     delivered_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class ResidentNotificationDelivery(Base):
+    """One email delivery intent per authorized in-app event; no plaintext recipient address."""
+    __tablename__='resident_notification_deliveries'
+    id=Column(Integer,primary_key=True)
+    event_id=Column(Integer,ForeignKey('outbox_events.id'),nullable=False,unique=True,index=True)
+    resident_id=Column(Integer,ForeignKey('residents.id'),nullable=False,index=True)
+    status=Column(String(24),nullable=False,default='pending',server_default='pending',index=True)
+    attempts=Column(Integer,nullable=False,default=0,server_default='0')
+    recipient_hash=Column(String(64),nullable=False)
+    next_attempt_at=Column(DateTime(timezone=True),nullable=True)
+    lease_until=Column(DateTime(timezone=True),nullable=True)
+    error_code=Column(String(64),nullable=True)
+    accepted_at=Column(DateTime(timezone=True),nullable=True)
+    created_at=Column(DateTime(timezone=True),nullable=False,server_default=func.now())
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Procurement Request  (FR-12 — RA 9184 Procurement Workflow)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -418,6 +434,17 @@ class ProjectRequest(Base):
     """
     __tablename__ = "project_requests"
 
+    coordination_version = Column(Integer, nullable=False, default=0, server_default='0')
+    coordination_started_at = Column(DateTime(timezone=True), nullable=True)
+    legacy_status = Column(String, nullable=True)
+    next_review_at = Column(DateTime(timezone=True), nullable=True)
+    completion_document_id = Column(Integer, ForeignKey('system_documents.id'), nullable=True)
+    completion_submitted_by_id = Column(Integer, ForeignKey('officials.id'), nullable=True)
+    completion_reviewed_by_id = Column(Integer, ForeignKey('officials.id'), nullable=True)
+    certificate_reference = Column(String(255), nullable=True)
+    certificate_document_id = Column(Integer, ForeignKey('system_documents.id'), nullable=True)
+    certificate_recorded_at = Column(DateTime(timezone=True), nullable=True)
+
     id               = Column(Integer, primary_key=True, index=True)
     proj_number      = Column(String, unique=True, index=True, default=_gen_proj_id)
 
@@ -494,6 +521,22 @@ class ProjectRequest(Base):
     certificate_issued_by = relationship("Official", foreign_keys=[certificate_issued_by_id])
     barangay_ref          = relationship("Barangay", foreign_keys=[barangay_id])
     district_ref          = relationship("District", foreign_keys=[district_id])
+
+
+class ProjectDependency(Base):
+    """An external follow-up, not a budget or procurement approval."""
+    __tablename__ = 'project_dependencies'
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey('project_requests.id'), nullable=False, index=True)
+    description = Column(Text, nullable=False)
+    office = Column(String(255), nullable=False)
+    reference = Column(String(255), nullable=True)
+    owner_id = Column(Integer, ForeignKey('officials.id'), nullable=False)
+    next_review_at = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String(20), nullable=False, default='pending', server_default='pending')
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_reference = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -744,12 +787,19 @@ class Announcement(Base):
 
     id                   = Column(Integer, primary_key=True, index=True)
     announcement_id      = Column(String, unique=True, index=True, default=_gen_announcement_id)
+    content_version      = Column(Integer, nullable=False, default=1, server_default="1")
+    approved_version     = Column(Integer, nullable=True)
+    published_version    = Column(Integer, nullable=True)
+    publication_format   = Column(String(20), nullable=False, default="announcement", server_default="announcement")
+    disclosure_ref_id    = Column(Integer, ForeignKey("budget_disclosures.id", use_alter=True, name="fk_announcement_disclosure_ref"), nullable=True)
 
     # ── Bilingual Content ────────────────────────────────────────────────────
     title_en             = Column(String, nullable=False, index=True)
     title_fil            = Column(String, nullable=True)
     content_en           = Column(Text, nullable=False)
     content_fil          = Column(Text, nullable=True)
+    publication_details  = Column(JSON, nullable=False, default=dict, server_default='{}')
+    attachments          = Column(JSON, nullable=False, default=list, server_default='[]')
 
     # ── Classification & Governance ──────────────────────────────────────────
     category             = Column(String, default="general_notice", index=True)
@@ -812,6 +862,19 @@ class Announcement(Base):
         cascade="all, delete-orphan",
         order_by="AnnouncementDelivery.channel"
     )
+    report_associations  = relationship(
+        "AnnouncementReportAssociation",
+        back_populates="announcement",
+        cascade="all, delete-orphan",
+        order_by="AnnouncementReportAssociation.created_at.desc()"
+    )
+    budget_disclosures   = relationship(
+        "BudgetDisclosure",
+        back_populates="announcement",
+        foreign_keys="BudgetDisclosure.announcement_id",
+        cascade="all, delete-orphan",
+        order_by="BudgetDisclosure.version.desc()"
+    )
 
 
 class AnnouncementCorrection(Base):
@@ -860,5 +923,116 @@ class AnnouncementDelivery(Base):
     announcement         = relationship("Announcement", back_populates="deliveries")
 
 
+class AnnouncementReportAssociation(Base):
+    """
+    Governed many-to-many link between an Announcement (or Advisory/News update)
+    and citizen Report(s). Supports the 4-state editorial association workflow:
+      - candidate: system-suggested match, never triggers public claim or notification
+      - contextual_relevance: reviewed area/corridor/category context
+      - confirmed_coverage: reviewed confirmation that the work/update covers this report
+      - rejected / revoked: excluded or withdrawn association with audit trail
+    """
+    __tablename__ = "announcement_report_associations"
+    __table_args__ = (
+        UniqueConstraint("announcement_id", "report_id", name="uq_announcement_report_assoc"),
+    )
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    announcement_id      = Column(Integer, ForeignKey("announcements.id"), nullable=False, index=True)
+    report_id            = Column(Integer, ForeignKey("reports.id"), nullable=False, index=True)
+
+    # candidate | contextual_relevance | confirmed_coverage | rejected | revoked
+    association_type     = Column(String, default="candidate", nullable=False, index=True)
+    basis_reason         = Column(Text, nullable=True)  # e.g. "Linked work order WO-2026-001", "Same barangay & category"
+
+    created_by_id        = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    reviewed_by_id       = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    reviewed_at          = Column(DateTime(timezone=True), nullable=True)
+
+    revoked_by_id        = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    revoked_at           = Column(DateTime(timezone=True), nullable=True)
+    revoked_reason       = Column(Text, nullable=True)
+
+    # Deduplication guard for resident notifications
+    notified_at          = Column(DateTime(timezone=True), nullable=True)
+
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    announcement         = relationship("Announcement", back_populates="report_associations")
+    report               = relationship("Report", foreign_keys=[report_id])
+    created_by           = relationship("Official", foreign_keys=[created_by_id])
+    reviewed_by          = relationship("Official", foreign_keys=[reviewed_by_id])
+    revoked_by           = relationship("Official", foreign_keys=[revoked_by_id])
+
+
+def _gen_budget_disclosure_id():
+    """Generates canonical budget disclosure identifier e.g. 'BD-2026-481920'"""
+    return f"BD-{datetime.now(timezone.utc).year}-{str(uuid.uuid4().int)[:6]}"
+
+
+class BudgetDisclosure(Base):
+    """
+    Sourced public budget disclosure record attached to an Announcement, Project, or WorkOrder.
+    PULSO does not process budgeting, obligations, cash release, or procurement in-app;
+    it records sourced, attributable disclosures and links to official Caloocan procurement pages.
+    """
+    __tablename__ = "budget_disclosures"
+
+    id                   = Column(Integer, primary_key=True, index=True)
+    disclosure_id        = Column(String, unique=True, index=True, default=_gen_budget_disclosure_id)
+
+    announcement_id      = Column(Integer, ForeignKey("announcements.id"), nullable=True, index=True)
+    project_id           = Column(Integer, ForeignKey("project_requests.id"), nullable=True, index=True)
+    work_order_id        = Column(Integer, ForeignKey("work_orders.id"), nullable=True, index=True)
+
+    version              = Column(Integer, default=1, nullable=False)
+    source_key           = Column(String(64), nullable=True, index=True)
+    publication_format   = Column(String, default="announcement", nullable=False)  # announcement | advisory | news
+
+    # Nullable amount allows explicit "No budget amount is disclosed in this update"
+    amount               = Column(Numeric(18, 2), nullable=True)
+    currency             = Column(String, default="PHP", nullable=False)
+    # approved_budget_for_contract | contract_award_amount | allocated_project_budget | maintenance_allocation | not_disclosed
+    amount_type          = Column(String, default="not_disclosed", nullable=False)
+
+    source_label         = Column(String, nullable=True)  # e.g. "BAC Resolution No. 2026-104"
+    source_url           = Column(String, nullable=True)  # Official document URL or public reference
+    official_bidding_url = Column(String, nullable=True, default="https://caloocancity.gov.ph/invitation-to-bid/")
+    source_date          = Column(Date, nullable=True)
+    fiscal_period        = Column(String, nullable=True)  # e.g. "FY 2026"
+    issuing_office       = Column(String, nullable=True, default="City Engineering Department")
+    scope_caveat         = Column(Text, nullable=True)
+
+    # draft | reviewed | approved | withdrawn
+    review_state         = Column(String, default="draft", nullable=False, index=True)
+
+    entered_by_id        = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    reviewed_by_id       = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    reviewed_at          = Column(DateTime(timezone=True), nullable=True)
+
+    created_at           = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    announcement         = relationship("Announcement", back_populates="budget_disclosures", foreign_keys=[announcement_id])
+    project              = relationship("ProjectRequest", foreign_keys=[project_id])
+    work_order           = relationship("WorkOrder", foreign_keys=[work_order_id])
+    entered_by           = relationship("Official", foreign_keys=[entered_by_id])
+    reviewed_by          = relationship("Official", foreign_keys=[reviewed_by_id])
+
+
+class AnnouncementRevision(Base):
+    """Immutable released snapshot; later draft edits do not rewrite public history."""
+    __tablename__ = "announcement_revisions"
+    __table_args__ = (UniqueConstraint("announcement_id", "version", name="uq_announcement_revision"),)
+    id = Column(Integer, primary_key=True)
+    announcement_id = Column(Integer, ForeignKey("announcements.id"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    snapshot = Column(JSON, nullable=False)
+    released_by_id = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    released_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 # Import models at the end to resolve circular dependency for relationships
 import models
+from referral_models import ReferralRecipient, ExternalReferral, ReferralEvent, ReferralDelivery, ReferralPacket

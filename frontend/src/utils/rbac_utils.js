@@ -1,3 +1,4 @@
+import { adminAllows } from './adminAccess';
 /**
  * rbac_utils.js
  * ──────────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ const hasRole = (userRole, allowedRoles) => {
 
 export const checkPermission = (user, rawModule, action) => {
     if (!user) return false;
+    if (rawModule === 'admin') return adminAllows(user, action);
     
     const userRole = user.role;
     const capabilities = user.capabilities || {};

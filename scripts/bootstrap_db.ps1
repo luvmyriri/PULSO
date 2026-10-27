@@ -21,7 +21,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Alembic stamp failed." }
     & $pythonExe -m alembic -c alembic.ini upgrade head
     if ($LASTEXITCODE -ne 0) { throw "Alembic upgrade failed." }
-    & $pythonExe $helper assert-revision f3a6d8c1b250
+    & $pythonExe $helper assert-revision 18efa117cb09
     if ($LASTEXITCODE -ne 0) { throw "Unexpected Alembic revision." }
     & $pythonExe -m alembic -c alembic.ini current
     if ($LASTEXITCODE -ne 0) { throw "Could not read Alembic current." }

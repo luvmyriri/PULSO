@@ -1,0 +1,168 @@
+/* One tactile surface contract for every authenticated government route. */
+:root {
+    --gov-depth-panel:6px 6px 18px rgb(31 53 78 / .12), -4px -4px 12px rgb(255 255 255 / .85);
+    --gov-depth-control:3px 3px 7px rgb(31 53 78 / .14), -2px -2px 5px rgb(255 255 255 / .95), inset 0 1px 0 rgb(255 255 255 / .9);
+    --gov-depth-inset:inset 3px 3px 6px rgb(31 53 78 / .11), inset -2px -2px 5px rgb(255 255 255 / .9);
+    --gov-depth-dialog:0 18px 48px rgb(12 29 49 / .25), inset 0 1px 0 rgb(255 255 255 / .9);
+    --workspace-raised:var(--gov-depth-panel);
+    --workspace-control:var(--gov-depth-control);
+    --workspace-inset:var(--gov-depth-inset);
+}
+.dark {
+    --gov-depth-panel:6px 6px 18px rgb(0 0 0 / .3), -3px -3px 10px rgb(78 111 148 / .09);
+    --gov-depth-control:3px 3px 8px rgb(0 0 0 / .32), -2px -2px 5px rgb(78 111 148 / .12), inset 0 1px 0 rgb(255 255 255 / .055);
+    --gov-depth-inset:inset 3px 3px 7px rgb(0 0 0 / .3), inset -2px -2px 5px rgb(78 111 148 / .09);
+    --gov-depth-dialog:0 20px 52px rgb(0 0 0 / .5), inset 0 1px 0 rgb(255 255 255 / .06);
+    --workspace-raised:var(--gov-depth-panel);
+    --workspace-control:var(--gov-depth-control);
+    --workspace-inset:var(--gov-depth-inset);
+}
+.gov-experience {
+    display:contents;
+    --gov-canvas:#ffffff;
+    --gov-surface:#ffffff;
+    --gov-surface-subtle:#f7f9fc;
+    --gov-surface-elevated:#ffffff;
+    --gov-rule:#dde2e6;
+    --gov-control-surface:#ffffff;
+    --gov-brand-orange:#ff6b00;
+    --gov-brand-orange-soft:#fff2e7;
+    --gov-brand-green:#86cdb7;
+    --gov-brand-green-edge:#047857;
+    --gov-brand-green-soft:#ecfdf5;
+    --gov-primary-fill:#cf4900;
+    --gov-primary-ink:#ffffff;
+    --gov-selection:#fff5eb;
+    --gov-selection-ink:#b64108;
+    --gov-selection-edge:var(--gov-primary-fill);
+    --gov-action:#047857;
+    /* Bind aliases here so inherited root values cannot retain the old blue fill. */
+    --workspace-selection:var(--gov-selection);
+    --workspace-selection-edge:var(--gov-selection-edge);
+    --workspace-accent:var(--gov-action);
+    --gov-depth-panel:0 2px 8px rgb(31 53 78 / .055);
+    --workspace-raised:var(--gov-depth-panel);
+    --workspace-control:var(--gov-depth-control);
+    --workspace-inset:var(--gov-depth-inset);
+}
+.dark .gov-experience {
+    --gov-canvas:#0b1421;
+    --gov-surface:#142237;
+    --gov-surface-subtle:#192b42;
+    --gov-surface-elevated:#17283e;
+    --gov-rule:#30445b;
+    --gov-control-surface:#17283e;
+    --gov-brand-orange:#ff974f;
+    --gov-brand-orange-soft:#38291f;
+    --gov-brand-green:#80d6ba;
+    --gov-brand-green-edge:#80d6ba;
+    --gov-brand-green-soft:#173b32;
+    --gov-primary-fill:#ff974f;
+    --gov-primary-ink:#102438;
+    --gov-selection:#35291f;
+    --gov-selection-ink:#ffad75;
+    --gov-action:#80d6ba;
+    --workspace-selection:var(--gov-selection);
+    --workspace-selection-edge:var(--gov-selection-edge);
+    --gov-depth-panel:0 2px 8px rgb(0 0 0 / .18);
+}
+
+/* Panels share elevation; rows keep a quiet continuous reading surface. */
+.gov-experience :is(.gov-surface,.gov-record-table,.gov-record-detail,.gov-bi-surface,.gov-account-card,.gov-account-hero,.gov-overview-tile,.gov-overview-section,.gov-coverage-banner,.report-docket,.citizen-reports-list,.work-orders-table-wrapper,.work-orders-summary-card,.wo-card) {
+    background:var(--gov-surface);
+    border-color:var(--gov-rule);
+    box-shadow:var(--gov-depth-panel);
+}
+/* Dashboard groups use soft elevation rather than a drawn perimeter. */
+.gov-experience .gov-bi-dashboard {--bi-panel-depth:0 3px 14px rgb(31 53 78 / .075);}
+.dark .gov-experience .gov-bi-dashboard {--bi-panel-depth:0 3px 14px rgb(0 0 0 / .22);}
+.gov-experience .gov-bi-dashboard :is(.gov-bi-surface,.gov-assistant__panel) {
+    border-color:transparent;
+    box-shadow:var(--bi-panel-depth);
+}
+.gov-experience :is(.gov-page-content,.gov-reports-page,.work-orders-page,.citizen-reports-shell) { background:var(--gov-canvas); }
+.gov-experience .gov-page-header { background:var(--gov-surface); }
+.gov-experience .gov-reports-table-surface { border-radius:14px; }
+.gov-experience .reports-review-table tr.gov-report-selected { background:var(--gov-selection); box-shadow:inset 2px 0 0 var(--gov-selection-edge); }
+.gov-experience .gov-report-choice { background:var(--gov-control-surface); box-shadow:var(--gov-depth-control); }
+.gov-experience .gov-report-choice[aria-pressed="true"] { background:var(--gov-selection); color:var(--gov-selection-ink); border-color:var(--gov-selection-edge); box-shadow:none; }
+
+/* Raised controls, with an inset pressed state. Text and row actions stay quiet. */
+.gov-experience :is(.gov-button,.gov-control,.gov-select-trigger,.citizen-reports-icon-button),
+.gov-experience .gov-filter select,
+.gov-experience .gov-pagination button,
+.gov-experience .gov-bi-period button[aria-pressed="true"] {
+    border-color:var(--gov-rule);
+    box-shadow:var(--gov-depth-control);
+}
+.gov-experience :is(.gov-control,.gov-select-trigger) {
+    background:var(--gov-control-surface);
+    color:var(--gov-text);
+}
+.gov-experience :is(.gov-button.is-primary,.gov-control--primary) {
+    background:var(--gov-primary-fill);
+    border-color:var(--gov-primary-fill);
+    color:var(--gov-primary-ink);
+}
+.gov-experience :is(.gov-select-trigger,.gov-control):hover:not(:disabled) { border-color:var(--gov-action); }
+.gov-experience .gov-select-trigger :is(span,svg) { color:inherit; }
+.gov-experience .gov-select-trigger:is([aria-expanded="true"],[data-active-filter="true"]) {
+    background:var(--gov-selection);
+    border-color:var(--gov-selection-edge);
+    color:var(--gov-selection-ink);
+    box-shadow:var(--gov-depth-inset);
+}
+.gov-experience :is(.gov-button,.gov-control,.gov-select-trigger):active:not(:disabled) { box-shadow:var(--gov-depth-inset); }
+.gov-experience :is(.gov-button,.gov-control,.gov-select-trigger):disabled { box-shadow:none; }
+.gov-experience .gov-pagination { background:var(--gov-surface); border-color:var(--gov-rule); }
+.gov-experience .gov-pagination button { background:var(--gov-control-surface); color:var(--gov-text); }
+.gov-experience .gov-pagination button:disabled { box-shadow:none; }
+.gov-experience .gov-pagination button[aria-current="page"] { background:var(--gov-selection); border-color:var(--gov-selection-edge); color:var(--gov-selection-ink); box-shadow:var(--gov-depth-inset); }
+.gov-experience .gov-control--quiet { background:transparent; box-shadow:none; }
+.gov-experience .gov-control--quiet[aria-pressed="true"] {background:var(--gov-selection);color:var(--gov-selection-ink);border-color:var(--gov-selection-edge);box-shadow:none;}
+
+/* Recessed inputs use the same finish in Reports and shared workspaces. */
+.gov-experience :is(.gov-search,.gov-search-wrapper,.gov-inset,.gov-field input,.gov-field textarea,.gov-field select,.citizen-reports-search input,.work-orders-search-box) {
+    background:var(--gov-control-surface);
+    border-color:var(--gov-rule);
+    color:var(--gov-text);
+    box-shadow:var(--gov-depth-inset);
+}
+.gov-experience :is(.gov-search-wrapper,.gov-search) input { background:transparent; box-shadow:none; }
+.gov-experience .gov-search-wrapper { border-radius:10px; }
+.dark .gov-experience input:is([type="checkbox"],[type="radio"]) { color-scheme:dark; }
+.gov-experience .publication-editor__scroll { padding-inline:10px; padding-bottom:18px; }
+.gov-experience #publication-body { box-shadow:var(--gov-depth-inset); }
+.gov-experience .gov-search-wrapper:focus-within { outline:3px solid var(--gov-focus); outline-offset:3px; }
+.gov-experience .report-view-switch { background:var(--gov-control-surface); box-shadow:var(--gov-depth-inset); }
+.gov-experience .report-view-switch a[aria-current="page"] { background:var(--gov-selection); color:var(--gov-selection-ink); box-shadow:none; }
+.gov-experience .gov-view-tabs .is-selected {background:var(--gov-selection);color:var(--gov-selection-ink);border-bottom-color:var(--gov-selection-edge);box-shadow:none;}
+.gov-experience .gov-sidebar nav a.gov-sidebar-selected {background:var(--gov-selection) !important;color:var(--gov-selection-ink) !important;box-shadow:none;}
+.gov-experience .gov-sidebar nav a.gov-sidebar-selected svg {color:var(--gov-selection-ink) !important;}
+.gov-experience .gov-bi-period button[aria-pressed="true"] {background:var(--gov-selection);color:var(--gov-selection-ink);box-shadow:none;}
+.gov-experience .gov-filter select:focus-visible {border-color:var(--gov-focus);}
+.gov-experience .gov-assistant__send {background:var(--gov-primary-fill);border-color:var(--gov-primary-fill);color:var(--gov-primary-ink);}
+.gov-experience .gov-assistant__starters button:hover {background:var(--gov-selection);}
+
+/* Floating menus and government dialogs also consume this contract. */
+.gov-experience .gov-select-menu { background:var(--gov-surface-elevated); border-color:var(--gov-rule); box-shadow:var(--gov-depth-dialog); }
+.gov-experience .gov-select-menu > .h-1 {display:none;}
+:is(.gov-modal-dialog,.gov-sheet-drawer,.gov-confirm) { box-shadow:var(--gov-depth-dialog); }
+:is(.gov-modal-input,.gov-modal-select,.gov-modal-textarea) { box-shadow:var(--gov-depth-inset); }
+
+@media (max-width:639px) {
+    .gov-experience .gov-tier2-actions { flex:1 1 100%; width:100%; min-width:0; max-width:100%; flex-wrap:wrap; }
+}
+
+@layer base {
+    .gov-experience :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible {
+        outline:3px solid var(--gov-focus) !important;
+        outline-offset:3px !important;
+    }
+}
+
+@media (forced-colors:active) {
+    .gov-experience .gov-bi-dashboard :is(.gov-bi-surface,.gov-assistant__panel) {border-color:CanvasText;box-shadow:none;}
+    .gov-experience :is(.gov-surface,.gov-record-table,.gov-record-detail,.gov-bi-surface,.gov-button,.gov-control,.gov-select-trigger,.gov-select-menu,.gov-search,.gov-search-wrapper,.gov-inset,#publication-body,.gov-field input,.gov-field select,.gov-field textarea,.gov-filter select,.gov-pagination button,.gov-view-tabs .is-selected,.report-view-switch,.report-view-switch a,.gov-sidebar nav a.gov-sidebar-selected),
+    :is(.gov-modal-dialog,.gov-sheet-drawer,.gov-confirm,.gov-modal-input,.gov-modal-select,.gov-modal-textarea) { box-shadow:none; border-color:CanvasText; }
+}

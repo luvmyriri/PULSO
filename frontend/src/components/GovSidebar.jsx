@@ -1,33 +1,56 @@
 /**
  * GovSidebar.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Unified, sleek left navigation sidebar for the PULSO Government Command Suite.
- * Mirrors reference structure (media_1788468722929.png):
- *   - PULSO COMMAND brand header with official emblem
- *   - 7 primary menu actions (Reports, Work orders, Assets, Map, Analytics, Directory, Settings)
- *   - Signature PULSO orange active-state indicator
- *   - Interactive `< Collapse` toggle with icon-only rail support
+ * Unified left navigation sidebar for the PULSO Government Workspace.
+ * Reorganized into four operational groups:
+ *   1. Workspace (Dashboard, My Work)
+ *   2. Operations (Reports, Work Orders, Infrastructure, Records)
+ *   3. Insight (Report Analysis, Predictive Maintenance)
+ *   4. Public Communication (Updates)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-    LayoutDashboard, ClipboardList, Wrench, Building2, MapPin, BarChart2,
-    Users, Settings, ChevronLeft, Megaphone, Activity
+    ClipboardList, Wrench, Building2, BarChart2,
+    Megaphone, Inbox, FileArchive, Menu, X, ShieldCheck,
+    LayoutDashboard
 } from 'lucide-react';
+import { readGovernmentUser } from './governmentWorkspaceConfig';
+import { useGovernmentData } from '../utils/governmentApi';
+import './gov-sidebar-responsive.css';
 
-export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
+export default function GovSidebar({ activeTab, onTabChange, currentUser, responsive = true }) {
     const location = useLocation();
+    const resolvedUser = currentUser || readGovernmentUser();
+    const navigation = useGovernmentData('/api/gov/navigation');
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const mobileDialog = useRef(null);
+    const mobileTrigger = useRef(null);
+    useEffect(() => {
+        const el = mobileDialog.current;
+        if (!el) return;
+        if (mobileOpen && !el.open) el.showModal();
+        if (!mobileOpen && el.open) el.close();
+    }, [mobileOpen]);
 
     // Persist collapsed state
-    const [isCollapsed, setIsCollapsed] = useState(() => {
+    const [storedCollapsed, setIsCollapsed] = useState(() => {
         try {
             return localStorage.getItem('pulso_gov_sidebar_collapsed') === 'true';
         } catch {
             return false;
         }
     });
+    const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width:1023px)').matches);
+    useEffect(() => {
+        const media = window.matchMedia('(max-width:1023px)');
+        const update = () => setNarrow(media.matches);
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
+    const isCollapsed = storedCollapsed && !narrow;
 
     const toggleCollapse = () => {
         setIsCollapsed(prev => {
@@ -39,88 +62,118 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
         });
     };
 
-    // Authoritative Menu Items
-    const NAV_ITEMS = [
+    const NAV_GROUPS = [
         {
-            id: 'dashboard',
-            label: 'Dashboard',
-            icon: LayoutDashboard,
-            to: '/gov/dashboard',
-            matches: ['/gov/dashboard', '/gov/my-dashboard', '/gov/bi']
+            name: 'Workspace',
+            items: [
+                {
+                    id: 'overview',
+                    label: 'Dashboard',
+                    icon: LayoutDashboard,
+                    to: '/gov/overview',
+                    matches: ['/gov/overview'],
+                },
+                {
+                    id: 'my-work',
+                    legacyIds: ['dashboard', 'today', 'my-work'],
+                    label: 'My Work',
+                    icon: Inbox,
+                    to: '/gov/dashboard',
+                    matches: ['/gov/dashboard', '/gov/my-dashboard', '/gov/my-work', '/gov/today'],
+                },
+            ],
         },
         {
-            id: 'today',
-            label: 'Today',
-            icon: Activity,
-            to: '/gov/today',
-            matches: ['/gov/today']
+            name: 'Operations',
+            items: [
+                {
+                    id: 'reports',
+                    legacyIds: ['reports', 'map'],
+                    label: 'Reports',
+                    icon: ClipboardList,
+                    to: '/gov/reports',
+                    matches: ['/gov/reports', '/gov/citizen-reports', '/gov/map', '/dispatcher'],
+                },
+                {
+                    id: 'work-orders',
+                    legacyIds: ['work-orders', 'projects', 'obo'],
+                    label: 'Work Orders',
+                    icon: Wrench,
+                    to: '/gov/work-orders',
+                    matches: ['/gov/work-orders', '/gov/projects', '/gov/delivery', '/gov/obo'],
+                },
+                {
+                    id: 'assets',
+                    legacyIds: ['assets'],
+                    label: 'Infrastructure',
+                    icon: Building2,
+                    to: '/gov/assets',
+                    matches: ['/gov/assets'],
+                },
+                {
+                    id: 'records',
+                    legacyIds: ['records'],
+                    label: 'Records',
+                    icon: FileArchive,
+                    to: '/gov/records-workspace?view=registry&tab=registry',
+                    matches: ['/gov/records-workspace', '/gov/records', '/gov/document-registry', '/gov/timeline', '/gov/audit-logs', '/gov/financial-history'],
+                },
+            ],
         },
         {
-            id: 'reports',
-            label: 'Reports',
-            icon: ClipboardList,
-            to: '/gov/reports',
-            matches: ['/gov/reports', '/gov/citizen-reports']
+            name: 'Insight',
+            items: [
+                {
+                    id: 'analytics',
+                    legacyIds: ['analytics', 'insights'],
+                    label: 'Report Analysis',
+                    icon: BarChart2,
+                    to: '/gov/insights?view=analytics&tab=analytics',
+                    matches: ['/gov/insights', '/gov/analytics', '/management', '/gov/bi'],
+                    excludeView: 'predictive',
+                },
+                {
+                    id: 'predictive',
+                    label: 'Predictive Maintenance',
+                    icon: ShieldCheck,
+                    to: '/gov/insights?view=predictive',
+                    matches: ['/gov/predictive'],
+                    requiredView: 'predictive',
+                },
+            ],
         },
         {
-            id: 'work-orders',
-            label: 'Work orders',
-            icon: Wrench,
-            to: '/gov/work-orders',
-            matches: ['/gov/work-orders']
+            name: 'Public Communication',
+            items: [
+                {
+                    id: 'announcements',
+                    legacyIds: ['announcements', 'updates'],
+                    label: 'Updates',
+                    icon: Megaphone,
+                    to: '/gov/announcements',
+                    matches: ['/gov/notification-deliveries', '/gov/announcements', '/gov/advisories'],
+                },
+            ],
         },
-        {
-            id: 'assets',
-            label: 'Assets',
-            icon: Building2,
-            to: '/gov/assets',
-            matches: ['/gov/assets']
-        },
-        {
-            id: 'announcements',
-            label: 'Announcements',
-            icon: Megaphone,
-            to: '/gov/announcements',
-            matches: ['/gov/announcements']
-        },
-        {
-            id: 'map',
-            label: 'Map',
-            icon: MapPin,
-            to: '/gov/map',
-            matches: ['/gov/map', '/dispatcher']
-        },
-        {
-            id: 'analytics',
-            label: 'Analytics',
-            icon: BarChart2,
-            to: '/gov/analytics',
-            matches: ['/gov/analytics', '/management', '/gov/bi']
-        },
-        {
-            id: 'settings',
-            label: 'Settings',
-            icon: Settings,
-            to: '/gov/administration?view=settings&tab=settings',
-            matches: ['/gov/settings', '/gov/administration', '/gov/audit-logs', '/gov/users', '/gov/residents']
-        }
     ];
 
-    return (
+    const sidebar = (
         <aside
-            className={`flex flex-col justify-between shrink-0 bg-white dark:bg-[#081120] text-slate-800 dark:text-white transition-all duration-300 z-40 relative h-screen ${
+            aria-label="Government workspace navigation"
+            data-collapsed={isCollapsed}
+            className={`gov-sidebar flex flex-col justify-between shrink-0 bg-white dark:bg-[#081120] text-slate-800 dark:text-white z-40 relative h-screen ${
                 isCollapsed ? 'w-20' : 'w-60'
             } border-r border-slate-200 dark:border-slate-800/80 shadow-xs dark:shadow-xl select-none`}
         >
             {/* Top Brand Header */}
-            <div>
-                <div className={`h-20 flex items-center px-4 border-b border-slate-200 dark:border-slate-800/80 ${isCollapsed ? 'justify-center' : ''}`}>
+            <div className="flex flex-col min-h-0 flex-1">
+                <div className={`gov-sidebar-brand ${isCollapsed ? 'is-collapsed' : ''}`}>
+                    <button type="button" className="gov-sidebar-collapse" onClick={toggleCollapse} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!isCollapsed}><Menu size={18} strokeWidth={1.75}/></button>
                     <Link
                         to="/gov/dashboard"
-                        className="flex items-center gap-2.5 group overflow-hidden cursor-pointer"
+                        className="flex items-center gap-2.5 group overflow-hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534] dark:focus-visible:ring-[#4ade80] rounded-lg"
                         title="City Government of Caloocan - City Engineering Department - PULSO"
                     >
-                        {/* Official City Engineering Department Logo */}
                         <img
                             src="/city-engineering-logo.png"
                             alt="City Engineering Department Logo"
@@ -143,59 +196,85 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser }) {
                     </Link>
                 </div>
 
-                {/* Nav Items List */}
-                <nav className="p-3 space-y-1.5 mt-2">
-                    {NAV_ITEMS.map((item) => {
-                        const Icon = item.icon;
-                        const isCurrentActive =
-                            item.matches.some(path => location.pathname === path || location.pathname.startsWith(path + '/')) ||
-                            activeTab === item.id;
+                {/* Nav Groups List */}
+                <nav className="gov-sidebar-nav overflow-y-auto overflow-x-hidden flex-1">
+                    {NAV_GROUPS.map((group, groupIdx) => {
+                        const visibleItems = group.items.filter(item => {
+                            if (navigation.data?.modules) {
+                                return navigation.data.modules.includes(item.id);
+                            }
+                            return false;
+                        });
+
+                        if (visibleItems.length === 0) return null;
 
                         return (
-                            <Link
-                                key={item.id}
-                                to={item.to}
-                                title={item.label}
-                                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-heading text-xs font-bold transition-all duration-150 cursor-pointer group ${
-                                    !isCollapsed ? 'justify-start' : 'justify-center'
-                                } ${
-                                    isCurrentActive
-                                        ? 'bg-[#ff6b00] text-white shadow-md shadow-orange-500/25 hover:bg-[#ea5f00] hover:shadow-lg hover:shadow-orange-500/30'
-                                        : 'text-black dark:text-white hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 font-bold'
-                                }`}
-                            >
-                                <Icon
-                                    size={18}
-                                    className={`shrink-0 transition-colors ${
-                                        isCurrentActive ? 'text-white' : 'text-black dark:text-white group-hover:text-black dark:group-hover:text-white'
-                                    }`}
-                                />
-                                {!isCollapsed && <span>{item.label}</span>}
-                            </Link>
+                            <div key={group.name} className="gov-sidebar-group">
+                                {!isCollapsed ? (
+                                    <div className="gov-sidebar-group__label">
+                                        {group.name}
+                                    </div>
+                                ) : (
+                                    groupIdx > 0 && <div className="mx-2 my-2 border-t border-slate-100 dark:border-slate-800" aria-hidden="true" />
+                                )}
+                                <div className="gov-sidebar-group__items">
+                                    {visibleItems.map((item) => {
+                                        const Icon = item.icon;
+                                        const view = new URLSearchParams(location.search).get('view');
+                                        const isPathMatch = (item.requiredView && location.pathname === '/gov/insights' && view === item.requiredView) || (view !== item.excludeView && item.matches.some(
+                                            path => location.pathname === path || location.pathname.startsWith(path + '/')
+                                        ));
+                                        const isTabMatch = activeTab && (item.id === activeTab || item.legacyIds?.includes(activeTab));
+                                        const isCurrentActive = Boolean(isPathMatch || isTabMatch);
+
+                                        return (
+                                            <Link
+                                                key={item.id}
+                                                to={item.to}
+                                                title={item.label}
+                                                aria-current={isCurrentActive ? 'page' : undefined}
+                                                onClick={() => {
+                                                    setMobileOpen(false);
+                                                    if (typeof onTabChange === 'function') {
+                                                        onTabChange(item.id);
+                                                    }
+                                                }}
+                                                className={`flex items-center gap-3 px-3 py-2 rounded-lg font-heading text-xs font-semibold transition-all duration-150 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534] dark:focus-visible:ring-[#4ade80] ${
+                                                    !isCollapsed ? 'justify-start' : 'justify-center'
+                                                } ${
+                                                    isCurrentActive
+                                                        ? 'gov-sidebar-selected font-bold'
+                                                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
+                                                }`}
+                                            >
+                                                <Icon
+                                                    size={18}
+                                                    className={`shrink-0 transition-colors ${
+                                                        isCurrentActive
+                                                            ? 'text-current'
+                                                            : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white'
+                                                    }`}
+                                                />
+                                                {!isCollapsed && <span className="truncate">{item.label}</span>}
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         );
                     })}
                 </nav>
+                {navigation.error && <p className="px-5 py-2 text-xs" role="alert">Navigation unavailable. <button className="underline" onClick={navigation.reload}>Try again</button></p>}
             </div>
 
-            {/* Bottom Rail: Collapse Toggle */}
-            <div className="p-3 border-t border-slate-200 dark:border-slate-800/80">
-                <button
-                    type="button"
-                    onClick={toggleCollapse}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-black dark:text-white hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-all cursor-pointer ${
-                        !isCollapsed ? 'justify-start' : 'justify-center'
-                    }`}
-                    title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                >
-                    <ChevronLeft
-                        size={18}
-                        className={`shrink-0 text-black dark:text-white transition-transform duration-300 ${
-                            isCollapsed ? 'rotate-180' : ''
-                        }`}
-                    />
-                    {!isCollapsed && <span>Collapse</span>}
-                </button>
-            </div>
         </aside>
     );
+    if (!responsive) return sidebar;
+    return <>
+        <button ref={mobileTrigger} type="button" className="gov-sidebar-mobile-trigger" onClick={() => setMobileOpen(true)} aria-label="Open government navigation"><Menu size={20} /></button>
+        <div className="gov-sidebar-desktop">{sidebar}</div>
+        <dialog ref={mobileDialog} className="gov-sidebar-mobile-dialog" aria-label="Government navigation" onClose={() => { setMobileOpen(false); mobileTrigger.current?.focus(); }} onClick={e => { if (e.target === e.currentTarget) setMobileOpen(false); }}>
+            <button className="gov-sidebar-mobile-close" onClick={() => setMobileOpen(false)}><X size={18} /> Close navigation</button>{sidebar}
+        </dialog>
+    </>;
 }

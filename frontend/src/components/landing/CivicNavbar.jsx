@@ -1,6 +1,7 @@
+import { Link, useNavigate } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, X, PhoneCall, LogIn, UserPlus, LogOut, ArrowRight, User, Smartphone } from 'lucide-react';
+import { Menu, X, PhoneCall, LogIn, UserPlus, LogOut, ArrowRight, User } from 'lucide-react';
 import Branding from '../Branding';
 import ThemeToggle from '../ThemeToggle';
 import PwaModal from './PwaModal';
@@ -22,6 +23,7 @@ import { isInstalledApp } from '../../utils/appContext';
  */
 export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, activeTab: propActiveTab, onSelectTab }) {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -105,7 +107,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
     const wasGov = currentUser?.role && currentUser.role !== 'resident';
     clearAuthSession();
     setCurrentUser(null);
-    window.location.href = wasGov ? '/gov' : '/login';
+    if (wasGov) { window.location.href = '/gov'; } else { navigate('/login'); }
   };
 
   const getUserDestination = (user) => {
@@ -145,7 +147,8 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
     const targetId = (id === 'map-preview' || id === 'map') ? (document.getElementById('map-content') ? 'map-content' : 'map-preview') : id;
     const element = document.getElementById(targetId) || document.getElementById(id);
     if (element) {
-      const offset = 76;
+      const navEl = typeof document !== 'undefined' ? document.querySelector('header nav') : null;
+      const offset = navEl ? navEl.offsetHeight : 56;
       const bodyRect = document.body.getBoundingClientRect().top;
       const elementRect = element.getBoundingClientRect().top;
       const elementPosition = elementRect - bodyRect;
@@ -188,7 +191,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
     },
     { 
       id: 'map',
-      label: 'Live Map', 
+      label: 'Community Map',
       onClick: () => { 
         setMobileMenuOpen(false); 
         setActiveSection('map');
@@ -328,8 +331,8 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
             {currentUser ? (
               /* Already Signed In: Recognizable Account Indicator */
               <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-1 pr-2 shadow-2xs">
-                <a
-                  href={getUserDestination(currentUser)}
+                <Link
+                  to={getUserDestination(currentUser)}
                   className="flex items-center gap-2 group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg"
                   aria-label={`Go to ${getDisplayName(currentUser)}'s account dashboard`}
                 >
@@ -344,7 +347,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
                       Active
                     </span>
                   </div>
-                </a>
+                </Link>
                 <button
                   type="button"
                   onClick={handleSignOut}
@@ -361,37 +364,37 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
                 <span className="text-xs text-slate-500 dark:text-slate-400 font-medium hidden lg:inline">
                   Already registered?
                 </span>
-                <a
-                  href="/login"
+                <Link
+                  to="/login"
                   className="inline-flex items-center gap-2 px-4 py-2 sm:py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white text-xs sm:text-[13px] font-heading font-extrabold tracking-wide transition-all shadow-sm hover:shadow-md hover:shadow-orange-500/25 whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
                   aria-label="Sign in to your account"
                 >
                   <LogIn size={15} className="shrink-0" />
                   <span>Sign In</span>
-                </a>
+                </Link>
               </div>
             ) : (
               /* Not Signed In: Paired Create Account + Filled High-Contrast Sign In */
               <div className="flex items-center gap-2">
                 {/* Secondary: Create Account (Outlined) */}
-                <a
-                  href="/register"
+                <Link
+                  to="/register"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white hover:bg-slate-50 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 hover:border-[#ff6b00] hover:text-[#ff6b00] dark:hover:border-[#ff6b00] dark:hover:text-[#ff6b00] text-xs sm:text-[13px] font-bold tracking-wide transition-all shadow-2xs hover:shadow-xs whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                   aria-label="Create a resident account"
                 >
                   <UserPlus size={15} className="text-[#ff6b00] shrink-0" />
                   <span>Create Account</span>
-                </a>
+                </Link>
 
                 {/* Primary Auth: Sign In (Filled Orange Accent - Highest Visual Rank) */}
-                <a
-                  href="/login"
+                <Link
+                  to="/login"
                   className="inline-flex items-center gap-2 px-4.5 py-2 sm:py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white text-xs sm:text-[13px] font-heading font-extrabold tracking-wide transition-all shadow-sm hover:shadow-md hover:shadow-orange-500/25 whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
                   aria-label="Sign in to your account"
                 >
                   <LogIn size={15} className="shrink-0" />
                   <span>Sign In</span>
-                </a>
+                </Link>
               </div>
             )}
 
@@ -401,55 +404,55 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
           <div className="flex items-center gap-1.5 xs:gap-2 md:hidden shrink-0">
             {currentUser ? (
               /* Mobile Signed-In Avatar Pill */
-              <a
-                href={getUserDestination(currentUser)}
-                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-50 dark:bg-slate-800 border border-orange-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white shrink-0"
+              <Link
+                to={getUserDestination(currentUser)}
+                className="inline-flex min-w-11 min-h-11 justify-center items-center gap-1.5 px-2 py-1 rounded-lg bg-orange-50 dark:bg-slate-800 border border-orange-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white shrink-0"
                 aria-label={`Go to ${getDisplayName(currentUser)}'s account`}
               >
                 <span className="w-5 h-5 rounded bg-[#ff6b00] text-white flex items-center justify-center text-[9px] font-black">
                   {getInitials(currentUser)}
                 </span>
-                <span className="max-w-[65px] truncate text-[11px] font-heading">
+                <span className="hidden sm:inline max-w-[65px] truncate text-[11px] font-heading">
                   {getDisplayName(currentUser)}
                 </span>
-              </a>
+              </Link>
             ) : mode === 'register' || (typeof window !== 'undefined' && window.location.pathname === '/register') ? (
-              <a
-                href="/login"
+              <Link
+                to="/login"
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ff6b00] text-white font-bold text-xs shadow-2xs whitespace-nowrap"
                 aria-label="Sign in to your account"
               >
                 <LogIn size={13} />
                 <span>Sign In</span>
-              </a>
+              </Link>
             ) : mode === 'login' || (typeof window !== 'undefined' && window.location.pathname === '/login') ? (
-              <a
-                href="/register"
+              <Link
+                to="/register"
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs shadow-2xs whitespace-nowrap"
                 aria-label="Create a resident account"
               >
                 <UserPlus size={13} className="text-[#ff6b00]" />
                 <span className="text-[11px]">Sign Up</span>
-              </a>
+              </Link>
             ) : (
               /* Mobile Not Signed-In: Clean Sign In button (Sign up available in mobile drawer) */
-              <a
-                href="/login"
+              <Link
+                to="/login"
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ff6b00] text-white font-bold text-xs shadow-2xs whitespace-nowrap"
                 aria-label="Sign in to your account"
               >
                 <LogIn size={13} />
                 <span>Sign In</span>
-              </a>
+              </Link>
             )}
 
-            <ThemeToggle className="hidden sm:flex" />
+            <div className="hidden sm:block"><ThemeToggle /></div>
 
             {/* Mobile Hamburger Toggle for Secondary Nav Links - guaranteed shrink-0 visibility */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="shrink-0 p-1.5 sm:p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] cursor-pointer"
+              className="shrink-0 min-w-11 min-h-11 inline-flex items-center justify-center p-1.5 sm:p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] cursor-pointer"
               aria-label={mobileMenuOpen ? 'Close Menu' : 'Open Menu'}
               aria-expanded={mobileMenuOpen}
             >
@@ -488,15 +491,9 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
                 <button
                   type="button"
                   onClick={() => { setMobileMenuOpen(false); handleOpenPwa(); }}
-                  className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl text-sm font-bold bg-orange-50 dark:bg-orange-950/40 text-[#ff6b00] border border-orange-200/80 dark:border-orange-800/60 transition-colors cursor-pointer"
+                  className="w-full text-left py-2.5 px-3 rounded-xl text-sm font-bold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-2">
-                    <Smartphone size={16} className="text-[#ff6b00]" />
-                    <span>Install Mobile App (PWA)</span>
-                  </div>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[#ff6b00] text-white">
-                    QR Code
-                  </span>
+                  <span>Install Mobile App</span>
                 </button>
               )}
             </div>
@@ -538,8 +535,8 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
             {/* Mobile Drawer Auth Actions */}
             {currentUser ? (
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                <a
-                  href={getUserDestination(currentUser)}
+                <Link
+                  to={getUserDestination(currentUser)}
                   className="flex items-center justify-between w-full py-3 px-4 rounded-xl bg-orange-50 dark:bg-slate-800 border border-orange-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold text-sm"
                 >
                   <div className="flex items-center gap-2">
@@ -549,7 +546,7 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
                     <span>{getDisplayName(currentUser)}</span>
                   </div>
                   <ArrowRight size={16} className="text-[#ff6b00]" />
-                </a>
+                </Link>
 
                 <button
                   type="button"
@@ -562,22 +559,22 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                <a
-                  href="/register"
+                <Link
+                  to="/register"
                   className="flex items-center justify-center gap-1.5 w-full py-3 text-center rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-900 dark:text-white font-bold text-xs sm:text-sm hover:border-[#ff6b00] hover:text-[#ff6b00] transition-colors shadow-2xs"
                   aria-label="Create a resident account"
                 >
                   <UserPlus size={14} className="text-[#ff6b00]" />
                   <span>Create Account</span>
-                </a>
-                <a
-                  href="/login"
+                </Link>
+                <Link
+                  to="/login"
                   className="flex items-center justify-center gap-1.5 w-full py-3 text-center rounded-xl bg-[#ff6b00] text-white font-bold text-xs sm:text-sm shadow-sm hover:bg-[#e65c00] transition-colors"
                   aria-label="Sign in to your account"
                 >
                   <LogIn size={14} />
                   <span>Sign In</span>
-                </a>
+                </Link>
               </div>
             )}
 

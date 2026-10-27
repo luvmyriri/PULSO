@@ -39,12 +39,14 @@ class SlidingWindowRateLimiter:
             return request.client.host.strip()
         return "127.0.0.1"
 
-    def check(self, request: Request):
+    def check(self, request: Request, identifier: Optional[str] = None):
         """
         Evaluates the rate limit for the incoming request IP.
         Raises HTTP 429 Too Many Requests if the limit is exceeded.
         """
-        client_ip = self._get_client_ip(request)
+        # Only callers that have authenticated the request may supply an account key.
+        # Never derive quota identity from an unverified bearer-token payload.
+        client_ip = f"account:{identifier}" if identifier else self._get_client_ip(request)
         now = time.time()
 
         with self._lock:
@@ -107,4 +109,10 @@ auth_limiter = SlidingWindowRateLimiter(
     max_requests=30,
     window_seconds=60,   # 1 minute
     error_detail="Too many authentication attempts. Please try again in 1 minute."
+)
+
+availability_check_limiter = SlidingWindowRateLimiter(
+    max_requests=120,
+    window_seconds=60,
+    error_detail="Too many check attempts. Please slow down."
 )

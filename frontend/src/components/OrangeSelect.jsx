@@ -112,7 +112,7 @@ const OrangeSelect = ({
     }, [options, filterText, activeGroup]);
 
     const selected = (options || []).find(o => o.value === value);
-    const isActiveFilter = value && value !== 'All' && value !== 'All Districts' && value !== 'All Barangays';
+    const isActiveFilter = Boolean(value && !['all', 'All', 'All Districts', 'All Barangays', 'All reports'].includes(value));
 
     const renderOptionItem = (opt) => {
         const isSelected = opt.value === value;
@@ -153,8 +153,10 @@ const OrangeSelect = ({
             {/* Trigger button */}
             <button
                 type="button"
+                aria-expanded={open}
+                data-active-filter={isActiveFilter}
                 onClick={() => setOpen(p => !p)}
-                className={`group w-full flex items-center justify-between gap-2 transition-all duration-200 cursor-pointer hover:text-black dark:hover:text-white ${
+                className={`gov-select-trigger group w-full flex items-center justify-between gap-2 transition-all duration-200 cursor-pointer hover:text-black dark:hover:text-white ${
                     size === 'sm'
                         ? `px-3 py-1.5 rounded-lg text-xs font-semibold border ${
                             open
@@ -197,7 +199,7 @@ const OrangeSelect = ({
                         animate={{ opacity: 1, y: effectiveDropUp ? -3 : 3, scale: 1 }}
                         exit={{ opacity: 0, y: effectiveDropUp ? -6 : 6, scale: 0.96 }}
                         transition={{ duration: 0.15, ease: "easeOut" }}
-                        className={`absolute ${effectiveDropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} z-[9999] bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-700/80 shadow-2xl shadow-black/25 dark:shadow-black/80 overflow-hidden min-w-full ${
+                        className={`gov-select-menu absolute ${effectiveDropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} z-[9999] bg-white dark:bg-[#0c1424] border border-slate-200 dark:border-slate-700/80 shadow-2xl shadow-black/25 dark:shadow-black/80 overflow-hidden min-w-full ${
                             size === 'sm' ? 'min-w-[200px] max-w-[340px] rounded-xl' : 'min-w-[280px] sm:min-w-[320px] max-w-[380px] rounded-2xl'
                         }`}
                     >

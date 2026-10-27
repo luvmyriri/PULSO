@@ -11,6 +11,6 @@ python_bin="${PYTHON:-python3}"
   cd "$repo_root/backend"
   "$python_bin" -m alembic -c alembic.ini stamp c455ca49f6d5
   "$python_bin" -m alembic -c alembic.ini upgrade head
-  "$python_bin" "$repo_root/scripts/db_schema.py" assert-revision f3a6d8c1b250
+  "$python_bin" "$repo_root/scripts/db_schema.py" assert-revision 18efa117cb09
   "$python_bin" -m alembic -c alembic.ini current
 )

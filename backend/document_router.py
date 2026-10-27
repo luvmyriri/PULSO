@@ -63,6 +63,11 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 # --- PULSO Retention & Gating Logic ---
 # (document_type) -> (Category, Retention, Confidentiality)
 RETENTION_MAP = {
+    "planning_record": ("Technical", "REVIEW_REQUIRED", "Restricted"),
+    "work_authorization": ("Technical", "REVIEW_REQUIRED", "Restricted"),
+    "completion_report": ("Technical", "REVIEW_REQUIRED", "Restricted"),
+    "inspection_report": ("Technical", "REVIEW_REQUIRED", "Restricted"),
+    "completion_certificate": ("Technical", "REVIEW_REQUIRED", "Restricted"),
     "as_built_plan":     ("Infrastructure", "PERPETUAL", "Public"),
     "building_permit":   ("Permits",        "PERPETUAL", "Restricted"),
     "materials_test":    ("Technical",      "10_YEARS",  "Restricted"),
@@ -78,7 +83,7 @@ RETENTION_MAP = {
 }
 
 def calculate_expiry(policy: str, start_date: datetime):
-    if policy == "PERPETUAL":
+    if policy in {"PERPETUAL", "REVIEW_REQUIRED"}:
         return None
     years = int(policy.split('_')[0])
     return start_date + timedelta(days=years * 365)
@@ -116,7 +121,11 @@ async def upload_document(
     Upload a document, calculate its SHA-256 fingerprint, and register it
     in the SystemDocument tracking table for status gating and FQA.
     """
-    _require_records_manage(db, current_user)
+    if target_model=='ProjectRequest':
+        import project_workspace
+        project_workspace.require(current_user,'evidence_upload')
+    else:
+        _require_records_manage(db, current_user)
     target_models = {
         "ProjectRequest": gov_models.ProjectRequest,
         "WorkOrder": gov_models.WorkOrder,
@@ -128,12 +137,14 @@ async def upload_document(
     target = db.query(target_models[target_model]).filter(target_models[target_model].id == target_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="Linked record not found.")
+    from government_access import require_scope
+    require_scope(current_user, target)
 
     # Validate file type
     ext = validate_file(file)
 
     # Read the file content
-    content = await file.read()
+    content = await file.read(MAX_FILE_SIZE+1)
     if not content:
         raise HTTPException(status_code=400, detail="File is empty.")
     
@@ -194,7 +205,16 @@ async def upload_document(
     )
 
     db.add(new_doc)
-    db.commit()
+    db.add(gov_models.AuditLog(trigger_type='document_upload',actor_id=current_user.id,actor_role=current_user.role,
+        project_id=target_id if target_model=='ProjectRequest' else None,
+        work_order_id=target_id if target_model=='WorkOrder' else None,
+        action='Document uploaded',details=json.dumps({'target_model':target_model,'target_id':target_id,'document_type':document_type,'file_name':safe_filename})))
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        if os.path.isfile(file_path): os.remove(file_path)
+        raise
     db.refresh(new_doc)
 
     return {
@@ -219,10 +239,18 @@ async def get_document_file(
     Serves the physical file with strict session-based Gating.
     Enforces RBAC based on document confidentiality.
     """
-    _require_records_view(db, current_user)
+    if not isinstance(current_user,models.Official): raise HTTPException(403,'Staff document access required.')
     doc = db.query(SystemDocument).filter(SystemDocument.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
+    from records_workspace import require_document_scope
+    import project_workspace
+    project_access=doc.target_model=='ProjectRequest' and doc.confidentiality!='Confidential' and project_workspace.allowed(current_user,'evidence_view')
+    if project_access:
+        project_workspace.target(db,current_user,doc.target_id)
+    else:
+        _require_records_view(db,current_user)
+        require_document_scope(db,current_user,doc)
 
     role = current_user.role
     
@@ -238,7 +266,7 @@ async def get_document_file(
              if not roles_service.has_permission(db, current_user, "records", "manage"):
                  raise HTTPException(status_code=403, detail="Access Denied: Highly Confidential.")
 
-    elif doc.confidentiality == "Restricted":
+    elif doc.confidentiality == "Restricted" and not project_access:
         # Check for fine-grained Records:View capability
         if not roles_service.has_permission(db, current_user, "records", "view"):
              # Residents specifically handled as before
@@ -277,12 +305,13 @@ def get_documents_by_target(
     Fetch all uploaded documents for a specific entity (e.g. ProjectRequest #12).
     """
     _require_records_view(db, current_user)
-    docs = db.query(SystemDocument).filter(
+    from records_workspace import documents_query,document_projection
+    docs = documents_query(db,current_user).filter(
         SystemDocument.target_model == model,
         SystemDocument.target_id == target_id
     ).order_by(SystemDocument.uploaded_at.desc()).all()
 
-    return docs
+    return [document_projection(doc) for doc in docs]
 
 
 @router.get("/registry")
@@ -302,7 +331,8 @@ def get_document_registry(
     """
     _require_records_view(db, current_user)
 
-    query = db.query(SystemDocument)
+    from records_workspace import documents_query,document_projection
+    query = documents_query(db,current_user)
 
     # Role-Based Visibility Filtering (Gating)
     # Convert role to lowercase for comparison and handle potential None
@@ -333,7 +363,7 @@ def get_document_registry(
     docs = query.order_by(SystemDocument.uploaded_at.desc()).offset(offset).limit(limit).all()
     
     return {
-        "documents": docs,
+        "documents": [document_projection(doc) for doc in docs],
         "total": total,
         "limit": limit,
         "offset": offset
@@ -349,16 +379,18 @@ def get_document_counts(
     Get document counts by target_model for the registry dashboard.
     """
     _require_records_view(db, current_user)
+    from records_workspace import documents_query
+    query=documents_query(db,current_user)
     counts = {}
     target_models = ["ProjectRequest", "WorkOrder", "ProcurementRequest", "OBOInspection"]
     for model in target_models:
-        count = db.query(SystemDocument).filter(SystemDocument.target_model == model).count()
+        count = query.filter(SystemDocument.target_model == model).count()
         counts[model] = count
     
     doc_type_counts = {}
-    doc_types = db.query(SystemDocument.document_type).distinct().all()
+    doc_types = query.with_entities(SystemDocument.document_type).distinct().all()
     for (doc_type,) in doc_types:
-        cnt = db.query(SystemDocument).filter(SystemDocument.document_type == doc_type).count()
+        cnt = query.filter(SystemDocument.document_type == doc_type).count()
         doc_type_counts[doc_type] = cnt
     
     return {
@@ -387,6 +419,8 @@ def toggle_legal_hold(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
 
+    from records_workspace import require_document_scope,document_projection
+    require_document_scope(db,current_user,doc)
     doc.legal_hold = payload["legal_hold"]
     from gov_models import AuditLog
     db.add(AuditLog(
@@ -398,7 +432,7 @@ def toggle_legal_hold(
     ))
     db.commit()
     db.refresh(doc)
-    return doc
+    return document_projection(doc)
 
 @router.delete("/{document_id}")
 def delete_document(
