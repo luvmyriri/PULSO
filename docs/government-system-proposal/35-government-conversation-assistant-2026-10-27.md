@@ -1,5 +1,10 @@
 # Government conversation assistant
 
+**Superseded, 28 October 2026:** the user requested Gemini with scoped PostGIS and
+LightGBM grounding and removal of the old About popup. The current observed
+contract is [Government Gemini grounding](../integration/government-gemini-grounding.md).
+The OpenAI/no-records descriptions below are retained as historical context.
+
 Status: observed implementation at the user's explicit request; pilot access policy, operational rollout and shared Figma component remain proposed. Implementation is not approval of those policies. Owner: PULSO product/LGU decision owners. Version: 1.1. Last validated: 2026-10-27.
 
 ## Job and design contract

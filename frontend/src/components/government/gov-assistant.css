@@ -70,11 +70,6 @@
 .gov-assistant__starters button {min-height:44px;padding:8px 12px;border:1px solid var(--gov-rule);border-radius:22px;background:transparent;color:var(--gov-text-secondary);font:inherit;font-size:12px;cursor:pointer;}
 .gov-assistant__starters button:hover {background:var(--gov-selection);color:var(--gov-action);}
 .gov-assistant__log::-webkit-scrollbar,.gov-assistant__composer textarea::-webkit-scrollbar {display:none;}
-.gov-assistant__about {position:static;}
-.gov-assistant__about summary {display:grid;place-items:center;width:44px;height:44px;border-radius:10px;color:var(--gov-text-secondary);cursor:pointer;list-style:none;}
-.gov-assistant__about summary::-webkit-details-marker {display:none;}
-.gov-assistant__about summary:focus-visible {outline:3px solid var(--gov-focus);outline-offset:3px;}
-.gov-assistant__about p {position:absolute;z-index:2;right:12px;top:calc(100% - 2px);width:calc(100% - 24px);max-width:280px;padding:14px;border:1px solid var(--gov-rule);border-radius:12px;background:var(--gov-surface-elevated);box-shadow:var(--gov-depth-dialog);font-size:12px;line-height:1.6;color:var(--gov-text-secondary);}
 .gov-assistant__message + .gov-assistant__message {margin-top:24px;}
 .gov-assistant__speaker {margin:0 0 6px;font-size:12px;font-weight:700;color:var(--gov-text-secondary);}
 .gov-assistant__message--user {margin-left:24px;padding:12px 14px;background:var(--gov-selection);border-radius:12px;}
@@ -135,3 +130,8 @@
     .gov-assistant__launcher[data-idle="true"] {opacity:1;}
     .gov-assistant :is(button,textarea,[tabindex]):focus-visible {outline-color:Highlight;}
 }
+.gov-assistant__sources {margin-top:12px;font-size:12px;color:var(--gov-text-secondary);}
+.gov-assistant__sources summary {min-height:44px;display:flex;align-items:center;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.gov-assistant__sources ul {margin:0;padding-inline-start:18px;}
+.gov-assistant__sources a {display:inline-flex;align-items:center;min-height:44px;color:var(--gov-action);text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere;}
+.gov-assistant__sources :is(summary,a):focus-visible {outline:3px solid var(--gov-focus);outline-offset:3px;}
