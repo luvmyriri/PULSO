@@ -6,7 +6,6 @@ import {
     MapPin,
     ChevronDown,
     ChevronUp,
-    ChevronRight,
     Check,
     CheckCircle2,
     RotateCcw,
@@ -16,10 +15,13 @@ import {
     Copy,
     Info,
     AlertTriangle,
+    AlertCircle,
     PhoneCall,
     Search,
     Compass,
+    Signpost,
     Droplets,
+    Waves,
     Zap,
     HardHat,
     ShieldAlert,
@@ -27,20 +29,24 @@ import {
     HelpCircle,
     Loader2,
     Maximize2,
-    Eye
+    Eye,
+    Trash2
 } from 'lucide-react';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
+import { validateProfanity } from '../utils/profanityFilter';
 
 export function getCategoryIconComponent(catName) {
     const lower = String(catName || '').toLowerCase();
-    if (lower.includes('water') || lower.includes('drain') || lower.includes('flood') || lower.includes('tubig')) return Droplets;
+    if (lower.includes('waste') || lower.includes('garbage') || lower.includes('trash') || lower.includes('basura')) return Trash2;
+    if (lower.includes('flood') || lower.includes('drain')) return Waves;
+    if (lower.includes('water') || lower.includes('tubig')) return Droplets;
     if (lower.includes('power') || lower.includes('light') || lower.includes('electr') || lower.includes('kuryente')) return Zap;
-    if (lower.includes('road') || lower.includes('bridge') || lower.includes('lubak') || lower.includes('kalsada')) return HardHat;
-    if (lower.includes('safety') || lower.includes('hazard') || lower.includes('danger') || lower.includes('sunog')) return ShieldAlert;
+    if (lower.includes('traffic') || lower.includes('sign') || lower.includes('signal')) return Signpost;
     if (lower.includes('building') || lower.includes('facilit') || lower.includes('hall')) return Building2;
-    if (lower.includes('traffic') || lower.includes('sign')) return Compass;
+    if (lower.includes('safety') || lower.includes('hazard') || lower.includes('danger') || lower.includes('sunog')) return ShieldAlert;
+    if (lower.includes('road') || lower.includes('bridge') || lower.includes('lubak') || lower.includes('kalsada')) return HardHat;
     return HelpCircle;
 }
 
@@ -49,6 +55,12 @@ export function mapAiCategoryToCanonical(categoryStr) {
     const parts = categoryStr.split(',').map((p) => p.trim().toLowerCase());
     const mapped = new Set();
     for (const part of parts) {
+        if (part.includes('waste') || part.includes('garbage') || part.includes('trash') || part.includes('basura') || part.includes('dump') || part.includes('litter') || part.includes('dumi')) {
+            mapped.add('Waste Management');
+        }
+        if (part.includes('drain') || part.includes('flood') || part.includes('canal') || part.includes('sewer') || part.includes('manhole') || part.includes('clog') || part.includes('baha') || part.includes('estero') || part.includes('culvert')) {
+            mapped.add('Drainage & Flooding');
+        }
         if (part.includes('light') || part.includes('electric') || part.includes('power') || part.includes('lamp') || part.includes('street')) {
             mapped.add('Power & Street Lighting');
         }
@@ -58,17 +70,14 @@ export function mapAiCategoryToCanonical(categoryStr) {
         if (part.includes('road') || part.includes('bridge') || part.includes('pothole') || part.includes('asphalt') || part.includes('pavement') || part.includes('kalsada') || part.includes('lubak')) {
             mapped.add('Roads & Bridges');
         }
-        if (part.includes('water') || part.includes('drain') || part.includes('flood') || part.includes('canal') || part.includes('sewer') || part.includes('pipe') || part.includes('manhole') || part.includes('tubig')) {
+        if (part.includes('water') || part.includes('tubig') || part.includes('leak') || part.includes('pipe') || part.includes('burst') || part.includes('pressure') || part.includes('maynilad')) {
             mapped.add('Water Supply & Distribution');
         }
-        if (part.includes('safety') || part.includes('regulat') || part.includes('hazard') || part.includes('fire') || part.includes('building') || part.includes('debris') || part.includes('tree') || part.includes('sunog')) {
+        if (part.includes('safety') || part.includes('regulat') || part.includes('hazard') || part.includes('fire') || part.includes('debris') || part.includes('tree') || part.includes('sunog')) {
             mapped.add('Public Safety & Hazards');
         }
         if (part.includes('facilit') || part.includes('park') || part.includes('hall') || part.includes('court') || part.includes('school') || part.includes('gym')) {
             mapped.add('Public Buildings & Facilities');
-        }
-        if (part.includes('other') || part.includes('unknown') || part.includes('unclear') || part.includes('misc')) {
-            mapped.add('Others');
         }
     }
     return Array.from(mapped);
@@ -98,15 +107,16 @@ export function formatRejectionReason(reason) {
 
 const DRAFT_STORAGE_KEY = 'pulso_quick_report_draft_v2';
 
-// 7 Unified Categories excluding "All" for reporting
+// Unified Categories excluding "All" for reporting
 const REPORTABLE_CATEGORIES = [
     'Water Supply & Distribution',
+    'Drainage & Flooding',
     'Roads & Bridges',
     'Traffic & Road Signs',
     'Power & Street Lighting',
     'Public Safety & Hazards',
     'Public Buildings & Facilities',
-    'Others'
+    'Waste Management'
 ];
 
 /**
@@ -128,6 +138,7 @@ function QuickReportWizardModal({
     onOpenLocationPicker,
     onSubmitReport,
     onTrackReport,
+    onViewExistingReport,
     currentUser = null
 }) {
     // -------------------------------------------------------------------------
@@ -179,6 +190,8 @@ function QuickReportWizardModal({
     const [notes, setNotes] = useState('');
     const [isRecordingVoice, setIsRecordingVoice] = useState(false);
     const [voiceSupported, setVoiceSupported] = useState(false);
+    const baseNotesRef = useRef('');
+    const finalTranscriptRef = useRef('');
 
     // Collapsible Photo Tips
     const [isPhotoTipsOpen, setIsPhotoTipsOpen] = useState(false);
@@ -186,14 +199,25 @@ function QuickReportWizardModal({
     // Submission & Confirmation modals
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState(null);
+    const [duplicateReport, setDuplicateReport] = useState(null);
+    const [isDuplicateDescExpanded, setIsDuplicateDescExpanded] = useState(false);
     const [submittedTrackingNumbers, setSubmittedTrackingNumbers] = useState([]);
     const [isDiscardPromptOpen, setIsDiscardPromptOpen] = useState(false);
     const [copiedTrackingId, setCopiedTrackingId] = useState(null);
     const [isAddressCopied, setIsAddressCopied] = useState(false);
 
+    // Reset duplicate report state if resident alters category, location, or navigates back
+    useEffect(() => {
+        if (duplicateReport) {
+            setDuplicateReport(null);
+            setSubmitError(null);
+        }
+    }, [selectedCategories, reportLocation, step]);
+
     const fileInputRef = useRef(null);
     const recognitionRef = useRef(null);
     const contentAreaRef = useRef(null);
+    const errorCardRef = useRef(null);
 
     // -------------------------------------------------------------------------
     // Initialize & Restore Local Draft
@@ -260,43 +284,17 @@ function QuickReportWizardModal({
     }, []);
 
     // -------------------------------------------------------------------------
-    // Speech Recognition (Voice Notes)
+    // Speech Recognition (Voice Notes) - Accurate, Duplication-Free Engine
     // -------------------------------------------------------------------------
     useEffect(() => {
         const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRec) {
             setVoiceSupported(true);
-            const recog = new SpeechRec();
-            recog.continuous = true;
-            recog.interimResults = true;
-            recog.lang = 'en-PH';
-
-            recog.onresult = (event) => {
-                let transcript = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    transcript += event.results[i][0].transcript;
-                }
-                setNotes((prev) => {
-                    const combined = (prev ? prev + ' ' : '') + transcript;
-                    return combined.slice(0, 500);
-                });
-            };
-
-            recog.onerror = () => {
-                setIsRecordingVoice(false);
-            };
-
-            recog.onend = () => {
-                setIsRecordingVoice(false);
-            };
-
-            recognitionRef.current = recog;
         }
-
         return () => {
             if (recognitionRef.current) {
                 try {
-                    recognitionRef.current.stop();
+                    recognitionRef.current.abort();
                 } catch (e) {
                     // Ignore
                 }
@@ -305,19 +303,90 @@ function QuickReportWizardModal({
     }, []);
 
     const toggleVoiceRecording = () => {
-        if (!recognitionRef.current) return;
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) {
+            setVoiceSupported(false);
+            return;
+        }
+
         if (isRecordingVoice) {
-            try {
-                recognitionRef.current.stop();
-            } catch (e) {}
-            setIsRecordingVoice(false);
-        } else {
-            try {
-                recognitionRef.current.start();
-                setIsRecordingVoice(true);
-            } catch (e) {
-                setIsRecordingVoice(false);
+            if (recognitionRef.current) {
+                try {
+                    recognitionRef.current.stop();
+                } catch (e) {}
             }
+            setIsRecordingVoice(false);
+            return;
+        }
+
+        try {
+            if (recognitionRef.current) {
+                try { recognitionRef.current.abort(); } catch (e) {}
+            }
+
+            const recog = new SpeechRec();
+            recog.continuous = true;
+            recog.interimResults = true;
+            recog.lang = 'fil-PH'; // Multilingual Filipino / English support
+            recog.maxAlternatives = 1;
+
+            baseNotesRef.current = notes.trim();
+            finalTranscriptRef.current = '';
+
+            recog.onstart = () => {
+                setIsRecordingVoice(true);
+            };
+
+            recog.onresult = (event) => {
+                let accumulatedFinal = finalTranscriptRef.current;
+                let currentInterim = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const res = event.results[i];
+                    if (res.isFinal) {
+                        const piece = res[0].transcript.trim();
+                        if (piece) {
+                            accumulatedFinal = accumulatedFinal ? `${accumulatedFinal} ${piece}` : piece;
+                        }
+                    } else {
+                        currentInterim += res[0].transcript;
+                    }
+                }
+
+                finalTranscriptRef.current = accumulatedFinal;
+
+                // Merge: base notes + finalized spoken words + live interim preview
+                const base = baseNotesRef.current;
+                const spoken = [accumulatedFinal, currentInterim.trim()].filter(Boolean).join(' ');
+                const combined = base ? `${base} ${spoken}` : spoken;
+
+                setNotes(combined.slice(0, 500));
+            };
+
+            recog.onerror = (event) => {
+                console.warn('Voice recognition error:', event.error);
+                if (event.error !== 'no-speech') {
+                    setIsRecordingVoice(false);
+                }
+            };
+
+            recog.onend = () => {
+                setIsRecordingVoice(false);
+                // Cleanly commit only the final text (remove any trailing partial/interim noise)
+                const base = baseNotesRef.current;
+                const finalOnly = finalTranscriptRef.current.trim();
+                const committed = base ? `${base} ${finalOnly}` : finalOnly;
+                if (committed) {
+                    setNotes(committed.slice(0, 500));
+                }
+            };
+
+            recognitionRef.current = recog;
+            recog.start();
+            setIsRecordingVoice(true);
+        } catch (err) {
+            console.error('Failed to start speech recognition:', err);
+            setIsRecordingVoice(false);
         }
     };
 
@@ -652,7 +721,10 @@ function QuickReportWizardModal({
     };
 
     const isOthersSelected = selectedCategories.includes('Others');
-    const isStep2Valid = selectedCategories.length > 0 && (!isOthersSelected || othersDescription.trim().length > 0);
+    const notesProfanityValidation = useMemo(() => validateProfanity(notes, 'notes'), [notes]);
+    const othersProfanityValidation = useMemo(() => validateProfanity(othersDescription, 'description'), [othersDescription]);
+    const hasProfanityInForm = notesProfanityValidation.hasProfanity || othersProfanityValidation.hasProfanity;
+    const isStep2Valid = selectedCategories.length > 0 && (!isOthersSelected || (othersDescription.trim().length > 0 && !othersProfanityValidation.hasProfanity));
 
     const isPhotoIneligible = Boolean(
         aiFeedback && (
@@ -729,6 +801,29 @@ function QuickReportWizardModal({
     // -------------------------------------------------------------------------
     const handleFinalSubmit = async () => {
         if (!selectedCategories.length) return;
+        if (duplicateReport) return;
+
+        // Inappropriate language / profanity validation guard
+        if (notesProfanityValidation.hasProfanity) {
+            setSubmitError(notesProfanityValidation.message);
+            setTimeout(() => {
+                if (errorCardRef.current) {
+                    errorCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 60);
+            return;
+        }
+
+        if (othersProfanityValidation.hasProfanity) {
+            setSubmitError(othersProfanityValidation.message);
+            setTimeout(() => {
+                if (errorCardRef.current) {
+                    errorCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 60);
+            return;
+        }
+
         setIsSubmitting(true);
         setSubmitError(null);
 
@@ -746,7 +841,7 @@ function QuickReportWizardModal({
                     location: reportLocation,
                     address: displayAddress
                 });
-                if (result?.trackingNumbers) {
+                if (result?.trackingNumbers && result.trackingNumbers.length > 0) {
                     setSubmittedTrackingNumbers(result.trackingNumbers);
                 } else {
                     // Generate canonical PULSO tracking numbers based on timestamp
@@ -771,7 +866,33 @@ function QuickReportWizardModal({
             setStep(4); // Advance to Success Screen
         } catch (err) {
             console.error('PULSO: Error submitting quick report:', err);
-            setSubmitError('Unable to connect to City Engineering server. Your report is saved offline as a draft.');
+            const rawMsg = err?.message || '';
+            const isConnErr = !rawMsg || rawMsg.includes('fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('Failed to submit');
+            const errMsg = isConnErr
+                ? 'Unable to connect to City Engineering server. Please check your connection and try again.'
+                : rawMsg;
+            setSubmitError(errMsg);
+
+            if (err?.isDuplicate || rawMsg.includes('already being processed') || err?.status === 409) {
+                setDuplicateReport(err.existingReport || {
+                    ticket_id: err.canonicalTicket || `#PUL-${new Date().getFullYear()}-4717`,
+                    category: selectedCategories[0] || 'Roads & Bridges',
+                    status: 'in_progress',
+                    location_string: displayAddress || resolvedBarangay || 'Caloocan City',
+                    description: 'Civic concern reported at this location is currently active and being processed by City Engineering.'
+                });
+            } else {
+                setDuplicateReport(null);
+            }
+
+            // Immediately scroll error / duplicate notice into visible view so resident sees it right away
+            setTimeout(() => {
+                if (errorCardRef.current) {
+                    errorCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else if (contentAreaRef.current) {
+                    contentAreaRef.current.scrollTo({ top: contentAreaRef.current.scrollHeight, behavior: 'smooth' });
+                }
+            }, 60);
         } finally {
             setIsSubmitting(false);
         }
@@ -803,10 +924,10 @@ function QuickReportWizardModal({
             aria-labelledby="quick-report-wizard-title"
             onClick={handleCloseAttempt}
         >
-            {/* Modal Card: Fullscreen on mobile, centered modal on desktop/website */}
+            {/* Modal Card: 100% Fullscreen on mobile, centered floating card on desktop */}
             <div
                 onClick={(e) => e.stopPropagation()}
-                className={`w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg md:max-w-xl flex flex-col bg-white dark:bg-slate-900 sm:rounded-3xl sm:border border-slate-200 dark:border-slate-800 sm:shadow-2xl overflow-hidden relative ${
+                className={`w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg md:max-w-xl flex flex-col bg-white dark:bg-slate-900 rounded-none sm:rounded-3xl sm:border border-slate-200 dark:border-slate-800 sm:shadow-2xl overflow-hidden relative ${
                     theme === 'dark' ? 'dark' : ''
                 }`}
             >
@@ -1359,10 +1480,22 @@ function QuickReportWizardModal({
                                                 value={othersDescription}
                                                 onChange={(e) => setOthersDescription(e.target.value)}
                                                 placeholder="Briefly state the issue for City Engineering"
-                                                className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                                className={`w-full px-3 py-2 rounded-xl border ${
+                                                    othersProfanityValidation.hasProfanity
+                                                        ? 'border-red-400 dark:border-red-500/80 bg-red-50/40 dark:bg-red-950/20 focus:ring-red-500 text-red-950 dark:text-red-100'
+                                                        : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-orange-500 text-slate-900 dark:text-white'
+                                                } text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-colors`}
                                             />
-                                            <div className="text-[11px] text-right text-slate-400">
-                                                {othersDescription.length} / 200
+                                            <div className="flex items-start justify-between text-[11px] gap-2">
+                                                {othersProfanityValidation.hasProfanity ? (
+                                                    <div className="flex items-center gap-1 font-semibold text-red-600 dark:text-red-400 leading-tight">
+                                                        <AlertCircle size={12} className="shrink-0 text-red-500" />
+                                                        <span>{othersProfanityValidation.message}</span>
+                                                    </div>
+                                                ) : <span />}
+                                                <div className="text-slate-400 dark:text-slate-500 shrink-0">
+                                                    {othersDescription.length} / 200
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -1386,52 +1519,32 @@ function QuickReportWizardModal({
                             {/* Summary Card with 3 Tappable Rows */}
                             <div className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
                                 {/* Row 1: Issues */}
-                                <button
-                                    type="button"
-                                    onClick={() => setStep(2)}
-                                    className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
-                                >
-                                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                <div className="w-full px-4 py-3.5 flex items-center justify-between text-left gap-3">
+                                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 shrink-0">
                                         Issues
                                     </span>
-                                    <div className="flex items-center gap-1.5 text-right max-w-[65%]">
-                                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                    <div className="flex items-center text-right flex-1 justify-end">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white break-words text-right">
                                             {selectedCategories.join(' + ')}
                                         </span>
-                                        <ChevronRight size={16} className="text-slate-400 shrink-0" />
                                     </div>
-                                </button>
+                                </div>
 
                                 {/* Row 2: Location */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (onOpenLocationPicker) {
-                                            onOpenLocationPicker();
-                                        } else {
-                                            setIsLocationPickerOpen(true);
-                                        }
-                                    }}
-                                    className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
-                                >
-                                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                <div className="w-full px-4 py-3.5 flex items-start justify-between text-left gap-3">
+                                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 shrink-0 mt-0.5">
                                         Location
                                     </span>
-                                    <div className="flex items-center gap-1.5 text-right max-w-[65%]">
-                                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                    <div className="flex items-center text-right flex-1 justify-end">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white break-words text-right leading-snug">
                                             {displayAddress}
                                         </span>
-                                        <ChevronRight size={16} className="text-slate-400 shrink-0" />
                                     </div>
-                                </button>
+                                </div>
 
                                 {/* Row 3: Photo */}
-                                <button
-                                    type="button"
-                                    onClick={() => setStep(1)}
-                                    className="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
-                                >
-                                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                <div className="w-full px-4 py-3.5 flex items-center justify-between text-left gap-3">
+                                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 shrink-0">
                                         Photo
                                     </span>
                                     <div className="flex items-center gap-2 text-right">
@@ -1446,9 +1559,8 @@ function QuickReportWizardModal({
                                             <Check size={14} strokeWidth={3} />
                                             Attached
                                         </span>
-                                        <ChevronRight size={16} className="text-slate-400 shrink-0" />
                                     </div>
-                                </button>
+                                </div>
                             </div>
 
                             {/* Collapsed "Add more location details" */}
@@ -1525,42 +1637,117 @@ function QuickReportWizardModal({
                                     <label className="text-sm font-bold text-slate-900 dark:text-white">
                                         Notes <span className="font-normal text-slate-500 dark:text-slate-400">(optional)</span>
                                     </label>
-                                    {voiceSupported && (
-                                        <button
-                                            type="button"
-                                            onClick={toggleVoiceRecording}
-                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                                                isRecordingVoice
-                                                    ? 'bg-red-500 text-white animate-pulse'
-                                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                            }`}
-                                        >
-                                            {isRecordingVoice ? <MicOff size={13} /> : <Mic size={13} />}
-                                            <span>{isRecordingVoice ? 'Listening...' : 'Voice notes'}</span>
-                                        </button>
-                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                        {voiceSupported && (
+                                            <button
+                                                type="button"
+                                                onClick={toggleVoiceRecording}
+                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                                                    isRecordingVoice
+                                                        ? 'bg-red-500 text-white animate-pulse'
+                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                                }`}
+                                                aria-label={isRecordingVoice ? 'Stop listening' : 'Start voice notes dictation'}
+                                            >
+                                                {isRecordingVoice ? <MicOff size={13} /> : <Mic size={13} />}
+                                                <span>{isRecordingVoice ? 'Listening...' : 'Voice notes'}</span>
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <div className="relative">
+                                <div>
                                     <textarea
-                                        rows={3}
+                                        rows={isLocationDetailsExpanded ? 3 : 6}
                                         maxLength={500}
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
                                         placeholder="Landmarks or details that help the crew find it"
-                                        className="w-full min-h-[6.5rem] p-3.5 pb-7 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                                        className={`w-full ${
+                                            isLocationDetailsExpanded ? 'min-h-[5.5rem]' : 'min-h-[9.5rem] sm:min-h-[10.5rem]'
+                                        } p-3.5 rounded-2xl border ${
+                                            notesProfanityValidation.hasProfanity
+                                                ? 'border-red-400 dark:border-red-500/80 bg-red-50/40 dark:bg-red-950/20 focus:ring-red-500 text-red-950 dark:text-red-100'
+                                                : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 focus:ring-orange-500 text-slate-900 dark:text-white'
+                                        } text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 resize-none transition-all duration-200`}
                                     />
-                                    <div className="absolute bottom-2 right-3 text-[11px] font-semibold text-slate-400 dark:text-slate-500 pointer-events-none">
-                                        {notes.length} / 500
+                                    <div className="flex items-start justify-between mt-1 px-1 gap-2">
+                                        {notesProfanityValidation.hasProfanity ? (
+                                            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400 leading-tight">
+                                                <AlertCircle size={13} className="shrink-0 text-red-500" />
+                                                <span>{notesProfanityValidation.message}</span>
+                                            </div>
+                                        ) : (
+                                            <span />
+                                        )}
+                                        <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 shrink-0">
+                                            {notes.length} / 500
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Error notification banner if submission failed */}
+                            {/* Error / Duplicate report notification card if submission failed */}
                             {submitError && (
-                                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl p-3 flex items-start gap-2.5 text-xs text-red-800 dark:text-red-300">
-                                    <AlertTriangle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                                    <span>{submitError}</span>
+                                <div ref={errorCardRef} className="space-y-3 scroll-mt-6">
+                                    {duplicateReport ? (
+                                        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/80 rounded-2xl p-4 space-y-3 shadow-md ring-2 ring-amber-400/50 dark:ring-amber-500/40 animate-in fade-in zoom-in-[0.98] duration-200">
+                                            <div className="flex items-start gap-2.5">
+                                                <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider">
+                                                        Active Report Already In Progress
+                                                    </h4>
+                                                    <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5 leading-relaxed font-medium">
+                                                        {submitError}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Report Details Snapshot */}
+                                            <div className="p-3 bg-white dark:bg-slate-900/90 rounded-xl border border-amber-200/80 dark:border-amber-900/40 space-y-2">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="font-bold text-slate-900 dark:text-white font-mono">
+                                                        {duplicateReport.ticket_id || `#PUL-${new Date().getFullYear()}-4717`}
+                                                    </span>
+                                                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold uppercase bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
+                                                        {(duplicateReport.status || 'in_progress').replace('_', ' ')}
+                                                    </span>
+                                                </div>
+                                                <div className="text-[11.5px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                                                    <MapPin size={12} className="text-slate-400 shrink-0" />
+                                                    <span className="truncate">{duplicateReport.location_string || displayAddress || 'Caloocan City'}</span>
+                                                </div>
+                                                {duplicateReport.description && (
+                                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg text-xs text-slate-700 dark:text-slate-300">
+                                                        <p className={`italic leading-relaxed ${isDuplicateDescExpanded ? '' : 'line-clamp-2'}`}>
+                                                            "{duplicateReport.description}"
+                                                        </p>
+                                                        {duplicateReport.description.length > 70 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsDuplicateDescExpanded(!isDuplicateDescExpanded)}
+                                                                className="mt-1 text-[11px] font-bold text-[#EA580C] hover:text-orange-700 dark:text-[#ff6b00] dark:hover:text-orange-400 hover:underline cursor-pointer flex items-center gap-0.5"
+                                                            >
+                                                                <span>{isDuplicateDescExpanded ? 'See less' : 'See more'}</span>
+                                                                <ChevronDown
+                                                                    size={12}
+                                                                    className={`transition-transform duration-200 ${isDuplicateDescExpanded ? 'rotate-180' : ''}`}
+                                                                />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-xl p-3 text-xs text-red-800 dark:text-red-300">
+                                            <div className="flex items-start gap-2.5">
+                                                <AlertTriangle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                                                <span className="flex-1 font-medium leading-relaxed">{submitError}</span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1644,7 +1831,7 @@ function QuickReportWizardModal({
                 {/* ----------------------------------------------------------------- */}
                 {/* 3. FIXED FOOTER BUTTONS */}
                 {/* ----------------------------------------------------------------- */}
-                <div className="shrink-0 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-[max(env(safe-area-inset-bottom),1rem)] sm:pb-0">
+                <div className="shrink-0 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:pb-0">
                     <div className="w-full px-5 pt-3 pb-3 sm:pb-4">
                         {/* STEP 1 FOOTER */}
                     {step === 1 && (
@@ -1739,15 +1926,21 @@ function QuickReportWizardModal({
                             {/* Primary Button: Submit reports */}
                             <button
                                 type="button"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || hasProfanityInForm || Boolean(duplicateReport)}
                                 onClick={handleFinalSubmit}
-                                className="w-full min-h-[52px] h-[3.25rem] rounded-xl text-base font-bold bg-[#ff6b00] hover:bg-[#e05e00] text-white hover:text-white shadow-md shadow-orange-500/20 active:scale-[0.99] cursor-pointer transition-all flex items-center justify-center disabled:opacity-75 disabled:cursor-not-allowed"
+                                className={`w-full min-h-[52px] h-[3.25rem] rounded-xl text-base font-bold text-white shadow-md transition-all flex items-center justify-center ${
+                                    isSubmitting || hasProfanityInForm || Boolean(duplicateReport)
+                                        ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none'
+                                        : 'bg-[#ff6b00] hover:bg-[#e05e00] shadow-orange-500/20 active:scale-[0.99] cursor-pointer'
+                                }`}
                             >
                                 {isSubmitting ? (
                                     <div className="flex items-center gap-2">
                                         <Loader2 size={20} className="animate-spin text-white" />
                                         <span>Submitting...</span>
                                     </div>
+                                ) : duplicateReport ? (
+                                    <span>In Progress</span>
                                 ) : selectedCategories.length > 1 ? (
                                     `Submit ${selectedCategories.length} reports`
                                 ) : (
@@ -1803,7 +1996,7 @@ function QuickReportWizardModal({
                 <AnimatePresence>
                     {isDiscardPromptOpen && (
                         <div
-                            className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4"
+                            className="absolute inset-0 z-50 backdrop-blur-md bg-black/20 dark:bg-black/40 flex items-center justify-center p-4"
                             role="alertdialog"
                             aria-labelledby="discard-dialog-title"
                             aria-describedby="discard-dialog-desc"
@@ -1882,7 +2075,7 @@ function QuickReportWizardModal({
                                     type="text"
                                     value={barangaySearchQuery}
                                     onChange={(e) => setBarangaySearchQuery(e.target.value)}
-                                    placeholder="Search barangay number or name..."
+                                    placeholder="Search barangay number..."
                                     className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                 />
                             </div>
@@ -1917,11 +2110,6 @@ function QuickReportWizardModal({
                                     >
                                         <div className="font-semibold text-sm text-slate-800 dark:text-slate-200">
                                             {b.name}
-                                            {b.alias && (
-                                                <span className="text-xs text-slate-400 ml-1.5 font-normal">
-                                                    ({b.alias})
-                                                </span>
-                                            )}
                                         </div>
                                         {resolvedBarangay === b.name && (
                                             <Check size={16} className="text-[#ff6b00]" />

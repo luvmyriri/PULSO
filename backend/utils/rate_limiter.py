@@ -39,16 +39,48 @@ class SlidingWindowRateLimiter:
             return request.client.host.strip()
         return "127.0.0.1"
 
-    def check(self, request: Request):
+    def _get_client_key(self, request: Request, identifier: Optional[str] = None) -> str:
         """
-        Evaluates the rate limit for the incoming request IP.
+        Determines the rate limiting key.
+        Prioritizes explicit account identifier or JWT Bearer subject
+        so distinct resident accounts do not share an IP quota.
+        Falls back to client IP for unauthenticated guest requests.
+        """
+        if identifier:
+            return f"user:{identifier}"
+
+        # Inspect Authorization header to isolate authenticated accounts
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
+            if token:
+                try:
+                    import base64
+                    import json
+                    parts = token.split(".")
+                    if len(parts) >= 2:
+                        payload_b64 = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
+                        payload_bytes = base64.urlsafe_b64decode(payload_b64.encode("utf-8"))
+                        payload = json.loads(payload_bytes.decode("utf-8"))
+                        sub = payload.get("sub")
+                        if sub:
+                            return f"user:{sub}"
+                except Exception:
+                    pass
+                return f"token:{token[:32]}"
+
+        return self._get_client_ip(request)
+
+    def check(self, request: Request, identifier: Optional[str] = None):
+        """
+        Evaluates the rate limit for the incoming request IP or authenticated account.
         Raises HTTP 429 Too Many Requests if the limit is exceeded.
         """
-        client_ip = self._get_client_ip(request)
+        client_key = self._get_client_key(request, identifier=identifier)
         now = time.time()
 
         with self._lock:
-            timestamps = self.requests[client_ip]
+            timestamps = self.requests[client_key]
 
             # 1. Purge expired timestamps outside the sliding window
             while timestamps and timestamps[0] <= now - self.window_seconds:

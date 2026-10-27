@@ -845,7 +845,7 @@ export default function Login() {
     return (
         <div
             style={isApp ? {
-                backgroundColor: isDark ? '#080D19' : '#EAF2FF',
+                backgroundColor: isDark ? '#020617' : '#f1f5f9',
                 transition: 'background-color 150ms ease, color 150ms ease'
             } : undefined}
             className={`relative min-h-screen min-h-[100dvh] w-full text-slate-900 dark:text-white transition-colors duration-300 flex flex-col justify-between overflow-x-hidden ${
@@ -854,23 +854,7 @@ export default function Login() {
                     : 'bg-gradient-to-b from-white via-[#fffbf9] to-[#fff7f0]/40 dark:from-[#070a12] dark:via-[#090e1a] dark:to-[#070a12]'
             }`}
         >
-            {/* Installed Mobile App City Scene Background */}
-            {isApp && (
-                <>
-                    <div
-                        className="absolute inset-0 w-full max-w-[480px] mx-auto pointer-events-none select-none z-0"
-                        style={{
-                            backgroundImage: isDark ? 'url(/pulso-bg-dark.svg)' : 'url(/pulso-bg-light.svg)',
-                            backgroundSize: '100% auto',
-                            backgroundPosition: 'center bottom',
-                            backgroundRepeat: 'no-repeat',
-                            transition: 'background-image 150ms ease'
-                        }}
-                        aria-hidden="true"
-                    />
-                    <PulsoBottomScrim isDark={isDark} />
-                </>
-            )}
+            {/* Clean background */}
 
             {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">

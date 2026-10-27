@@ -1587,7 +1587,7 @@ export default function DevAppPreviewPage() {
               style={{
                 '--bg-scrim-rgb': previewIsDark ? '11, 17, 32' : '245, 249, 255'
               }}
-              className={`w-full h-full rounded-[34px] overflow-hidden relative flex flex-col ${previewIsDark ? 'dark bg-[#080D19]' : 'bg-[#EAF2FF]'
+              className={`w-full h-full rounded-[34px] overflow-hidden relative flex flex-col ${previewIsDark ? 'dark bg-slate-950' : 'bg-slate-100'
                 }`}
             >
               {/* CASE 0: Loading Screen Preview (Wordmark & Traveling Pulse Line) */}

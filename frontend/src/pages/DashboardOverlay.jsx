@@ -10,6 +10,7 @@ import { getAuthToken } from '../utils/authSession';
 import { useInteractionHarden } from '../hooks/useInteractionHarden';
 import PulseAIMarkdown from '../components/PulseAIMarkdown';
 import PulseAIChatWindow from '../components/PulseAIChatWindow';
+import PulseAIIcon from '../components/common/PulseAIIcon';
 
 export default function DashboardOverlay({ onNavigate }) {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -454,7 +455,7 @@ export default function DashboardOverlay({ onNavigate }) {
                         aria-label="Open PULSEAI Assistant"
                         className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-[#e65100] to-[#f97316] shadow-xl flex items-center justify-center text-white hover:brightness-110 transition-all hover:scale-105 active:scale-95 group focus:outline-none focus:ring-4 focus:ring-orange-500/30"
                     >
-                        <Brain size={28} className="group-hover:animate-pulse" />
+                        <PulseAIIcon size={36} className="group-hover:scale-105 transition-transform" />
                     </button>
                 </div>
             )}

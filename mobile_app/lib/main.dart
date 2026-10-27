@@ -6,6 +6,7 @@ import 'package:pulso_mobile/core/api/api_client.dart';
 import 'package:pulso_mobile/core/providers/settings_provider.dart';
 import 'package:pulso_mobile/l10n/app_localizations.dart';
 import 'package:pulso_mobile/core/theme/app_theme.dart';
+import 'package:pulso_mobile/features/onboarding/onboarding_screen.dart';
 import 'package:pulso_mobile/features/landing/screens/landing_screen.dart';
 import 'package:pulso_mobile/features/auth/screens/resident_login_screen.dart';
 import 'package:pulso_mobile/features/auth/screens/register_screen.dart';
@@ -68,6 +69,7 @@ class PulsoApp extends StatelessWidget {
       initialRoute: '/login',
       routes: {
         '/': (context) => const LandingScreen(),
+        '/onboarding': (context) => const OnboardingScreen(),
         '/login': (context) => const ResidentLoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/agent': (context) => const AgentScreen(),
@@ -76,3 +78,4 @@ class PulsoApp extends StatelessWidget {
     );
   }
 }
+

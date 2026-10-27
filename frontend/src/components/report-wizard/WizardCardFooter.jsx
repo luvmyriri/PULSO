@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ArrowRight, Send, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Send, Loader2, Info } from 'lucide-react';
 
 export default function WizardCardFooter({
   onBack,
@@ -25,43 +25,40 @@ export default function WizardCardFooter({
     noteText ||
     (isSubmit
       ? t('reportWizard.shell.reviewBeforeSubmit', 'Review your details carefully before submitting.')
-      : t('reportWizard.shell.notSubmittedYet', 'Your report has not been submitted yet.'));
+      : t('reportWizard.shell.notSubmittedYet', 'Your report is not submitted until you confirm it in Review.'));
 
   return (
-    <footer className="w-full pt-6 mt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-3">
-      {/* Action Buttons: Single row (one line) on mobile and desktop */}
-      <div className="w-full flex items-center justify-between gap-3">
-        {/* Left: Back Button (Icon Only, "Back" word removed) + Desktop Note */}
-        <div className="flex items-center gap-3">
-          {onBack && canBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              disabled={!canBack || isSubmitting}
-              aria-label={resolvedBackText}
-              title={resolvedBackText}
-              className={`w-12 h-12 sm:w-[52px] sm:h-[52px] rounded-xl border font-bold text-sm flex items-center justify-center shrink-0 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
-                canBack && !isSubmitting
-                  ? 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] cursor-pointer'
-                  : 'border-slate-200/50 dark:border-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-50'
-              }`}
-            >
-              <ArrowLeft size={20} aria-hidden="true" />
-            </button>
-          )}
+    <footer className="w-full pt-6 mt-8 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* Left: Back Button (if allowed) + Information Note */}
+      <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 order-2 sm:order-1 self-start sm:self-auto">
+        {onBack && canBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={!canBack || isSubmitting}
+            aria-label={resolvedBackText}
+            title={resolvedBackText}
+            className={`w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] flex items-center justify-center shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer ${
+              isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            <ArrowLeft size={18} aria-hidden="true" />
+          </button>
+        )}
 
-          {/* Desktop Note */}
-          <span className="hidden sm:inline text-xs text-slate-500 dark:text-slate-400 font-medium leading-tight">
-            {resolvedNote}
-          </span>
+        <div className="flex items-center gap-1.5 leading-snug">
+          <Info size={16} className="text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true" />
+          <span>{resolvedNote}</span>
         </div>
+      </div>
 
-        {/* Right: Continue / Submit Action Button (Fills line on mobile) */}
+      {/* Right: Continue / Submit Action Button */}
+      <div className="w-full sm:w-auto order-1 sm:order-2 flex justify-end">
         <button
           type="button"
           onClick={onContinue}
           disabled={isContinueDisabled || isSubmitting}
-          className={`flex-1 sm:flex-initial min-h-[48px] h-12 sm:min-h-[52px] sm:h-[52px] px-8 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+          className={`w-full sm:w-auto min-h-[46px] h-11 sm:h-12 px-6 sm:px-7 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
             !isContinueDisabled && !isSubmitting
               ? 'bg-[#ff6b00] hover:bg-[#ea580c] active:bg-[#c2410c] text-white hover:shadow-md active:scale-[0.98] cursor-pointer'
               : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none'
@@ -84,11 +81,6 @@ export default function WizardCardFooter({
           )}
         </button>
       </div>
-
-      {/* Mobile Note below the button row */}
-      <p className="sm:hidden text-center text-xs text-slate-500 dark:text-slate-400 font-medium">
-        {resolvedNote}
-      </p>
     </footer>
   );
 }

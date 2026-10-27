@@ -1,13 +1,12 @@
 /**
  * onboardingContent.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Centralized plain-language copy for the 5 PULSO Onboarding screens.
- * Designed to match the editorial reference layout in both Dark and Light modes:
- * - Plain words a 12-year-old can read
- * - <= 12 words per sentence
- * - One idea per sentence
- * - Consistent vocabulary ("concern", "report", "City Engineering", "tracking code")
- * - Translatable structure ready for Filipino (Tagalog) localization.
+ * Centralized copy for the 5 PULSO Onboarding screens matching target design:
+ * - Step 1: A better neighborhood starts with you.
+ * - Step 2: Show us what needs attention.
+ * - Step 3: Put the issue on the map.
+ * - Step 4: A clear photo tells the story.
+ * - Step 5: Stay informed after you submit.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -15,7 +14,7 @@ export const ONBOARDING_CONTENT = {
   header: {
     city: 'CALOOCAN CITY',
     title: 'City Engineering Department',
-    subtitle: 'powered by: PULSO',
+    subtitle: 'powered by PULSO',
     shortTitle: 'City Engineering Department',
     sealAlt: 'Caloocan City Engineering Department Logo',
     backAria: 'Go to previous step',
@@ -25,108 +24,128 @@ export const ONBOARDING_CONTENT = {
   screen1: {
     step: 1,
     eyebrow: 'CALOOCAN CITY',
-    title: 'Report a concern in your area.',
-    subtitle: 'Send a report to City Engineering about a concern in your area.',
+    title: 'A better neighborhood starts with you.',
+    subtitle: "Report local infrastructure concerns and follow the city's response.",
     howItWorksHeading: 'How it works',
-    howItWorks: [
-      { number: 1, title: 'Describe your concern', description: 'Tell us what problem needs help in your area.' },
-      { number: 2, title: 'Add the location and details', description: 'Confirm the address and add extra details.' },
-      { number: 3, title: 'Review and submit your report', description: 'Check your report and send it to our team.' }
+    items: [
+      {
+        number: 1,
+        icon: 'number',
+        title: 'Describe the concern',
+        description: 'Tell us what needs attention.'
+      },
+      {
+        number: 2,
+        icon: 'number',
+        title: 'Pin the location',
+        description: 'Add the spot and a clear photo.'
+      },
+      {
+        number: 3,
+        icon: 'number',
+        title: 'Review and submit',
+        description: 'Check your details before sending.'
+      }
     ],
     primaryButton: 'Start a report',
     secondaryText: 'Already have an account?',
-    secondaryLink: 'Sign in.'
+    secondaryLink: 'Sign in'
   },
   screen2: {
     step: 2,
-    title: 'Report in 3 Easy Steps',
-    subtitle: 'Here is what you need to do.',
-    steps: [
+    title: 'Show us what needs attention.',
+    subtitle: 'Choose a category and describe the concern.',
+    items: [
       {
-        number: 1,
-        title: 'Take a photo',
-        description: 'Add a clear photo of your concern.'
+        icon: 'wrench',
+        title: 'Roads and public facilities',
+        description: 'Report issues like roads, sidewalks, streetlights and more.'
       },
       {
-        number: 2,
-        title: 'Choose a category',
-        description: 'Select the category that best fits your report.'
+        icon: 'message-square',
+        title: 'Clear specific description',
+        description: 'Share what you see in simple details.'
       },
       {
-        number: 3,
-        title: 'Confirm the location',
-        description: 'Check the location and adjust it if needed.'
+        icon: 'clipboard-list',
+        title: 'One concern per report',
+        description: 'Keep each report focused on one issue.'
       }
     ],
-    primaryButton: 'Next'
+    backButton: 'Back',
+    primaryButton: 'Continue'
   },
   screen3: {
     step: 3,
-    title: 'How City Engineering Helps',
-    subtitle: 'What happens after you send a report.',
-    steps: [
+    title: 'Put the issue on the map.',
+    subtitle: 'Pin the exact location so the team knows where to look.',
+    items: [
       {
-        number: 1,
-        title: 'We review your report',
-        description: 'Our team checks the details and location you provide.'
+        icon: 'map-pin',
+        title: 'Place the map pin',
+        description: 'Tap the map to mark the exact location.'
       },
       {
-        number: 2,
-        title: 'We plan the repairs',
-        description: 'A city repair team is dispatched to fix it.'
+        icon: 'map',
+        title: 'Add a street or landmark',
+        description: 'Include a nearby street address or landmark to help.'
       },
       {
-        number: 3,
-        title: 'You receive updates',
-        description: 'Follow the status of your report until work finishes.'
+        icon: 'crosshair',
+        title: 'Check the location',
+        description: 'Make sure the pin is in the right spot before continuing.'
       }
     ],
-    primaryButton: 'Next'
+    backButton: 'Back',
+    primaryButton: 'Continue'
   },
   screen4: {
     step: 4,
-    title: 'Follow Your Report Progress',
-    subtitle: 'Each report has a tracking code so you can check its status.',
-    exampleBadge: 'EXAMPLE REPORT',
-    trackingLabel: 'Tracking code',
-    sampleTrackingCode: 'PUL-2026-1049',
-    statusBadge: 'In progress',
-    milestones: [
+    title: 'A clear photo tells the story.',
+    subtitle: 'Add useful evidence from a safe place.',
+    items: [
       {
-        id: 'received',
-        number: 1,
-        status: 'done',
-        title: 'Received',
-        badge: null,
-        description: 'Your report has been submitted.'
+        icon: 'camera',
+        title: 'Show the issue clearly',
+        description: 'Capture the problem in good light and focus.'
       },
       {
-        id: 'in_progress',
-        number: 2,
-        status: 'current',
-        title: 'In progress',
-        badge: 'Current',
-        description: 'Your concern is being addressed.'
+        icon: 'image',
+        title: 'Include nearby surroundings',
+        description: 'Show the area around the issue to provide context.'
       },
       {
-        id: 'resolved',
-        number: 3,
-        status: 'next',
-        title: 'Resolved',
-        badge: null,
-        description: 'A final update is available.'
+        icon: 'user',
+        title: 'Avoid unnecessary personal details',
+        description: 'Keep people\'s faces, license plates and private information out of photos.'
       }
     ],
-    primaryButton: 'Next'
+    backButton: 'Back',
+    primaryButton: 'Continue'
   },
   screen5: {
     step: 5,
-    title: 'You Are Ready to Report',
-    subtitle: 'Create an account to submit your first report and follow its progress.',
-    cardTitle: 'Caloocan City Engineering',
-    cardDescription: 'Your reports are sent to City Engineering for review.',
-    primaryButton: 'Create Account',
-    primaryButtonProfile: 'Back to Settings',
+    title: 'Stay informed after you submit.',
+    subtitle: 'Find your report ID and follow updates in My Reports.',
+    items: [
+      {
+        icon: 'bell',
+        title: 'Check report status',
+        description: 'See progress and any changes in My Reports.'
+      },
+      {
+        icon: 'message-square',
+        title: 'Read department feedback',
+        description: 'Look for messages or requests for more information.'
+      },
+      {
+        icon: 'clipboard-check',
+        title: 'Review any next steps',
+        description: 'Follow any instructions provided by the department.'
+      }
+    ],
+    backButton: 'Back',
+    primaryButton: 'Start a report',
     secondaryText: 'Already have an account?',
     secondaryLink: 'Sign in'
   },
@@ -134,118 +153,141 @@ export const ONBOARDING_CONTENT = {
   // Tagalog (tl) localization dictionary
   tl: {
     header: {
-      title: 'City Engineering Office',
-      subtitle: 'Mga Serbisyong Pambayan',
-      shortTitle: 'City Engineering',
-      sealAlt: 'Kagawaran ng City Engineering, Lungsod ng Caloocan, tatak ng PULSO',
+      title: 'City Engineering Department',
+      subtitle: 'powered by PULSO',
+      shortTitle: 'City Engineering Department',
+      sealAlt: 'Caloocan City Engineering Department Logo',
       backAria: 'Bumalik sa nakaraang hakbang',
       skipLabel: 'Laktawan',
       skipAria: 'Laktawan ang onboarding'
     },
     screen1: {
+      step: 1,
       eyebrow: 'LUNGSOD NG CALOOCAN',
-      title: 'Mag-ulat ng problema sa inyong lugar.',
-      subtitle: 'Magpadala ng ulat sa City Engineering tungkol sa problema sa komunidad.',
+      title: 'Nagsisimula sa inyo ang mas maayos na komunidad.',
+      subtitle: 'Iulat ang mga sira sa inyong lugar at subaybayan ang aksyon ng lungsod.',
       howItWorksHeading: 'Paano ito gumagana',
-      howItWorks: [
-        { number: 1, title: 'Ilarawan ang inyong problema', description: 'Sabihin kung ano ang kailangang ayusin sa inyong lugar.' },
-        { number: 2, title: 'Ilagay ang lokasyon at detalye', description: 'Kumpirmahin ang tirahan at dagdag na impormasyon.' },
-        { number: 3, title: 'Suriin at ipadala ang ulat', description: 'Tingnan ang buod at ipadala sa aming koponan.' }
+      items: [
+        {
+          number: 1,
+          icon: 'number',
+          title: 'Ilarawan ang problema',
+          description: 'Sabihin kung ano ang kailangang ayusin.'
+        },
+        {
+          number: 2,
+          icon: 'number',
+          title: 'I-pin ang lokasyon',
+          description: 'Ilagay ang lugar at malinaw na litrato.'
+        },
+        {
+          number: 3,
+          icon: 'number',
+          title: 'Suriin at ipadala',
+          description: 'Tingnan ang detalye bago magpadala.'
+        }
       ],
       primaryButton: 'Magsimula ng ulat',
       secondaryText: 'May account ka na ba?',
-      secondaryLink: 'Mag-sign in.'
+      secondaryLink: 'Mag-sign in'
     },
     screen2: {
-      title: 'Mag-ulat sa 3 Simpleng Hakbang',
-      subtitle: 'Ito ang kailangan ninyong gawin.',
-      steps: [
+      step: 2,
+      title: 'Ipakita ang kailangang bigyang-pansin.',
+      subtitle: 'Pumili ng kategorya at ilarawan ang problema.',
+      items: [
         {
-          number: 1,
-          title: 'Kumuha ng litrato',
-          description: 'Maglagay ng malinaw na litrato ng sira.'
+          icon: 'wrench',
+          title: 'Mga kalsada at pampublikong pasilidad',
+          description: 'Mag-ulat ng mga sira tulad ng kalsada, bangketa, at ilaw.'
         },
         {
-          number: 2,
-          title: 'Pumili ng kategorya',
-          description: 'Piliin ang kategoryang angkop sa ulat.'
+          icon: 'message-square',
+          title: 'Malinaw at tiyak na paglalarawan',
+          description: 'Ibahagi ang inyong nakikita sa simpleng detalye.'
         },
         {
-          number: 3,
-          title: 'Kumpirmahin ang lugar',
-          description: 'Tingnan ang lokasyon at ayusin kung kailangan.'
+          icon: 'clipboard-list',
+          title: 'Isang problema bawat ulat',
+          description: 'Panatilihing nakatutok ang bawat ulat sa isang isyu.'
         }
       ],
-      primaryButton: 'Susunod'
+      backButton: 'Bumalik',
+      primaryButton: 'Magpatuloy'
     },
     screen3: {
-      title: 'Paano Tumutulong ang City Engineering',
-      subtitle: 'Ito ang mangyayari pagkatapos maipadala ang ulat.',
-      steps: [
+      step: 3,
+      title: 'Ilagay ang problema sa mapa.',
+      subtitle: 'I-pin ang eksaktong lokasyon para malaman ng koponan kung saan pupunta.',
+      items: [
         {
-          number: 1,
-          title: 'Sinusuri namin ang ulat',
-          description: 'Tinitingnan ng aming koponan ang litrato at lokasyon.'
+          icon: 'map-pin',
+          title: 'Ilagay ang map pin',
+          description: 'Pindutin ang mapa upang itakda ang eksaktong lugar.'
         },
         {
-          number: 2,
-          title: 'Ipinaplano ang pagkukumpuni',
-          description: 'Ipapadala ang repair team upang ayusin ito.'
+          icon: 'map',
+          title: 'Maglagay ng kalye o palatandaan',
+          description: 'Magsama ng kalapit na tirahan, kalye, o landmark.'
         },
         {
-          number: 3,
-          title: 'May natatanggap kang abiso',
-          description: 'Sundan ang kalagayan hanggang matapos ang gawa.'
+          icon: 'crosshair',
+          title: 'Suriin ang lokasyon',
+          description: 'Siguraduhing nasa tamang lugar ang pin bago magpatuloy.'
         }
       ],
-      primaryButton: 'Susunod'
+      backButton: 'Bumalik',
+      primaryButton: 'Magpatuloy'
     },
     screen4: {
-      title: 'Sundan ang Progreso ng Ulat',
-      subtitle: 'Bawat ulat ay may tracking code upang tingnan ang estado.',
-      exampleBadge: 'HALIMBAWANG ULAT',
-      trackingLabel: 'Tracking code',
-      sampleTrackingCode: 'PUL-2026-1049',
-      statusBadge: 'Ginagawa na',
-      milestones: [
+      step: 4,
+      title: 'Mas malinaw ang kwento gamit ang litrato.',
+      subtitle: 'Magdagdag ng patunay mula sa ligtas na lugar.',
+      items: [
         {
-          id: 'received',
-          number: 1,
-          status: 'done',
-          title: 'Natanggap',
-          badge: null,
-          description: 'Naipadala at natanggap na ang inyong ulat.'
+          icon: 'camera',
+          title: 'Ipakita nang malinaw ang sira',
+          description: 'Kunan ang problema sa magandang ilaw at linaw.'
         },
         {
-          id: 'in_progress',
-          number: 2,
-          status: 'current',
-          title: 'Ginagawa na',
-          badge: 'Kasalukuyan',
-          description: 'Kasalukuyang inaayos ng repair team ang sira.'
+          icon: 'image',
+          title: 'Isama ang paligid',
+          description: 'Ipakita ang paligid upang magbigay ng konteksto.'
         },
         {
-          id: 'resolved',
-          number: 3,
-          status: 'next',
-          title: 'Naayos na',
-          badge: null,
-          description: 'May huling ulat at litrato ng patunay.'
+          icon: 'user',
+          title: 'Iwasan ang mga personal na detalye',
+          description: 'Iwasang makuhanan ang mukha ng tao at plaka ng sasakyan.'
         }
       ],
-      primaryButton: 'Susunod'
+      backButton: 'Bumalik',
+      primaryButton: 'Magpatuloy'
     },
     screen5: {
-      title: 'Handa Ka Nang Mag-ulat',
-      subtitle: 'Gumawa ng account para maipadala ang ulat at masubaybayan ito.',
-      cardTitle: 'City Engineering ng Caloocan',
-      cardDescription: 'Direktang ipinapadala ang inyong mga ulat sa City Engineering.',
-      primaryButton: 'Gumawa ng Account',
-      primaryButtonProfile: 'Bumalik sa Settings',
+      step: 5,
+      title: 'Manatiling updated pagkatapos magsumite.',
+      subtitle: 'Alamin ang inyong report ID at sundan ang update sa My Reports.',
+      items: [
+        {
+          icon: 'bell',
+          title: 'Tingnan ang estado ng ulat',
+          description: 'Tingnan ang progreso at anumang pagbabago sa My Reports.'
+        },
+        {
+          icon: 'message-square',
+          title: 'Basahin ang tugon ng departamento',
+          description: 'Maghintay ng mensahe o kahilingan para sa dagdag na impormasyon.'
+        },
+        {
+          icon: 'clipboard-check',
+          title: 'Suriin ang susunod na hakbang',
+          description: 'Sundin ang anumang tagubilin mula sa departamento.'
+        }
+      ],
+      backButton: 'Bumalik',
+      primaryButton: 'Magsimula ng ulat',
       secondaryText: 'May account ka na ba?',
       secondaryLink: 'Mag-sign in'
     }
   }
 };
-
-export default ONBOARDING_CONTENT;

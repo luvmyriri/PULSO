@@ -2425,8 +2425,9 @@ async def create_new_report(
     Executes rate limiting, boundary enforcement, spatial duplicate check, magic byte validation,
     multi-modal Gemini AI triage, cryptographic token generation, and DB persistence.
     """
-    # 0. Rate limiting check
-    report_submission_limiter.check(request)
+    # 0. Rate limiting check (per-account for authenticated residents, per-IP for guest submissions)
+    user_id_str = f"resident_{current_user.id}" if current_user and hasattr(current_user, "id") else None
+    report_submission_limiter.check(request, identifier=user_id_str)
 
     # 1. Payload validation
     text_fields = (
@@ -3597,3 +3598,12 @@ def delete_news_item(news_id: int, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=33159, reload=True)
+
+@app.post("/api/dev/reset-rate-limits")
+async def dev_reset_rate_limits():
+    """Development endpoint to reset in-memory sliding window rate limits."""
+    report_submission_limiter.reset()
+    tracking_query_limiter.reset()
+    claim_limiter.reset()
+    auth_limiter.reset()
+    return {"status": "success", "message": "Rate limits reset"}

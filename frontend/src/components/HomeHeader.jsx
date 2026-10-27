@@ -3,6 +3,7 @@ import { Search, Bell, X, ChevronLeft, User, Brain } from 'lucide-react';
 import Branding from './Branding';
 import UserMenu from './UserMenu';
 import NotificationDropdown from './NotificationDropdown';
+import ThemeToggle from './ThemeToggle';
 import { API_BASE_URL } from '../utils/apiBase';
 import { formatGreetingName } from '../utils/greetingHelper';
 
@@ -61,6 +62,7 @@ export default function HomeHeader({
     userMenuItems = [],
     handleLogout,
     handleSetTab,
+    onGoHome,
     t = (k, o) => o?.defaultValue || k,
     className = ''
 }) {
@@ -230,23 +232,9 @@ export default function HomeHeader({
                         </div>
                     </div>
 
-                    {/* Right: AI Assistant Button + Round Bell Button (Mobile only) */}
+                    {/* Right: Theme Toggle + Round Bell Button (Mobile only) */}
                     <div className="flex items-center gap-2 shrink-0">
-                        {/* AI Assistant Button (48px) */}
-                        <button
-                            type="button"
-                            onClick={onOpenAIChat}
-                            aria-label="Open PULSE AI assistant"
-                            title="PULSE AI Assistant"
-                            className={`w-12 h-12 min-w-[48px] min-h-[48px] rounded-full flex items-center justify-center border transition-all shadow-2xs relative shrink-0 outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] cursor-pointer active:scale-95 ${
-                                isAIChatOpen
-                                    ? 'bg-[#ff6b00] border-[#ff6b00] text-white'
-                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-[#ff6b00] hover:bg-orange-50 dark:hover:bg-orange-950/30'
-                            }`}
-                        >
-                            <Brain size={22} strokeWidth={2.2} />
-                        </button>
-
+                        <ThemeToggle responsiveBreakpoint="sm" />
                         {/* Round Bell Button (3rem / 48px) with Unread Alert Badge */}
                         <button
                             ref={mobileBellRef}
@@ -334,7 +322,7 @@ export default function HomeHeader({
                                     inputRef.current?.blur();
                                 }
                             }}
-                            placeholder="Search reports, maps, guides (e.g. drainage, street light, Barangay 171)"
+                            placeholder="Search PULSO"
                             aria-label="Search PULSO"
                             className="flex-1 min-w-0 bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none text-base font-normal text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 truncate caret-[#ff6b00]"
                             style={{ outline: 'none', boxShadow: 'none' }}
@@ -373,17 +361,19 @@ export default function HomeHeader({
             </div>
 
             {/* ── DESKTOP HOME HEADER (≥ 768px: Official municipal bar intact) ── */}
-            <div className="hidden md:flex max-w-[1600px] mx-auto px-4 lg:px-6 relative items-center justify-between gap-4 md:gap-6 h-14 sm:h-16 py-1 sm:py-0">
+            <div className="hidden md:flex w-full px-4 lg:px-6 relative items-center justify-between gap-4 md:gap-6 h-14 sm:h-16 py-1 sm:py-0">
                 {/* Brand Block */}
                 <div className={`items-center shrink-0 min-w-0 ${isSearchOpen ? 'hidden md:flex' : 'flex'}`}>
                     <a
                         href="/dashboard"
                         onClick={(e) => {
                             e.preventDefault();
-                            if (handleSetTab) handleSetTab('overview');
+                            if (onGoHome) onGoHome();
+                            else if (handleSetTab) handleSetTab('overview');
                         }}
-                        className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl cursor-pointer min-w-0"
+                        className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl cursor-pointer min-w-0 transition-opacity hover:opacity-90 active:scale-[0.99]"
                         aria-label="PULSO home, Caloocan City Engineering Department"
+                        title="Go to Home"
                     >
                         <Branding showText={true} />
                     </a>
@@ -421,7 +411,7 @@ export default function HomeHeader({
                                     desktopSearchInputRef.current?.blur();
                                 }
                             }}
-                            placeholder="Search reports, maps, guides (e.g. drainage, street light, Barangay 171)"
+                            placeholder="Search PULSO"
                             aria-label="Search PULSO"
                             className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm flex-1 min-w-0 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                         />
@@ -452,8 +442,10 @@ export default function HomeHeader({
                     )}
                 </div>
 
-                {/* Actions: Notifications + User Menu */}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Actions: Theme Mode Toggle + Notifications + User Menu */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                    <ThemeToggle />
+
                     <button
                         ref={desktopBellRef}
                         type="button"

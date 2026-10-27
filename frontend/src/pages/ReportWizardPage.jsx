@@ -5,7 +5,6 @@ import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getStoredToken } from '../utils/auth';
 import { CALOOCAN_CENTERS } from '../utils/geospatial';
-import { isInstalledApp } from '../utils/appContext';
 
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -17,7 +16,7 @@ import Step4DetailsDuplicate from '../components/report-wizard/Step4DetailsDupli
 import Step5ContactPreferences from '../components/report-wizard/Step5ContactPreferences';
 import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
 import DuplicateWarningModal from '../components/report-wizard/DuplicateWarningModal';
-import { Check, Home } from 'lucide-react';
+import { Home } from 'lucide-react';
 
 const DRAFT_STORAGE_KEY = 'pulso_report_wizard_draft_v1';
 
@@ -35,6 +34,7 @@ export default function ReportWizardPage() {
   const [announcement, setAnnouncement] = useState('');
   const [duplicateModalData, setDuplicateModalData] = useState(null);
   const [submissionError, setSubmissionError] = useState(null);
+  const [isHelpGuideOpen, setIsHelpGuideOpen] = useState(false);
 
   // Consolidated Form State
   const [formData, setFormData] = useState({
@@ -229,13 +229,13 @@ export default function ReportWizardPage() {
   const currentStepName = t(`reportWizard.steps.${currentStepObj.key}`, currentStepObj.defaultLabel);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
+    <div className="min-h-screen bg-[#f4f7fb] dark:bg-[#0b1120] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
       {/* Screen Reader Live Region */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
 
-      {/* ── Top Header: Logo on top-left & Home Section (matching Login page layout) ───────────── */}
+      {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
       <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
         {/* Logo on top-left linking to home */}
         <Link
@@ -251,7 +251,7 @@ export default function ReportWizardPage() {
           <ThemeToggle />
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
             title="Return to Home Section"
           >
             <Home size={14} className="text-[#ff6b00]" />
@@ -300,7 +300,7 @@ export default function ReportWizardPage() {
                   title={`${step.id}. ${label}`}
                   aria-label={`Step ${step.id}: ${label}${isCurrent ? ' (current step)' : ''}`}
                   aria-current={isCurrent ? 'step' : undefined}
-                  className={`h-1 sm:h-1.5 rounded-full transition-all duration-300 ${
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
                     isClickable ? 'cursor-pointer hover:opacity-80 active:scale-95' : 'cursor-default'
                   } ${
                     isPassedOrCurrent
@@ -322,18 +322,19 @@ export default function ReportWizardPage() {
         )}
 
         {/* Two-Column Layout (Desktop) */}
-        <div className="flex-1 flex items-start gap-8">
+        <div className="flex-1 flex flex-col lg:flex-row items-stretch lg:items-start gap-6 lg:gap-8">
           {/* Left Column: Persistent Desktop Sidebar */}
           <WizardSidebar
             currentStep={currentStep}
             maxStepReached={maxStepReached}
             onStepClick={jumpToStep}
+            onOpenHelpGuide={() => setIsHelpGuideOpen(true)}
           />
 
           {/* Right Column: Rounded Main Card */}
           <section
             aria-label={`Step ${currentStep} form content`}
-            className="flex-1 w-full rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 md:p-10 shadow-xs min-h-[640px] flex flex-col justify-between"
+            className="flex-1 w-full rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 md:p-10 shadow-xs min-h-[640px] flex flex-col justify-between"
           >
             {currentStep === 1 && (
               <Step1CategoryEmergency 
@@ -341,6 +342,9 @@ export default function ReportWizardPage() {
                 onSelectCategory={(cat) => setFormData(p => ({ ...p, category: cat }))}
                 onContinue={goToNextStep}
                 onBack={goToPreviousStep}
+                isGuideModalOpen={isHelpGuideOpen}
+                onCloseGuideModal={() => setIsHelpGuideOpen(false)}
+                onOpenGuideModal={() => setIsHelpGuideOpen(true)}
               />
             )}
 

@@ -39,6 +39,7 @@ import {
     FileText
 } from 'lucide-react';
 import PulseAIMarkdown from './PulseAIMarkdown';
+import PulseAIIcon from './common/PulseAIIcon';
 import { API_BASE_URL } from '../utils/apiBase';
 import { apiFetch } from '../utils/apiFetch';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
@@ -396,7 +397,7 @@ export default function PulseAIChatWindow({
                         <div className="p-3.5 sm:p-4 bg-gradient-to-r from-[#e65100] via-[#f97316] to-[#ea580c] flex justify-between items-center shrink-0 select-none shadow-xs">
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 shadow-xs">
-                                    <Brain size={18} className="text-white" />
+                                    <PulseAIIcon size={22} />
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="font-heading font-black text-white text-sm leading-tight tracking-tight">
@@ -653,7 +654,7 @@ export default function PulseAIChatWindow({
                                         <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                             {msg.role === 'assistant' && (
                                                 <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0 shadow-xs">
-                                                    <Brain size={12} className="text-white" />
+                                                    <PulseAIIcon size={18} />
                                                 </div>
                                             )}
                                             <div
@@ -689,7 +690,7 @@ export default function PulseAIChatWindow({
                                     {isLoading && (
                                         <div className="flex justify-start">
                                             <div className="w-6 h-6 rounded-full bg-[#f05a00] flex items-center justify-center mr-2 mt-0.5 shrink-0 shadow-xs">
-                                                <Brain size={12} className="text-white" />
+                                                <PulseAIIcon size={18} />
                                             </div>
                                             <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-2xl rounded-bl-xs flex gap-1.5 border border-slate-200/50 dark:border-slate-700/50 items-center">
                                                 <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>

@@ -138,7 +138,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Text(
-                        'Showing ${filteredReports.length} sample reports.',
+                        'Showing ${filteredReports.length} reports.',
                         style: const TextStyle(
                           fontSize: 11,
                           color: Color(0xFF94A3B8),
@@ -597,7 +597,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Text(
-            'Sample report history',
+            'Report history',
             style: TextStyle(
               color: Color(0xFFEA580C),
               fontSize: 11,
