@@ -146,6 +146,15 @@ const IDCameraModal = ({
     const [isLandscape, setIsLandscape] = useState(false);
     const prevIsOpenRef = useRef(false);
 
+    // Determine current active substate
+    const isPermissionDenied = error === 'permission_denied' || (typeof error === 'string' && error.toLowerCase().includes('denied'));
+    const isOtherCameraError = Boolean(error && !isPermissionDenied);
+    const isInvalidState = Boolean(validationError);
+    const isCheckingState = isVerifying;
+    const isPreviewAcceptedState = isAccepted && capturedPreviewUrl && !validationError && !isVerifying;
+    const isLiveState = !capturedPreviewUrl && !error && !isCheckingState;
+    const isFullBleed16x9 = (isLiveState || isCheckingState || isPreviewAcceptedState) && photoRatio === 'Full';
+
     // Sync ratio if controlled via dev showcase
     useEffect(() => {
         if (ratioOverride) {
@@ -214,7 +223,17 @@ const IDCameraModal = ({
 
     // Reset captured preview when modal opens or closes
     useEffect(() => {
-        if (!isOpen) {
+        if (isOpen) {
+            if (!previewMode) {
+                setCapturedPreviewUrl(null);
+                setCapturedBlob(null);
+                setCapturedAiData(null);
+                setIsAccepted(false);
+                setValidationError(null);
+                setIsVerifying(false);
+                setError(null);
+            }
+        } else {
             if (capturedPreviewUrl && !previewMode) {
                 URL.revokeObjectURL(capturedPreviewUrl);
             }
@@ -239,6 +258,23 @@ const IDCameraModal = ({
         setValidationError(null);
         setIsVerifying(false);
         setAnnouncement('Returned to live camera view.');
+
+        // Restart or re-activate camera stream so viewfinder is active
+        const stream = streamRef.current;
+        const hasLiveTracks = stream && stream.getVideoTracks().some(t => t.readyState === 'live');
+        if (!hasLiveTracks) {
+            startStream();
+        } else if (videoRef.current) {
+            const video = videoRef.current;
+            if (video.srcObject !== stream) {
+                video.srcObject = stream;
+            }
+            video.play().catch(() => {
+                video.onloadedmetadata = () => {
+                    video.play().catch(() => {});
+                };
+            });
+        }
     };
 
     // Live clock for real-time camera viewfinder watermark
@@ -339,11 +375,11 @@ const IDCameraModal = ({
             }
 
             if (videoRef.current) {
-                videoRef.current.srcObject = newStream;
-                await new Promise((resolve) => {
-                    videoRef.current.onloadedmetadata = () => {
-                        videoRef.current.play().catch(() => {});
-                        resolve();
+                const video = videoRef.current;
+                video.srcObject = newStream;
+                video.play().catch(() => {
+                    video.onloadedmetadata = () => {
+                        video.play().catch(() => {});
                     };
                 });
             }
@@ -382,6 +418,33 @@ const IDCameraModal = ({
             startStream();
         }
     }, [facingMode]);
+
+    // Watchdog effect: whenever modal is open in live state, ensure video is bound to active stream
+    useEffect(() => {
+        if (!isOpen || !isLiveState) return;
+
+        let active = true;
+        const stream = streamRef.current;
+        const hasLiveTracks = stream && stream.getVideoTracks().some(t => t.readyState === 'live');
+
+        if (!hasLiveTracks) {
+            startStream();
+        } else if (videoRef.current) {
+            const video = videoRef.current;
+            if (video.srcObject !== stream) {
+                video.srcObject = stream;
+            }
+            video.play().catch(() => {
+                video.onloadedmetadata = () => {
+                    if (active) video.play().catch(() => {});
+                };
+            });
+        }
+
+        return () => {
+            active = false;
+        };
+    }, [isOpen, isLiveState, startStream]);
 
     const handleSwitchCamera = () => {
         setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
@@ -610,15 +673,6 @@ const IDCameraModal = ({
         onClose();
     };
 
-    // Determine current active substate
-    const isPermissionDenied = error === 'permission_denied' || (typeof error === 'string' && error.toLowerCase().includes('denied'));
-    const isOtherCameraError = Boolean(error && !isPermissionDenied);
-    const isInvalidState = Boolean(validationError);
-    const isCheckingState = isVerifying;
-    const isPreviewAcceptedState = isAccepted && capturedPreviewUrl && !validationError && !isVerifying;
-    const isLiveState = !capturedPreviewUrl && !error && !isCheckingState;
-    const isFullBleed16x9 = (isLiveState || isCheckingState || isPreviewAcceptedState) && photoRatio === 'Full';
-
     const displayTitle = isIssue ? 'Take a photo' : (title || 'Take a photo');
     const displaySubtitle = isIssue ? 'Photos are saved with your location and time.' : (subtitle || '');
 
@@ -787,7 +841,17 @@ const IDCameraModal = ({
                                         />
                                     ) : (
                                         <video
-                                            ref={videoRef}
+                                            ref={(el) => {
+                                                videoRef.current = el;
+                                                if (el && streamRef.current && el.srcObject !== streamRef.current) {
+                                                    el.srcObject = streamRef.current;
+                                                    el.play().catch(() => {
+                                                        el.onloadedmetadata = () => {
+                                                            el.play().catch(() => {});
+                                                        };
+                                                    });
+                                                }
+                                            }}
                                             autoPlay
                                             playsInline
                                             muted
