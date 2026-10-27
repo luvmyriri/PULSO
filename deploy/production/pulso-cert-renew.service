@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew the PULSO HTTPS certificate
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pulso/bin/renew-certificate.sh
