@@ -15,6 +15,7 @@ import LegalModal from '../components/LegalModal';
 import PendingVerificationModal from '../components/PendingVerificationModal';
 import { setAuthSession } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
+import { getRecaptchaConfig } from '../utils/recaptchaConfig';
 import { isInstalledApp } from '../utils/appContext';
 import PulsoBottomScrim from '../components/mobile/PulsoBottomScrim';
 import '../index.css';
@@ -230,6 +231,7 @@ function SixDigitOtpInput({
 }
 
 export default function Login() {
+    const captchaConfig = getRecaptchaConfig();
     const navigate = useNavigate();
     const [legalModal, setLegalModal]     = useState({ isOpen: false, tab: 'privacy' });
     const [email, setEmail]               = useState('');
@@ -1023,17 +1025,23 @@ export default function Login() {
                                                                 animate={{ opacity: 1, height: 'auto' }}
                                                                 exit={{ opacity: 0, height: 0 }}
                                                                 transition={{ duration: 0.25, ease: 'easeOut' }}
-                                                                className="flex justify-center w-full py-1 overflow-hidden"
+                                                                className="flex flex-col items-center justify-center gap-2 w-full py-1 overflow-hidden"
                                                             >
                                                                 <div className="p-1 rounded-2xl bg-slate-50/60 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800/80 shadow-xs inline-flex justify-center items-center scale-90 sm:scale-95 origin-center transition-colors">
-                                                                    <ReCAPTCHA
+                                                                    {captchaConfig.siteKey ? <ReCAPTCHA
                                                                         key={isDark ? 'recaptcha-dark' : 'recaptcha-light'}
                                                                         ref={recaptchaRef}
-                                                                        sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                                                        sitekey={captchaConfig.siteKey}
                                                                         onChange={(val) => setCaptchaValue(val)}
+                                                                        onExpired={() => setCaptchaValue(null)}
+                                                                        onErrored={() => {
+                                                                            setCaptchaValue(null);
+                                                                            setError('The security check could not load. Check your connection or contact the administrator.');
+                                                                        }}
                                                                         theme={isDark ? 'dark' : 'light'}
-                                                                    />
+                                                                    /> : <p role="alert" className="text-sm text-red-700 dark:text-red-300">Sign-in security is not configured. Contact the administrator.</p>}
                                                                 </div>
+                                                                {captchaConfig.localTest && <p className="text-xs text-slate-600 dark:text-slate-300">Local development CAPTCHA</p>}
                                                             </motion.div>
                                                         )}
                                                     </AnimatePresence>

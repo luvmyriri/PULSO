@@ -1,9 +1,13 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
+import process from 'node:process'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const localCaptchaTest = mode === 'development' && env.VITE_RECAPTCHA_LOCAL_TEST === 'true'
+  return {
   plugins: [
     react({
       babel: {
@@ -14,7 +18,8 @@ export default defineConfig({
   ],
   server: {
     allowedHosts: true,
-    host: '0.0.0.0',
+    // Do not expose an always-passing development challenge through the LAN proxy.
+    host: localCaptchaTest ? '127.0.0.1' : '0.0.0.0',
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:33159',
@@ -56,5 +61,6 @@ export default defineConfig({
         next();
       });
     }
+  }
   }
 })

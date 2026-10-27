@@ -31,7 +31,7 @@ load_dotenv()
 import mimetypes
 mimetypes.add_type("image/webp", ".webp")
 
-RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe") # Default to test key
+from recaptcha_service import verify_recaptcha
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "1005696776742-cb6hpoeho2qap0plhgljboc3agf33d2s.apps.googleusercontent.com")
 
 from google.oauth2 import id_token as google_id_token
@@ -372,27 +372,6 @@ SMTP_PASS = os.getenv("SMTP_PASS")
 # Consolidating send_otp_email logic
 
 
-
-async def verify_recaptcha(token: str):
-    """Verifies reCAPTCHA token with Google."""
-    if not token:
-        return False
-    if token in ("mobile_bypass", "dev_bypass", "mock_captcha_token"):
-        return True
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(
-                "https://www.google.com/recaptcha/api/siteverify",
-                data={
-                    "secret": RECAPTCHA_SECRET_KEY,
-                    "response": token
-                }
-            )
-            data = response.json()
-            return data.get("success", False)
-        except Exception as e:
-            print(f"reCAPTCHA verification error: {e}")
-            return False
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Register Government-Side Router
@@ -987,6 +966,7 @@ def register_user(user: schemas.ResidentCreate, request: Request, db: Session = 
 
 @app.post("/api/auth/login")
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(), 
     captcha_token: Optional[str] = Form(None),
     db: Session = Depends(get_db)
@@ -1017,20 +997,16 @@ async def login(
     
     # 2. Check for reCAPTCHA if credentials are valid
     if user.role == "resident":
-        if captcha_token in ("mobile_bypass", "dev_bypass"):
-            pass # mobile app and dev bypass check
-        else:
-            if not captcha_token:
-                return {
-                    "require_captcha": True,
-                    "message": "Security synchronization required. Please verify you are not a robot."
-                }
-
-            if not await verify_recaptcha(captcha_token):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid reCAPTCHA. Please try again."
-                )
+        if not captcha_token:
+            return {
+                "require_captcha": True,
+                "message": "Please complete the security check."
+            }
+        if not await verify_recaptcha(captcha_token, request):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The security check could not be verified. Please complete it again."
+            )
     
     # 3. Check verification status (Mandatory for residents)
     if not user.is_verified and user.role == "resident":
@@ -1584,7 +1560,7 @@ async def verify_2fa_code(req: Verify2FARequest, db: Session = Depends(get_db)):
     return {"status": "success", "message": "2FA verification successful."}
 
 @app.post("/api/auth/phone/send-otp")
-async def send_phone_otp(req: SendPhoneOTPRequest, db: Session = Depends(get_db)):
+async def send_phone_otp(req: SendPhoneOTPRequest, request: Request, db: Session = Depends(get_db)):
     """
     Dispatches a 6-digit SMS OTP to the resident's registered Philippine mobile phone.
     """
@@ -1613,7 +1589,7 @@ async def send_phone_otp(req: SendPhoneOTPRequest, db: Session = Depends(get_db)
 
     # 3. Optional reCAPTCHA verification if provided
     if req.captcha_token:
-        if not await verify_recaptcha(req.captcha_token):
+        if not await verify_recaptcha(req.captcha_token, request):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid reCAPTCHA puzzle. Please try again."
