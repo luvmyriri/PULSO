@@ -93,8 +93,8 @@ export function mapAiCategoryToCanonical(categoryStr) {
         if (part.includes('road') || part.includes('bridge') || part.includes('pothole') || part.includes('asphalt') || part.includes('pavement') || part.includes('kalsada') || part.includes('lubak')) {
             mapped.add('Roads & Bridges');
         }
-        if (part.includes('water') || part.includes('tubig') || part.includes('leak') || part.includes('pipe') || part.includes('burst') || part.includes('pressure') || part.includes('maynilad')) {
-            mapped.add('Water Supply & Distribution');
+        if (part.includes('water') || part.includes('tubig') || part.includes('leak') || part.includes('pipe') || part.includes('pipeline') || part.includes('burst') || part.includes('pressure') || part.includes('maynilad')) {
+            mapped.add('Water Pipeline');
         }
         if (part.includes('safety') || part.includes('regulat') || part.includes('hazard') || part.includes('fire') || part.includes('debris') || part.includes('tree') || part.includes('sunog')) {
             mapped.add('Public Safety & Hazards');
@@ -134,7 +134,7 @@ const REPORTABLE_CATEGORIES = [
     'Roads & Bridges',
     'Drainage & Flooding',
     'Street Lighting',
-    'Water Supply & Distribution',
+    'Water Pipeline',
     'Public Safety & Hazards',
     'Traffic & Road Signs',
     'Public Buildings & Facilities',
@@ -146,8 +146,9 @@ export const CATEGORY_SUBTITLES = {
     'Roads & Bridges': 'Potholes, damaged roads, and sidewalks',
     'Drainage & Flooding': 'Clogged drains, gutters, and flooding',
     'Street Lighting': 'Busted, flickering, or damaged lights',
-    'Water Supply & Distribution': 'Pipe leaks and low water pressure',
-    'Water Supply': 'Pipe leaks and low water pressure',
+    'Water Pipeline': 'Pipeline leaks, burst pipes, and low water pressure',
+    'Water Supply & Distribution': 'Pipeline leaks, burst pipes, and low water pressure',
+    'Water Supply': 'Pipeline leaks, burst pipes, and low water pressure',
     'Public Safety & Hazards': 'Fallen trees, open manholes, hazards',
     'Public Safety Hazards': 'Fallen trees, open manholes, hazards',
     'Traffic & Road Signs': 'Missing or damaged traffic signs',

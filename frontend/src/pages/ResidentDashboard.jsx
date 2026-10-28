@@ -830,9 +830,9 @@ const ResidentHomeView = ({
         },
         {
             id: 'water',
-            categoryKey: 'Water Supply',
-            title: 'Water supply',
-            desc: 'Pipe leaks and low water pressure',
+            categoryKey: 'Water Pipeline',
+            title: 'Water pipeline',
+            desc: 'Pipeline leaks, burst pipes, and low water pressure',
             icon: <Droplets size={20} className="text-sky-500" />,
             iconBg: 'bg-sky-50 dark:bg-sky-950/40 text-sky-500 border border-sky-100 dark:border-sky-900/30'
         },
@@ -2842,7 +2842,7 @@ const CIVIC_ISSUE_CATEGORIES = [
     'Roads & bridges',
     'Drainage & flooding',
     'Street lighting',
-    'Water supply',
+    'Water pipeline',
     'Public safety hazards',
     'Traffic & road signs',
     'Public facilities',
@@ -2868,7 +2868,7 @@ const matchesCivicCategory = (reportCat, targetCat) => {
     if (t === 'street lighting') {
         return (r.includes('light') || r.includes('lamp') || r.includes('streetlight')) && !r.includes('traffic');
     }
-    if (t === 'water supply') {
+    if (t === 'water supply' || t === 'water pipeline') {
         return (r.includes('water') && !r.includes('waterway')) || r.includes('leak') || r.includes('pipe') || r.includes('pressure');
     }
     if (t === 'public safety hazards') {
@@ -3750,7 +3750,7 @@ const MyReports = ({
                                         className="px-3.5 py-2.5 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-sky-100 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer"
                                     >
                                         <Droplets size={14} className="text-blue-500" />
-                                        <span>Water supply</span>
+                                        <span>Water pipeline</span>
                                     </button>
 
                                     <button
@@ -6925,6 +6925,8 @@ const CATEGORY_META = {
 // Backward-compatible category aliases
 CATEGORY_META['Water Supply Network'] = CATEGORY_META['Water Supply & Distribution'];
 CATEGORY_META['Water & Drainage'] = CATEGORY_META['Water Supply & Distribution'];
+CATEGORY_META['Water Pipeline'] = CATEGORY_META['Water Supply & Distribution'];
+CATEGORY_META['Water pipeline'] = CATEGORY_META['Water Supply & Distribution'];
 CATEGORY_META['Roads & Drainage'] = CATEGORY_META['Roads & Bridges'];
 CATEGORY_META['Public Safety & Regulatory'] = CATEGORY_META['Public Safety & Hazards'];
 CATEGORY_META['Public Facilities'] = CATEGORY_META['Public Buildings & Facilities'];
