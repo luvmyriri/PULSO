@@ -3,12 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Check } from 'lucide-react';
 
 const STEPS = [
-  { id: 1, key: 'category', defaultLabel: 'Category' },
-  { id: 2, key: 'location', defaultLabel: 'Location' },
-  { id: 3, key: 'evidence', defaultLabel: 'Evidence' },
-  { id: 4, key: 'details', defaultLabel: 'Details' },
-  { id: 5, key: 'contact', defaultLabel: 'Contact' },
-  { id: 6, key: 'review', defaultLabel: 'Review' },
+  { id: 1, key: 'evidence_location', defaultLabel: 'Photo & Location' },
+  { id: 2, key: 'category', defaultLabel: 'Category' },
+  { id: 3, key: 'details', defaultLabel: 'Details' },
+  { id: 4, key: 'contact', defaultLabel: 'Contact' },
+  { id: 5, key: 'review', defaultLabel: 'Review' },
 ];
 
 export default function WizardSignalCutRail({ currentStep, maxStepReached, onStepClick }) {

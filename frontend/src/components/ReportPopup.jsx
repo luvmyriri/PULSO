@@ -49,6 +49,23 @@ export function getFriendlyStatusName(rawStatus) {
 /**
  * Returns corresponding category icon component
  */
+export const RoadIcon = ({ size = 20, className = '', style = {} }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        style={style}
+    >
+        <path d="M4 19L9 5M20 19L15 5M12 7V9M12 13V15M12 19V21" />
+    </svg>
+);
+
 export function getCategoryIconComponent(category, rawCategory) {
     const cat = (category || rawCategory || '').toLowerCase();
     if (cat.includes('flood') || cat.includes('drain')) return Waves;
@@ -57,7 +74,7 @@ export function getCategoryIconComponent(category, rawCategory) {
     if (cat.includes('traffic') || cat.includes('sign') || cat.includes('signal')) return Signpost;
     if (cat.includes('building') || cat.includes('facilit') || cat.includes('hall')) return Building2;
     if (cat.includes('safety') || cat.includes('hazard') || cat.includes('danger') || cat.includes('sunog')) return AlertTriangle;
-    if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole') || cat.includes('lubak') || cat.includes('kalsada')) return Mountain;
+    if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole') || cat.includes('lubak') || cat.includes('kalsada')) return RoadIcon;
     return MoreHorizontal;
 }
 

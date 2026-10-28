@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Check, MapPin } from 'lucide-react';
+import { cleanResidentAddress, formatNearbyAddress } from '../utils/locationPrivacy';
 import {
     REPORT_WORKFLOW_STEPS,
     getReportWorkflowIndex,
@@ -14,58 +15,13 @@ import {
  */
 export function getShortIncidentAddress(report) {
     if (!report) return null;
-    const raw = report.location_string || report.address || '';
-
-    if (raw && typeof raw === 'string') {
-        let cleaned = raw
-            .replace(/\b(Philippines|Pilipinas|PH)\b/gi, '')
-            .replace(/\b(Metro Manila|National Capital Region|NCR)\b/gi, '')
-            .replace(/\b(Caloocan City|City of Caloocan|Caloocan)\b/gi, '')
-            .replace(/\b(14\d{2})\b/g, '')
-            .replace(/\s*,\s*/g, ', ')
-            .replace(/,\s*,+/g, ',')
-            .replace(/^[\s,]+|[\s,]+$/g, '')
-            .trim();
-
-        // Check if string was only coordinate numbers
-        if (/^Lat:?\s*[\d.]+/i.test(cleaned) || /^[\d.]+,\s*[\d.]+$/.test(cleaned)) {
-            cleaned = '';
-        }
-
-        if (cleaned.length > 0) {
-            return cleaned;
-        }
-    }
-
-    if (report.barangay) {
-        return `Barangay ${String(report.barangay).replace(/^Barangay\s*/i, '')}`;
-    }
-
-    if (report.lat && report.lng) {
-        return `GPS (${Number(report.lat).toFixed(4)}, ${Number(report.lng).toFixed(4)})`;
-    }
-
-    return null;
+    return formatNearbyAddress(report.location_string || report.address || report.barangay) || null;
 }
 
-/**
- * Returns full address for tooltip / detail display.
- */
+/** Privacy-safe address for tooltip and detail display; no raw-string fallback. */
 export function getFullIncidentAddress(report) {
     if (!report) return '';
-    if (report.location_string && report.location_string.trim()) {
-        return report.location_string.trim();
-    }
-    if (report.address && report.address.trim()) {
-        return report.address.trim();
-    }
-    if (report.barangay) {
-        return `Barangay ${report.barangay}, Caloocan City`;
-    }
-    if (report.lat && report.lng) {
-        return `Coordinates: ${Number(report.lat).toFixed(5)}, ${Number(report.lng).toFixed(5)}`;
-    }
-    return '';
+    return cleanResidentAddress(report.location_string || report.address || report.barangay);
 }
 
 /**
@@ -121,7 +77,7 @@ export default function LatestReportCard({
     const badgeText = getCanonicalBadgeLabel(report.status);
     const shortAddress = getShortIncidentAddress(report);
     const fullAddress = getFullIncidentAddress(report);
-    const displayAddress = fullAddress || shortAddress || report.location_string || report.address || '';
+    const displayAddress = fullAddress || shortAddress || '';
 
     const handleCardClick = () => {
         if (onOpenReport) {
@@ -286,7 +242,7 @@ export default function LatestReportCard({
                             INCIDENT LOCATION
                         </span>
                         <p className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white leading-snug break-words">
-                            {fullAddress || shortAddress || report.location_string || report.address || 'Caloocan City'}
+                            {fullAddress || shortAddress || 'Caloocan City'}
                         </p>
                     </div>
 

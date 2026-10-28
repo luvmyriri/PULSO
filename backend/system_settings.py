@@ -48,8 +48,9 @@ def read_config(db,key):
     raw=row.value if isinstance(row.value,dict) else {}
     try: return SCHEMAS[key].model_validate({name:raw[name] for name in fields if name in raw}).model_dump()
     except ValidationError:
-        # Invalid saved values cannot silently enable automation.
-        return {'enabled':False,'suggest_urgency':False} if key=='ai_report_category_suggestion' else {'enabled':False} if key=='report_review_routing' else None
+        if key=='ai_report_category_suggestion':
+            return {'enabled':True,'suggest_urgency':True}
+        return {'enabled':False} if key=='report_review_routing' else None
 
 
 def display(key,value):

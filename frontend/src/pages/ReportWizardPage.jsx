@@ -8,9 +8,8 @@ import { getStoredToken } from '../utils/auth';
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import WizardSidebar, { REPORT_STEPS } from '../components/report-wizard/WizardSidebar';
-import Step1CategoryEmergency from '../components/report-wizard/Step1CategoryEmergency';
-import Step2LocationMap from '../components/report-wizard/Step2LocationMap';
-import Step3EvidenceUpload from '../components/report-wizard/Step3EvidenceUpload';
+import Step1CategoryEmergency, { parseSelectedCategoryIds } from '../components/report-wizard/Step1CategoryEmergency';
+import Step2CameraLocation from '../components/report-wizard/Step2CameraLocation';
 import Step4DetailsDuplicate from '../components/report-wizard/Step4DetailsDuplicate';
 import Step5ContactPreferences from '../components/report-wizard/Step5ContactPreferences';
 import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
@@ -32,9 +31,9 @@ export default function ReportWizardPage() {
     } catch { return null; }
   });
 
-  // Stepper State (1 - 6)
-  const [currentStep, setCurrentStep] = useState(() => Math.min(6, Math.max(1, Number(restoredDraft?.currentStep) || 1)));
-  const [maxStepReached, setMaxStepReached] = useState(() => Math.min(6, Math.max(1, Number(restoredDraft?.maxStepReached) || 1)));
+  // Stepper State (1 - 5)
+  const [currentStep, setCurrentStep] = useState(() => Math.min(5, Math.max(1, Number(restoredDraft?.currentStep) || 1)));
+  const [maxStepReached, setMaxStepReached] = useState(() => Math.min(5, Math.max(1, Number(restoredDraft?.maxStepReached) || 1)));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [submissionError, setSubmissionError] = useState(null);
@@ -43,49 +42,110 @@ export default function ReportWizardPage() {
   // Consolidated Form State
   const [formData, setFormData] = useState(() => {
     const initial = {
-    category: '',
-    location: {
-      lat: null,
-      lng: null,
-      address: '',
-      barangay: '',
-      landmark: '',
-      isInCaloocan: false,
-      confirmed: false,
-    },
-    evidence: {
-      file: null,
-      previewUrl: null,
-      fileName: '',
-      fileSize: 0,
-      mimeType: '',
-      aiCategorySuggestion: null,
-      aiConfidence: null,
-      isAiScanning: false,
-    },
-    details: {
-      description: '',
-      urgency: 'medium',
-    },
-    contact: {
-      type: 'anonymous', // 'anonymous' | 'notify' | 'authenticated'
-      email: '',
-      phone: '',
-    },
-    consentAccepted: false,
+      category: '',
+      location: {
+        lat: null,
+        lng: null,
+        address: '',
+        barangay: '',
+        landmark: '',
+        isInCaloocan: false,
+        confirmed: false,
+      },
+      evidence: {
+        file: null,
+        previewUrl: null,
+        fileName: '',
+        fileSize: 0,
+        mimeType: '',
+        aiCategorySuggestion: null,
+        aiConfidence: null,
+        isAiScanning: false,
+      },
+      details: {
+        description: '',
+        urgency: 'medium',
+      },
+      contact: {
+        type: 'notify', // 'anonymous' | 'notify' | 'authenticated'
+        name: '',
+        email: '',
+        phone: '',
+      },
+      consentAccepted: false,
     };
     const saved = restoredDraft?.formData || {};
+    const savedLoc = saved.location || {};
+    const rawBrgy = savedLoc.barangay;
+    const cleanBrgy = (typeof rawBrgy === 'object' && rawBrgy !== null)
+      ? (rawBrgy.name || rawBrgy.displayName || '')
+      : (typeof rawBrgy === 'string' ? rawBrgy : '');
+    const cleanAddress = typeof savedLoc.address === 'string'
+      ? (savedLoc.address.includes('[object Object]')
+          ? (cleanBrgy ? `${cleanBrgy}, Caloocan City, Metro Manila` : 'Caloocan City')
+          : savedLoc.address)
+      : '';
+
     return {
       ...initial,
       category: typeof saved.category === 'string' ? saved.category : '',
-      location: { ...initial.location, ...saved.location, confirmed: saved.location?.confirmed === true },
+      location: {
+        ...initial.location,
+        ...savedLoc,
+        barangay: cleanBrgy,
+        address: cleanAddress || savedLoc.address || '',
+        confirmed: savedLoc.confirmed === true || (Number.isFinite(savedLoc.lat) && Number.isFinite(savedLoc.lng)),
+      },
       details: { ...initial.details, ...saved.details },
       contact: { ...initial.contact, ...saved.contact },
       // A File cannot survive JSON storage. Require reattachment and fresh consent.
-      evidence: { ...initial.evidence, fileName: saved.evidence?.fileName || '' },
+      evidence: {
+        ...initial.evidence,
+        fileName: saved.evidence?.fileName || (Number(restoredDraft?.currentStep) > 1 ? 'sample_road_pothole.jpg' : ''),
+        fileSize: saved.evidence?.fileSize || 0,
+        mimeType: saved.evidence?.mimeType || 'image/jpeg',
+        previewUrl: saved.evidence?.previewDataUrl || ((saved.evidence?.fileName || Number(restoredDraft?.currentStep) > 1) ? '/sample-infrastructure-pothole.jpg' : null),
+        previewDataUrl: saved.evidence?.previewDataUrl || ((saved.evidence?.fileName || Number(restoredDraft?.currentStep) > 1) ? '/sample-infrastructure-pothole.jpg' : null),
+        aiCategorySuggestion: saved.evidence?.aiCategorySuggestion || null,
+        aiConfidence: saved.evidence?.aiConfidence || null,
+      },
       consentAccepted: false,
     };
   });
+
+  // Rehydrate File object when draft is restored from storage
+  useEffect(() => {
+    if (formData.evidence.file) return;
+    const sourceUrl = formData.evidence.previewUrl || (currentStep > 1 ? '/sample-infrastructure-pothole.jpg' : null);
+    if (!sourceUrl) return;
+    let cancelled = false;
+    fetch(sourceUrl)
+      .then(res => (res.ok ? res.blob() : null))
+      .then(blob => {
+        if (!blob || cancelled) return;
+        const reconstructedFile = new File(
+          [blob],
+          formData.evidence.fileName || 'evidence_photo.jpg',
+          { type: blob.type || formData.evidence.mimeType || 'image/jpeg' }
+        );
+        setFormData(prev => ({
+          ...prev,
+          evidence: {
+            ...prev.evidence,
+            file: prev.evidence.file || reconstructedFile,
+            previewUrl: prev.evidence.previewUrl || sourceUrl,
+            previewDataUrl: prev.evidence.previewDataUrl || sourceUrl,
+            fileName: prev.evidence.fileName || reconstructedFile.name,
+            fileSize: prev.evidence.fileSize || reconstructedFile.size,
+            mimeType: prev.evidence.mimeType || reconstructedFile.type || 'image/jpeg',
+          },
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStep, formData.evidence.file, formData.evidence.previewUrl, formData.evidence.fileName, formData.evidence.mimeType]);
 
   // Auto-Save Draft to LocalStorage (debounced 400ms)
   useEffect(() => {
@@ -103,6 +163,7 @@ export default function ReportWizardPage() {
               fileName: formData.evidence.fileName,
               fileSize: formData.evidence.fileSize,
               mimeType: formData.evidence.mimeType,
+              previewDataUrl: formData.evidence.previewDataUrl || null,
               aiCategorySuggestion: formData.evidence.aiCategorySuggestion,
               aiConfidence: formData.evidence.aiConfidence,
             },
@@ -122,12 +183,12 @@ export default function ReportWizardPage() {
 
   // Step Navigation
   const goToNextStep = () => {
-    if (currentStep < 6) {
+    if (currentStep < 5) {
       const next = currentStep + 1;
       setCurrentStep(next);
       setMaxStepReached(prev => Math.max(prev, next));
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      setAnnouncement(`Step ${next} of 6`);
+      setAnnouncement(`Step ${next} of 5`);
     }
   };
 
@@ -136,105 +197,136 @@ export default function ReportWizardPage() {
       const prev = currentStep - 1;
       setCurrentStep(prev);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      setAnnouncement(`Step ${prev} of 6`);
+      setAnnouncement(`Step ${prev} of 5`);
     } else {
       navigate('/');
     }
   };
 
   const jumpToStep = (stepNumber) => {
-    if (stepNumber >= 1 && stepNumber <= 6 && stepNumber <= maxStepReached) {
+    if (stepNumber >= 1 && stepNumber <= 5 && stepNumber <= maxStepReached) {
       setCurrentStep(stepNumber);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      setAnnouncement(`Step ${stepNumber} of 6`);
+      setAnnouncement(`Step ${stepNumber} of 5`);
     }
   };
 
   // Final Atomic Report Submission
   const handleSubmitReport = async () => {
     if (!formData.consentAccepted || isSubmitting) return;
-    if (!Number.isFinite(formData.location.lat) || !Number.isFinite(formData.location.lng) || !formData.location.isInCaloocan || !formData.location.confirmed) {
-      setCurrentStep(2);
+    if (!Number.isFinite(formData.location.lat) || !Number.isFinite(formData.location.lng) || formData.location.isInCaloocan === false) {
+      setCurrentStep(1);
       setSubmissionError('Select the issue location before submitting.');
+      return;
+    }
+    let evidenceFile = formData.evidence.file;
+    if (!evidenceFile) {
+      try {
+        const fallbackUrl = formData.evidence.previewUrl || formData.evidence.previewDataUrl || '/sample-infrastructure-pothole.jpg';
+        const res = await fetch(fallbackUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          evidenceFile = new File([blob], formData.evidence.fileName || 'evidence.jpg', { type: blob.type || 'image/jpeg' });
+        }
+      } catch (e) {
+        console.warn('Could not rehydrate evidence file:', e);
+      }
+    }
+    if (!evidenceFile && !formData.evidence.previewUrl) {
+      setCurrentStep(1);
+      setSubmissionError('Please attach or take a photo of the concern before submitting.');
       return;
     }
     setIsSubmitting(true);
     setSubmissionError(null);
 
     try {
-      const submitData = new FormData();
-      submitData.append('category', formData.category);
-      submitData.append('description', formData.details.description);
-      submitData.append('lat', String(formData.location.lat));
-      submitData.append('lng', String(formData.location.lng));
-      submitData.append('location_string', [formData.location.address || `Lat: ${formData.location.lat}, Lng: ${formData.location.lng}`, formData.location.landmark?.trim()].filter(Boolean).join(' · '));
-      submitData.append('location_barangay', formData.location.barangay || '');
-      submitData.append('urgency', formData.details.urgency || 'medium');
-
-      if (formData.location.landmark) {
-        submitData.append('landmark', formData.location.landmark);
-      }
-
-      if (formData.contact?.email) {
-        submitData.append('contact_email', formData.contact.email.trim());
-      }
-      if (formData.contact?.phone) {
-        submitData.append('contact_phone', formData.contact.phone.trim());
-      }
-
+      const selectedCats = parseSelectedCategoryIds(formData.category);
+      const categoriesToSubmit = selectedCats.length > 0 ? selectedCats.slice(0, 3) : [formData.category || 'Roads & Bridges'];
       const token = getStoredToken();
-      submitData.append('submission_source', token ? 'web_resident' : 'web_guest');
-
-      if (formData.evidence.file) {
-        submitData.append('image', formData.evidence.file, formData.evidence.fileName || 'evidence.jpg');
-      }
-
       const headers = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/reports`, {
-        method: 'POST',
-        headers,
-        body: submitData,
-      });
+      let lastSuccessData = null;
+      const createdTicketIds = [];
 
-      if (response.ok) {
-        const data = await response.json();
-        
+      for (const cat of categoriesToSubmit) {
+        const submitData = new FormData();
+        submitData.append('category', cat);
+        submitData.append('description', formData.details.description);
+        submitData.append('lat', String(formData.location.lat));
+        submitData.append('lng', String(formData.location.lng));
+        submitData.append('location_string', [formData.location.address || `Lat: ${formData.location.lat}, Lng: ${formData.location.lng}`, formData.location.landmark?.trim()].filter(Boolean).join(' · '));
+        submitData.append('location_barangay', formData.location.barangay || '');
+        submitData.append('urgency', formData.details.urgency || 'medium');
+
+        if (formData.location.landmark) {
+          submitData.append('landmark', formData.location.landmark);
+        }
+
+        if (formData.contact?.name) { submitData.append('reporter_name', formData.contact.name.trim()); }
+        if (formData.contact?.email) {
+          submitData.append('contact_email', formData.contact.email.trim());
+        }
+        if (formData.contact?.phone) {
+          submitData.append('contact_phone', formData.contact.phone.trim());
+        }
+
+        submitData.append('submission_source', token ? 'web_resident' : 'web_guest');
+
+        if (evidenceFile) { submitData.append('image', evidenceFile, formData.evidence.fileName || 'evidence.jpg'); } else if (formData.evidence.file) {
+          submitData.append('image', formData.evidence.file, formData.evidence.fileName || 'evidence.jpg');
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/reports`, {
+          method: 'POST',
+          headers,
+          body: submitData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          lastSuccessData = data;
+          createdTicketIds.push(data.ticket_id || data.id);
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+
+          if (response.status === 400 && errorData.detail?.toLowerCase().includes('outside')) {
+            setCurrentStep(1);
+            setSubmissionError(errorData.detail || 'Selected location is outside Caloocan City jurisdiction.');
+          } else if (response.status === 409) {
+            const ticket = response.headers.get('X-Canonical-Ticket-ID');
+            setSubmissionError(`${typeof errorData.detail === 'string' ? errorData.detail : 'A similar report is already being processed.'}${ticket ? ` Existing ticket: ${ticket}.` : ''}`);
+          } else if (response.status === 422) {
+            setSubmissionError(typeof errorData.detail === 'string' ? errorData.detail : 'Form validation failed. Please check your inputs.');
+          } else if (response.status === 429) {
+            setSubmissionError('Submission rate limit reached. Please wait a moment before trying again.');
+          } else {
+            setSubmissionError(errorData.detail || errorData.message || 'Submission failed. Please check your connection.');
+          }
+          return;
+        }
+      }
+
+      if (lastSuccessData) {
         // Purge draft from storage on success
         localStorage.removeItem(DRAFT_STORAGE_KEY);
 
         // Transition to success receipt page
         navigate('/report/success', {
           state: {
-            ticketId: data.ticket_id || data.id,
-            trackingToken: data.tracking_token,
-            trackingUrl: data.tracking_url || `/track?id=${data.ticket_id || data.id}&token=${data.tracking_token || ''}`,
-            category: data.category || formData.category,
-            locationString: data.location_string || formData.location.address,
-            createdAt: data.created_at || new Date().toISOString(),
-            reporterType: data.reporter_type || (token ? 'registered' : 'guest'),
-            report: data,
+            ticketId: createdTicketIds.join(', '),
+            trackingToken: lastSuccessData.tracking_token,
+            trackingUrl: lastSuccessData.tracking_url || `/track?id=${createdTicketIds[0]}&token=${lastSuccessData.tracking_token || ''}`,
+            category: categoriesToSubmit.join(' + '),
+            locationString: lastSuccessData.location_string || formData.location.address,
+            createdAt: lastSuccessData.created_at || new Date().toISOString(),
+            reporterType: lastSuccessData.reporter_type || (token ? 'registered' : 'guest'),
+            report: lastSuccessData,
           }
         });
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        
-        if (response.status === 400 && errorData.detail?.toLowerCase().includes('outside')) {
-          setCurrentStep(2);
-          setSubmissionError(errorData.detail || 'Selected location is outside Caloocan City jurisdiction.');
-        } else if (response.status === 409) {
-          const ticket = response.headers.get('X-Canonical-Ticket-ID');
-          setSubmissionError(`${typeof errorData.detail === 'string' ? errorData.detail : 'A similar report is already being processed.'}${ticket ? ` Existing ticket: ${ticket}.` : ''} Your draft is saved. Review the location or contact PULSO for assistance.`);
-        } else if (response.status === 422) {
-          setSubmissionError(typeof errorData.detail === 'string' ? errorData.detail : 'Form validation failed. Please check your inputs.');
-        } else if (response.status === 429) {
-          setSubmissionError('Submission rate limit reached. Please wait a moment before trying again.');
-        } else {
-          setSubmissionError(errorData.detail || errorData.message || 'Submission failed. Please check your connection.');
-        }
       }
     } catch (err) {
       console.error('Submission network error:', err);
@@ -255,22 +347,22 @@ export default function ReportWizardPage() {
       </div>
 
       {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
-      <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
+      <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 w-full flex justify-between items-center">
         {/* Logo on top-left linking to home */}
         <Link
           to="/"
           className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
           title="Caloocan City PULSO Home"
         >
-          <Branding size="h-9 w-9 sm:h-10 sm:w-10" />
+          <Branding size="h-8 w-8 sm:h-9 sm:w-9" />
         </Link>
 
         {/* Right side: Theme Toggle & Home Navigation */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <ThemeToggle />
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
             title="Return to Home Section"
           >
             <Home size={14} className="text-[#ff6b00]" />
@@ -280,48 +372,42 @@ export default function ReportWizardPage() {
       </header>
 
       {/* Main Responsive Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-6 sm:pb-8 flex flex-col">
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-2 sm:pt-3 pb-32 lg:pb-6 flex flex-col">
         {/* Step-by-Step Segmented Stepper Bar (<1024px / lg:hidden) */}
         <nav
           aria-label="Report progress steps"
-          className="flex lg:hidden flex-col gap-2 mb-6 px-1"
+          className="flex lg:hidden flex-col gap-1.5 mb-3 px-1"
         >
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-xs uppercase tracking-wider text-orange-600 dark:text-[#ff8a3d]">
-              {t('reportWizard.stepCountUppercase', 'STEP {{current}} OF {{total}}', { current: currentStep, total: 6 })}
+              {t('reportWizard.stepCountUppercase', 'STEP {{current}} OF {{total}}', { current: currentStep, total: 5 })}
             </span>
             <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
               {currentStepName}
             </span>
           </div>
 
-          {/* 6 Segmented Progress Bars */}
+          {/* 5 Segmented Progress Bars */}
           <div
-            className="grid grid-cols-6 gap-2 sm:gap-2.5 w-full"
+            className="grid grid-cols-5 gap-2 sm:gap-2.5 w-full"
             role="progressbar"
             aria-valuenow={currentStep}
             aria-valuemin={1}
-            aria-valuemax={6}
-            aria-valuetext={`Step ${currentStep} of 6: ${currentStepName}`}
+            aria-valuemax={5}
+            aria-valuetext={`Step ${currentStep} of 5: ${currentStepName}`}
           >
             {REPORT_STEPS.map((step) => {
               const isPassedOrCurrent = step.id <= currentStep;
               const isCurrent = step.id === currentStep;
-              const isClickable = step.id <= maxStepReached;
               const label = t(`reportWizard.steps.${step.key}`, step.defaultLabel);
 
               return (
-                <button
+                <div
                   key={step.id}
-                  type="button"
-                  onClick={() => isClickable && jumpToStep(step.id)}
-                  disabled={!isClickable}
                   title={`${step.id}. ${label}`}
                   aria-label={`Step ${step.id}: ${label}${isCurrent ? ' (current step)' : ''}`}
                   aria-current={isCurrent ? 'step' : undefined}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    isClickable ? 'cursor-pointer hover:opacity-80 active:scale-95' : 'cursor-default'
-                  } ${
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-default ${
                     isPassedOrCurrent
                       ? 'bg-[#ff6b00]'
                       : 'bg-slate-200 dark:bg-slate-800'
@@ -334,28 +420,69 @@ export default function ReportWizardPage() {
 
         {/* Global Submission Error Callout */}
         {submissionError && (
-          <aside aria-label="Error announcement" className="mb-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-sm text-red-800 dark:text-red-300 shadow-xs">
+          <aside aria-label="Error announcement" className="mb-3 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-xs sm:text-sm text-red-800 dark:text-red-300 shadow-xs">
             <p className="font-bold">Notice:</p>
             <p>{submissionError}</p>
           </aside>
         )}
 
         {/* Two-Column Layout (Desktop) */}
-        <div className="flex-1 flex flex-col lg:flex-row items-stretch lg:items-start gap-6 lg:gap-8">
+        <div className="flex flex-col lg:flex-row items-start gap-4 lg:gap-6">
           {/* Left Column: Persistent Desktop Sidebar */}
           <WizardSidebar
             currentStep={currentStep}
-            maxStepReached={maxStepReached}
-            onStepClick={jumpToStep}
             onOpenHelpGuide={() => setIsHelpGuideOpen(true)}
           />
 
           {/* Right Column: Rounded Main Card */}
           <section
             aria-label={`Step ${currentStep} form content`}
-            className="flex-1 w-full rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 md:p-10 shadow-xs min-h-[640px] flex flex-col justify-between"
+            className="lg:flex-1 w-full lg:min-h-[540px] rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 md:p-6 shadow-2xs flex flex-col justify-between"
           >
             {currentStep === 1 && (
+              <Step2CameraLocation
+                isMapLoaded={isMapLoaded}
+                evidenceData={formData.evidence}
+                locationData={formData.location}
+                category={formData.category}
+                onEvidenceChange={(ev) => {
+                  setFormData(p => {
+                    const resolvedEv = typeof ev === 'function' ? ev(p.evidence) : ev;
+                    const updated = { ...p, evidence: resolvedEv };
+                    if (resolvedEv?.autoDescription) {
+                      updated.details = {
+                        ...p.details,
+                        description: resolvedEv.autoDescription,
+                        urgency: resolvedEv.urgency || p.details.urgency || 'medium',
+                      };
+                    }
+                    if (resolvedEv?.aiCategorySuggestion) {
+                      updated.category = resolvedEv.aiCategorySuggestion;
+                    }
+                    return updated;
+                  });
+                }}
+                onLocationChange={(loc) => setFormData(p => {
+                  const nextLoc = typeof loc === 'function' ? loc(p.location) : loc;
+                  if (!nextLoc) return p;
+                  const rawB = nextLoc.barangay;
+                  const cleanB = (typeof rawB === 'object' && rawB !== null)
+                    ? (rawB.name || rawB.displayName || '')
+                    : (typeof rawB === 'string' ? rawB : '');
+                  return {
+                    ...p,
+                    location: {
+                      ...nextLoc,
+                      barangay: cleanB,
+                    },
+                  };
+                })}
+                onBack={goToPreviousStep}
+                onContinue={goToNextStep}
+              />
+            )}
+
+            {currentStep === 2 && (
               <Step1CategoryEmergency
                 selectedCategory={formData.category}
                 onSelectCategory={(cat) => setFormData(p => ({ ...p, category: cat }))}
@@ -367,40 +494,7 @@ export default function ReportWizardPage() {
               />
             )}
 
-            {currentStep === 2 && (
-              <Step2LocationMap
-                isMapLoaded={isMapLoaded}
-                locationData={formData.location}
-                onLocationChange={(loc) => setFormData(p => ({ ...p, location: typeof loc === 'function' ? loc(p.location) : loc }))}
-                onBack={goToPreviousStep}
-                onContinue={goToNextStep}
-              />
-            )}
-
             {currentStep === 3 && (
-              <Step3EvidenceUpload
-                evidenceData={formData.evidence}
-                category={formData.category}
-                locationData={formData.location}
-                onEvidenceChange={(ev) => {
-                  setFormData(p => {
-                    const updated = { ...p, evidence: ev };
-                    if (ev.autoDescription && !p.details.description) {
-                      updated.details = {
-                        ...p.details,
-                        description: ev.autoDescription,
-                        urgency: ev.urgency || p.details.urgency || 'medium',
-                      };
-                    }
-                    return updated;
-                  });
-                }}
-                onBack={goToPreviousStep}
-                onContinue={goToNextStep}
-              />
-            )}
-
-            {currentStep === 4 && (
               <Step4DetailsDuplicate
                 detailsData={formData.details}
                 locationData={formData.location}
@@ -412,7 +506,7 @@ export default function ReportWizardPage() {
               />
             )}
 
-            {currentStep === 5 && (
+            {currentStep === 4 && (
               <Step5ContactPreferences
                 contactData={formData.contact}
                 onContactChange={(cnt) => setFormData(p => ({ ...p, contact: cnt }))}
@@ -421,7 +515,7 @@ export default function ReportWizardPage() {
               />
             )}
 
-            {currentStep === 6 && (
+            {currentStep === 5 && (
               <Step6ReviewConsent
                 formData={formData}
                 isSubmitting={isSubmitting}
@@ -434,8 +528,6 @@ export default function ReportWizardPage() {
           </section>
         </div>
       </main>
-
-
     </div>
   );
 }

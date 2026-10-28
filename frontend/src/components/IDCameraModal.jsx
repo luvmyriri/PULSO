@@ -8,8 +8,8 @@ import {
     CameraOff,
     Loader2
 } from 'lucide-react';
-import { drawEvidenceWatermark, burnEvidenceWatermark, formatWatermarkTimestamp } from '../utils/watermark';
-import { formatWatermarkAddress } from '../utils/philippineAddress';
+import { drawEvidenceWatermark, burnEvidenceWatermark, formatWatermarkTimestamp, formatWatermarkCoordinates } from '../utils/watermark';
+import { formatWatermarkAddress } from '../utils/locationPrivacy';
 import { API_BASE_URL } from '../utils/apiBase';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import CameraTopBar from './camera/CameraTopBar';
@@ -17,6 +17,7 @@ import CameraMessage from './camera/CameraMessage';
 import ShutterButton from './camera/ShutterButton';
 import RatioSelector from './camera/RatioSelector';
 import WatermarkPainter from './camera/WatermarkPainter';
+import CameraZoomControls from './camera/CameraZoomControls';
 
 // ---------------------------------------------------------------------------
 // Faint Guide Silhouettes for ID Viewfinder (Visual Echo of Document Layout)
@@ -141,6 +142,19 @@ const IDCameraModal = ({
     const [flashOn, setFlashOn] = useState(false);
     const [isFlashSupported, setIsFlashSupported] = useState(Boolean(previewMode));
 
+    // Zoom state (1.0x to 5.0x, gestures & native/CSS scale)
+    const [zoom, setZoom] = useState(1);
+    const [hasNativeZoom, setHasNativeZoom] = useState(false);
+    const [isPinching, setIsPinching] = useState(false);
+    const [showZoomIndicator, setShowZoomIndicator] = useState(false);
+    const zoomIndicatorTimerRef = useRef(null);
+    const touchStartRef = useRef({ dist: 0, initialZoom: 1 });
+    const zoomRef = useRef(zoom);
+    const viewfinderRef = useRef(null);
+    useEffect(() => {
+        zoomRef.current = zoom;
+    }, [zoom]);
+
     // Aspect ratio selection state (4:3 default, persists during retakes, resets on new report)
     const [photoRatio, setPhotoRatio] = useState(ratioOverride || '4:3');
     const [isLandscape, setIsLandscape] = useState(false);
@@ -224,6 +238,7 @@ const IDCameraModal = ({
     // Reset captured preview when modal opens or closes
     useEffect(() => {
         if (isOpen) {
+            setZoom(1);
             if (!previewMode) {
                 setCapturedPreviewUrl(null);
                 setCapturedBlob(null);
@@ -244,6 +259,7 @@ const IDCameraModal = ({
             setValidationError(null);
             setIsVerifying(false);
             setFlashOn(false);
+            setZoom(1);
         }
     }, [isOpen]);
 
@@ -257,6 +273,7 @@ const IDCameraModal = ({
         setIsAccepted(false);
         setValidationError(null);
         setIsVerifying(false);
+        setZoom(1);
         setAnnouncement('Returned to live camera view.');
 
         // Restart or re-activate camera stream so viewfinder is active
@@ -276,6 +293,124 @@ const IDCameraModal = ({
             });
         }
     };
+
+    // Zoom management & gesture handling
+    const applyZoom = useCallback(async (newZoom) => {
+        const clamped = Math.min(Math.max(Math.round(newZoom * 10) / 10, 1), 5);
+        setZoom(clamped);
+        setShowZoomIndicator(true);
+        if (zoomIndicatorTimerRef.current) clearTimeout(zoomIndicatorTimerRef.current);
+        zoomIndicatorTimerRef.current = setTimeout(() => {
+            setShowZoomIndicator(false);
+        }, 1800);
+
+        if (streamRef.current && hasNativeZoom) {
+            const track = streamRef.current.getVideoTracks()[0];
+            if (track && typeof track.applyConstraints === 'function') {
+                try {
+                    await track.applyConstraints({
+                        advanced: [{ zoom: clamped }]
+                    });
+                } catch (err) {
+                    console.warn('Native zoom constraint not applied:', err);
+                }
+            }
+        }
+    }, [hasNativeZoom]);
+
+    const handleTouchStart = (e) => {
+        if (e.touches.length === 2) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            touchStartRef.current = { dist, initialZoom: zoomRef.current };
+            setIsPinching(true);
+            setShowZoomIndicator(true);
+        }
+    };
+
+    const handleTouchEnd = (e) => {
+        if (e.touches.length < 2) {
+            setIsPinching(false);
+            touchStartRef.current.dist = 0;
+            if (zoomIndicatorTimerRef.current) clearTimeout(zoomIndicatorTimerRef.current);
+            zoomIndicatorTimerRef.current = setTimeout(() => {
+                setShowZoomIndicator(false);
+            }, 1800);
+        }
+    };
+
+    // Prevent browser zoom & restrict zoom strictly to camera viewfinder
+    useEffect(() => {
+        if (!isOpen) return;
+
+        // 1. Intercept Ctrl+wheel / trackpad pinch at window level while camera is open so browser NEVER zooms page
+        const onGlobalWheel = (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                if (isLiveState) {
+                    const delta = -e.deltaY * 0.01;
+                    applyZoom(zoomRef.current + delta);
+                }
+            }
+        };
+
+        // 2. Intercept Mac / Safari gesture zooming
+        const onGesture = (e) => {
+            e.preventDefault();
+        };
+
+        window.addEventListener('wheel', onGlobalWheel, { passive: false });
+        window.addEventListener('gesturestart', onGesture, { passive: false });
+        window.addEventListener('gesturechange', onGesture, { passive: false });
+        window.addEventListener('gestureend', onGesture, { passive: false });
+
+        return () => {
+            window.removeEventListener('wheel', onGlobalWheel);
+            window.removeEventListener('gesturestart', onGesture);
+            window.removeEventListener('gesturechange', onGesture);
+            window.removeEventListener('gestureend', onGesture);
+        };
+    }, [isOpen, isLiveState, applyZoom]);
+
+    // 3. Viewfinder-level non-passive wheel & multi-touch listeners
+    useEffect(() => {
+        const el = viewfinderRef.current;
+        if (!el || !isOpen) return;
+
+        const onLocalWheel = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!isLiveState) return;
+            const delta = e.ctrlKey ? -e.deltaY * 0.01 : (e.deltaY < 0 ? 0.2 : -0.2);
+            applyZoom(zoomRef.current + delta);
+        };
+
+        const onTouchMove = (e) => {
+            if (e.touches.length === 2) {
+                // Prevent mobile browser viewport pinch-zoom
+                if (e.cancelable) e.preventDefault();
+                if (touchStartRef.current.dist > 0) {
+                    const currentDist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    const factor = currentDist / touchStartRef.current.dist;
+                    const newZoom = touchStartRef.current.initialZoom * factor;
+                    applyZoom(newZoom);
+                }
+            }
+        };
+
+        el.addEventListener('wheel', onLocalWheel, { passive: false });
+        el.addEventListener('touchmove', onTouchMove, { passive: false });
+
+        return () => {
+            el.removeEventListener('wheel', onLocalWheel);
+            el.removeEventListener('touchmove', onTouchMove);
+        };
+    }, [isOpen, isLiveState, applyZoom]);
 
     // Live clock for real-time camera viewfinder watermark
     useEffect(() => {
@@ -370,8 +505,10 @@ const IDCameraModal = ({
             if (videoTrack && typeof videoTrack.getCapabilities === 'function') {
                 const capabilities = videoTrack.getCapabilities();
                 setIsFlashSupported(Boolean(capabilities?.torch));
+                setHasNativeZoom(Boolean(capabilities?.zoom));
             } else {
                 setIsFlashSupported(false);
+                setHasNativeZoom(false);
             }
 
             if (videoRef.current) {
@@ -494,6 +631,16 @@ const IDCameraModal = ({
                     cY = Math.round((imgH - cH) / 2);
                 }
 
+                // Account for zoom in simulated preview capture
+                if (zoom > 1) {
+                    const zoomedCW = Math.round(cW / zoom);
+                    const zoomedCH = Math.round(cH / zoom);
+                    cX = Math.round(cX + (cW - zoomedCW) / 2);
+                    cY = Math.round(cY + (cH - zoomedCH) / 2);
+                    cW = zoomedCW;
+                    cH = zoomedCH;
+                }
+
                 const maxC = Math.max(cW, cH);
                 const sc = Math.max(1, 1280 / maxC);
                 canvas.width = Math.round(cW * sc);
@@ -560,6 +707,16 @@ const IDCameraModal = ({
             cropY = Math.round((vh - cropH) / 2);
         }
 
+        // Apply software crop zoom if native hardware zoom is not supported
+        if (!hasNativeZoom && zoom > 1) {
+            const zoomedW = Math.round(cropW / zoom);
+            const zoomedH = Math.round(cropH / zoom);
+            cropX = Math.round(cropX + (cropW - zoomedW) / 2);
+            cropY = Math.round(cropY + (cropH - zoomedH) / 2);
+            cropW = zoomedW;
+            cropH = zoomedH;
+        }
+
         // Ensure long side is at least 1280px after crop
         const maxCrop = Math.max(cropW, cropH);
         const scale = Math.max(1, 1280 / maxCrop);
@@ -594,7 +751,7 @@ const IDCameraModal = ({
 
             // Attach text version of watermark in existing details data for screen readers
             const fullAddr = formatWatermarkAddress(metadata?.structuredAddress || metadata?.locationAddress || metadata?.address, metadata?.location || metadata?.coordinates);
-            file.watermarkText = `PULSO · Caloocan City | ${fullAddr} | ${formatWatermarkTimestamp(liveTime)}`;
+            file.watermarkText = ['PULSO · Caloocan City', fullAddr, formatWatermarkCoordinates(metadata), formatWatermarkTimestamp(liveTime)].filter(Boolean).join(' | ');
 
             // If not issue photo (e.g. ID card), proceed directly
             if (side !== 'ISSUE') {
@@ -688,8 +845,9 @@ const IDCameraModal = ({
                         standalone
                             ? `absolute inset-0 z-20 w-full h-full ${isDark ? 'bg-black text-white' : 'bg-white text-slate-900'}`
                             : 'fixed inset-0 z-[200] w-full h-[100dvh] bg-black/75 backdrop-blur-md flex items-center justify-center'
-                    } overflow-hidden select-none`}
+                    } overflow-hidden select-none touch-none`}
                     style={{
+                        touchAction: 'none',
                         paddingTop: standalone ? '0px' : 'env(safe-area-inset-top, 0px)',
                         paddingBottom: standalone ? '0px' : 'env(safe-area-inset-bottom, 0px)'
                     }}
@@ -723,6 +881,7 @@ const IDCameraModal = ({
                             translucent={isFullBleed16x9}
                             showRatioControl={isIssue && isLiveState}
                             photoRatio={photoRatio}
+                            centerContent={isLiveState ? <CameraZoomControls zoom={zoom} onZoomChange={applyZoom} /> : null}
                             onRatioChange={(newRatio) => {
                                 setPhotoRatio(newRatio);
                                 onRatioChange?.(newRatio);
@@ -832,12 +991,23 @@ const IDCameraModal = ({
 
                             {/* ── State F: Live Camera View (16:9 Full-Bleed, 4:3 Standard, 1:1 Square) ── */}
                             {isLiveState && (
-                                <div className={`relative ${getFrameRatioClass(photoRatio)} overflow-hidden bg-black flex items-center justify-center transition-all duration-300 motion-reduce:transition-none`}>
+                                <div
+                                    ref={viewfinderRef}
+                                    className={`relative ${getFrameRatioClass(photoRatio)} overflow-hidden bg-black flex items-center justify-center transition-all duration-300 motion-reduce:transition-none touch-none`}
+                                    style={{ touchAction: 'none' }}
+                                    onTouchStart={handleTouchStart}
+                                    onTouchEnd={handleTouchEnd}
+                                    onTouchCancel={handleTouchEnd}
+                                >
                                     {previewMode === 'live' && !streamRef.current ? (
                                         <img
                                             src={previewSamplePhoto || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=80"}
                                             alt="Simulated camera live feed"
-                                            className="w-full h-full object-cover"
+                                            className="w-full h-full object-cover transition-transform duration-100 ease-out"
+                                            style={{
+                                                transform: `scale(${zoom})`,
+                                                transformOrigin: 'center center'
+                                            }}
                                         />
                                     ) : (
                                         <video
@@ -855,8 +1025,24 @@ const IDCameraModal = ({
                                             autoPlay
                                             playsInline
                                             muted
-                                            className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+                                            style={{
+                                                transform: hasNativeZoom
+                                                    ? (facingMode === 'user' ? 'scaleX(-1)' : undefined)
+                                                    : `scale(${zoom}) ${facingMode === 'user' ? 'scaleX(-1)' : ''}`,
+                                                transformOrigin: 'center center'
+                                            }}
+                                            className="w-full h-full object-cover transition-transform duration-100 ease-out"
                                         />
+                                    )}
+
+                                    {/* Floating Zoom Indicator Pill (visible on zoom change or pinch) */}
+                                    {(showZoomIndicator || isPinching || zoom > 1) && (
+                                        <div className="absolute top-3 inset-x-0 flex justify-center pointer-events-none z-30 transition-opacity duration-200">
+                                            <div className="bg-black/75 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-mono font-bold border border-white/20 shadow-lg flex items-center gap-1.5 animate-in fade-in">
+                                                <span className="text-white font-bold">{zoom.toFixed(1)}x</span>
+                                                <span className="text-white/80 font-sans text-[11px]">Zoom</span>
+                                            </div>
+                                        </div>
                                     )}
 
                                     {/* ID Card Silhouette (Only when capturing resident ID) */}
@@ -890,6 +1076,7 @@ const IDCameraModal = ({
                                             />
                                         </div>
                                     )}
+
 
                                     {/* Loading spinner while stream initializes */}
                                     {isLoading && (

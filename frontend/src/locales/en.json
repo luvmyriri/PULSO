@@ -1,5 +1,38 @@
 {
   "translation": {
+    "locationPrivacy": {
+      "title": "Current location",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "fields": {
+        "plusCode": "Plus Code (coarse area)",
+        "subdivision": "Village/Subdivision",
+        "neighborhood": "Neighborhood / Community",
+        "street": "Street/Road",
+        "barangay": "Barangay",
+        "city": "City/Municipality",
+        "postalCode": "Postal code",
+        "region": "Region"
+      },
+      "loading": "Looking up address details… GPS and the map remain available.",
+      "unavailable": "Address details are unavailable or incomplete. Your selected location is kept; retry GPS to look up the address again.",
+      "empty": "Select a location to see available address details.",
+      "privacy": "Residential identifiers are omitted. The area code is generalized; streets and villages can still identify a small area. The map pin and submitted report keep the selected coordinates.",
+      "source": "Address source: Google Maps.",
+      "copy": "Copy displayed address",
+      "copied": "Address copied",
+      "copyFailed": "Could not copy the address. Select the displayed text to copy it.",
+      "gpsDenied": "Location permission was denied. Allow location access in your browser or select the issue location manually.",
+      "gpsUnavailable": "GPS is unavailable. Select the issue location manually or retry.",
+      "gpsTimeout": "GPS timed out. Your previous selection is kept. Retry or select the issue location manually.",
+      "gpsError": "Could not acquire GPS. Your previous selection is kept. Retry or select the issue location manually.",
+      "copyCoordinates": "Copy latitude and longitude",
+      "coordinatesCopied": "Coordinates copied",
+      "copyCoordinatesFailed": "Could not copy coordinates. Select the numbers to copy them.",
+      "approximateAccuracy": "Approx. ±{{accuracy}}m",
+      "accurateAccuracy": "GPS ±{{accuracy}}m",
+      "gpsSelected": "GPS selected"
+    },
     "mapPublicReports": {
       "loading": "Loading public reports…",
       "error": "Public reports could not be loaded.",
@@ -44,29 +77,29 @@
       "loadOlder": "Load older notifications"
     },
     "reportLink": {
-        "loading": "Opening your report…",
-        "error": "This report could not be opened. Check your connection and try again. It may be unavailable, or your account may not have access.",
-        "retry": "Try again",
-        "back": "Back to My reports"
+      "loading": "Opening your report…",
+      "error": "This report could not be opened. Check your connection and try again. It may be unavailable, or your account may not have access.",
+      "retry": "Try again",
+      "back": "Back to My reports"
     },
     "informationReply": {
-        "title": "Information requested",
-        "banner": "Read the department’s request below and send your response.",
-        "loading": "Loading the department’s request…",
-        "loadError": "The request details could not be loaded. Try again before replying.",
-        "label": "Your response",
-        "hint": "Provide 10–2,000 characters. Your response goes to the department for review and is not shown publicly.",
-        "send": "Send information",
-        "sending": "Sending…",
-        "success": "Your response was recorded. The report is back in the department’s review queue.",
-        "tooShort": "Please provide at least 10 characters of additional information.",
-        "expired": "Your session has expired. Sign in again before sending.",
-        "denied": "Your account does not have permission to reply to this report.",
-        "unavailable": "This report is unavailable or does not belong to your account.",
-        "changed": "This report is no longer awaiting information. Refresh the report to see its current status.",
-        "rateLimit": "Too many attempts. Wait a moment before trying again.",
-        "sendFailed": "We could not confirm your response. Your text is kept here. Refresh the report status before trying again.",
-        "refresh": "Refresh report status"
+      "title": "Information requested",
+      "banner": "Read the department’s request below and send your response.",
+      "loading": "Loading the department’s request…",
+      "loadError": "The request details could not be loaded. Try again before replying.",
+      "label": "Your response",
+      "hint": "Provide 10–2,000 characters. Your response goes to the department for review and is not shown publicly.",
+      "send": "Send information",
+      "sending": "Sending…",
+      "success": "Your response was recorded. The report is back in the department’s review queue.",
+      "tooShort": "Please provide at least 10 characters of additional information.",
+      "expired": "Your session has expired. Sign in again before sending.",
+      "denied": "Your account does not have permission to reply to this report.",
+      "unavailable": "This report is unavailable or does not belong to your account.",
+      "changed": "This report is no longer awaiting information. Refresh the report to see its current status.",
+      "rateLimit": "Too many attempts. Wait a moment before trying again.",
+      "sendFailed": "We could not confirm your response. Your text is kept here. Refresh the report status before trying again.",
+      "refresh": "Refresh report status"
     },
     "auth": {
       "strength": {
@@ -346,7 +379,8 @@
         "evidence": "Evidence",
         "details": "Details",
         "contact": "Contact",
-        "review": "Review"
+        "review": "Review",
+        "evidence_location": "Photo & Location"
       },
       "step1Category": {
         "title": "What would you like to report?",
@@ -516,7 +550,7 @@
       },
       "step5Contact": {
         "title": "How can we reach you?",
-        "subtitle": "Add a mobile number or email to receive updates.",
+        "subtitle": "Add your full name and Gmail address to receive official report notifications and status updates.",
         "guestOption": {
           "title": "Anonymous Guest (No account required)",
           "desc": "No email or phone stored. You will receive a private tracking token to check status online."
@@ -530,8 +564,8 @@
           "desc": "Link this report directly to your resident dashboard for unified tracking."
         },
         "authenticatedBadge": "Submitting as Registered Resident: {{name}}",
-        "emailLabel": "Email address",
-        "emailPlaceholder": "you@example.com",
+        "emailLabel": "Gmail / Email address",
+        "emailPlaceholder": "you@gmail.com",
         "phoneLabel": "Mobile number",
         "phonePlaceholder": "09XX XXX XXXX",
         "privacyNotice": "Your contact information is protected under the Data Privacy Act of 2012 (RA 10173) and will never be shared on public boards.",
@@ -601,6 +635,83 @@
         "submitReport": "Submit Report",
         "continue": "Continue",
         "back": "Back"
+      },
+      "subtitles": {
+        "category": "Choose the type of issue",
+        "evidence_location": "Capture photo and auto-locate",
+        "details": "Describe the concern",
+        "contact": "How we can reach you",
+        "review": "Check before submitting"
+      },
+      "step2CameraLocation": {
+        "badge": "STEP 1 OF 5 / EVIDENCE & LOCATION",
+        "title": "Take photo and auto-locate",
+        "subtitle": "Capture a clear photo of the concern. Your location will be automatically tagged.",
+        "cameraHeading": "Capture the issue with your camera",
+        "cameraDesc": "Photos taken with the PULSO camera automatically record the verified GPS coordinates and time.",
+        "openCameraBtn": "Open Camera",
+        "uploadBtn": "Upload from device",
+        "continue": "Continue to category",
+        "continueToCategory": "Continue to category",
+        "takePhotoNote": "Please take or upload a photo of the concern to continue."
+      },
+      "validation": {
+        "attentionCount": "{{count}} things need your attention",
+        "fixCount": "Please fix {{count}} things before sending",
+        "fixLabel": "Fix",
+        "leavePrompt": "Leave this report? Your answers are saved on this device.",
+        "stay": "Stay",
+        "leave": "Leave",
+        "category": {
+          "required": "Please choose the type of problem."
+        },
+        "location": {
+          "required": "Please pin the exact spot of the problem.",
+          "outsideCaloocan": "This spot is outside Caloocan City. Please move the pin inside the city.",
+          "permissionDenied": "We can't find your location. Turn on Location in your phone settings, or pin the spot on the map yourself.",
+          "accuracyWarning": "Location may be off. Tap Change location to fix it.",
+          "confirmPin": "This pin is the right spot",
+          "addressNotReadable": "Please ensure the address is readable or adjust the pin.",
+          "landmarkTooLong": "Please keep the landmark under 100 characters."
+        },
+        "evidence": {
+          "required": "Take at least one photo to continue.",
+          "tooMany": "You can upload up to 5 photos.",
+          "checking": "Checking your photo...",
+          "fileType": "This file type isn't supported. Please use a JPG, PNG or WebP photo.",
+          "fileSize": "This photo is too large. Please take a new one.",
+          "duplicate": "You already added this photo.",
+          "rejected": "This looks like a personal photo. Please take a clear photo of the problem.",
+          "checkFailed": "We couldn't check this photo. Please try again.",
+          "tryAgain": "Try again",
+          "countLabel": "{{current}} of {{max}} photos",
+          "suggestCategory": "This looks like {{category}}. Change category?",
+          "keepMine": "Keep mine",
+          "changeCategory": "Change"
+        },
+        "details": {
+          "required": "Please describe the problem.",
+          "tooShort": "Please add a bit more detail (at least 20 characters).",
+          "tooLong": "Please keep it under 1000 characters.",
+          "gibberish": "Please describe what you see in a few words.",
+          "counter": "{{current}} / {{max}}"
+        },
+        "contact": {
+          "nameRequired": "Please enter your full name.",
+          "phoneInvalid": "Please enter a valid mobile number, like 0917 123 4567.",
+          "emailInvalid": "That email doesn't look right. Please check it.",
+          "contactRequired": "Please provide either a mobile number or an email address so we can reach you.",
+          "consentRequired": "Please confirm to continue.",
+          "consentLabel": "I agree to the use of my contact details for report verification, updates, and follow-ups",
+          "orDivider": "or",
+          "typoHint": "Did you mean {{suggestion}}?"
+        },
+        "server": {
+          "offline": "You're offline. Your report is saved. We'll send it when you're back online.",
+          "rejected": "We couldn't accept your report. Please check the marked fields.",
+          "rateLimit": "Please wait a minute and try again.",
+          "generic": "Something went wrong. Your report is saved. Please try again."
+        }
       }
     },
     "receipt": {

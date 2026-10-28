@@ -41,6 +41,7 @@ build/
 # Large APK files
 *.apk
 frontend/public/apk/
+android-twa/
 
 # Logs and transient text files
 *.log

@@ -19,7 +19,9 @@ export default function CameraTopBar({
     translucent = false,
     showRatioControl = false,
     photoRatio = '4:3',
-    onRatioChange
+    onRatioChange,
+    centerContent = null,
+    children
 }) {
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const popupWrapperRef = useRef(null);
@@ -54,7 +56,7 @@ export default function CameraTopBar({
             </h1>
 
             {/* Top Icons Row */}
-            <div className="w-full flex items-center justify-between gap-3 px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2.5">
+            <div className="w-full flex items-center justify-between gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2.5">
                 {/* Top Left: Back (<) Button */}
                 <button
                     type="button"
@@ -69,8 +71,13 @@ export default function CameraTopBar({
                     <ChevronLeft size={26} strokeWidth={2.75} className="drop-shadow-sm" />
                 </button>
 
+                {/* Center Content: Zoom Controls on Top */}
+                <div className="flex-1 flex items-center justify-center">
+                    {centerContent || children}
+                </div>
+
                 {/* Top Right: 3-Line Menu Icon */}
-                <div className="flex items-center justify-end">
+                <div className="flex items-center justify-end shrink-0">
                     {showRatioControl ? (
                         <button
                             type="button"

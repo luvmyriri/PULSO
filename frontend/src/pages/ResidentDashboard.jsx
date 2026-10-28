@@ -147,6 +147,7 @@ import {
 import { API_BASE_URL } from '../utils/apiBase';
 import { apiFetch, dedupeFetch, checkServerHealth, logApiFailure } from '../utils/apiFetch';
 import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
+import { reverseGeocodeLocation } from '../utils/reverseGeocode';
 import ClaimReportModal from '../components/modals/ClaimReportModal';
 import IDCameraModal from '../components/IDCameraModal';
 import AvatarCropModal, { validateAvatarFile } from '../components/AvatarCropModal';
@@ -182,14 +183,9 @@ import {
     getPostalCodeForBarangay,
     encodeOpenLocationCode,
     extractCleanPlusCode,
-    parseGeocodedAddress,
-    parseAddressString,
-    formatFullAddress,
-    formatCardAddress,
-    formatNearbyAddress,
-    formatNearbyIssueLocation,
     isMinimumViableAddress
 } from '../utils/philippineAddress';
+import { cleanResidentAddress, parseAddressString, formatFullAddress, formatCardAddress, formatNearbyAddress, formatNearbyIssueLocation } from '../utils/locationPrivacy';
 import { isUsingNameFallback } from '../utils/greetingHelper';
 import { validateProfanity } from '../utils/profanityFilter';
 
@@ -414,7 +410,7 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
     const navDestinations = [
         { id: 'overview', icon: <Home size={19} strokeWidth={2.2} aria-hidden="true" />, label: 'Home' },
         { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: 'My Reports' },
-        { id: 'updates', icon: <Bell size={19} strokeWidth={2} aria-hidden="true" />, label: 'Updates' },
+        { id: 'updates', icon: <Radio size={19} strokeWidth={2} aria-hidden="true" />, label: 'Updates' },
         { id: 'map', icon: <MapIcon size={19} strokeWidth={2} aria-hidden="true" />, label: 'Map' },
     ];
 
@@ -492,14 +488,6 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
                                         {item.icon}
                                     </span>
                                     <span className="truncate">{item.label}</span>
-                                    {item.id === 'updates' && unreadCount > 0 && (
-                                        <span
-                                            className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#f05a00] text-white tabular-nums shadow-xs"
-                                            aria-label={`${unreadCount} unread`}
-                                        >
-                                            {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
-                                        </span>
-                                    )}
                                 </button>
                             );
                         })}
@@ -784,9 +772,9 @@ const ResidentHomeView = ({
         },
         {
             id: 'water',
-            categoryKey: 'Water Supply',
-            title: 'Water supply',
-            desc: 'Pipe leaks and low water pressure',
+            categoryKey: 'Water Pipeline',
+            title: 'Water pipeline',
+            desc: 'Pipeline leaks, burst pipes, and low water pressure',
             icon: <Droplets size={20} className="text-sky-500" />,
             iconBg: 'bg-sky-50 dark:bg-sky-950/40 text-sky-500 border border-sky-100 dark:border-sky-900/30'
         },
@@ -2676,7 +2664,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                                                 Recorded Location
                                             </p>
                                             <p className="text-slate-800 dark:text-slate-200 font-medium select-text cursor-text">
-                                                {formatFullAddress(parseAddressString(report.location_string)) || report.location_string || 'Caloocan City'}
+                                                {formatFullAddress(parseAddressString(report.location_string)) || 'Caloocan City'}
                                             </p>
                                         </div>
                                         {report.lat && report.lng && (
@@ -2727,7 +2715,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                                             Recorded Location
                                         </p>
                                         <p className="text-slate-800 dark:text-slate-200 font-medium select-text cursor-text">
-                                            {formatFullAddress(parseAddressString(report.location_string)) || report.location_string || 'Caloocan City'}
+                                            {formatFullAddress(parseAddressString(report.location_string)) || 'Caloocan City'}
                                         </p>
                                     </div>
                                     {report.lat && report.lng && (
@@ -2814,7 +2802,7 @@ const CIVIC_ISSUE_CATEGORIES = [
     'Roads & bridges',
     'Drainage & flooding',
     'Street lighting',
-    'Water supply',
+    'Water pipeline',
     'Public safety hazards',
     'Traffic & road signs',
     'Public facilities',
@@ -2840,7 +2828,7 @@ const matchesCivicCategory = (reportCat, targetCat) => {
     if (t === 'street lighting') {
         return (r.includes('light') || r.includes('lamp') || r.includes('streetlight')) && !r.includes('traffic');
     }
-    if (t === 'water supply') {
+    if (t === 'water supply' || t === 'water pipeline') {
         return (r.includes('water') && !r.includes('waterway')) || r.includes('leak') || r.includes('pipe') || r.includes('pressure');
     }
     if (t === 'public safety hazards') {
@@ -2883,7 +2871,7 @@ const SAMPLE_REPORTS_LIST = [
         title: 'Reported public safety hazard',
         category: 'Public Safety & Hazards',
         status: 'rejected',
-        subdivision: 'Celina Homes 3',
+        subdivision: 'Sample subdivision',
         barangay: 'Barangay 171',
         location_string: 'Barangay 171, Caloocan City',
         latitude: 14.7518,
@@ -3064,13 +3052,14 @@ const MyReports = ({
         return baseReports.filter(r => {
             // Status Tab Filter
             const s = (r.status || '').toLowerCase();
-            if (reportStatusFilter === 'pending' || reportStatusFilter === 'awaiting_review') {
+            const isTicketSearch = searchQuery.trim().toUpperCase().startsWith('PUL-');
+            if (!isTicketSearch && (reportStatusFilter === 'pending' || reportStatusFilter === 'awaiting_review')) {
                 if (!['pending', 'unverified', 'received', 'under_review'].includes(s)) return false;
-            } else if (reportStatusFilter === 'in_progress') {
+            } else if (!isTicketSearch && reportStatusFilter === 'in_progress') {
                 if (!['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(s)) return false;
-            } else if (reportStatusFilter === 'resolved') {
+            } else if (!isTicketSearch && reportStatusFilter === 'resolved') {
                 if (!['resolved', 'completed', 'fixed'].includes(s)) return false;
-            } else if (reportStatusFilter === 'rejected') {
+            } else if (!isTicketSearch && reportStatusFilter === 'rejected') {
                 if (!['rejected', 'declined', 'invalid', 'spam'].includes(s)) return false;
             }
 
@@ -3743,7 +3732,7 @@ const MyReports = ({
                                         className="px-3.5 py-2.5 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 border border-sky-100 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer"
                                     >
                                         <Droplets size={14} className="text-blue-500" />
-                                        <span>Water supply</span>
+                                        <span>Water pipeline</span>
                                     </button>
 
                                     <button
@@ -4172,9 +4161,9 @@ const MyReports = ({
                                                         <span>Rejected</span>
                                                     </span>
                                                 ) : isPending ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-slate-950 shadow-md">
-                                                        <Clock size={13} strokeWidth={2.5} className="text-slate-950 shrink-0" />
-                                                        <span>Awaiting review</span>
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-white shadow-md">
+                                                        <Clock size={13} strokeWidth={2.5} className="text-white shrink-0" />
+                                                        <span className="text-white">Awaiting review</span>
                                                     </span>
                                                 ) : isInProgress ? (
                                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500 text-white shadow-md">
@@ -4187,9 +4176,9 @@ const MyReports = ({
                                                         <span>Resolved</span>
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-slate-950 shadow-md">
-                                                        <Clock size={13} strokeWidth={2.5} className="text-slate-950 shrink-0" />
-                                                        <span>Awaiting review</span>
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-white shadow-md">
+                                                        <Clock size={13} strokeWidth={2.5} className="text-white shrink-0" />
+                                                        <span className="text-white">Awaiting review</span>
                                                     </span>
                                                 )}
                                             </div>
@@ -6918,6 +6907,8 @@ const CATEGORY_META = {
 // Backward-compatible category aliases
 CATEGORY_META['Water Supply Network'] = CATEGORY_META['Water Supply & Distribution'];
 CATEGORY_META['Water & Drainage'] = CATEGORY_META['Water Supply & Distribution'];
+CATEGORY_META['Water Pipeline'] = CATEGORY_META['Water Supply & Distribution'];
+CATEGORY_META['Water pipeline'] = CATEGORY_META['Water Supply & Distribution'];
 CATEGORY_META['Roads & Drainage'] = CATEGORY_META['Roads & Bridges'];
 CATEGORY_META['Public Safety & Regulatory'] = CATEGORY_META['Public Safety & Hazards'];
 CATEGORY_META['Public Facilities'] = CATEGORY_META['Public Buildings & Facilities'];
@@ -7362,6 +7353,7 @@ const ResidentModals = ({
                     structuredAddress={structuredAddress}
                     requestDeviceLocation={requestDeviceLocation}
                     isLocating={isLocating}
+                    isGeocoding={geocodingAddress}
                     isTrackingLocation={isTrackingLocation}
                     onStartLocationTracking={startDeviceLocationTracking}
                     onStopLocationTracking={stopDeviceLocationTracking}
@@ -9337,7 +9329,6 @@ const TopNavigation = ({
                     unreadCount={unreadCount}
                     onOpenAccount={() => handleSetTab('profile')}
                     onOpenUpdates={() => handleSetTab('updates')}
-                    onOpenAllNotifications={() => handleSetModal('all-notifications')}
                     onSignIn={() => handleSetModal('login')}
                     onOpenAIChat={() => setIsAIChatOpen && setIsAIChatOpen(prev => !prev)}
                     isAIChatOpen={isAIChatOpen}
@@ -9350,6 +9341,7 @@ const TopNavigation = ({
                     showNotifications={showNotifications}
                     setShowNotifications={setShowNotifications}
                     onNotificationClick={handleNotificationClick}
+                    onOpenAllNotifications={() => handleSetModal('all-notifications')}
                     onMarkAllRead={handleMarkAllRead}
                     loadingNotifications={loadingNotifications}
                     notificationsError={notificationsError}
@@ -9377,6 +9369,7 @@ const TopNavigation = ({
                     showNotifications={showNotifications}
                     setShowNotifications={setShowNotifications}
                     onNotificationClick={handleNotificationClick}
+                    onOpenAllNotifications={() => handleSetModal('all-notifications')}
                     onMarkAllRead={handleMarkAllRead}
                     loadingNotifications={loadingNotifications}
                     notificationsError={notificationsError}
@@ -9869,7 +9862,7 @@ export default function ResidentDashboard() {
 
     const getIconForCategory = (category) => {
         const cat = (category || '').toLowerCase();
-        if (cat.includes('public works') || cat.includes('road') || cat.includes('bridge')) return <HardHat size={18} className="text-orange-500" />;
+        if (cat.includes('public works') || cat.includes('road') || cat.includes('bridge')) return <RoadIcon size={18} className="text-orange-500" />;
         if (cat.includes('utilit') || cat.includes('water') || cat.includes('drain')) return <Droplets size={18} className="text-blue-500" />;
         if (cat.includes('advisory') || cat.includes('safety') || cat.includes('hazard')) return <ShieldAlert size={18} className="text-red-500" />;
         if (cat.includes('other')) return <HelpCircle size={18} className="text-purple-500" />;
@@ -10092,15 +10085,7 @@ export default function ResidentDashboard() {
             setReportStatusFilter('all');
             showToast(`Viewing details for report status update`);
         } else {
-            setSelectedPost({
-                department: 'System Notice',
-                title: notif.title,
-                description: notif.message,
-                created_at: notif.created_at,
-                category: 'Advisory',
-                advisory_id: `NOTIF-${notif.id}`
-            });
-            setActiveModal('post-details');
+            handleSetModal('all-notifications');
         }
         setShowNotifications(false);
     };
@@ -10799,9 +10784,17 @@ export default function ResidentDashboard() {
         setIsTrackingLocation(false);
     }, []);
 
-    const acceptDevicePosition = (position) => {
+    const acceptDevicePosition = (position, isForced = false) => {
         const { latitude, longitude, accuracy } = position.coords || {};
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            setIsLocating(false);
+            return;
+        }
+        // Don't degrade an already locked accurate fix with a jittery reading unless explicitly requested
+        if (!isForced && reportLocation?.accuracy && Number.isFinite(accuracy) && accuracy > reportLocation.accuracy * 1.8) {
+            setIsLocating(false);
+            return;
+        }
         const loc = {
             lat: latitude,
             lng: longitude,
@@ -10815,7 +10808,7 @@ export default function ResidentDashboard() {
         setIsLocating(false);
         const previous = lastGeocodedPositionRef.current;
         const moved = !previous || Math.abs(previous.lat - latitude) > 0.0002 || Math.abs(previous.lng - longitude) > 0.0002;
-        if (moved) {
+        if (moved || isForced) {
             lastGeocodedPositionRef.current = loc;
             setLocationAddress('');
             setStructuredAddress(null);
@@ -10824,7 +10817,7 @@ export default function ResidentDashboard() {
         }
     };
 
-    const requestDeviceLocation = () => {
+    const requestDeviceLocation = (force = false) => {
         if (!navigator.geolocation) {
             setIsLocating(false);
             setLocationPermissionDenied(true);
@@ -10834,14 +10827,33 @@ export default function ResidentDashboard() {
         setIsLocating(true);
         setLocationPermissionDenied(false);
         navigator.geolocation.getCurrentPosition(
-            position => { if (requestId === locationRequestRef.current) acceptDevicePosition(position); },
+            position => {
+                if (requestId === locationRequestRef.current) {
+                    acceptDevicePosition(position, force);
+                }
+            },
             error => {
                 if (requestId !== locationRequestRef.current) return;
-                setIsLocating(false);
-                setLocationPermissionDenied(error?.code === 1);
-                showToast('Could not refresh GPS. Choose the issue location on the map or retry.', 'info');
+                if (error?.code === 1) {
+                    setIsLocating(false);
+                    setLocationPermissionDenied(true);
+                    return;
+                }
+                // Fallback to network/WiFi position if high-accuracy GPS hardware times out
+                navigator.geolocation.getCurrentPosition(
+                    fallbackPos => {
+                        if (requestId === locationRequestRef.current) acceptDevicePosition(fallbackPos, force);
+                    },
+                    () => {
+                        if (requestId === locationRequestRef.current) {
+                            setIsLocating(false);
+                            showToast('Could not refresh GPS. Choose the issue location on the map or retry.', 'info');
+                        }
+                    },
+                    { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+                );
             },
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
         );
     };
 
@@ -10854,19 +10866,29 @@ export default function ResidentDashboard() {
         setIsLocating(true);
         setIsTrackingLocation(true);
         locationWatchRef.current = navigator.geolocation.watchPosition(
-            acceptDevicePosition,
+            position => {
+                acceptDevicePosition(position);
+            },
             error => {
                 setIsLocating(false);
-                setLocationPermissionDenied(error?.code === 1);
-                stopDeviceLocationTracking();
-                showToast('Live location stopped. Refresh GPS or choose the issue location on the map.', 'info');
+                if (error?.code === 1) {
+                    setLocationPermissionDenied(true);
+                    stopDeviceLocationTracking();
+                } else {
+                    showToast(t(error?.code === 3 ? 'locationPrivacy.gpsTimeout' : error?.code === 2 ? 'locationPrivacy.gpsUnavailable' : 'locationPrivacy.gpsError'), 'info');
+                }
             },
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     };
 
     useEffect(() => {
-        if (activeModal !== 'file-report') stopDeviceLocationTracking();
+        if (activeModal === 'file-report') {
+            requestDeviceLocation();
+            startDeviceLocationTracking();
+        } else {
+            stopDeviceLocationTracking();
+        }
         return () => {
             if (locationWatchRef.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(locationWatchRef.current);
             locationWatchRef.current = null;
@@ -11003,128 +11025,17 @@ export default function ResidentDashboard() {
     const reverseGeocode = async (lat, lng) => {
         const requestId = ++geocodeRequest.current;
         setGeocodingAddress(true);
-
-        let primaryAddress = '';
-        let resolvedStructured = null;
-        const autoPlusCode = encodeOpenLocationCode(lat, lng, true);
-        let plusCodeStr = autoPlusCode;
-
-        // 1. Try backend reverse geocoding first (avoids browser referrer/key restrictions)
-        try {
-            const res = await apiFetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`, {
-                timeout: 4000
-            });
-            if (res.ok && res.data?.address && !res.data.address.startsWith("Lat:")) {
-                resolvedStructured = parseAddressString(res.data.address) || parseGeocodedAddress([], lat, lng, autoPlusCode);
-                if (!resolvedStructured.plusCode) resolvedStructured.plusCode = autoPlusCode;
-                primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-                if (resolvedStructured.plusCode) plusCodeStr = resolvedStructured.plusCode;
-            }
-        } catch (backendErr) {
-            console.debug("[PULSO] Backend reverse geocode skipped/failed, falling back to client geocoder:", backendErr);
-        }
-
-        // 2. Fall back to browser Google Maps Geocoder if backend was unreachable or returned empty
-        if (!primaryAddress && isLoaded && window.google?.maps?.Geocoder) {
-            try {
-                const geocoder = new window.google.maps.Geocoder();
-                const response = await Promise.race([
-                    geocoder.geocode({ location: { lat, lng } }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Browser geocode timeout')), 4000))
-                ]);
-                if (response.results && response.results.length > 0) {
-                    const googlePlusCode = response.plus_code?.compound_code || response.plus_code?.global_code || autoPlusCode;
-                    resolvedStructured = parseGeocodedAddress(response.results, lat, lng, googlePlusCode);
-                    primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-                    if (resolvedStructured.plusCode) plusCodeStr = resolvedStructured.plusCode;
-                }
-            } catch (browserErr) {
-                console.debug("[PULSO] Browser Google geocoding failed or timed out:", browserErr);
-            }
-        }
-
-        // 3. Fallback to OpenStreetMap (Nominatim) if still unresolved
-        if (!primaryAddress && navigator.onLine) {
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
-                    signal: AbortSignal.timeout(4000)
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.display_name) {
-                        const addr = data.address || {};
-                        const brgyCandidate = addr.suburb || addr.quarter || addr.neighbourhood || addr.village || '';
-                        resolvedStructured = {
-                            subdivision: '',
-                            plusCode: autoPlusCode,
-                            streetAddress: [addr.house_number, addr.road].filter(Boolean).join(' ') || 'Address unavailable',
-                            barangay: brgyCandidate.includes('Barangay') ? brgyCandidate : (brgyCandidate ? `Barangay ${brgyCandidate}` : ''),
-                            city: 'Caloocan',
-                            postalCode: addr.postcode || getPostalCodeForBarangay(brgyCandidate),
-                            region: 'Metro Manila'
-                        };
-                        primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-                        plusCodeStr = autoPlusCode;
-                    }
-                }
-            } catch (osmErr) {
-                // non-fatal
-            }
-        }
-
-        // 4. Fallback to BigDataCloud Plus Code if needed
-        if ((!plusCodeStr || plusCodeStr === autoPlusCode) && navigator.onLine) {
-            try {
-                const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`, {
-                    signal: AbortSignal.timeout(3000)
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data?.plusCode) {
-                        const cleanCode = extractCleanPlusCode(data.plusCode, lat, lng);
-                        if (cleanCode) plusCodeStr = cleanCode;
-                    }
-                }
-            } catch {
-                // non-fatal
-            }
-        }
-
+        const result = await reverseGeocodeLocation(lat, lng);
         if (requestId !== geocodeRequest.current) return;
-
-        // 5. Final fallback: Known Caloocan barangay polygon or Coordinates with "Address unavailable"
-        if (!resolvedStructured) {
-            const autoBrgy = findBarangayByCoordinates(lat, lng);
-            const brgyName = autoBrgy ? autoBrgy.name : '';
-            resolvedStructured = {
-                subdivision: '',
-                plusCode: plusCodeStr || autoPlusCode,
-                streetAddress: 'Address unavailable',
-                barangay: brgyName,
-                city: 'Caloocan',
-                postalCode: brgyName ? getPostalCodeForBarangay(brgyName) : '1421',
-                region: 'Metro Manila'
-            };
-            primaryAddress = `Address unavailable (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
-        } else if (!resolvedStructured.barangay || !resolvedStructured.barangay.trim()) {
-            const autoBrgy = findBarangayByCoordinates(lat, lng);
-            if (autoBrgy) {
-                resolvedStructured.barangay = autoBrgy.name;
-                resolvedStructured.postalCode = getPostalCodeForBarangay(autoBrgy.name);
-                primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-            }
-        }
-
-        setStructuredAddress(resolvedStructured);
-        const finalAddress = primaryAddress || `Address unavailable (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
-        setLocationAddress(finalAddress);
-        const finalPlus = plusCodeStr || autoPlusCode;
-        setPlusCode(finalPlus);
+        setStructuredAddress({ ...result.structuredAddress, lookupStatus: result.status });
+        setLocationAddress(result.address);
+        setPlusCode(result.structuredAddress.plusCode);
         setGeocodingAddress(false);
+        // Do not persist geocoded addresses or precise Plus Codes in sessionStorage.
         try {
-            sessionStorage.setItem('pulso_user_address', finalAddress);
-            if (finalPlus) sessionStorage.setItem('pulso_user_plus_code', finalPlus);
-            if (resolvedStructured) sessionStorage.setItem('pulso_user_structured_address', JSON.stringify(resolvedStructured));
+            sessionStorage.removeItem('pulso_user_address');
+            sessionStorage.removeItem('pulso_user_plus_code');
+            sessionStorage.removeItem('pulso_user_structured_address');
         } catch (_) {}
     };
 
@@ -11203,7 +11114,7 @@ export default function ResidentDashboard() {
             }
         }
 
-        const catsToSubmit = Array.isArray(categories) && categories.length > 0 ? categories : ['Roads & Bridges'];
+        const catsToSubmit = Array.isArray(categories) && categories.length > 0 ? categories.slice(0, 3) : ['Roads & Bridges'];
         const repLoc = location || reportLocation;
         const repBarangay = barangay || structuredAddress?.barangay || (repLoc?.lat && repLoc?.lng ? findBarangayByCoordinates(repLoc.lat, repLoc.lng)?.name : 'Barangay 171');
         const repAddress = address || locationAddress || `${repBarangay}, Caloocan City`;
@@ -12037,104 +11948,211 @@ export default function ResidentDashboard() {
             />
 
             {activeModal === 'all-notifications' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setActiveModal(null)}>
+                <div
+                    className="fixed inset-0 z-[1000] bg-slate-900/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+                    onClick={() => setActiveModal(null)}
+                >
                     <motion.div
                         role="dialog"
                         aria-modal="true"
-                        aria-label={t('notificationCenter.title', 'All notifications')}
-                        initial={{ y: '100%', opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: '100%', opacity: 0 }}
-                        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                        aria-label={t('notificationCenter.title', 'Notifications')}
+                        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                        transition={{ duration: 0.18, ease: 'easeOut' }}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full sm:max-w-2xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-[28px] sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[88dvh] sm:max-h-[90dvh] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
+                        className="w-full sm:max-w-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]"
                     >
-                        {/* Mobile Pull Bar / Drag Pill */}
-                        <div className="w-full pt-3 pb-1 flex justify-center sm:hidden shrink-0">
-                            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
-                        </div>
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                                <Bell className="text-orange-500" /> {t('notificationCenter.title', 'All notifications')}
-                            </h2>
-                            <button autoFocus type="button" aria-label="Close all notifications" onClick={() => setActiveModal(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition focus-visible:outline-3 focus-visible:outline-blue-600">
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-3">
-                            <div className="flex justify-end mb-2">
+                        {/* Header */}
+                        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-[#ea580c] dark:text-[#ff6b00] flex items-center justify-center shrink-0">
+                                    <Bell size={17} strokeWidth={2.2} />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                                        {t('notificationCenter.title', 'Notifications')}
+                                    </h2>
+                                    {unreadCount > 0 && (
+                                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#ff6b00]/10 text-[#b83a00] dark:text-[#ff6b00] tabular-nums">
+                                            {unreadCount} {t('common.unread', 'unread')}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {unreadCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleMarkAllRead}
+                                        className="text-xs font-semibold text-[#b83a00] dark:text-[#ff6b00] hover:underline px-2 py-1 rounded-md transition focus-visible:outline-2 focus-visible:outline-[#ff6b00]"
+                                    >
+                                        {t('notificationCenter.markAllRead', 'Mark all read')}
+                                    </button>
+                                )}
                                 <button
-                                    onClick={handleMarkAllRead}
-                                    className="text-orange-500 text-sm font-bold hover:underline shrink-0 focus:outline-none"
+                                    type="button"
+                                    aria-label="Close"
+                                    onClick={() => setActiveModal(null)}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:outline-2 focus-visible:outline-[#ff6b00]"
                                 >
-                                    Mark all as read
+                                    <X size={18} />
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Notifications List */}
+                        <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-2.5 flex-1 min-h-0">
                             {loadingNotifications ? (
-                                <p className="text-center text-slate-500 py-8" role="status">Loading notifications…</p>
+                                <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center">
+                                    <Loader2 size={24} className="animate-spin text-orange-500 mb-2" />
+                                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Loading notifications…</p>
+                                </div>
                             ) : notificationsError ? (
-                                <div className="text-center py-8" role="alert">
-                                    <p className="text-slate-600 dark:text-slate-300">{t('notificationCenter.loadError', 'Unable to load notifications.')}</p>
-                                    <button type="button" onClick={() => currentUser?.id && fetchNotifications(currentUser.id)} className="mt-3 min-h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 focus-visible:outline-3 focus-visible:outline-blue-600">{t('notificationCenter.tryAgain', 'Try again')}</button>
+                                <div className="py-10 text-center" role="alert">
+                                    <p className="text-sm text-slate-600 dark:text-slate-300">{t('notificationCenter.loadError', 'Unable to load notifications.')}</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => currentUser?.id && fetchNotifications(currentUser.id)}
+                                        className="mt-3 px-4 py-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                    >
+                                        {t('notificationCenter.tryAgain', 'Try again')}
+                                    </button>
                                 </div>
                             ) : notifications.length === 0 ? (
-                                <p className="text-center text-slate-500 py-8">{t('notificationCenter.empty', 'No notifications available.')}</p>
+                                <div className="py-12 text-center flex flex-col items-center justify-center">
+                                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-3">
+                                        <Bell size={22} strokeWidth={1.8} />
+                                    </div>
+                                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                                        {t('notificationCenter.empty', 'No notifications yet.')}
+                                    </p>
+                                </div>
                             ) : (
-                                notifications.map(notif => (
-                                    <div key={notif.id} className={`p-4 rounded-xl border ${notif.is_read ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800/80' : 'bg-white dark:bg-slate-800/80 border-blue-100 dark:border-blue-900/60 shadow-sm'} ${notif.is_hidden ? 'opacity-50' : ''}`}>
-                                        <div className="flex justify-between items-start gap-4">
-                                            <div className="flex gap-4">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${notif.is_read ? 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400'}`}>
-                                                    <FileText size={18} />
+                                notifications.map(notif => {
+                                    const textLower = `${notif.title || ''} ${notif.message || ''}`.toLowerCase();
+                                    const isResolved = textLower.includes('resolved') || textLower.includes('completed') || textLower.includes('repaired');
+                                    const isRejected = textLower.includes('rejected') || textLower.includes('cancelled') || textLower.includes('could not be');
+                                    const isWarning = textLower.includes('warning') || textLower.includes('alert') || textLower.includes('hazard');
+
+                                    const tileColor = isRejected
+                                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                        : isResolved
+                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                        : isWarning
+                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                        : 'bg-orange-500/10 text-[#ea580c] dark:text-[#ff6b00] border border-orange-500/20';
+
+                                    const icon = isRejected
+                                        ? <XCircle size={18} strokeWidth={2} />
+                                        : isResolved
+                                        ? <CheckCircle2 size={18} strokeWidth={2} />
+                                        : isWarning
+                                        ? <AlertTriangle size={18} strokeWidth={2} />
+                                        : <FileText size={18} strokeWidth={2} />;
+
+                                    return (
+                                        <div
+                                            key={notif.id}
+                                            onClick={() => {
+                                                handleNotificationClick(notif);
+                                                setActiveModal(null);
+                                            }}
+                                            className={`group relative p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+                                                notif.is_read
+                                                    ? 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
+                                                    : 'bg-orange-50/40 dark:bg-slate-800/80 border-orange-200/70 dark:border-orange-500/30 hover:border-orange-300 shadow-2xs'
+                                            } ${notif.is_hidden ? 'opacity-40' : ''}`}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                {/* Status Icon Tile */}
+                                                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${tileColor}`}>
+                                                    {icon}
                                                 </div>
-                                                <div>
-                                                    <h4 className={`font-bold text-[15px] ${notif.is_read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>
-                                                        {notif.title}
-                                                        {notif.is_hidden && <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-500 px-2.5 py-0.5 rounded-md ml-3 uppercase tracking-wider font-bold">Dismissed</span>}
-                                                    </h4>
-                                                    <p className={`text-[13px] mt-1 ${notif.is_read ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{notif.message}</p>
-                                                    <p className="text-[11px] text-blue-500 mt-2 font-bold">{new Date(notif.created_at).toLocaleString()}</p>
+
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0 pr-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className={`text-[13.5px] sm:text-sm leading-snug truncate ${
+                                                            notif.is_read
+                                                                ? 'font-medium text-slate-700 dark:text-slate-300'
+                                                                : 'font-semibold text-slate-950 dark:text-white'
+                                                        }`}>
+                                                            {notif.title}
+                                                        </h3>
+                                                        {!notif.is_read && (
+                                                            <span className="w-2 h-2 rounded-full bg-[#ff6b00] shrink-0" aria-label="Unread" />
+                                                        )}
+                                                        {notif.is_hidden && (
+                                                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-medium">
+                                                                Dismissed
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 mt-1 leading-relaxed line-clamp-3">
+                                                        {notif.message}
+                                                    </p>
+
+                                                    <div className="flex items-center justify-between gap-2 mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/60">
+                                                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                                            <Clock size={12} className="text-slate-400 dark:text-slate-500" />
+                                                            {formatRelativeTime(notif.created_at) || new Date(notif.created_at).toLocaleDateString()}
+                                                        </span>
+
+                                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                            {!notif.is_read && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleNotificationClick(notif);
+                                                                    }}
+                                                                    className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
+                                                                >
+                                                                    Mark read
+                                                                </button>
+                                                            )}
+                                                            {!notif.is_hidden && (
+                                                                <button
+                                                                    type="button"
+                                                                    aria-label="Dismiss notification"
+                                                                    onClick={async (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_hidden: true } : n));
+                                                                        try {
+                                                                            const authToken = token || getAuthToken();
+                                                                            await fetch(`${API_BASE_URL}/api/notifications/${notif.id}`, {
+                                                                                method: 'DELETE',
+                                                                                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                                                                            });
+                                                                        } catch (err) {
+                                                                            console.error("Delete error:", err);
+                                                                        }
+                                                                    }}
+                                                                    className="text-[11px] font-medium text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                                                                >
+                                                                    Dismiss
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex flex-col gap-2 items-end shrink-0">
-                                                {!notif.is_read && (
-                                                    <button
-                                                        onClick={() => handleNotificationClick(notif)}
-                                                        className="text-[11px] uppercase tracking-wider font-bold text-blue-500 hover:text-blue-600 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition focus:outline-none"
-                                                    >
-                                                        Mark Read
-                                                    </button>
-                                                )}
-                                                {!notif.is_hidden && (
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_hidden: true } : n));
-                                                            try {
-                                                                const authToken = token || getAuthToken();
-                                                                await fetch(`${API_BASE_URL}/api/notifications/${notif.id}`, {
-                                                                    method: 'DELETE',
-                                                                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                                                                });
-                                                            } catch (err) {
-                                                                console.error("Delete error:", err);
-                                                            }
-                                                        }}
-                                                        className="text-[11px] uppercase tracking-wider font-bold text-slate-400 hover:text-red-500 px-3 py-1.5 bg-slate-50 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-900/20 rounded-lg transition focus:outline-none"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                             {!loadingNotifications && !notificationsError && notificationsHasMore && (
-                                <div className="pt-3 text-center">
-                                    {olderNotificationsError && <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{t('notificationCenter.olderError', 'Unable to load older notifications.')}</p>}
-                                    <button type="button" onClick={fetchOlderNotifications} disabled={loadingOlderNotifications} className="min-h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-semibold focus-visible:outline-3 focus-visible:outline-blue-600 disabled:opacity-60">
+                                <div className="pt-2 text-center">
+                                    {olderNotificationsError && <p role="alert" className="mb-2 text-xs text-red-600 dark:text-red-400">{t('notificationCenter.olderError', 'Unable to load older notifications.')}</p>}
+                                    <button
+                                        type="button"
+                                        onClick={fetchOlderNotifications}
+                                        disabled={loadingOlderNotifications}
+                                        className="px-4 py-2 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition disabled:opacity-60"
+                                    >
                                         {loadingOlderNotifications ? t('notificationCenter.loadingOlder', 'Loading older notifications…') : t('notificationCenter.loadOlder', 'Load older notifications')}
                                     </button>
                                 </div>

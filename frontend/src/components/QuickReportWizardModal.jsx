@@ -31,23 +31,42 @@ import {
     Loader2,
     Maximize2,
     Eye,
-    Trash2
+    Trash2,
+    Lightbulb
 } from 'lucide-react';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
 import { validateProfanity } from '../utils/profanityFilter';
 
+export const RoadIcon = ({ size = 20, className = '', style = {} }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        style={style}
+    >
+        <path d="M4 19L9 5M20 19L15 5M12 7V9M12 13V15M12 19V21" />
+    </svg>
+);
+
 export function getCategoryIconComponent(catName) {
     const lower = String(catName || '').toLowerCase();
     if (lower.includes('waste') || lower.includes('garbage') || lower.includes('trash') || lower.includes('basura')) return Trash2;
     if (lower.includes('flood') || lower.includes('drain')) return Waves;
     if (lower.includes('water') || lower.includes('tubig')) return Droplets;
-    if (lower.includes('power') || lower.includes('light') || lower.includes('electr') || lower.includes('kuryente')) return Zap;
+    if (lower.includes('street light') || lower.includes('lighting') || lower.includes('streetlight') || lower.includes('ilaw') || lower.includes('lamp') || lower.includes('bulb')) return Lightbulb;
+    if (lower.includes('wiring') || lower.includes('wire') || lower.includes('cable') || lower.includes('electrical') || lower.includes('power') || lower.includes('electr') || lower.includes('kuryente')) return Zap;
     if (lower.includes('traffic') || lower.includes('sign') || lower.includes('signal')) return Signpost;
     if (lower.includes('building') || lower.includes('facilit') || lower.includes('hall')) return Building2;
     if (lower.includes('safety') || lower.includes('hazard') || lower.includes('danger') || lower.includes('sunog')) return ShieldAlert;
-    if (lower.includes('road') || lower.includes('bridge') || lower.includes('lubak') || lower.includes('kalsada')) return HardHat;
+    if (lower.includes('road') || lower.includes('bridge') || lower.includes('lubak') || lower.includes('kalsada')) return RoadIcon;
     return HelpCircle;
 }
 
@@ -62,8 +81,11 @@ export function mapAiCategoryToCanonical(categoryStr) {
         if (part.includes('drain') || part.includes('flood') || part.includes('canal') || part.includes('sewer') || part.includes('manhole') || part.includes('clog') || part.includes('baha') || part.includes('estero') || part.includes('culvert')) {
             mapped.add('Drainage & Flooding');
         }
-        if (part.includes('light') || part.includes('electric') || part.includes('power') || part.includes('lamp') || part.includes('street')) {
-            mapped.add('Power & Street Lighting');
+        if (part.includes('street light') || part.includes('streetlight') || part.includes('lighting') || part.includes('lamp') || (part.includes('light') && !part.includes('traffic'))) {
+            mapped.add('Street Lighting');
+        }
+        if (part.includes('wiring') || part.includes('wire') || part.includes('cable') || part.includes('electric') || part.includes('power') || part.includes('kuryente')) {
+            mapped.add('Electrical Wiring');
         }
         if (part.includes('traffic') || part.includes('sign') || part.includes('signal') || part.includes('marking')) {
             mapped.add('Traffic & Road Signs');
@@ -71,8 +93,8 @@ export function mapAiCategoryToCanonical(categoryStr) {
         if (part.includes('road') || part.includes('bridge') || part.includes('pothole') || part.includes('asphalt') || part.includes('pavement') || part.includes('kalsada') || part.includes('lubak')) {
             mapped.add('Roads & Bridges');
         }
-        if (part.includes('water') || part.includes('tubig') || part.includes('leak') || part.includes('pipe') || part.includes('burst') || part.includes('pressure') || part.includes('maynilad')) {
-            mapped.add('Water Supply & Distribution');
+        if (part.includes('water') || part.includes('tubig') || part.includes('leak') || part.includes('pipe') || part.includes('pipeline') || part.includes('burst') || part.includes('pressure') || part.includes('maynilad')) {
+            mapped.add('Water Pipeline');
         }
         if (part.includes('safety') || part.includes('regulat') || part.includes('hazard') || part.includes('fire') || part.includes('debris') || part.includes('tree') || part.includes('sunog')) {
             mapped.add('Public Safety & Hazards');
@@ -81,17 +103,17 @@ export function mapAiCategoryToCanonical(categoryStr) {
             mapped.add('Public Buildings & Facilities');
         }
     }
-    return Array.from(mapped);
+    return Array.from(mapped).slice(0, 3);
 }
 
 import {
     CALOOCAN_BARANGAYS,
-    encodeOpenLocationCode,
-    formatFullAddress,
-    getPostalCodeForBarangay
 } from '../utils/philippineAddress';
 import { findBarangayByCoordinates } from '../data/caloocanBoundaries';
 import IDCameraModal from './IDCameraModal';
+import LocationAddressPanel from './maps/LocationAddressPanel';
+import LocationCoordinates from './maps/LocationCoordinates';
+import { normalizeDisplayAddress, parseLegacyDisplayAddress, safeAddressValue, formatFullAddress, cleanResidentAddress } from '../utils/locationPrivacy';
 
 export function formatRejectionReason(reason) {
     if (!reason || typeof reason !== 'string') {
@@ -106,18 +128,36 @@ export function formatRejectionReason(reason) {
 }
 
 const DRAFT_STORAGE_KEY = 'pulso_quick_report_draft_v2';
+const MAX_SELECTED_CATEGORIES = 3;
 
 // Unified Categories excluding "All" for reporting
 const REPORTABLE_CATEGORIES = [
-    'Water Supply & Distribution',
-    'Drainage & Flooding',
     'Roads & Bridges',
-    'Traffic & Road Signs',
-    'Power & Street Lighting',
+    'Drainage & Flooding',
+    'Street Lighting',
+    'Water Pipeline',
     'Public Safety & Hazards',
+    'Traffic & Road Signs',
     'Public Buildings & Facilities',
+    'Electrical Wiring',
     'Waste Management'
 ];
+
+export const CATEGORY_SUBTITLES = {
+    'Roads & Bridges': 'Potholes, damaged roads, and sidewalks',
+    'Drainage & Flooding': 'Clogged drains, gutters, and flooding',
+    'Street Lighting': 'Busted, flickering, or damaged lights',
+    'Water Pipeline': 'Pipeline leaks, burst pipes, and low water pressure',
+    'Water Supply & Distribution': 'Pipeline leaks, burst pipes, and low water pressure',
+    'Water Supply': 'Pipeline leaks, burst pipes, and low water pressure',
+    'Public Safety & Hazards': 'Fallen trees, open manholes, hazards',
+    'Public Safety Hazards': 'Fallen trees, open manholes, hazards',
+    'Traffic & Road Signs': 'Missing or damaged traffic signs',
+    'Public Buildings & Facilities': 'Parks, civic centers, and buildings',
+    'Public Facilities': 'Parks, civic centers, and buildings',
+    'Electrical Wiring': 'Dangling cables and exposed wires',
+    'Waste Management': 'Uncollected garbage, illegal dumping, litter'
+};
 
 /**
  * QuickReportWizardModal
@@ -134,14 +174,15 @@ function QuickReportWizardModal({
     structuredAddress = null,
     requestDeviceLocation,
     isLocating = false,
+    isGeocoding = false,
     isTrackingLocation = false,
-    _onStartLocationTracking,
+    onStartLocationTracking,
     onStopLocationTracking,
     locationPermissionDenied = false,
-    _onOpenLocationPicker,
+    onOpenLocationPicker,
     onSubmitReport,
     onTrackReport,
-    _onViewExistingReport,
+    onViewExistingReport,
     currentUser = null
 }) {
     const { t } = useTranslation();
@@ -150,8 +191,10 @@ function QuickReportWizardModal({
     // -------------------------------------------------------------------------
     const [step, setStep] = useState(1); // 1: Photo, 2: Category, 3: Details, 4: Success
     useEffect(() => {
-        if (!isOpen || step !== 1) onStopLocationTracking?.();
-    }, [isOpen, step, onStopLocationTracking]);
+        if (!isOpen) {
+            onStopLocationTracking?.();
+        }
+    }, [isOpen, onStopLocationTracking]);
     const [photo, setPhoto] = useState(null); // Data URL or Blob URL
     const [photoFile, setPhotoFile] = useState(null);
     const [photoCapturedAt, setPhotoCapturedAt] = useState(null);
@@ -212,7 +255,6 @@ function QuickReportWizardModal({
     const [isDiscardPromptOpen, setIsDiscardPromptOpen] = useState(false);
     const [copiedTrackingId, setCopiedTrackingId] = useState(null);
     const [isAddressCopied, setIsAddressCopied] = useState(false);
-
     // Reset duplicate report state if resident alters category, location, or navigates back
     useEffect(() => {
         if (duplicateReport) {
@@ -241,10 +283,10 @@ function QuickReportWizardModal({
                     if (draft.photo) setPhoto(draft.photo);
                     if (draft.photoCapturedAt) setPhotoCapturedAt(draft.photoCapturedAt);
                     if (Array.isArray(draft.selectedCategories) && draft.selectedCategories.length > 0) {
-                        setSelectedCategories(draft.selectedCategories);
+                        setSelectedCategories(draft.selectedCategories.slice(0, MAX_SELECTED_CATEGORIES));
                     }
                     if (Array.isArray(draft.suggestedCategories)) {
-                        setSuggestedCategories(draft.suggestedCategories);
+                        setSuggestedCategories(draft.suggestedCategories.slice(0, MAX_SELECTED_CATEGORIES));
                     }
                     if (draft.notes) setNotes(draft.notes);
                     if (draft.othersDescription) setOthersDescription(draft.othersDescription);
@@ -410,46 +452,27 @@ function QuickReportWizardModal({
         return '';
     }, [customBarangay, structuredAddress, reportLocation]);
 
-    const resolvedPlusCode = useMemo(() => {
-        if (plusCode && typeof plusCode === 'string' && plusCode.trim()) {
-            return plusCode.trim();
-        }
-        if (structuredAddress?.plusCode && typeof structuredAddress.plusCode === 'string') {
-            return structuredAddress.plusCode.trim();
-        }
-        if (reportLocation?.lat && reportLocation?.lng) {
-            return encodeOpenLocationCode(reportLocation.lat, reportLocation.lng, true);
-        }
-        return '';
-    }, [plusCode, structuredAddress, reportLocation]);
+    const displayStructuredAddress = useMemo(() => {
+        const address = structuredAddress
+            ? normalizeDisplayAddress(structuredAddress, reportLocation)
+            : parseLegacyDisplayAddress(locationAddress, reportLocation);
+        if (customBarangay) address.barangay = safeAddressValue(customBarangay);
+        return address;
+    }, [structuredAddress, locationAddress, customBarangay, reportLocation]);
 
-    const displayAddress = useMemo(() => {
-        if (customBarangay) {
-            const zip = getPostalCodeForBarangay(customBarangay) || '1421';
-            const prefix = resolvedPlusCode ? `${resolvedPlusCode}, ` : '';
-            return `${prefix}${customBarangay}, Caloocan, ${zip} Metro Manila`;
-        }
-        if (structuredAddress && (structuredAddress.barangay || structuredAddress.streetAddress || structuredAddress.subdivision)) {
-            return formatFullAddress({
-                ...structuredAddress,
-                plusCode: resolvedPlusCode || structuredAddress.plusCode,
-                city: structuredAddress.city || 'Caloocan',
-                region: structuredAddress.region || 'Metro Manila',
-                postalCode: structuredAddress.postalCode || getPostalCodeForBarangay(structuredAddress.barangay) || '1421'
-            }, reportLocation);
-        }
-        if (locationAddress && locationAddress.trim() && !locationAddress.startsWith('Lat:')) {
-            return locationAddress;
-        }
-        return reportLocation ? `${t('reportWizard.step2Location.selectedCoordinates', 'Selected coordinates')}: ${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}` : t('reportWizard.step2Location.chooseLocation', 'Choose the issue location');
-    }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation, t]);
+    const resolvedPlusCode = displayStructuredAddress.plusCode;
+    const displayAddress = formatFullAddress(displayStructuredAddress);
 
-    const handleCopyAddress = (e) => {
+    const handleCopyAddress = async (e) => {
         e?.stopPropagation?.();
         if (displayAddress && navigator?.clipboard) {
-            navigator.clipboard.writeText(displayAddress);
-            setIsAddressCopied(true);
-            setTimeout(() => setIsAddressCopied(false), 2000);
+            try {
+                await navigator.clipboard.writeText(displayAddress);
+                setIsAddressCopied(true);
+                setTimeout(() => setIsAddressCopied(false), 2000);
+            } catch {
+                setSubmitError(t('locationPrivacy.copyFailed'));
+            }
         }
     };
 
@@ -675,7 +698,7 @@ function QuickReportWizardModal({
             ctx.fillRect(20, 20, 480, 70);
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 18px monospace';
-            ctx.fillText(`PULSO VERIFIED FIELD PHOTO`, 35, 50);
+            ctx.fillText(`PULSO VERIFIED FIELD PHOTO - ROAD DAMAGE & STREETLIGHT`, 35, 50);
             ctx.font = '14px monospace';
             ctx.fillStyle = '#94a3b8';
             ctx.fillText(`${resolvedBarangay || 'Caloocan'}, Caloocan • ${new Date().toLocaleDateString()}`, 35, 72);
@@ -701,9 +724,11 @@ function QuickReportWizardModal({
         setSelectedCategories((prev) => {
             if (prev.includes(catName)) {
                 return prev.filter((c) => c !== catName);
-            } else {
-                return [...prev, catName];
             }
+            if (prev.length >= MAX_SELECTED_CATEGORIES) {
+                return prev;
+            }
+            return [...prev, catName];
         });
     };
 
@@ -716,7 +741,7 @@ function QuickReportWizardModal({
     const notesProfanityValidation = useMemo(() => validateProfanity(notes, 'notes'), [notes]);
     const othersProfanityValidation = useMemo(() => validateProfanity(othersDescription, 'description'), [othersDescription]);
     const hasProfanityInForm = notesProfanityValidation.hasProfanity || othersProfanityValidation.hasProfanity;
-    const isStep2Valid = selectedCategories.length > 0 && (!isOthersSelected || (othersDescription.trim().length > 0 && !othersProfanityValidation.hasProfanity));
+    const isStep2Valid = selectedCategories.length > 0 && selectedCategories.length <= MAX_SELECTED_CATEGORIES && (!isOthersSelected || (othersDescription.trim().length > 0 && !othersProfanityValidation.hasProfanity));
 
     const isPhotoIneligible = Boolean(
         aiFeedback && (
@@ -825,7 +850,7 @@ function QuickReportWizardModal({
                     photo,
                     photoFile,
                     photoCapturedAt,
-                    categories: selectedCategories,
+                    categories: selectedCategories.slice(0, MAX_SELECTED_CATEGORIES),
                     notes,
                     othersDescription,
                     locationDetails,
@@ -1012,15 +1037,20 @@ function QuickReportWizardModal({
                                     <div className="flex-1 min-w-0">
                                         {/* Address Text + Copy Button */}
                                         <div className="flex items-start justify-between gap-1.5">
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug break-words select-text cursor-text flex-1">
-                                                {displayAddress}
-                                            </p>
+                                            <LocationAddressPanel
+                                                address={displayStructuredAddress}
+                                                coordinates={reportLocation}
+                                                showCoordinates={false}
+                                                status={structuredAddress?.lookupStatus}
+                                                loading={isLocating || isGeocoding}
+                                            />
                                             <button
                                                 type="button"
                                                 onClick={handleCopyAddress}
-                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
-                                                title={isAddressCopied ? 'Copied!' : 'Copy full address'}
-                                                aria-label="Copy address"
+                                                disabled={!displayAddress}
+                                                className="min-h-11 min-w-11 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg focus-visible:outline-3 focus-visible:outline-blue-600 transition-colors cursor-pointer shrink-0"
+                                                title={isAddressCopied ? t('locationPrivacy.copied') : t('locationPrivacy.copy')}
+                                                aria-label={t('locationPrivacy.copy')}
                                             >
                                                 {isAddressCopied ? (
                                                     <Check size={14} className="text-emerald-500" />
@@ -1031,68 +1061,59 @@ function QuickReportWizardModal({
                                         </div>
 
                                         {/* Location Badges & Accuracy Indicator (Single line) */}
-                                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                            {reportLocation && typeof reportLocation.lat === 'number' && typeof reportLocation.lng === 'number' && (
-                                                <>
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 select-all">
-                                                        <span className="text-slate-500 dark:text-slate-400 font-semibold">Lat</span> {reportLocation.lat.toFixed(5)}
+                                        {(reportLocation || locationPermissionDenied) && (
+                                            <LocationCoordinates coordinates={reportLocation}>
+                                                {locationPermissionDenied ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40 shrink-0 whitespace-nowrap">
+                                                        <AlertTriangle size={13} className="text-red-500 shrink-0" />
+                                                        <span>Location permission denied</span>
+                                                        {requestDeviceLocation && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => requestDeviceLocation(true)}
+                                                                className="underline ml-1 cursor-pointer font-bold hover:text-red-700 dark:hover:text-red-300"
+                                                            >
+                                                                Retry
+                                                            </button>
+                                                        )}
                                                     </span>
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 select-all">
-                                                        <span className="text-slate-500 dark:text-slate-400 font-semibold">Lng</span> {reportLocation.lng.toFixed(5)}
-                                                    </span>
-                                                </>
-                                            )}
 
-                                            {locationPermissionDenied ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40">
-                                                    <AlertTriangle size={13} className="text-red-500 shrink-0" />
-                                                    <span>Location permission denied</span>
-                                                    {requestDeviceLocation && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => requestDeviceLocation(true)}
-                                                            className="underline ml-1 cursor-pointer font-bold hover:text-red-700 dark:hover:text-red-300"
-                                                        >
-                                                            Retry
-                                                        </button>
+                                                ) : !reportLocation ? null : (reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50 shrink-0 whitespace-nowrap">
+                                                        <Info size={13} className="text-amber-500 shrink-0" />
+                                                        <span>{t('locationPrivacy.approximateAccuracy', { accuracy: Math.round(reportLocation.accuracy) })}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50 shrink-0 whitespace-nowrap">
+                                                        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                                                        <span>{reportLocation?.accuracy ? t('locationPrivacy.accurateAccuracy', { accuracy: Math.round(reportLocation.accuracy) }) : t('locationPrivacy.gpsSelected')}</span>
+                                                    </span>
+                                                )}
+                                            </LocationCoordinates>
+                                        )}
+                                        {!reportLocation && requestDeviceLocation && (
+                                            <div className="flex flex-wrap items-center gap-2 mt-3" aria-label="Location controls">
+                                                <button
+                                                    type="button"
+                                                    disabled={isLocating}
+                                                    onClick={() => {
+                                                        requestDeviceLocation(true);
+                                                        onStartLocationTracking?.();
+                                                    }}
+                                                    className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] disabled:bg-orange-400 disabled:cursor-not-allowed text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer active:scale-95"
+                                                    aria-busy={isLocating}
+                                                >
+                                                    {isLocating ? (
+                                                        <>
+                                                            <Loader2 size={15} className="animate-spin text-white shrink-0" />
+                                                            <span>Locating...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <MapPin size={14} className="shrink-0" />
+                                                            <span>{t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
+                                                        </>
                                                     )}
-                                                </span>
-                                            ) : !reportLocation ? (
-                                                <span className="text-xs text-slate-600 dark:text-slate-300">{t('reportWizard.step2Location.noLocationHelp', 'Location not set. Use GPS or choose a place on the map.')}</span>
-                                            ) : (reportLocation?.accuracy && reportLocation.accuracy > 20) ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50">
-                                                    <Info size={13} className="text-amber-500 shrink-0" />
-                                                    <span>Approximate Location (±{Math.round(reportLocation.accuracy)}m)</span>
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50">
-                                                    <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                                                    <span>{locationStatusText}{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
-                                                </span>
-                                            )}
-                                            {/* Minimal Refresh Icon (Resync GPS) */}
-                                            {reportLocation && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => requestDeviceLocation?.()}
-                                                    disabled={isLocating}
-                                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors cursor-pointer inline-flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600 ml-0.5 disabled:opacity-50"
-                                                    title={t('reportWizard.step2Location.resyncGps', 'Resync GPS')}
-                                                    aria-label={t('reportWizard.step2Location.resyncGps', 'Resync GPS')}
-                                                >
-                                                    <RotateCcw size={14} className={isLocating ? 'animate-spin text-[#ff6b00]' : ''} />
-                                                </button>
-                                            )}
-                                        </div>
-                                        {!reportLocation && (
-                                            <div className="flex flex-wrap gap-2 mt-3" aria-label="Location controls">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => requestDeviceLocation?.()}
-                                                    disabled={isLocating}
-                                                    className="min-h-11 px-3 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-800 dark:text-white focus-visible:outline-3 focus-visible:outline-blue-600"
-                                                >
-                                                    {isLocating ? t('reportWizard.step2Location.locating', 'Finding location…') : t('reportWizard.step2Location.useMyLocation', 'Use my location')}
                                                 </button>
                                             </div>
                                         )}
@@ -1354,19 +1375,24 @@ function QuickReportWizardModal({
                             ) : (
                                 <>
                                     <div>
-                                        <h3 className="font-bold text-lg sm:text-xl text-slate-900 dark:text-white">
-                                            {selectedCategories.length === 0
-                                                ? 'Select issue category'
-                                                : selectedCategories.length === 1
-                                                ? 'Confirm the 1 issue'
-                                                : `Confirm the ${selectedCategories.length} issues`}
-                                        </h3>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <h3 className="font-bold text-lg sm:text-xl text-slate-900 dark:text-white">
+                                                {selectedCategories.length === 0
+                                                    ? 'Select issue category'
+                                                    : selectedCategories.length === 1
+                                                    ? 'Confirm the 1 issue'
+                                                    : `Confirm the ${selectedCategories.length} issues`}
+                                            </h3>
+                                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+                                                {selectedCategories.length} / {MAX_SELECTED_CATEGORIES} max
+                                            </span>
+                                        </div>
                                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                                             {selectedCategories.length === 0
-                                                ? (aiAnalysisError || "We couldn't detect the issue automatically. Please pick one below.")
+                                                ? (aiAnalysisError || "We couldn't detect the issue automatically. Please pick up to 3 below.")
                                                 : selectedCategories.length === 1
-                                                ? 'We found 1 problem in your photo. Remove or add types if needed.'
-                                                : `We found ${selectedCategories.length} problems in your photo. Remove or add types if needed.`}
+                                                ? 'We found 1 problem in your photo. Remove or add types if needed (up to 3).'
+                                                : `We found ${selectedCategories.length} problems in your photo. Remove or add types if needed (up to 3).`}
                                         </p>
                                     </div>
 
@@ -1402,6 +1428,11 @@ function QuickReportWizardModal({
                                                                 <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
                                                                     {catName}
                                                                 </div>
+                                                                {CATEGORY_SUBTITLES[catName] && (
+                                                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                                        {CATEGORY_SUBTITLES[catName]}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -1439,23 +1470,36 @@ function QuickReportWizardModal({
                                         </button>
                                     )}
 
-                                    {/* Expanded Category Checklist: 7 Canonical Categories */}
+                                    {/* Expanded Category Checklist: Canonical Categories (Max 3) */}
                                     {(isExpandedCategories || selectedCategories.length === 0) && (
                                         <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                                            {selectedCategories.length >= MAX_SELECTED_CATEGORIES && (
+                                                <div className="text-xs font-semibold text-orange-600 dark:text-orange-400 px-1">
+                                                    Maximum of {MAX_SELECTED_CATEGORIES} issues reached. Uncheck one to select a different category.
+                                                </div>
+                                            )}
                                             {REPORTABLE_CATEGORIES.map((catName) => {
                                                 const isSelected = selectedCategories.includes(catName);
+                                                const isLimitReached = !isSelected && selectedCategories.length >= MAX_SELECTED_CATEGORIES;
                                                 const IconComp = getCategoryIconComponent(catName);
                                                 return (
                                                     <div
                                                         key={catName}
-                                                        onClick={() => toggleCategory(catName)}
-                                                        className={`min-h-[3.25rem] px-4 py-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all group ${
+                                                        role="checkbox"
+                                                        aria-checked={isSelected}
+                                                        aria-disabled={isLimitReached}
+                                                        onClick={() => {
+                                                            if (!isLimitReached) toggleCategory(catName);
+                                                        }}
+                                                        className={`min-h-[3.25rem] px-4 py-2.5 rounded-xl border flex items-center justify-between transition-all group ${
                                                             isSelected
-                                                                ? 'border-2 border-[#ff6b00] bg-orange-500/10 dark:bg-orange-500/15'
-                                                                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-slate-300 dark:hover:border-slate-700'
+                                                                ? 'border-2 border-[#ff6b00] bg-orange-500/10 dark:bg-orange-500/15 cursor-pointer'
+                                                                : isLimitReached
+                                                                ? 'border-slate-200/70 dark:border-slate-800/70 bg-slate-50/70 dark:bg-slate-900/40 opacity-50 cursor-not-allowed'
+                                                                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer'
                                                         }`}
                                                     >
-                                                        <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="flex items-center gap-3 min-w-0 pr-2">
                                                             <div
                                                                 className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                                                                     isSelected
@@ -1465,9 +1509,16 @@ function QuickReportWizardModal({
                                                             >
                                                                 <IconComp size={18} className={isSelected ? 'text-white' : ''} />
                                                             </div>
-                                                            <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                                                                {catName}
-                                                            </span>
+                                                            <div className="min-w-0">
+                                                                <span className="font-bold text-sm text-slate-900 dark:text-white block truncate">
+                                                                    {catName}
+                                                                </span>
+                                                                {CATEGORY_SUBTITLES[catName] && (
+                                                                    <span className="text-xs text-slate-500 dark:text-slate-400 block truncate">
+                                                                        {CATEGORY_SUBTITLES[catName]}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
 
                                                         {/* Checkbox */}
@@ -1611,7 +1662,7 @@ function QuickReportWizardModal({
                                                 onChange={(e) =>
                                                     setLocationDetails({ ...locationDetails, subdivision: e.target.value })
                                                 }
-                                                placeholder="e.g. Celina Homes 3 or Camarin Commercial Ctr"
+                                                placeholder={t('locationPrivacy.fields.subdivision')}
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             />
                                         </div>
@@ -1626,7 +1677,7 @@ function QuickReportWizardModal({
                                                 onChange={(e) =>
                                                     setLocationDetails({ ...locationDetails, houseNumber: e.target.value })
                                                 }
-                                                placeholder="e.g. Blk 4 Lot 16 Silver Street"
+                                                placeholder={t('locationPrivacy.fields.street')}
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             />
                                         </div>
@@ -1734,7 +1785,7 @@ function QuickReportWizardModal({
                                                 </div>
                                                 <div className="text-[11.5px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5 truncate">
                                                     <MapPin size={12} className="text-slate-400 shrink-0" />
-                                                    <span className="truncate">{duplicateReport.location_string || displayAddress || 'Caloocan City'}</span>
+                                                    <span className="truncate">{cleanResidentAddress(duplicateReport.location_string) || displayAddress || t('locationPrivacy.empty')}</span>
                                                 </div>
                                                 {duplicateReport.description && (
                                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg text-xs text-slate-700 dark:text-slate-300">

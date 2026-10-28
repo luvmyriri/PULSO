@@ -18,7 +18,14 @@ from collections import OrderedDict
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+local_env_path = os.path.join(os.path.dirname(__file__), ".env.local")
+if os.path.exists(local_env_path):
+    load_dotenv(local_env_path)
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+else:
+    load_dotenv()
 
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google-credentials.json")
 GCP_PROJECT        = os.getenv("GOOGLE_CLOUD_PROJECT", "pulso-509010")
@@ -463,7 +470,8 @@ Intelligence Rules (STRICT SCOPE OF SERVICE):
    - Roads & Bridges: Local city/barangay roads, potholes, broken pavement, sidewalks, gutters, pavement markings (crossings/dividers).
    - Water & Drainage: De-clogging canals/manholes, pumping stations, estero flood control. Public fountains/toilets in parks. 
      *EXCLUSION: Do NOT include potable water supply (Maynilad) or major rivers.*
-   - Street Lighting: Burned-out streetlight bulbs, city-owned electrical wiring/lamp posts.
+   - Street Lighting: Burned-out streetlight bulbs, flickering or damaged lamp posts, unlit intersections.
+   - Electrical Wiring: Dangling cables, exposed wires, sparking utility connections, leaning electrical poles.
    - Public Safety & Regulatory: Structural safety (post-earthquake), building permit compliance, debris/fallen tree clearing, fire/electrical compliance for NEW constructions.
    - Public Facilities: Public schools, health centers, City Hall, basketball courts, plazas, covered courts, parks.
 

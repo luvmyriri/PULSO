@@ -3,8 +3,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
   CheckCircle2, Copy, Check, QrCode, ArrowRight, 
-  ExternalLink, UserPlus, RefreshCw, Home, Clock, 
-  ShieldCheck 
+  ExternalLink, UserPlus, RefreshCw, Home, Clock 
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import WizardHeader from '../components/report-wizard/WizardHeader';
@@ -101,11 +100,11 @@ export default function ReportSuccessPage() {
               </div>
             </div>
 
-            <div className="sm:text-right">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <div className="flex flex-col items-start sm:items-end gap-1.5">
+              <span className="block text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 {t('receipt.statusLabel', 'Current Status')}
               </span>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-bold mt-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-bold">
                 <Clock size={13} />
                 <span>{t('receipt.statusReceived', 'Received & Queued for Triage')}</span>
               </div>
@@ -229,33 +228,6 @@ export default function ReportSuccessPage() {
             </Link>
           </div>
         )}
-
-        {/* ── WHAT HAPPENS NEXT TIMELINE ─────────────────────────────────────── */}
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-4">
-          <h2 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-            <ShieldCheck size={18} className="text-orange-600" />
-            <span>{t('receipt.nextSteps.title', 'What Happens Next?')}</span>
-          </h2>
-
-          <ol className="space-y-2.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-            <li className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 font-bold flex items-center justify-center shrink-0 text-xs mt-0.5">1</span>
-              <span>{t('receipt.nextSteps.step1', 'AI and dispatch engineers verify the location and severity within 2 hours.')}</span>
-            </li>
-            <li className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 font-bold flex items-center justify-center shrink-0 text-xs mt-0.5">2</span>
-              <span>{t('receipt.nextSteps.step2', 'An engineering work order is created and assigned to the relevant district field team.')}</span>
-            </li>
-            <li className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 font-bold flex items-center justify-center shrink-0 text-xs mt-0.5">3</span>
-              <span>{t('receipt.nextSteps.step3', 'Field crews inspect and complete repairs, uploading photographic proof of resolution.')}</span>
-            </li>
-            <li className="flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-950 text-orange-600 font-bold flex items-center justify-center shrink-0 text-xs mt-0.5">4</span>
-              <span>{t('receipt.nextSteps.step4', 'The ticket is marked resolved and closed on the public registry.')}</span>
-            </li>
-          </ol>
-        </div>
 
         {/* ── BOTTOM RETURN ACTIONS ───────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-center gap-4 pt-2">

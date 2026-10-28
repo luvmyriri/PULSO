@@ -1,4 +1,4 @@
-import { formatWatermarkAddress } from './philippineAddress';
+import { formatWatermarkAddress } from './locationPrivacy';
 
 /**
  * Formats a Date or date string into a clean, standardized civic timestamp:
@@ -23,6 +23,14 @@ export function formatWatermarkTimestamp(dateInput) {
     return `${dateStr} · ${timeStr}`;
 }
 
+/** Only measured/selected coordinates are included; never use a default point. */
+export function formatWatermarkCoordinates(metadata = {}) {
+    const location = metadata.location || metadata.coordinates || { lat: metadata.lat, lng: metadata.lng };
+    if (!Number.isFinite(location.lat) || !Number.isFinite(location.lng)
+        || Math.abs(location.lat) > 90 || Math.abs(location.lng) > 180) return '';
+    return `Lat ${location.lat.toFixed(6)} · Lng ${location.lng.toFixed(6)}`;
+}
+
 /**
  * drawEvidenceWatermark / burnEvidenceWatermark
  * ─────────────────────────────────────────────────────────────────────────────
@@ -41,8 +49,8 @@ export function formatWatermarkTimestamp(dateInput) {
  * 4. Content:
  *    - Line 1: Left "PULSO · Caloocan City" (PULSO in #ff6b00, rest in white bold)
  *              Right timestamp ("Oct 16, 2026 · 3:02 PM")
- *    - Next lines: FULL readable address, including the selected location's Plus Code, in white bold
- *    - Last line: Coordinates ("14.7520, 121.0263") in soft white small text
+ *    - Next lines: Privacy-safe address with a coarse area Plus Code, in white bold
+ *    - Last line: Selected latitude/longitude and actual GPS accuracy, when available.
  * 5. Contrast & Scrim:
  *    - Dark vertical gradient panel anchored to bottom (fade to clear at top, 78% opacity at bottom).
  *    - Thin dark outline on text for 100% legibility on any bright or noisy background.
@@ -67,26 +75,15 @@ export function drawEvidenceWatermark(canvas, metadata = {}) {
     const addressSource = metadata.structuredAddress || metadata.locationAddress || metadata.address;
     const addressText = formatWatermarkAddress(addressSource, metadata.location || metadata.coordinates);
 
-    // Format coordinates: "14.7520° N, 121.0263° E"
-    let coordsText = '';
+    // The resident requested coordinates on both the live and saved watermark.
+    const coordsText = formatWatermarkCoordinates(metadata);
     const loc = metadata.location || metadata.coordinates;
-    if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
-        const latDir = loc.lat >= 0 ? 'N' : 'S';
-        const lngDir = loc.lng >= 0 ? 'E' : 'W';
-        coordsText = `${Math.abs(loc.lat).toFixed(4)}° ${latDir}, ${Math.abs(loc.lng).toFixed(4)}° ${lngDir}`;
-    } else if (metadata.lat && metadata.lng) {
-        const latVal = Number(metadata.lat);
-        const lngVal = Number(metadata.lng);
-        const latDir = latVal >= 0 ? 'N' : 'S';
-        const lngDir = lngVal >= 0 ? 'E' : 'W';
-        coordsText = `${Math.abs(latVal).toFixed(4)}° ${latDir}, ${Math.abs(lngVal).toFixed(4)}° ${lngDir}`;
-    }
 
     // Accuracy indicator pill (e.g. "(±12m)")
     const rawAccuracy = loc?.accuracy ?? metadata.accuracy ?? metadata.location?.accuracy ?? metadata.coordinates?.accuracy ?? metadata.reportLocation?.accuracy;
     const accuracyNum = (typeof rawAccuracy === 'number' && !isNaN(rawAccuracy) && rawAccuracy > 0)
         ? Math.round(rawAccuracy)
-        : (coordsText ? 12 : null);
+        : null;
     const accuracyText = accuracyNum ? `(±${accuracyNum}m)` : '';
 
     // 2. Base Unit "u" = shorter side

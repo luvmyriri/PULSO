@@ -77,24 +77,24 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
             </p>
 
             {/* Primary Action Button Pair */}
-            <div className="flex flex-wrap items-center gap-3 w-full">
+            <div className="flex flex-nowrap items-center gap-2 sm:gap-3 w-full">
               <Link
                 to="/report"
-                className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-xs sm:text-sm tracking-wide shadow-sm hover:shadow transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-heading font-bold text-[11px] sm:text-sm whitespace-nowrap tracking-wide shadow-sm hover:shadow transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
               >
-                <SquarePen size={17} className="shrink-0" />
+                <SquarePen size={16} className="shrink-0" />
                 <span>Report a Problem</span>
-                <ArrowRight size={15} className="shrink-0" />
+                <ArrowRight size={14} className="shrink-0" />
               </Link>
 
               <button
                 type="button"
                 onClick={onOpenTrackModal}
-                className="inline-flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-100 hover:text-slate-900 dark:hover:text-white font-heading font-bold text-xs sm:text-sm border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 shadow-2xs hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-800 dark:text-slate-100 hover:text-slate-900 dark:hover:text-white font-heading font-bold text-[11px] sm:text-sm whitespace-nowrap border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 shadow-2xs hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ff6b00]"
               >
-                <Search size={16} className="text-slate-600 dark:text-slate-300 shrink-0" strokeWidth={1.8} />
+                <Search size={15} className="text-slate-600 dark:text-slate-300 shrink-0" strokeWidth={1.8} />
                 <span>Track My Report</span>
-                <ArrowRight size={15} className="text-slate-400 dark:text-slate-400 shrink-0" strokeWidth={1.8} />
+                <ArrowRight size={14} className="text-slate-400 dark:text-slate-400 shrink-0" strokeWidth={1.8} />
               </button>
             </div>
 

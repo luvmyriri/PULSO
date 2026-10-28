@@ -1,58 +1,30 @@
-import React, { useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  AlertTriangle, CheckCircle2, Circle, Sparkles,
-  Check, ArrowRight, ShieldAlert
-} from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { cleanDescription, validateDetails } from '../../utils/reportWizardValidation';
 import WizardCardFooter from './WizardCardFooter';
-
-const SEVERITY_OPTIONS = [
-  {
-    id: 'low',
-    labelKey: 'reportWizard.step4Details.severityMinor',
-    defaultLabel: 'Minor',
-    descKey: 'reportWizard.step4Details.severityMinorDesc',
-    defaultDesc: 'Little disruption'
-  },
-  {
-    id: 'medium',
-    labelKey: 'reportWizard.step4Details.severityModerate',
-    defaultLabel: 'Moderate',
-    descKey: 'reportWizard.step4Details.severityModerateDesc',
-    defaultDesc: 'Some disruption'
-  },
-  {
-    id: 'high',
-    labelKey: 'reportWizard.step4Details.severityHigh',
-    defaultLabel: 'High',
-    descKey: 'reportWizard.step4Details.severityHighDesc',
-    defaultDesc: 'Significant impact'
-  },
-];
 
 export default function Step4DetailsDuplicate({
   detailsData,
   onDetailsChange,
   onBack,
   onContinue,
+  stepErrors = [],
 }) {
   const { t } = useTranslation();
-  const description = detailsData?.description || '';
-  const urgency = detailsData?.urgency || 'medium';
-  const charCount = description.trim().length;
-  const isDescriptionValid = charCount >= 10 && charCount <= 5000;
+  const textareaRef = useRef(null);
 
-  const [duplicateDismissed, setDuplicateDismissed] = useState(false);
+  const rawDescription = detailsData?.description || '';
+  const charCount = rawDescription.trim().length;
 
-  // Duplicate detection is authoritative at submission; no simulated ticket is shown.
-  const nearbyReport = null;
+  const descError = stepErrors.find(e => e.field === 'description');
+  const hasError = Boolean(descError);
 
-  const handleUrgencySelect = (val) => {
-    onDetailsChange({
-      ...detailsData,
-      urgency: val,
-    });
-  };
+  useEffect(() => {
+    if (hasError && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [hasError]);
 
   const handleDescriptionChange = (e) => {
     onDetailsChange({
@@ -61,142 +33,93 @@ export default function Step4DetailsDuplicate({
     });
   };
 
+  const handleDescriptionBlur = () => {
+    // Sanitize on blur
+    const cleaned = cleanDescription(rawDescription);
+    if (cleaned !== rawDescription) {
+      onDetailsChange({
+        ...detailsData,
+        description: cleaned,
+      });
+    }
+  };
+
   return (
-    <div className="flex flex-col justify-between h-full space-y-6">
-      <div className="space-y-6">
-        {/* Nearby Duplicate Notice if detected */}
-        {nearbyReport && !duplicateDismissed && (
-          <aside
-            aria-label="Nearby duplicate report warning"
-            className="rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 p-4 sm:p-5 flex items-start justify-between gap-4"
-          >
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 shrink-0">
-                <AlertTriangle size={18} />
-              </div>
-              <div className="space-y-0.5">
-                <h2 className="text-sm font-bold text-amber-950 dark:text-amber-200">
-                  {t('reportWizard.step4Details.duplicateBannerTitle', 'Similar Active Report Found Nearby')}
-                </h2>
-                <p className="text-xs text-amber-800 dark:text-amber-300">
-                  {t('reportWizard.step4Details.duplicateBannerDesc', 'A report in this category is already active within {{distance}}m of your pin (Ticket: {{ticketId}}).', {
-                    distance: nearbyReport.distance,
-                    ticketId: nearbyReport.ticketId,
-                  })}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDuplicateDismissed(true)}
-              className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:underline shrink-0"
-            >
-              Dismiss
-            </button>
-          </aside>
+    <div className="flex flex-col justify-between flex-1 h-full space-y-4 lg:space-y-6">
+      <div className="space-y-3.5 lg:flex-1 lg:flex lg:flex-col">
+        {/* Inline Step Error Banner */}
+        {hasError && (
+          <div id="description-error-banner" role="alert" className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-sm font-semibold text-red-700 dark:text-red-300 animate-fadeIn">
+            <AlertCircle size={18} className="shrink-0 text-red-500" aria-hidden="true" />
+            <span>{descError.message}</span>
+          </div>
         )}
 
-        {/* Top: Severity Section (How much is it affecting the area?) */}
-        <div className="space-y-3">
+        {/* Tell us what happened / Description */}
+        <div className="space-y-3 lg:flex-1 lg:flex lg:flex-col">
           <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {t('reportWizard.step4Details.severityTitle', 'How much is it affecting the area?')}
-            </h1>
-            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-              {t('reportWizard.step4Details.severitySubtitle', 'Choose the closest option. The team will assess the report.')}
-            </p>
-          </div>
-
-          <fieldset role="radiogroup" aria-label="Severity level" className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
-            <legend className="sr-only">Severity selection</legend>
-            {SEVERITY_OPTIONS.map((opt) => {
-              const isSelected = urgency === opt.id;
-              const label = t(opt.labelKey, opt.defaultLabel);
-              const desc = t(opt.descKey, opt.defaultDesc);
-
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() => handleUrgencySelect(opt.id)}
-                  className={`relative p-5 rounded-2xl border text-left flex flex-col justify-between min-h-[96px] transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
-                    isSelected
-                      ? 'border-orange-600 dark:border-orange-500 bg-orange-50/70 dark:bg-orange-950/30 ring-2 ring-orange-500/20 shadow-xs'
-                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between w-full mb-1">
-                    <span className="font-bold text-base text-slate-900 dark:text-white">
-                      {label}
-                    </span>
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                      isSelected
-                        ? 'bg-[#ff6b00] text-white'
-                        : 'border border-slate-300 dark:border-slate-600 bg-transparent'
-                    }`}>
-                      {isSelected && <Check size={12} strokeWidth={3} aria-hidden="true" />}
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    {desc}
-                  </p>
-                </button>
-              );
-            })}
-          </fieldset>
-        </div>
-
-        {/* Below: Tell us what happened / Description */}
-        <div className="space-y-3 pt-2">
-          <div className="space-y-1">
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {t('reportWizard.step4Details.stepBadge', 'STEP 3 OF 5')}
+            </span>
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               {t('reportWizard.step4Details.title', 'Tell us what happened')}
-            </h2>
+            </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
               {t('reportWizard.step4Details.subtitle', 'Share the details that will help the team review your report.')}
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5 lg:flex-1 lg:flex lg:flex-col">
             <label htmlFor="report-description" className="sr-only">
               {t('reportWizard.step4Details.descriptionLabel', 'Description')}
             </label>
-            <div className="relative">
+            <div className="relative lg:flex-1 lg:flex lg:flex-col">
               <textarea
+                ref={textareaRef}
                 id="report-description"
-                rows={6}
-                value={description}
+                rows={5}
+                value={rawDescription}
                 onChange={handleDescriptionChange}
+                onBlur={handleDescriptionBlur}
+                aria-invalid={hasError ? 'true' : undefined}
+                aria-describedby={hasError ? 'description-error-msg' : undefined}
                 placeholder={t('reportWizard.step4Details.descriptionPlaceholder', "What did you notice? When did it start?\nInclude any details that could help the team understand the concern.")}
-                className={`w-full min-h-[160px] p-4 sm:p-5 rounded-2xl border bg-white dark:bg-slate-900 text-sm sm:text-base leading-relaxed placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 transition-colors ${
-                  charCount > 0 && charCount < 10
-                    ? 'border-red-400 dark:border-red-600'
+                className={`w-full min-h-[140px] lg:flex-1 lg:min-h-[220px] p-3.5 sm:p-4 rounded-2xl border bg-white dark:bg-slate-900 text-sm leading-relaxed placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 transition-colors ${
+                  hasError
+                    ? 'border-red-500 ring-1 ring-red-500 focus-visible:ring-red-500'
                     : 'border-slate-200 dark:border-slate-800'
                 }`}
               />
             </div>
 
+            {/* Inline Error under field if present */}
+            {hasError && (
+              <p id="description-error-msg" className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 animate-fadeIn">
+                <AlertCircle size={14} className="shrink-0 text-red-500" aria-hidden="true" />
+                <span>{descError.message}</span>
+              </p>
+            )}
+
             {/* Hint and Character Counter Row */}
             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
-              <span className={charCount > 0 && charCount < 10 ? 'text-red-500 font-bold' : ''}>
-                {t('reportWizard.step4Details.charLimitMin', 'At least 10 characters')}
+              <span>
+                {t('reportWizard.step4Details.charLimitMin', 'Between 20 and 1000 characters')}
               </span>
-              <span className="font-mono">
-                {charCount.toLocaleString()} / 5,000
+              <span className={`font-mono ${charCount > 1000 ? 'text-red-500 font-bold' : ''}`}>
+                {charCount.toLocaleString()} / 1,000
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Pinned Footer */}
+      {/* Pinned Footer: Disabled until required description is valid */}
       <WizardCardFooter
         onBack={onBack}
         canBack={true}
         onContinue={onContinue}
-        isContinueDisabled={!isDescriptionValid}
+        isContinueDisabled={!validateDetails(detailsData).valid}
+        compact={true}
       />
     </div>
   );

@@ -74,7 +74,7 @@ export const CALOOCAN_NORTH_BARANGAYS_DETAILED = CALOOCAN_BARANGAYS
         value: `Brgy. ${b.number}`,
         label: `Brgy. ${b.number}`,
         group: 'North Caloocan (District 3)',
-        description: `District 3 · ${b.alias || 'North Caloocan'}`
+        description: `District 3 -+ ${b.alias || 'North Caloocan'}`
     }));
 
 export const CALOOCAN_SOUTH_BARANGAYS_DETAILED = CALOOCAN_BARANGAYS
@@ -83,7 +83,7 @@ export const CALOOCAN_SOUTH_BARANGAYS_DETAILED = CALOOCAN_BARANGAYS
         value: `Brgy. ${b.number}`,
         label: `Brgy. ${b.number}`,
         group: 'South Caloocan (Districts 1 & 2)',
-        description: `Districts 1 & 2 · ${b.alias || 'South Caloocan'}`
+        description: `Districts 1 & 2 -+ ${b.alias || 'South Caloocan'}`
     }));
 
 export const CALOOCAN_ALL_BARANGAYS_OPTIONS = [
@@ -215,7 +215,9 @@ export function parseGeocodedAddress(results, lat, lng, apiPlusCode = '') {
     };
 
     // 1. Resolve full Plus Code
-    structured.plusCode = extractCleanPlusCode(apiPlusCode, lat, lng);
+    const rawPlusFromFormatted = extractCleanPlusCode(results?.[0]?.formatted_address);
+    const googlePlusCode = apiPlusCode || results?.[0]?.plus_code?.compound_code || results?.[0]?.plus_code?.global_code || rawPlusFromFormatted;
+    structured.plusCode = extractCleanPlusCode(googlePlusCode, lat, lng);
 
     if (!results || results.length === 0) {
         // Minimal fallback with coordinate-based barangay resolution
@@ -229,14 +231,18 @@ export function parseGeocodedAddress(results, lat, lng, apiPlusCode = '') {
         return structured;
     }
 
-    // Identify best result from Google Maps array
+    // Identify best result from Google Maps array:
+    // Prioritize street_address, then route/intersection, avoiding private subpremise overrides
     let bestRes = results[0];
-    for (const r of results) {
-        const types = r.types || [];
-        if (types.includes('premise') || types.includes('street_address') || types.includes('subpremise')) {
-            bestRes = r;
-            break;
-        }
+    const streetRes = results.find(r => (r.types || []).includes('street_address'));
+    const routeRes = results.find(r => (r.types || []).includes('route'));
+    const premiseRes = results.find(r => (r.types || []).includes('premise') && !(r.types || []).includes('subpremise'));
+    if (streetRes) {
+        bestRes = streetRes;
+    } else if (routeRes) {
+        bestRes = routeRes;
+    } else if (premiseRes) {
+        bestRes = premiseRes;
     }
 
     const compMap = {};
@@ -303,6 +309,22 @@ export function parseGeocodedAddress(results, lat, lng, apiPlusCode = '') {
         structured.streetAddress = structured.houseNumber;
     }
 
+    // If neither subdivision nor street was found, inspect formatted address segments (e.g. "Diamond" in "Q23G+2FV, Diamond, Caloocan, ...")
+    if (!structured.subdivision && !structured.streetAddress && formatted) {
+        const segs = formatted.split(',').map(s => s.trim()).filter(Boolean);
+        for (const seg of segs) {
+            if (structured.plusCode && seg.includes(structured.plusCode)) continue;
+            if (/^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4}$/i.test(seg)) continue;
+            if (/^(caloocan|caloocan city|metro manila|philippines|ncr)$/i.test(seg)) continue;
+            if (/\b(?:Barangay|Brgy\.?|Bgy\.?)\b/i.test(seg)) continue;
+            if (/^14\d{2}/.test(seg)) continue;
+
+            structured.street = seg;
+            structured.streetAddress = seg;
+            break;
+        }
+    }
+
     // Barangay detection
     let rawBrgy = compMap.sublocality_level_1 || compMap.sublocality_level_2 || compMap.sublocality || '';
     if (!rawBrgy && formatted) {
@@ -337,17 +359,37 @@ export function parseGeocodedAddress(results, lat, lng, apiPlusCode = '') {
         }
     }
 
+    let isOfficialBrgy = false;
     if (rawBrgy) {
         const numMatch = rawBrgy.match(/\d+[A-Za-z]?/);
         if (numMatch) {
             structured.barangay = `Barangay ${numMatch[0]}`;
+            isOfficialBrgy = true;
         } else {
-            structured.barangay = rawBrgy.startsWith('Barangay') ? rawBrgy : `Barangay ${rawBrgy}`;
+            // Check if it's a known Caloocan barangay name/alias
+            const cleanRaw = rawBrgy.replace(/^Barangay\s*/i, '').trim();
+            const matched = CALOOCAN_BARANGAYS.find(b =>
+                b.name.toLowerCase() === rawBrgy.toLowerCase() ||
+                b.name.toLowerCase() === `barangay ${cleanRaw}`.toLowerCase() ||
+                (b.alias && b.alias.toLowerCase().includes(cleanRaw.toLowerCase()))
+            );
+            if (matched) {
+                structured.barangay = matched.name;
+                isOfficialBrgy = true;
+            } else {
+                // Not an official Caloocan barangay name (e.g. Google labeled "Diamond" as sublocality).
+                // Reassign to street/subdivision if empty, and clear rawBrgy so boundary polygon resolves true Barangay.
+                if (!structured.subdivision && !structured.streetAddress) {
+                    structured.street = rawBrgy;
+                    structured.streetAddress = rawBrgy;
+                }
+                rawBrgy = '';
+            }
         }
     }
 
     // 100% Authoritative GeoJSON Boundary Fallback for all 188 Caloocan Barangays
-    if (!structured.barangay && lat != null && lng != null) {
+    if ((!structured.barangay || !isOfficialBrgy) && lat != null && lng != null) {
         const detected = findBarangayByCoordinates(lat, lng);
         if (detected) {
             structured.barangay = detected.name;
@@ -364,15 +406,6 @@ export function parseGeocodedAddress(results, lat, lng, apiPlusCode = '') {
     // Postal Code (Authoritative Caloocan lookup)
     const brgyPostal = getPostalCodeForBarangay(structured.barangay);
     structured.postalCode = brgyPostal || compMap.postal_code || '1421';
-
-    // Well-known Celina Homes 3 reference calibration
-    if (lat >= 14.7505 && lat <= 14.7535 && lng >= 121.0250 && lng <= 121.0275) {
-        if (!structured.subdivision) structured.subdivision = 'Celina Homes 3';
-        if (!structured.plusCode) structured.plusCode = 'Q22G+QGP';
-        if (!structured.streetAddress || structured.streetAddress === 'Silver') structured.streetAddress = 'Blk 4 Lot 16 Silver';
-        if (!structured.barangay) structured.barangay = 'Barangay 171';
-        structured.postalCode = '1421';
-    }
 
     return structured;
 }
@@ -430,6 +463,7 @@ export function parseAddressString(str, lat = null, lng = null) {
         if (brgyMatch && seg.toLowerCase().includes('barangay')) continue;
         if (/^14\d{2}/.test(seg) || seg.toLowerCase().includes('metro manila')) continue;
         if (seg.toLowerCase() === 'caloocan' || seg.toLowerCase() === 'caloocan city') continue;
+        if (seg.toLowerCase() === 'philippines') continue;
 
         // Check if subdivision
         if (/\b(?:Homes|Village|Heights|Subdivision|Residences|Compound|Estate|Ville)\b/i.test(seg)) {
@@ -442,7 +476,30 @@ export function parseAddressString(str, lat = null, lng = null) {
     }
 
     if (nonStandardSegments.length > 0) {
-        structured.streetAddress = nonStandardSegments.join(', ');
+        // Deduplicate repeated street names (e.g. '1604 Sampaguita Dr' vs '1604 Sampaguita Drive')
+        const norm = (s) => s.toLowerCase()
+            .replace(/\b(drive|dr\.?)\b/g, 'drive')
+            .replace(/\b(street|st\.?)\b/g, 'street')
+            .replace(/\b(avenue|ave\.?)\b/g, 'avenue')
+            .replace(/\b(boulevard|blvd\.?)\b/g, 'boulevard')
+            .replace(/\b(road|rd\.?)\b/g, 'road')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const deduped = [];
+        for (const seg of nonStandardSegments) {
+            const sn = norm(seg);
+            const idx = deduped.findIndex(ex => {
+                const en = norm(ex);
+                return en === sn || en.includes(sn) || sn.includes(en);
+            });
+            if (idx === -1) {
+                deduped.push(seg);
+            } else if (seg.length > deduped[idx].length) {
+                deduped[idx] = seg;
+            }
+        }
+        structured.streetAddress = deduped.join(', ');
     }
 
     return structured;
@@ -461,7 +518,11 @@ export function parseAddressString(str, lat = null, lng = null) {
 export function formatFullAddress(structured, fallbackCoordinates = null) {
     if (!structured) {
         if (fallbackCoordinates && fallbackCoordinates.lat && fallbackCoordinates.lng) {
-            return `Caloocan City (${Number(fallbackCoordinates.lat).toFixed(5)}, ${Number(fallbackCoordinates.lng).toFixed(5)})`;
+            const pc = encodeOpenLocationCode(fallbackCoordinates.lat, fallbackCoordinates.lng, true);
+            const autoBrgy = findBarangayByCoordinates(fallbackCoordinates.lat, fallbackCoordinates.lng);
+            const brgyName = autoBrgy ? autoBrgy.name : 'Barangay 171';
+            const zip = getPostalCodeForBarangay(brgyName) || '1421';
+            return [pc, brgyName, 'Caloocan', `${zip} Metro Manila`, 'Philippines'].filter(Boolean).join(', ');
         }
         return 'Caloocan City';
     }
@@ -476,16 +537,59 @@ export function formatFullAddress(structured, fallbackCoordinates = null) {
         region = 'Metro Manila'
     } = structured;
 
-    const postalAdmin = [postalCode, region].filter(Boolean).join(' ');
+    // Resolve Plus Code: use existing or generate from coordinates
+    const resolvedPlus = plusCode || (fallbackCoordinates?.lat && fallbackCoordinates?.lng
+        ? encodeOpenLocationCode(fallbackCoordinates.lat, fallbackCoordinates.lng, true)
+        : '');
 
-    const parts = [
-        subdivision,
-        plusCode,
-        streetAddress,
-        barangay,
-        city,
-        postalAdmin
+    // Resolve Barangay: use existing or detect from coordinates
+    let resolvedBrgy = barangay;
+    if (!resolvedBrgy && fallbackCoordinates?.lat && fallbackCoordinates?.lng) {
+        const detected = findBarangayByCoordinates(fallbackCoordinates.lat, fallbackCoordinates.lng);
+        if (detected) resolvedBrgy = detected.name;
+    }
+
+    // Resolve Postal Code
+    const resolvedPostal = postalCode || getPostalCodeForBarangay(resolvedBrgy) || '1421';
+
+    // Deduplicate subdivision and streetAddress if they refer to the same street/number
+    let cleanSubd = (subdivision || '').trim();
+    let cleanStreet = (streetAddress || '').trim();
+
+    // Filter out generic placeholders like "Address unavailable"
+    if (/^address unavailable/i.test(cleanStreet)) cleanStreet = '';
+    if (/^address unavailable/i.test(cleanSubd)) cleanSubd = '';
+
+    if (cleanSubd && cleanStreet) {
+        const normSubd = cleanSubd.toLowerCase().replace(/\b(drive|dr\.?)\b/g, 'dr').replace(/\b(street|st\.?)\b/g, 'st').replace(/\b(avenue|ave\.?)\b/g, 'ave').replace(/\s+/g, ' ').trim();
+        const normStreet = cleanStreet.toLowerCase().replace(/\b(drive|dr\.?)\b/g, 'dr').replace(/\b(street|st\.?)\b/g, 'st').replace(/\b(avenue|ave\.?)\b/g, 'ave').replace(/\s+/g, ' ').trim();
+        if (normSubd === normStreet || normStreet.includes(normSubd)) {
+            cleanSubd = '';
+        } else if (normSubd.includes(normStreet)) {
+            cleanStreet = '';
+        }
+    }
+
+    const cleanCity = city ? city.replace(/\s*City$/i, '') : 'Caloocan';
+    const postalAdmin = [resolvedPostal, region].filter(Boolean).join(' ');
+
+    const rawParts = [
+        resolvedPlus,
+        cleanSubd,
+        cleanStreet,
+        resolvedBrgy,
+        cleanCity,
+        postalAdmin,
+        'Philippines'
     ].filter(Boolean);
+
+    // Deduplicate any repeated segments
+    const parts = [];
+    for (const p of rawParts) {
+        if (!parts.some(existing => existing.toLowerCase() === p.toLowerCase())) {
+            parts.push(p);
+        }
+    }
 
     if (parts.length > 0) {
         return parts.join(', ');
