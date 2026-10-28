@@ -10788,11 +10788,15 @@ export default function ResidentDashboard() {
         setIsTrackingLocation(false);
     }, []);
 
-    const acceptDevicePosition = (position) => {
+    const acceptDevicePosition = (position, isForced = false) => {
         const { latitude, longitude, accuracy } = position.coords || {};
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-        // Don't degrade an already locked accurate fix with a jittery reading
-        if (reportLocation?.accuracy && Number.isFinite(accuracy) && accuracy > reportLocation.accuracy * 1.8) {
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            setIsLocating(false);
+            return;
+        }
+        // Don't degrade an already locked accurate fix with a jittery reading unless explicitly requested
+        if (!isForced && reportLocation?.accuracy && Number.isFinite(accuracy) && accuracy > reportLocation.accuracy * 1.8) {
+            setIsLocating(false);
             return;
         }
         const loc = {
@@ -10829,7 +10833,7 @@ export default function ResidentDashboard() {
         navigator.geolocation.getCurrentPosition(
             position => {
                 if (requestId === locationRequestRef.current) {
-                    acceptDevicePosition(position);
+                    acceptDevicePosition(position, force);
                 }
             },
             error => {
@@ -10842,7 +10846,7 @@ export default function ResidentDashboard() {
                 // Fallback to network/WiFi position if high-accuracy GPS hardware times out
                 navigator.geolocation.getCurrentPosition(
                     fallbackPos => {
-                        if (requestId === locationRequestRef.current) acceptDevicePosition(fallbackPos);
+                        if (requestId === locationRequestRef.current) acceptDevicePosition(fallbackPos, force);
                     },
                     () => {
                         if (requestId === locationRequestRef.current) {
@@ -10850,10 +10854,10 @@ export default function ResidentDashboard() {
                             showToast('Could not refresh GPS. Choose the issue location on the map or retry.', 'info');
                         }
                     },
-                    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+                    { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
                 );
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
         );
     };
 

@@ -1122,11 +1122,25 @@ function QuickReportWizardModal({
                                             <div className="flex flex-wrap items-center gap-2 mt-3" aria-label="Location controls">
                                                 <button
                                                     type="button"
-                                                    onClick={() => requestDeviceLocation(true)}
-                                                    className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                                                    disabled={isLocating}
+                                                    onClick={() => {
+                                                        requestDeviceLocation(true);
+                                                        onStartLocationTracking?.();
+                                                    }}
+                                                    className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] disabled:bg-orange-400 disabled:cursor-not-allowed text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer active:scale-95"
+                                                    aria-busy={isLocating}
                                                 >
-                                                    <MapPin size={14} />
-                                                    <span>{t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
+                                                    {isLocating ? (
+                                                        <>
+                                                            <Loader2 size={15} className="animate-spin text-white shrink-0" />
+                                                            <span>Locating...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <MapPin size={14} className="shrink-0" />
+                                                            <span>{t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
+                                                        </>
+                                                    )}
                                                 </button>
                                             </div>
                                         )}
