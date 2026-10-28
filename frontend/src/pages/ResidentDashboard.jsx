@@ -9877,7 +9877,7 @@ export default function ResidentDashboard() {
 
     const getIconForCategory = (category) => {
         const cat = (category || '').toLowerCase();
-        if (cat.includes('public works') || cat.includes('road') || cat.includes('bridge')) return <HardHat size={18} className="text-orange-500" />;
+        if (cat.includes('public works') || cat.includes('road') || cat.includes('bridge')) return <RoadIcon size={18} className="text-orange-500" />;
         if (cat.includes('utilit') || cat.includes('water') || cat.includes('drain')) return <Droplets size={18} className="text-blue-500" />;
         if (cat.includes('advisory') || cat.includes('safety') || cat.includes('hazard')) return <ShieldAlert size={18} className="text-red-500" />;
         if (cat.includes('other')) return <HelpCircle size={18} className="text-purple-500" />;

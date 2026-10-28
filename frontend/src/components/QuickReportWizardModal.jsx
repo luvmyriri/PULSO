@@ -39,6 +39,23 @@ import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
 import { validateProfanity } from '../utils/profanityFilter';
 
+export const RoadIcon = ({ size = 20, className = '', style = {} }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        style={style}
+    >
+        <path d="M4 19L9 5M20 19L15 5M12 7V9M12 13V15M12 19V21" />
+    </svg>
+);
+
 export function getCategoryIconComponent(catName) {
     const lower = String(catName || '').toLowerCase();
     if (lower.includes('waste') || lower.includes('garbage') || lower.includes('trash') || lower.includes('basura')) return Trash2;
@@ -49,7 +66,7 @@ export function getCategoryIconComponent(catName) {
     if (lower.includes('traffic') || lower.includes('sign') || lower.includes('signal')) return Signpost;
     if (lower.includes('building') || lower.includes('facilit') || lower.includes('hall')) return Building2;
     if (lower.includes('safety') || lower.includes('hazard') || lower.includes('danger') || lower.includes('sunog')) return ShieldAlert;
-    if (lower.includes('road') || lower.includes('bridge') || lower.includes('lubak') || lower.includes('kalsada')) return HardHat;
+    if (lower.includes('road') || lower.includes('bridge') || lower.includes('lubak') || lower.includes('kalsada')) return RoadIcon;
     return HelpCircle;
 }
 
