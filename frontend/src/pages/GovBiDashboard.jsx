@@ -37,6 +37,7 @@ import GovNotificationDropdown from '../components/GovNotificationDropdown';
 import GovUserDropdown from '../components/GovUserDropdown';
 import SearchInput from '../components/SearchInput';
 import Swal from 'sweetalert2';
+import { exportToStyledXLSX } from '../utils/xlsxExport';
 
 // ─── Constants & Fallback Reference BI Data ──────────────────────────────────
 const DATE_RANGES = [
@@ -228,27 +229,58 @@ export default function GovBiDashboard() {
         };
     }, [barangayFilter]);
 
-    // Export CSV report handler
-    const handleExportCSV = () => {
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + "Barangay,Total Reports,Resolved,Active Backlog,Resolution Rate\n"
-            + BARANGAY_VOLUME_DATA.map(e => `"${e.name}",${e.count},${e.resolved},${e.active},${e.pct}%`).join("\n");
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `PULSO_BI_Analytics_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const [isExporting, setIsExporting] = useState(false);
 
-        Swal.fire({
-            icon: 'success',
-            title: 'Analytics Data Exported',
-            text: 'Detailed CSV dataset successfully saved to your downloads.',
-            confirmButtonColor: '#ff6b00',
-            timer: 2500
-        });
+    // Export styled XLSX report handler
+    const handleExportXLSX = async () => {
+        if (isExporting) return;
+        setIsExporting(true);
+        try {
+            const columns = [
+                { header: 'Barangay', key: 'name', width: 22 },
+                { header: 'Total Reports', key: 'count', align: 'right', width: 16 },
+                { header: 'Resolved', key: 'resolved', align: 'right', width: 14 },
+                { header: 'Active Backlog', key: 'active', align: 'right', width: 16 },
+                { header: 'Resolution Rate', key: 'rate', align: 'right', width: 18 }
+            ];
+            const rows = BARANGAY_VOLUME_DATA.map(e => ({
+                name: e.name,
+                count: e.count,
+                resolved: e.resolved,
+                active: e.active,
+                rate: `${e.pct}%`
+            }));
+            const dateStr = new Date().toISOString().slice(0, 10);
+            await exportToStyledXLSX({
+                title: 'OPERATIONS & BI ANALYTICS — BARANGAY WORKLOAD',
+                subtitle: 'CITY GOVERNMENT OF CALOOCAN • CITY ENGINEERING DEPARTMENT',
+                scope: barangayFilter || 'North Caloocan (All Barangays)',
+                filename: `PULSO_BI_Analytics_${dateStr}`,
+                sheetName: 'BI Analytics',
+                columns,
+                rows
+            });
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Analytics Workbook Exported',
+                text: 'Official styled .xlsx workbook successfully generated and saved.',
+                confirmButtonColor: '#2563EB',
+                timer: 2200
+            });
+        } catch (err) {
+            console.error('Failed to export BI XLSX:', err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Export Failed',
+                text: 'Could not generate the spreadsheet. Please try again.',
+                confirmButtonColor: '#2563EB'
+            });
+        } finally {
+            setIsExporting(false);
+        }
     };
+    const handleExportCSV = handleExportXLSX;
 
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-[#f4f6fa] dark:bg-[#070a12] text-slate-900 dark:text-slate-100 font-sans antialiased select-none">
@@ -287,13 +319,17 @@ export default function GovBiDashboard() {
                             <span>North Caloocan</span>
                         </div>
 
-                        {/* Export Report CTA */}
+                        {/* Minimal Export Button (Excel .xlsx) */}
                         <button
-                            onClick={handleExportCSV}
-                            className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-heading font-bold text-white bg-[#ff6b00] hover:bg-[#e65c00] shadow-sm shadow-orange-500/20 transition-all cursor-pointer"
+                            type="button"
+                            onClick={handleExportXLSX}
+                            disabled={isExporting}
+                            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer disabled:opacity-40"
+                            title="Export analytics dataset to Excel (.xlsx)"
+                            aria-label="Export analytics dataset to Excel"
                         >
-                            <Download size={13} />
-                            <span>Export BI Report</span>
+                            <Download size={13} className="text-slate-500 dark:text-slate-400" />
+                            <span>{isExporting ? 'Exporting…' : 'Export'}</span>
                         </button>
 
                         <ThemeToggle />

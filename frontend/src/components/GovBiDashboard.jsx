@@ -21,9 +21,22 @@ function DataTable({ label, columns, rows, note }) {
     </details>;
 }
 
-function CsvButton({ label, onClick, disabled = false }) {
-    return <button type="button" className="gov-bi-csv-button" onClick={onClick} disabled={disabled} aria-label={`Export ${label} as CSV`} title={disabled ? 'Complete, current records are required for export' : `Export ${label} as CSV`}><Download size={13} aria-hidden="true"/> CSV</button>;
+function ExportButton({ label, onClick, disabled = false }) {
+    return (
+        <button
+            type="button"
+            className="gov-bi-export-button"
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={`Export ${label} to Excel (.xlsx)`}
+            title={disabled ? 'Complete, current records are required for export' : `Export ${label} to Excel (.xlsx)`}
+        >
+            <Download size={12} aria-hidden="true" />
+            <span>Export</span>
+        </button>
+    );
 }
+const CsvButton = ExportButton;
 
 function KpiCard({ title, value, detail, url, action, segments, total, onExport, children }) {
     return <section className="gov-bi-surface gov-bi-kpi" aria-label={title}>

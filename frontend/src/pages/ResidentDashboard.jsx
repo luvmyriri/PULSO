@@ -1,3 +1,4 @@
+import { exportResidentReportsToXLSX } from '../utils/xlsxExport';
 import { residentPublication } from '../utils/publicationAdapter';
 import ResidentNotificationSettings from '../components/ResidentNotificationSettings';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -720,61 +721,19 @@ export const isLocalDevHost = () => {
 };
 
 /**
- * Safely exports reports to a standard CSV file with proper escaping,
- * UTF-8 Byte Order Mark (BOM) for Excel compatibility, and formula injection safeguards.
+ * Exports resident reports as an artistic, professionally styled .xlsx workbook.
  */
-export const exportReportsToCSV = (reports, filenamePrefix = 'PULSO_My_Reports') => {
+export const exportReportsToXLSX = async (reports, residentName = 'Citizen') => {
     if (!reports || !Array.isArray(reports) || reports.length === 0) return false;
-
-    const escapeCell = (val) => {
-        if (val === null || val === undefined) return '""';
-        let str = String(val);
-        // Formula injection protection (CWE-1236): prefix leading =, +, -, @, \t, \r with single quote
-        if (/^[=+\-@\t\r]/.test(str)) {
-            str = "'" + str;
-        }
-        return `"${str.replace(/"/g, '""')}"`;
-    };
-
-    const headers = [
-        'Ticket ID',
-        'Title / Description',
-        'Category',
-        'Status',
-        'Date Submitted',
-        'Barangay',
-        'Address / Landmark',
-        'Latitude',
-        'Longitude',
-        'Last Updated'
-    ];
-
-    const rows = reports.map((r) => [
-        escapeCell(r.ticket_id || r.id || 'N/A'),
-        escapeCell(r.title || r.description || ''),
-        escapeCell(r.category || r.ai_category || 'General'),
-        escapeCell(r.status || 'pending'),
-        escapeCell(r.created_at ? new Date(r.created_at).toISOString().replace('T', ' ').slice(0, 19) : ''),
-        escapeCell(r.barangay || r.location_barangay || ''),
-        escapeCell(r.location_string || r.address || ''),
-        escapeCell(r.latitude ?? r.location_lat ?? r.lat ?? ''),
-        escapeCell(r.longitude ?? r.location_lng ?? r.lng ?? ''),
-        escapeCell(r.updated_at ? new Date(r.updated_at).toISOString().replace('T', ' ').slice(0, 19) : '')
-    ].join(','));
-
-    // UTF-8 BOM (\uFEFF) ensures Excel and spreadsheet apps render international characters correctly
-    const csvContent = '\uFEFF' + [headers.map(escapeCell).join(','), ...rows].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    return true;
+    try {
+        await exportResidentReportsToXLSX(reports, residentName);
+        return true;
+    } catch (err) {
+        console.error('Failed to export resident reports to XLSX:', err);
+        return false;
+    }
 };
+export const exportReportsToCSV = exportReportsToXLSX;
 
 const ResidentHomeView = ({
     user,
@@ -943,18 +902,19 @@ const ResidentHomeView = ({
                             {isLocalhost && userReportCount > 0 && (
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        const ok = exportReportsToCSV(userReports);
+                                    onClick={async () => {
+                                        const residentName = user?.first_name || user?.name || 'Citizen';
+                                        const ok = await exportReportsToXLSX(userReports, residentName);
                                         if (ok && showToast) {
-                                            showToast(`Exported ${userReports.length} report(s) to CSV.`);
+                                            showToast(`Exported ${userReports.length} report(s) to Excel.`);
                                         }
                                     }}
-                                    className="px-4 py-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-2xs transition-all cursor-pointer focus-visible:outline-3 focus-visible:outline-[#ff6b00]"
-                                    title="Export your reports as CSV (Localhost only)"
-                                    aria-label="Export your reports as CSV"
+                                    className="px-2.5 py-1.5 rounded-xl border border-slate-200/90 dark:border-slate-700/80 bg-slate-100/80 dark:bg-slate-800/60 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-[#2563EB]"
+                                    title="Export your reports to Excel (.xlsx)"
+                                    aria-label="Export your reports to Excel"
                                 >
-                                    <Download size={15} className="text-slate-500 dark:text-slate-400" />
-                                    <span>Export CSV</span>
+                                    <Download size={13} className="text-slate-500 dark:text-slate-400" />
+                                    <span>Export</span>
                                 </button>
                             )}
                             <button
@@ -3168,17 +3128,25 @@ const MyReports = ({
         { id: 'rejected', label: 'Rejected', count: rejectedCount, icon: XCircle, color: 'text-rose-500' }
     ];
 
-    const handleExportCSV = () => {
+    const [isExporting, setIsExporting] = useState(false);
+    const handleExportXLSX = async () => {
         const reportsToExport = (filteredReports && filteredReports.length > 0) ? filteredReports : baseReports;
-        if (!reportsToExport || reportsToExport.length === 0) {
-            showToast?.('No reports available to export.', 'warning');
+        if (!reportsToExport || reportsToExport.length === 0 || isExporting) {
+            if (!isExporting) showToast?.('No reports available to export.', 'warning');
             return;
         }
-        const ok = exportReportsToCSV(reportsToExport);
-        if (ok && showToast) {
-            showToast(`Exported ${reportsToExport.length} report(s) to CSV.`);
+        setIsExporting(true);
+        try {
+            const residentName = user?.first_name || user?.name || 'Citizen';
+            const ok = await exportReportsToXLSX(reportsToExport, residentName);
+            if (ok && showToast) {
+                showToast(`Exported ${reportsToExport.length} report(s) to Excel.`);
+            }
+        } finally {
+            setIsExporting(false);
         }
     };
+    const handleExportCSV = handleExportXLSX;
 
     const getCategoryIcon = (categoryStr) => {
         const cat = (categoryStr || '').toLowerCase();
@@ -3341,13 +3309,14 @@ const MyReports = ({
                     {isLocalhost && (
                         <button
                             type="button"
-                            onClick={handleExportCSV}
-                            className="px-3.5 py-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-2xs transition-all cursor-pointer focus-visible:outline-3 focus-visible:outline-[#ff6b00]"
-                            title="Export reports as CSV (Localhost only)"
-                            aria-label="Export reports as CSV"
+                            onClick={handleExportXLSX}
+                            disabled={isExporting}
+                            className="px-2.5 py-1.5 rounded-xl border border-slate-200/90 dark:border-slate-700/80 bg-slate-100/80 dark:bg-slate-800/60 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[#2563EB]"
+                            title="Export reports to Excel (.xlsx)"
+                            aria-label="Export reports to Excel"
                         >
-                            <Download size={15} className="text-slate-500 dark:text-slate-400" />
-                            <span>Export CSV</span>
+                            <Download size={13} className="text-slate-500 dark:text-slate-400" />
+                            <span>{isExporting ? 'Exporting…' : 'Export'}</span>
                         </button>
                     )}
                     <button

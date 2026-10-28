@@ -1,3 +1,5 @@
+import { exportToStyledXLSX } from './xlsxExport.js';
+
 const ZONE = 'Asia/Manila';
 
 const PRIORITIES = [
@@ -112,4 +114,49 @@ export function buildOverviewCsv(data, kind, { days = 14 } = {}) {
             throw new Error('Unknown overview export.');
     }
     return { headers, rows, filename };
+}
+
+/**
+ * Exports overview datasets as an artistic, professionally styled .xlsx spreadsheet.
+ */
+export async function exportOverviewXLSX(data, kind, options = {}) {
+    const { headers, rows, filename } = buildOverviewCsv(data, kind, options);
+
+    const kindTitles = {
+        open_reports: 'OPEN REPORTS WORKLOAD',
+        current_work_orders: 'CURRENT WORK ORDERS DISPATCH',
+        needs_triage: 'TRIAGE & UNREVIEWED REPORTS QUEUE',
+        attention: 'ATTENTION REQUIRED QUEUES',
+        intake: 'DAILY REPORT INTAKE TRENDS',
+        areas: 'OPEN REPORTS BY BARANGAY AREA',
+        priorities: 'OPEN REPORTS BY ASSESSED PRIORITY',
+        work_stages: 'CURRENT WORK ORDERS BY STAGE',
+        summary: 'OPERATIONS COMPREHENSIVE EXECUTIVE SUMMARY'
+    };
+
+    const columns = headers.map((h, i) => {
+        const isNumeric = ['Count', 'Open reports', 'With current work', 'Without current work', 'Reports received', 'Current orders'].includes(h);
+        return {
+            header: h,
+            key: `c_${i}`,
+            align: isNumeric ? 'right' : (h.includes('Scope') || h.includes('As of') || h.includes('Unit') ? 'center' : 'left'),
+            width: h.length > 20 ? 26 : Math.max(h.length + 5, 14)
+        };
+    });
+
+    const dataRows = rows.map(r => {
+        const row = {};
+        r.forEach((val, i) => { row[`c_${i}`] = val; });
+        return row;
+    });
+
+    return exportToStyledXLSX({
+        title: `OPERATIONS OVERVIEW — ${kindTitles[kind] || 'SUMMARY'}`,
+        subtitle: 'CITY GOVERNMENT OF CALOOCAN • CITY ENGINEERING DEPARTMENT',
+        scope: data.scope || 'Authorized Scope',
+        filename,
+        sheetName: (kindTitles[kind] || kind).slice(0, 31),
+        columns,
+        rows: dataRows
+    });
 }
