@@ -1118,7 +1118,7 @@ function QuickReportWizardModal({
                                                 </span>
                                             )}
                                         </div>
-                                        {!reportLocation ? (
+                                        {!reportLocation && (
                                             <div className="flex flex-wrap items-center gap-2 mt-3" aria-label="Location controls">
                                                 {onOpenLocationPicker && (
                                                     <button
@@ -1140,17 +1140,7 @@ function QuickReportWizardModal({
                                                     </button>
                                                 )}
                                             </div>
-                                        ) : onOpenLocationPicker ? (
-                                            <div className="mt-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={onOpenLocationPicker}
-                                                    className="text-xs font-semibold text-[#ff6b00] hover:underline cursor-pointer inline-flex items-center gap-1"
-                                                >
-                                                    <span>Change or open location on map</span>
-                                                </button>
-                                            </div>
-                                        ) : null}
+                                        )}
                                     </div>
                                 </div>
                             </div>
