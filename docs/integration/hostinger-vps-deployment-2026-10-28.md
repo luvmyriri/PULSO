@@ -234,7 +234,9 @@ On 2026-10-28, the government workflow API release
 existing styled Excel workbooks for each Operations overview KPI and chart.
 The web release was copied from the then-current
 `20261028-styled-xlsx-export-v1` source and overlaid only with the export
-changes. A database and file backup is at
+changes. The subsequent `20261028-admin-navigation-v1` became the current
+web release and contains the same CSV/Excel source plus the authorized
+Administration navigation. A database and file backup is at
 `/opt/pulso/backups/20261028T130659Z`; the previous web image and release
 remain available for rollback. Five focused CSV tests, targeted ESLint, the
 Vite production build and the UI detector passed. The live web, API and DB
