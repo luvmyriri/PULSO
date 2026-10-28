@@ -17,9 +17,13 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('residents', sa.Column('normalized_email', sa.String(), nullable=True))
-    op.add_column('residents', sa.Column('normalized_phone_number', sa.String(), nullable=True))
     connection = op.get_bind()
+    insp = sa.inspect(connection)
+    existing_cols = {c['name'] for c in insp.get_columns('residents')}
+    if 'normalized_email' not in existing_cols:
+        op.add_column('residents', sa.Column('normalized_email', sa.String(), nullable=True))
+    if 'normalized_phone_number' not in existing_cols:
+        op.add_column('residents', sa.Column('normalized_phone_number', sa.String(), nullable=True))
     residents = sa.table('residents', sa.column('id'), sa.column('email'), sa.column('phone_number'),
                         sa.column('normalized_email'), sa.column('normalized_phone_number'), sa.column('is_verified'))
     rows = list(connection.execute(sa.select(residents.c.id, residents.c.email, residents.c.phone_number, residents.c.is_verified)).mappings())
@@ -39,12 +43,17 @@ def upgrade():
         connection.execute(residents.update().where(residents.c.id == row['id']).values(normalized_email=email, normalized_phone_number=phone))
     if ambiguous:
         logging.getLogger('alembic.runtime.migration').warning('Legacy confirmed contact conflicts preserved for manual review; resident IDs: %s', sorted(set(ambiguous)))
-    op.create_index('ix_residents_normalized_email', 'residents', ['normalized_email'])
-    op.create_index('ix_residents_normalized_phone_number', 'residents', ['normalized_phone_number'])
-    op.create_index('uq_residents_confirmed_norm_email', 'residents', ['normalized_email'], unique=True,
-                    postgresql_where=sa.text('is_verified = TRUE AND normalized_email IS NOT NULL'))
-    op.create_index('uq_residents_confirmed_norm_phone', 'residents', ['normalized_phone_number'], unique=True,
-                    postgresql_where=sa.text('is_verified = TRUE AND normalized_phone_number IS NOT NULL'))
+    existing_indexes = {idx['name'] for idx in insp.get_indexes('residents')}
+    if 'ix_residents_normalized_email' not in existing_indexes:
+        op.create_index('ix_residents_normalized_email', 'residents', ['normalized_email'])
+    if 'ix_residents_normalized_phone_number' not in existing_indexes:
+        op.create_index('ix_residents_normalized_phone_number', 'residents', ['normalized_phone_number'])
+    if 'uq_residents_confirmed_norm_email' not in existing_indexes:
+        op.create_index('uq_residents_confirmed_norm_email', 'residents', ['normalized_email'], unique=True,
+                        postgresql_where=sa.text('is_verified = TRUE AND normalized_email IS NOT NULL'))
+    if 'uq_residents_confirmed_norm_phone' not in existing_indexes:
+        op.create_index('uq_residents_confirmed_norm_phone', 'residents', ['normalized_phone_number'], unique=True,
+                        postgresql_where=sa.text('is_verified = TRUE AND normalized_phone_number IS NOT NULL'))
 
 
 def downgrade():
