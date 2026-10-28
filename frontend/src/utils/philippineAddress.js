@@ -365,14 +365,7 @@ export function parseGeocodedAddress(results, lat, lng, apiPlusCode = '') {
     const brgyPostal = getPostalCodeForBarangay(structured.barangay);
     structured.postalCode = brgyPostal || compMap.postal_code || '1421';
 
-    // Well-known Celina Homes 3 reference calibration
-    if (lat >= 14.7505 && lat <= 14.7535 && lng >= 121.0250 && lng <= 121.0275) {
-        if (!structured.subdivision) structured.subdivision = 'Celina Homes 3';
-        if (!structured.plusCode) structured.plusCode = 'Q22G+QGP';
-        if (!structured.streetAddress || structured.streetAddress === 'Silver') structured.streetAddress = 'Blk 4 Lot 16 Silver';
-        if (!structured.barangay) structured.barangay = 'Barangay 171';
-        structured.postalCode = '1421';
-    }
+
 
     return structured;
 }

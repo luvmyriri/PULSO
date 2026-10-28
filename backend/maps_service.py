@@ -151,14 +151,6 @@ async def reverse_geocode(lat: float, lng: float) -> str:
             admin_area = comp_map.get("administrative_area_level_1") or "Metro Manila"
             postal_admin = f"{postal_code} {admin_area}".strip() if postal_code else admin_area
 
-            # Specific coordinate snapping for Celina Homes 3 / Barangay 171 block & lot
-            if 14.7505 <= lat <= 14.7535 and 121.0250 <= lng <= 121.0275:
-                if not premise: premise = "Celina Homes 3"
-                if not plus_code: plus_code = "Q22G+QGP"
-                if not street_str or street_str == "Silver": street_str = "Blk 4 Lot 16 Silver"
-                if not brgy: brgy = "Barangay 171"
-                if not postal_code: postal_admin = "1421 Metro Manila"
-
             parts = []
             if premise: parts.append(premise)
             if plus_code: parts.append(plus_code)
