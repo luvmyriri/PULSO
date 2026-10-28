@@ -76,19 +76,45 @@ async def reverse_geocode(lat: float, lng: float) -> str:
                 if pc_m:
                     plus_code = pc_m.group(1)
 
-            # Extract premise name from formatted if not explicitly in components
+            street_parts = []
+            if street_num: street_parts.append(street_num)
+            if route and route not in street_num: street_parts.append(route)
+            street_str = " ".join(street_parts).strip()
+
+            # Extract premise name ONLY if it is an actual building, subdivision, or POI (not a street address)
             if not premise and formatted:
                 clean = formatted
                 if plus_code:
                     clean = clean.replace(plus_code, "").strip()
                 first_seg = clean.split(",")[0].strip()
-                if first_seg and first_seg != route and first_seg != street_num and not first_seg.lower().startswith("barangay"):
+                is_street_seg = (
+                    first_seg == route or 
+                    first_seg == street_num or 
+                    first_seg == street_str or
+                    (street_num and street_num in first_seg) or
+                    (route and route.lower() in first_seg.lower()) or
+                    any(kw in first_seg.lower().split() for kw in ["dr", "dr.", "drive", "st", "st.", "street", "ave", "ave.", "avenue", "rd", "rd.", "road", "blvd", "blvd."])
+                )
+                if first_seg and not is_street_seg and not first_seg.lower().startswith("barangay"):
                     premise = first_seg
 
-            street_parts = []
-            if street_num: street_parts.append(street_num)
-            if route and route not in street_num: street_parts.append(route)
-            street_str = " ".join(street_parts).strip()
+            # Deduplicate premise against street_str to prevent repeating street names
+            if premise and street_str:
+                import re
+                p_norm = re.sub(r'\b(drive|dr\.?)\b', 'drive', premise.lower())
+                p_norm = re.sub(r'\b(street|st\.?)\b', 'street', p_norm)
+                p_norm = re.sub(r'\b(avenue|ave\.?)\b', 'avenue', p_norm)
+                p_norm = re.sub(r'\b(road|rd\.?)\b', 'road', p_norm)
+                p_norm = re.sub(r'\s+', ' ', p_norm).strip()
+
+                s_norm = re.sub(r'\b(drive|dr\.?)\b', 'drive', street_str.lower())
+                s_norm = re.sub(r'\b(street|st\.?)\b', 'street', s_norm)
+                s_norm = re.sub(r'\b(avenue|ave\.?)\b', 'avenue', s_norm)
+                s_norm = re.sub(r'\b(road|rd\.?)\b', 'road', s_norm)
+                s_norm = re.sub(r'\s+', ' ', s_norm).strip()
+
+                if p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
+                    premise = ""
 
             brgy = comp_map.get("sublocality_level_1") or comp_map.get("sublocality_level_2") or comp_map.get("neighborhood") or comp_map.get("sublocality") or ""
 

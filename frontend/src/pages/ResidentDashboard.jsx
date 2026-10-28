@@ -10799,14 +10799,10 @@ export default function ResidentDashboard() {
             setIsLocating(false);
             return;
         }
-        // Calibrate accuracy: decrease wide approximate radius (e.g. 105m) to accurate GPS radius (<= 12m)
-        const rawAccuracy = Number.isFinite(accuracy) ? Math.round(accuracy) : 12;
-        const refinedAccuracy = rawAccuracy > 20 ? 12 : rawAccuracy;
-
         const loc = {
             lat: latitude,
             lng: longitude,
-            accuracy: refinedAccuracy,
+            accuracy: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
             confirmed: true,
             source: 'device-gps',
             timestamp: position.timestamp || Date.now()
@@ -10889,7 +10885,10 @@ export default function ResidentDashboard() {
     };
 
     useEffect(() => {
-        if (activeModal !== 'file-report') {
+        if (activeModal === 'file-report') {
+            requestDeviceLocation();
+            startDeviceLocationTracking();
+        } else {
             stopDeviceLocationTracking();
         }
         return () => {
