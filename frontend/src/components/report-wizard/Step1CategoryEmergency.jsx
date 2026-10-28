@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Info, Sparkles, Check } from 'lucide-react';
+import { X, Info, Sparkles, Check, AlertCircle } from 'lucide-react';
 import WizardCardFooter from './WizardCardFooter';
 
 // ── Custom Pictograms matching the redesign specification ──
@@ -194,6 +194,7 @@ export default function Step1CategoryEmergency({
   isGuideModalOpen = false,
   onCloseGuideModal = () => {},
   onOpenGuideModal = () => {},
+  stepErrors = [],
 }) {
   const { t } = useTranslation();
   const [localModalOpen, setLocalModalOpen] = useState(false);
@@ -207,6 +208,16 @@ export default function Step1CategoryEmergency({
     setLocalModalOpen(true);
     onOpenGuideModal();
   };
+
+  const firstCardRef = useRef(null);
+  const categoryError = stepErrors.find(e => e.field === 'category');
+  const hasError = Boolean(categoryError);
+
+  useEffect(() => {
+    if (hasError && firstCardRef.current) {
+      firstCardRef.current.focus();
+    }
+  }, [hasError]);
 
   const selectedCatObj = CATEGORIES.find(c =>
     c.id.toLowerCase() === selectedCategory?.toLowerCase() ||
@@ -245,10 +256,20 @@ export default function Step1CategoryEmergency({
           </p>
         </div>
 
+        {/* Inline Category Error Message */}
+        {hasError && (
+          <div id="category-error-message" role="alert" className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-sm font-semibold text-red-700 dark:text-red-300 animate-fadeIn">
+            <AlertCircle size={18} className="shrink-0 text-red-500" aria-hidden="true" />
+            <span>{categoryError.message || t('reportWizard.validation.category.required', 'Please choose the type of problem.')}</span>
+          </div>
+        )}
+
         {/* 3x3 Grid of Categories */}
         <fieldset
           role="radiogroup"
           aria-label="Issue category selector"
+          aria-invalid={hasError ? 'true' : undefined}
+          aria-describedby={hasError ? 'category-error-message' : undefined}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4"
         >
           <legend className="sr-only">Choose an infrastructure category</legend>
@@ -265,10 +286,13 @@ export default function Step1CategoryEmergency({
                 role="radio"
                 aria-checked={isSelected}
                 aria-label={`${label}. ${subtitle}`}
+                ref={cat.id === CATEGORIES[0].id ? firstCardRef : null}
                 onClick={() => onSelectCategory(cat.id)}
                 className={`group relative text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 flex items-start justify-between gap-3 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
                   isSelected
                     ? 'border-[#ff6b00] dark:border-[#ff6b00] bg-[#fff8f5] dark:bg-orange-950/25 ring-1 ring-[#ff6b00] shadow-xs'
+                    : hasError
+                    ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20 dark:bg-red-950/20 hover:border-red-600'
                     : 'border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-2xs'
                 }`}
               >
@@ -339,7 +363,7 @@ export default function Step1CategoryEmergency({
         onBack={null}
         canBack={false}
         onContinue={onContinue}
-        isContinueDisabled={!selectedCategory}
+        isContinueDisabled={false}
         continueLabel={t('reportWizard.step1Category.continueToLocation', 'Continue to location')}
         noteText={t('reportWizard.shell.notSubmittedYet', 'Your report is not submitted until you confirm it in Review.')}
       />

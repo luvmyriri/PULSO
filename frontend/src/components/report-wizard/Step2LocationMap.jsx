@@ -43,7 +43,9 @@ export default function Step2LocationMap({
   locationData, 
   onLocationChange, 
   onBack, 
-  onContinue 
+  onContinue,
+  stepErrors = [],
+  stepWarnings = [],
 }) {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -65,6 +67,10 @@ export default function Step2LocationMap({
   useEffect(() => () => {
     if (watchRef.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchRef.current);
   }, []);
+
+  const locError = stepErrors.find(e => e.field === 'location' || e.field === 'address');
+  const landmarkVal = locationData?.landmark || '';
+  const landmarkLength = landmarkVal.length;
 
   const currentLat = locationData?.lat ?? CALOOCAN_CENTERS.north.lat;
   const currentLng = locationData?.lng ?? CALOOCAN_CENTERS.north.lng;
@@ -144,7 +150,7 @@ export default function Step2LocationMap({
       (error) => {
         console.warn('Geolocation acquisition failed:', error);
         setIsLocating(false);
-        setGeoError(t('reportWizard.step2Location.locationError', 'Unable to acquire GPS location. Please drag the pin on the map.'));
+        setGeoError(t('reportWizard.validation.location.permissionDenied', "We can't find your location. Turn on Location in your phone settings, or pin the spot on the map yourself."));
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -224,6 +230,14 @@ export default function Step2LocationMap({
             {t('reportWizard.step2Location.subtitle', 'Search for a place, then adjust the pin to the right spot.')}
           </p>
         </div>
+
+        {/* Inline Step Error Banner */}
+        {locError && (
+          <div id="location-step-error" role="alert" className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-sm font-semibold text-red-700 dark:text-red-300 animate-fadeIn">
+            <AlertCircle size={18} className="shrink-0 text-red-500" aria-hidden="true" />
+            <span>{locError.message}</span>
+          </div>
+        )}
 
         {/* Search Row: Input + "Use my location" button */}
         <div className="space-y-1.5">
@@ -342,16 +356,42 @@ export default function Step2LocationMap({
 
 
               {!hasSelection && hasSavedCoordinates && <button type="button" onClick={() => updateCoordinates(locationData.lat, locationData.lng, locationData.address)} className="min-h-11 px-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus-visible:outline-3 focus-visible:outline-blue-600">{t('reportWizard.step2Location.confirmSavedLocation', 'Confirm saved location')}</button>}
+              {/* Accuracy Warning and Confirmation Checkbox */}
+              {locationData?.accuracy > 20 && (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-xs space-y-2">
+                  <p className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                    <AlertTriangle size={14} className="shrink-0 text-amber-600" />
+                    <span>{t('reportWizard.validation.location.accuracyWarning', 'Location may be off. Tap Change location to fix it.')}</span>
+                  </p>
+                  <label className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={locationData?.pinConfirmed || false}
+                      onChange={(e) => onLocationChange(prev => ({ ...prev, pinConfirmed: e.target.checked }))}
+                      className="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500"
+                    />
+                    <span>{t('reportWizard.validation.location.confirmPin', 'This pin is the right spot')}</span>
+                  </label>
+                </div>
+              )}
               {/* Nearby Landmark Field */}
               <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-800">
-                <label htmlFor="location-landmark" className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                  {t('reportWizard.step2Location.landmarkLabel', 'Nearby landmark (optional)')}
-                </label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="location-landmark" className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                    {t('reportWizard.step2Location.landmarkLabel', 'Nearby landmark (optional)')}
+                  </label>
+                  {landmarkLength >= 80 && (
+                    <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                      {landmarkLength} / 100
+                    </span>
+                  )}
+                </div>
                 <input
                   id="location-landmark"
                   type="text"
                   value={locationData?.landmark || ''}
                   onChange={handleLandmarkChange}
+                  maxLength={100}
                   placeholder={t('reportWizard.step2Location.landmarkPlaceholder', 'Add a gate, building or landmark')}
                   className="w-full min-h-[44px] px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs sm:text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
                 />
@@ -368,7 +408,7 @@ export default function Step2LocationMap({
         onBack={onBack}
         canBack={true}
         onContinue={onContinue}
-        isContinueDisabled={!inCaloocan}
+        isContinueDisabled={false}
       />
     </div>
   );

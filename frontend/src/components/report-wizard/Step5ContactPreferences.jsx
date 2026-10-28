@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  Mail, Phone, Lock, Check
+  User, Mail, Phone, Lock, Check, AlertCircle, Sparkles
 } from 'lucide-react';
-import { getStoredUser } from '../../utils/auth';
+import { normalizeMobileNumber, validateEmail } from '../../utils/reportWizardValidation';
 import WizardCardFooter from './WizardCardFooter';
 
 export default function Step5ContactPreferences({
@@ -11,36 +11,86 @@ export default function Step5ContactPreferences({
   onContactChange,
   onBack,
   onContinue,
+  stepErrors = [],
+  stepWarnings = [],
 }) {
   const { t } = useTranslation();
-  const [currentUser] = useState(() => getStoredUser());
-  const [receiveUpdates, setReceiveUpdates] = useState(true);
+  const nameInputRef = useRef(null);
+  const phoneInputRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const consentRef = useRef(null);
 
-  const email = contactData?.email || '';
+  const fullName = contactData?.name || '';
   const phone = contactData?.phone || '';
+  const email = contactData?.email || '';
+  const consentAccepted = contactData?.consentAccepted || false;
+  const receiveUpdates = contactData?.receiveUpdates !== false;
 
-  // Validation
-  const isEmailValid = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const isPhoneValid = !phone || /^(09|\+639)\d{9}$/.test(phone.replace(/[\s-]/g, ''));
-  const hasAtLeastOneContact = Boolean(phone.trim().length > 0 || email.trim().length > 0);
+  const nameError = stepErrors.find(e => e.field === 'name');
+  const contactError = stepErrors.find(e => e.field === 'contact');
+  const phoneError = stepErrors.find(e => e.field === 'phone');
+  const emailError = stepErrors.find(e => e.field === 'email');
+  const consentError = stepErrors.find(e => e.field === 'consent');
 
-  const canContinue = currentUser 
-    ? (isEmailValid && isPhoneValid)
-    : (hasAtLeastOneContact && isEmailValid && isPhoneValid);
+  const emailWarning = stepWarnings.find(w => w.field === 'email');
+
+  useEffect(() => {
+    if (nameError && nameInputRef.current) {
+      nameInputRef.current.focus();
+    } else if ((phoneError || contactError) && phoneInputRef.current) {
+      phoneInputRef.current.focus();
+    } else if (emailError && emailInputRef.current) {
+      emailInputRef.current.focus();
+    } else if (consentError && consentRef.current) {
+      consentRef.current.focus();
+    }
+  }, [nameError, contactError, phoneError, emailError, consentError]);
+
+  const handleNameChange = (e) => {
+    onContactChange({
+      ...contactData,
+      name: e.target.value,
+    });
+  };
 
   const handlePhoneChange = (e) => {
     onContactChange({
       ...contactData,
-      type: 'notify',
       phone: e.target.value,
     });
+  };
+
+  const handlePhoneBlur = () => {
+    const res = normalizeMobileNumber(phone);
+    if (res.valid && res.normalized) {
+      onContactChange({
+        ...contactData,
+        phone: res.normalized,
+      });
+    }
   };
 
   const handleEmailChange = (e) => {
     onContactChange({
       ...contactData,
-      type: 'notify',
       email: e.target.value,
+    });
+  };
+
+  const handleEmailBlur = () => {
+    if (email) {
+      const res = validateEmail(email);
+      onContactChange({
+        ...contactData,
+        email: res.normalized,
+      });
+    }
+  };
+
+  const handleAcceptTypo = (suggested) => {
+    onContactChange({
+      ...contactData,
+      email: suggested,
     });
   };
 
@@ -53,104 +103,204 @@ export default function Step5ContactPreferences({
             {t('reportWizard.step5Contact.title', 'How can we reach you?')}
           </h1>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-            {t('reportWizard.step5Contact.subtitle', 'Add a mobile number or email to receive updates.')}
+            {t('reportWizard.step5Contact.subtitle', 'Add your name and a mobile number or email to receive updates.')}
           </p>
         </div>
 
-        {/* Two Input Fields: Mobile Number & Email Address */}
-        <div className="space-y-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            {/* Mobile Number */}
-            <div className="space-y-1.5">
-              <label htmlFor="contact-phone" className="block text-sm font-bold text-slate-900 dark:text-white">
-                {t('reportWizard.step5Contact.phoneLabel', 'Mobile number')}
-              </label>
-              <div className="relative">
-                <Phone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <input
-                  id="contact-phone"
-                  type="tel"
-                  value={phone}
-                  onChange={handlePhoneChange}
-                  placeholder={t('reportWizard.step5Contact.phonePlaceholder', '09XX XXX XXXX')}
-                  className={`w-full min-h-[50px] pl-10 pr-4 rounded-xl border bg-white dark:bg-slate-900 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
-                    !isPhoneValid ? 'border-red-400 focus-visible:ring-red-400' : 'border-slate-200 dark:border-slate-700'
-                  }`}
-                />
-              </div>
-              {!isPhoneValid && (
-                <span className="text-[11px] text-red-500 font-medium block">
-                  Please enter a valid 11-digit Philippine mobile number (e.g. 09171234567).
-                </span>
-              )}
-            </div>
+        {/* Global/Contact Missing Error Banner */}
+        {contactError && (
+          <div role="alert" className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-sm font-semibold text-red-700 dark:text-red-300 flex items-center gap-2 animate-fadeIn">
+            <AlertCircle size={18} className="text-red-500 shrink-0" aria-hidden="true" />
+            <span>{contactError.message}</span>
+          </div>
+        )}
 
-            {/* Email Address */}
-            <div className="space-y-1.5">
-              <label htmlFor="contact-email" className="block text-sm font-bold text-slate-900 dark:text-white">
-                {t('reportWizard.step5Contact.emailLabel', 'Email address')}
-              </label>
-              <div className="relative">
-                <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                <input
-                  id="contact-email"
-                  type="email"
-                  value={email}
-                  onChange={handleEmailChange}
-                  placeholder={t('reportWizard.step5Contact.emailPlaceholder', 'you@example.com')}
-                  className={`w-full min-h-[50px] pl-10 pr-4 rounded-xl border bg-white dark:bg-slate-900 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
-                    !isEmailValid ? 'border-red-400 focus-visible:ring-red-400' : 'border-slate-200 dark:border-slate-700'
-                  }`}
-                />
-              </div>
-              {!isEmailValid && (
-                <span className="text-[11px] text-red-500 font-medium block">
-                  Please enter a valid email address.
-                </span>
-              )}
+        {/* Honeypot field (hidden from screen reader & real users) */}
+        <div className="sr-only" aria-hidden="true">
+          <label htmlFor="website_hp">Leave this empty</label>
+          <input
+            id="website_hp"
+            name="website_hp"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={contactData?.website_hp || ''}
+            onChange={(e) => onContactChange({ ...contactData, website_hp: e.target.value })}
+          />
+        </div>
+
+        {/* Full Name Field (Required) */}
+        <div className="space-y-1.5">
+          <label htmlFor="contact-name" className="block text-sm font-bold text-slate-900 dark:text-white">
+            <span>{t('reportWizard.step5Contact.nameLabel', 'Full name')}</span>
+            <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+          </label>
+          <div className="relative">
+            <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+            <input
+              ref={nameInputRef}
+              id="contact-name"
+              type="text"
+              value={fullName}
+              onChange={handleNameChange}
+              placeholder={t('reportWizard.step5Contact.namePlaceholder', 'e.g. Maria Cristina Santos')}
+              aria-invalid={nameError ? 'true' : undefined}
+              aria-describedby={nameError ? 'contact-name-error' : undefined}
+              className={`w-full min-h-[48px] pl-10 pr-4 rounded-xl border bg-white dark:bg-slate-900 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
+                nameError
+                  ? 'border-red-500 ring-1 ring-red-500 focus-visible:ring-red-500'
+                  : 'border-slate-200 dark:border-slate-700'
+              }`}
+            />
+          </div>
+          {nameError && (
+            <p id="contact-name-error" className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 animate-fadeIn">
+              <AlertCircle size={14} className="shrink-0 text-red-500" aria-hidden="true" />
+              <span>{nameError.message}</span>
+            </p>
+          )}
+        </div>
+
+        {/* Mobile Number & Email with "OR" Divider */}
+        <div className="space-y-4 pt-1">
+          <div className="space-y-1.5">
+            <label htmlFor="contact-phone" className="block text-sm font-bold text-slate-900 dark:text-white">
+              {t('reportWizard.step5Contact.phoneLabel', 'Mobile number')}
+            </label>
+            <div className="relative">
+              <Phone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+              <input
+                ref={phoneInputRef}
+                id="contact-phone"
+                type="tel"
+                value={phone}
+                onChange={handlePhoneChange}
+                onBlur={handlePhoneBlur}
+                placeholder={t('reportWizard.step5Contact.phonePlaceholder', '0917 123 4567')}
+                aria-invalid={phoneError ? 'true' : undefined}
+                aria-describedby={phoneError ? 'contact-phone-error' : undefined}
+                className={`w-full min-h-[48px] pl-10 pr-4 rounded-xl border bg-white dark:bg-slate-900 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
+                  phoneError
+                    ? 'border-red-500 ring-1 ring-red-500 focus-visible:ring-red-500'
+                    : 'border-slate-200 dark:border-slate-700'
+                }`}
+              />
             </div>
+            {phoneError ? (
+              <p id="contact-phone-error" className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 animate-fadeIn">
+                <AlertCircle size={14} className="shrink-0 text-red-500" aria-hidden="true" />
+                <span>{phoneError.message}</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                Format: 09XX XXX XXXX or +639XX XXX XXXX
+              </p>
+            )}
           </div>
 
-          <p className="text-xs text-slate-500 dark:text-slate-400 pt-1">
-            {t('reportWizard.step5Contact.helperNote', 'Provide either a mobile number or an email address. You can add both.')}
-          </p>
-        </div>
+          {/* "OR" Divider */}
+          <div className="relative flex items-center justify-center py-1">
+            <div className="border-t border-slate-200 dark:border-slate-800 w-full" />
+            <span className="bg-white dark:bg-slate-900 px-3 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 absolute">
+              {t('reportWizard.validation.contact.orDivider', 'or')}
+            </span>
+          </div>
 
-        {/* Report Updates Section */}
-        <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              {t('reportWizard.step5Contact.updatesHeading', 'Report updates')}
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {t('reportWizard.step5Contact.updatesSubtitle', 'Send me status updates using:')}
+          {/* Email Address */}
+          <div className="space-y-1.5">
+            <label htmlFor="contact-email" className="block text-sm font-bold text-slate-900 dark:text-white">
+              {t('reportWizard.step5Contact.emailLabel', 'Email address')}
+            </label>
+            <div className="relative">
+              <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true" />
+              <input
+                ref={emailInputRef}
+                id="contact-email"
+                type="email"
+                value={email}
+                onChange={handleEmailChange}
+                onBlur={handleEmailBlur}
+                placeholder={t('reportWizard.step5Contact.emailPlaceholder', 'name@example.com')}
+                aria-invalid={emailError ? 'true' : undefined}
+                aria-describedby={emailError ? 'contact-email-error' : undefined}
+                className={`w-full min-h-[48px] pl-10 pr-4 rounded-xl border bg-white dark:bg-slate-900 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
+                  emailError
+                    ? 'border-red-500 ring-1 ring-red-500 focus-visible:ring-red-500'
+                    : 'border-slate-200 dark:border-slate-700'
+                }`}
+              />
+            </div>
+            {emailError && (
+              <p id="contact-email-error" className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 animate-fadeIn">
+                <AlertCircle size={14} className="shrink-0 text-red-500" aria-hidden="true" />
+                <span>{emailError.message}</span>
+              </p>
+            )}
+            {/* Email typo hint */}
+            {emailWarning && emailWarning.suggestion && (
+              <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between gap-2 animate-fadeIn">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-amber-600 shrink-0" />
+                  <span>Did you mean <strong>{emailWarning.suggestion}</strong>?</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleAcceptTypo(emailWarning.suggestion)}
+                  className="px-2 py-0.5 rounded bg-orange-600 text-white font-bold text-[11px] hover:bg-orange-700 transition-colors cursor-pointer"
+                >
+                  Yes, use this
+                </button>
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              We will send status updates here.
             </p>
           </div>
+        </div>
 
-          <label className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
-            <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-colors ${
-              receiveUpdates
+        {/* Consent Checkbox (Required) */}
+        <div className="pt-2">
+          <label className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-colors cursor-pointer ${
+            consentError
+              ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20 dark:bg-red-950/20'
+              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+          }`}>
+            <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+              consentAccepted
                 ? 'bg-[#ff6b00] text-white'
                 : 'border border-slate-300 dark:border-slate-600 bg-transparent'
             }`}>
-              {receiveUpdates && <Check size={14} strokeWidth={3} aria-hidden="true" />}
+              {consentAccepted && <Check size={14} strokeWidth={3} aria-hidden="true" />}
             </div>
             <input
+              ref={consentRef}
               type="checkbox"
-              checked={receiveUpdates}
-              onChange={(e) => setReceiveUpdates(e.target.checked)}
+              checked={consentAccepted}
+              onChange={(e) => onContactChange({ ...contactData, consentAccepted: e.target.checked })}
               className="sr-only"
             />
-            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              {t('reportWizard.step5Contact.updatesCheckbox', 'My provided contact details')}
-            </span>
+            <div className="space-y-0.5">
+              <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 leading-relaxed block">
+                {t('reportWizard.validation.contact.consentLabel', 'I agree that City Engineering may use these details to follow up on my report')}
+                <span className="text-red-500 ml-1" aria-hidden="true">*</span>
+              </span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Your contact details are strictly protected and never published publicly.
+              </p>
+            </div>
           </label>
+          {consentError && (
+            <p className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 mt-1.5 pl-1 animate-fadeIn">
+              <AlertCircle size={14} className="shrink-0 text-red-500" aria-hidden="true" />
+              <span>{consentError.message}</span>
+            </p>
+          )}
         </div>
 
-        {/* Privacy Card */}
+        {/* Privacy Note */}
         <aside
           aria-label="Privacy guarantee"
-          className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-4 sm:p-5 flex items-start gap-3.5"
+          className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 p-4 flex items-start gap-3.5"
         >
           <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0 mt-0.5">
             <Lock size={18} aria-hidden="true" />
@@ -171,7 +321,7 @@ export default function Step5ContactPreferences({
         onBack={onBack}
         canBack={true}
         onContinue={onContinue}
-        isContinueDisabled={!canContinue}
+        isContinueDisabled={false}
       />
     </div>
   );

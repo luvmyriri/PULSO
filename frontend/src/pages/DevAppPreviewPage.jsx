@@ -47,6 +47,14 @@ import SettingsRow from '../components/SettingsRow';
 import LanguageToggle from '../components/LanguageToggle';
 import NearbyIssuesMapModal from '../components/NearbyIssuesMapModal';
 import QuickReportWizardModal from '../components/QuickReportWizardModal';
+import Step1CategoryEmergency from '../components/report-wizard/Step1CategoryEmergency';
+import Step2LocationMap from '../components/report-wizard/Step2LocationMap';
+import Step3EvidenceUpload from '../components/report-wizard/Step3EvidenceUpload';
+import Step4DetailsDuplicate from '../components/report-wizard/Step4DetailsDuplicate';
+import Step5ContactPreferences from '../components/report-wizard/Step5ContactPreferences';
+import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
+import { validateStep, validateAllSteps } from '../utils/reportWizardValidation';
+
 import IDCameraModal from '../components/IDCameraModal';
 import ReportHistoryCard from '../components/ReportHistoryCard';
 import ReportDetailView from '../components/ReportDetailView';
@@ -872,6 +880,14 @@ function DevAppPreviewContent() {
       };
     }
 
+        if (previewTarget === 'wizard') {
+      const modeLabel = wizardState === 'valid' ? 'Valid State' : wizardState === 'warning' ? 'Warning State' : 'Invalid / Error State';
+      return {
+        badge: `Report Wizard · Step ${wizardStep} (${modeLabel})`,
+        desc: `Step-by-step validation showcase for Step ${wizardStep} in ${modeLabel}. Tests inline error states, accessibility, and form rules.`,
+      };
+    }
+
     if (previewTarget === 'report') {
       return {
         badge: 'Quick Report 3-Step Flow (Photo, Category, Details)',
@@ -1519,6 +1535,19 @@ function DevAppPreviewContent() {
                 }`}
             >
               Popup
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewTarget('wizard');
+                addLog('Switched preview to Report Wizard 6-Step Validation Logic.');
+              }}
+              className={`py-2 px-0.5 rounded-lg text-[10px] font-bold text-center truncate cursor-pointer ${previewTarget === 'wizard'
+                ? 'bg-[#ff6b00] text-slate-950 font-black shadow-xs'
+                : 'text-slate-400 hover:text-white'
+                }`}
+            >
+              Wizard (6 Steps)
             </button>
             <button
               type="button"
@@ -2551,6 +2580,117 @@ function DevAppPreviewContent() {
               )}
 
               {/* CASE H: Quick Report 3-Step Flow */}
+                            {/* ── REPORT WIZARD 6-STEP PREVIEW IN PHONE ── */}
+              {previewTarget === 'wizard' && (
+                <div className="relative w-full h-full overflow-y-auto bg-white dark:bg-slate-900 p-4 text-slate-900 dark:text-slate-100">
+                  {wizardStep === 1 && (
+                    <Step1CategoryEmergency
+                      selectedCategory={wizardState === 'valid' ? 'Roads & Bridges' : ''}
+                      onSelectCategory={(cat) => addLog(`Selected category: ${cat}`)}
+                      onContinue={() => addLog('Continue clicked on Step 1')}
+                      onBack={() => addLog('Back clicked on Step 1')}
+                      stepErrors={wizardState === 'invalid' ? [{ field: 'category', message: 'Please choose the type of problem.' }] : []}
+                    />
+                  )}
+
+                  {wizardStep === 2 && (
+                    <Step2LocationMap
+                      isMapLoaded={false}
+                      locationData={{
+                        lat: 14.7566,
+                        lng: 121.0450,
+                        address: wizardState === 'invalid' ? '' : '1604 Sampaguita Drive, Barangay 171, Caloocan City',
+                        barangay: 'Barangay 171',
+                        isInCaloocan: wizardState !== 'invalid',
+                        confirmed: wizardState !== 'invalid',
+                        accuracy: wizardState === 'warning' ? 35 : 10,
+                        pinConfirmed: false,
+                        landmark: 'Near 7-Eleven store',
+                      }}
+                      onLocationChange={(loc) => addLog('Location updated')}
+                      onBack={() => addLog('Back clicked on Step 2')}
+                      onContinue={() => addLog('Continue clicked on Step 2')}
+                      stepErrors={wizardState === 'invalid' ? [{ field: 'location', message: 'This spot is outside Caloocan City. Please move the pin inside the city.' }] : []}
+                      stepWarnings={wizardState === 'warning' ? [{ field: 'accuracy', message: 'Location may be off. Tap Change location to fix it.' }] : []}
+                    />
+                  )}
+
+                  {wizardStep === 3 && (
+                    <Step3EvidenceUpload
+                      evidenceData={{
+                        photos: wizardState === 'invalid' 
+                          ? [{ file: null, previewUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150', fileName: 'selfie.jpg', fileSize: 1024*500, isInappropriate: true, rejectionReason: 'This looks like a personal photo. Please take a clear photo of the problem.' }]
+                          : wizardState === 'warning'
+                          ? [{ file: {}, previewUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=150', fileName: 'street_light.jpg', fileSize: 1024*800, aiCategorySuggestion: 'Street Lighting' }]
+                          : [{ file: {}, previewUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=150', fileName: 'pothole.jpg', fileSize: 1024*800, aiCategorySuggestion: 'Roads & Bridges' }],
+                        isAiScanning: false,
+                      }}
+                      category="Roads & Bridges"
+                      onCategoryChange={(c) => addLog(`Changed category to ${c}`)}
+                      onEvidenceChange={(ev) => addLog('Evidence updated')}
+                      onBack={() => addLog('Back clicked on Step 3')}
+                      onContinue={() => addLog('Continue clicked on Step 3')}
+                      stepErrors={wizardState === 'invalid' ? [{ field: 'photos', message: 'Take at least one photo to continue.' }] : []}
+                    />
+                  )}
+
+                  {wizardStep === 4 && (
+                    <Step4DetailsDuplicate
+                      detailsData={{
+                        description: wizardState === 'invalid' ? 'lubak' : 'Malaking lubak sa tapat ng barangay hall na nagdudulot ng mabigat na trapiko at panganib sa motorista.',
+                        urgency: 'high',
+                      }}
+                      onDetailsChange={(det) => addLog('Details updated')}
+                      onBack={() => addLog('Back clicked on Step 4')}
+                      onContinue={() => addLog('Continue clicked on Step 4')}
+                      stepErrors={wizardState === 'invalid' ? [{ field: 'description', message: 'Please add a bit more detail (at least 20 characters).' }] : []}
+                    />
+                  )}
+
+                  {wizardStep === 5 && (
+                    <Step5ContactPreferences
+                      contactData={{
+                        name: wizardState === 'invalid' ? '' : 'Juan Dela Cruz',
+                        phone: wizardState === 'invalid' ? '123' : '09171234567',
+                        email: wizardState === 'warning' ? 'juan@gmai.com' : 'juan@gmail.com',
+                        consentAccepted: wizardState !== 'invalid',
+                      }}
+                      onContactChange={(cnt) => addLog('Contact updated')}
+                      onBack={() => addLog('Back clicked on Step 5')}
+                      onContinue={() => addLog('Continue clicked on Step 5')}
+                      stepErrors={wizardState === 'invalid' ? [
+                        { field: 'name', message: 'Please enter your full name.' },
+                        { field: 'phone', message: 'Please enter a valid mobile number, like 0917 123 4567.' },
+                        { field: 'consent', message: 'Please confirm to continue.' },
+                      ] : []}
+                      stepWarnings={wizardState === 'warning' ? [{ field: 'email', message: 'Did you mean juan@gmail.com?', suggestion: 'juan@gmail.com' }] : []}
+                    />
+                  )}
+
+                  {wizardStep === 6 && (
+                    <Step6ReviewConsent
+                      formData={{
+                        category: 'Roads & Bridges',
+                        location: { address: 'Sampaguita Drive, Barangay 171, Caloocan City', lat: 14.7566, lng: 121.0450 },
+                        evidence: { photos: [{ previewUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=150', fileName: 'evidence.jpg', fileSize: 500000 }] },
+                        details: { description: 'Malaking lubak sa tapat ng barangay hall na nagdudulot ng mabigat na trapiko.', urgency: 'medium' },
+                        contact: { name: 'Juan Dela Cruz', phone: '+639171234567', email: 'juan@gmail.com' },
+                        consentAccepted: wizardState !== 'invalid',
+                      }}
+                      isSubmitting={false}
+                      onJumpToStep={(s) => { setWizardStep(s); addLog(`Jumped to step ${s}`); }}
+                      onConsentChange={(c) => addLog(`Consent changed: ${c}`)}
+                      onBack={() => addLog('Back clicked on Step 6')}
+                      onSubmit={() => addLog('Submit clicked on Step 6')}
+                      reviewErrors={wizardState === 'invalid' ? [
+                        { step: 2, message: 'Please pin the exact spot' },
+                        { step: 5, message: 'Please confirm to continue.' }
+                      ] : []}
+                    />
+                  )}
+                </div>
+              )}
+
               {previewTarget === 'report' && (
                 <div className="relative w-full h-full overflow-hidden">
                   <QuickReportWizardModal
@@ -2834,6 +2974,87 @@ function DevAppPreviewContent() {
                 <p className="text-[11px] text-slate-400">
                   5rem red warning circle, "NOT AN INFRASTRUCTURE PHOTO" all-caps pill, 20-22px bold heading ("Cannot proceed with this photo"), and full-width 52px solid orange button with dark navy text.
                 </p>
+              </div>
+            </div>
+          </div>
+
+                    {/* ── REPORT WIZARD 6-STEP VALIDATION SHOWCASE CONTROLS ── */}
+          <div className="p-5 rounded-3xl bg-slate-900 border border-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#ff6b00]" />
+                <h2 className="font-heading font-black text-lg text-white">
+                  Report a Concern: 6-Step Validation Logic
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewTarget('wizard');
+                  addLog('Switched preview to Report Wizard 6-Step Validation Logic.');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${previewTarget === 'wizard'
+                  ? 'bg-[#ff6b00] text-slate-950 shadow-sm font-black'
+                  : 'bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+              >
+                {previewTarget === 'wizard' ? 'Active in phone' : 'Show in phone'}
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Examines every step (Category, Location, Evidence, Details, Contact, Review) across Valid, Invalid/Error, and Warning states with zero code alteration to backend APIs.
+            </p>
+
+            {/* Step Selection 1 to 6 */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider">Select Step (1 to 6):</span>
+              <div className="grid grid-cols-6 gap-1.5">
+                {[1, 2, 3, 4, 5, 6].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setWizardStep(s);
+                      setPreviewTarget('wizard');
+                      addLog(`Selected Wizard Step ${s}`);
+                    }}
+                    className={`py-2 rounded-xl text-xs font-extrabold cursor-pointer transition-all ${wizardStep === s && previewTarget === 'wizard'
+                      ? 'bg-[#ff6b00] text-white shadow-xs'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    Step {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* State Toggle: Valid, Invalid, Warning */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider">Validation State:</span>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'valid', label: 'Valid State', color: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' },
+                  { id: 'invalid', label: 'Invalid / Error', color: 'border-red-500/50 bg-red-500/10 text-red-400' },
+                  { id: 'warning', label: 'Warning State', color: 'border-amber-500/50 bg-amber-500/10 text-amber-400' },
+                ].map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => {
+                      setWizardState(st.id);
+                      setPreviewTarget('wizard');
+                      addLog(`Toggled Wizard State to ${st.id.toUpperCase()}`);
+                    }}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${wizardState === st.id && previewTarget === 'wizard'
+                      ? `${st.color} ring-2 ring-[#ff6b00]`
+                      : 'border-slate-800 bg-slate-800/60 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

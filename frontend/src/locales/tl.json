@@ -44,29 +44,29 @@
       "loadOlder": "Kunin ang mga naunang abiso"
     },
     "reportLink": {
-        "loading": "Binubuksan ang iyong ulat…",
-        "error": "Hindi mabuksan ang ulat. Suriin ang koneksiyon at subukang muli. Maaaring hindi ito magagamit o wala kang pahintulot na makita ito.",
-        "retry": "Subukang muli",
-        "back": "Bumalik sa Aking mga ulat"
+      "loading": "Binubuksan ang iyong ulat…",
+      "error": "Hindi mabuksan ang ulat. Suriin ang koneksiyon at subukang muli. Maaaring hindi ito magagamit o wala kang pahintulot na makita ito.",
+      "retry": "Subukang muli",
+      "back": "Bumalik sa Aking mga ulat"
     },
     "informationReply": {
-        "title": "Hinihinging impormasyon",
-        "banner": "Basahin ang hiling ng departamento sa ibaba at ipadala ang iyong sagot.",
-        "loading": "Kinukuha ang hiling ng departamento…",
-        "loadError": "Hindi makuha ang detalye ng hiling. Subukang muli bago sumagot.",
-        "label": "Ang iyong sagot",
-        "hint": "Magbigay ng 10–2,000 karakter. Ipapadala ang sagot sa departamento para sa pagsusuri at hindi ito ipapakita sa publiko.",
-        "send": "Ipadala ang impormasyon",
-        "sending": "Ipinapadala…",
-        "success": "Naitala ang iyong sagot. Ibinalik ang ulat sa pila ng departamento para sa pagsusuri.",
-        "tooShort": "Magbigay ng hindi bababa sa 10 karakter ng karagdagang impormasyon.",
-        "expired": "Nag-expire ang iyong sesyon. Mag-sign in muli bago magpadala.",
-        "denied": "Walang pahintulot ang iyong account na sumagot sa ulat na ito.",
-        "unavailable": "Hindi magagamit ang ulat o hindi ito kabilang sa iyong account.",
-        "changed": "Hindi na naghihintay ng impormasyon ang ulat. I-refresh upang makita ang kasalukuyang katayuan.",
-        "rateLimit": "Napakaraming pagsubok. Maghintay muna bago subukang muli.",
-        "sendFailed": "Hindi namin makumpirma ang iyong sagot. Nananatili rito ang iyong isinulat. I-refresh muna ang katayuan ng ulat bago muling subukan.",
-        "refresh": "I-refresh ang katayuan ng ulat"
+      "title": "Hinihinging impormasyon",
+      "banner": "Basahin ang hiling ng departamento sa ibaba at ipadala ang iyong sagot.",
+      "loading": "Kinukuha ang hiling ng departamento…",
+      "loadError": "Hindi makuha ang detalye ng hiling. Subukang muli bago sumagot.",
+      "label": "Ang iyong sagot",
+      "hint": "Magbigay ng 10–2,000 karakter. Ipapadala ang sagot sa departamento para sa pagsusuri at hindi ito ipapakita sa publiko.",
+      "send": "Ipadala ang impormasyon",
+      "sending": "Ipinapadala…",
+      "success": "Naitala ang iyong sagot. Ibinalik ang ulat sa pila ng departamento para sa pagsusuri.",
+      "tooShort": "Magbigay ng hindi bababa sa 10 karakter ng karagdagang impormasyon.",
+      "expired": "Nag-expire ang iyong sesyon. Mag-sign in muli bago magpadala.",
+      "denied": "Walang pahintulot ang iyong account na sumagot sa ulat na ito.",
+      "unavailable": "Hindi magagamit ang ulat o hindi ito kabilang sa iyong account.",
+      "changed": "Hindi na naghihintay ng impormasyon ang ulat. I-refresh upang makita ang kasalukuyang katayuan.",
+      "rateLimit": "Napakaraming pagsubok. Maghintay muna bago subukang muli.",
+      "sendFailed": "Hindi namin makumpirma ang iyong sagot. Nananatili rito ang iyong isinulat. I-refresh muna ang katayuan ng ulat bago muling subukan.",
+      "refresh": "I-refresh ang katayuan ng ulat"
     },
     "auth": {
       "strength": {
@@ -598,6 +598,64 @@
         "submitReport": "Ipadala ang Ulat",
         "continue": "Magpatuloy",
         "back": "Bumalik"
+      },
+      "validation": {
+        "attentionCount": "{{count}} bagay ang kailangang ayusin",
+        "fixCount": "Pakiayos ang {{count}} bagay bago ipadala",
+        "fixLabel": "Ayusin",
+        "leavePrompt": "Aalis sa ulat na ito? Naka-save ang iyong mga sagot sa device na ito.",
+        "stay": "Manatili",
+        "leave": "Umalis",
+        "category": {
+          "required": "Pumili po ng uri ng problema."
+        },
+        "location": {
+          "required": "Pakituro ang eksaktong lokasyon ng problema sa mapa.",
+          "outsideCaloocan": "Nasa labas ng Caloocan City ang lugar na ito. Pakilipat ang pin sa loob ng lungsod.",
+          "permissionDenied": "Hindi namin mahanap ang iyong lokasyon. Buksan ang Location sa settings ng iyong telepono, o ituro ang lugar sa mapa.",
+          "accuracyWarning": "Maaaring hindi eksakto ang lokasyon. Pindutin ang Baguhin ang lokasyon upang ayusin.",
+          "confirmPin": "Ito ang tamang lokasyon sa mapa",
+          "addressNotReadable": "Pakisigurong nababasa ang address o ayusin ang pin sa mapa.",
+          "landmarkTooLong": "Panatilihin po sa ilalim ng 100 karakter ang landmark."
+        },
+        "evidence": {
+          "required": "Kumuha ng kahit isang larawan upang magpatuloy.",
+          "tooMany": "Hanggang 5 larawan lamang ang maaaring i-upload.",
+          "checking": "Sinusuri ang iyong larawan...",
+          "fileType": "Hindi suportado ang format na ito. Gumamit ng JPG, PNG, o WebP na larawan.",
+          "fileSize": "Masyadong malaki ang larawang ito. Paki-upload ng mas maliit na file.",
+          "duplicate": "Naidagdag mo na ang larawang ito.",
+          "rejected": "Mukhang personal na larawan ito. Kumuha po ng malinaw na larawan ng problema sa kalsada o pasilidad.",
+          "checkFailed": "Hindi namin masuri ang larawan. Pakisubukan muli.",
+          "tryAgain": "Subukan muli",
+          "countLabel": "{{current}} sa {{max}} larawan",
+          "suggestCategory": "Mukhang {{category}} ito. Nais mo bang palitan ang kategorya?",
+          "keepMine": "Panatilihin ang napili",
+          "changeCategory": "Palitan"
+        },
+        "details": {
+          "required": "Pakilarawan ang problema.",
+          "tooShort": "Magdagdag pa ng kaunting detalye (hindi bababa sa 20 karakter).",
+          "tooLong": "Panatilihin po sa ilalim ng 1000 karakter.",
+          "gibberish": "Pakilarawan sa ilang salita ang iyong nakikita.",
+          "counter": "{{current}} / {{max}}"
+        },
+        "contact": {
+          "nameRequired": "Pakilagay ang iyong buong pangalan.",
+          "phoneInvalid": "Maglagay ng wastong mobile number, tulad ng 0917 123 4567.",
+          "emailInvalid": "Hindi wasto ang format ng email. Pakisuri muli.",
+          "contactRequired": "Maglagay ng mobile number o email address upang makipag-ugnayan kami sa iyo.",
+          "consentRequired": "Pakikumpirma upang magpatuloy.",
+          "consentLabel": "Sumasang-ayon ako na gamitin ng City Engineering ang mga detalyeng ito para sa follow-up ng aking ulat",
+          "orDivider": "o kaya",
+          "typoHint": "Ang ibig mo bang sabihin ay {{suggestion}}?"
+        },
+        "server": {
+          "offline": "Offline ka ngayon. Naka-save ang iyong ulat at ipapadala kapag may koneksyon na muli.",
+          "rejected": "Hindi matanggap ang iyong ulat. Pakisuri ang mga minarkahang field.",
+          "rateLimit": "Maghintay ng ilang sandali bago sumubok muli.",
+          "generic": "May naganap na aberya. Naka-save ang iyong ulat. Pakisubukan muli."
+        }
       }
     },
     "receipt": {

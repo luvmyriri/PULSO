@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Lightbulb } from 'lucide-react';
+import { Check, Lightbulb, AlertCircle } from 'lucide-react';
 
 export const REPORT_STEPS = [
   { id: 1, key: 'category', defaultLabel: 'Category', subtitle: 'Choose the type of issue' },
@@ -11,7 +11,13 @@ export const REPORT_STEPS = [
   { id: 6, key: 'review', defaultLabel: 'Review', subtitle: 'Check before submitting' },
 ];
 
-export default function WizardSidebar({ currentStep, maxStepReached, onStepClick, onOpenHelpGuide }) {
+export default function WizardSidebar({ 
+  currentStep, 
+  maxStepReached, 
+  onStepClick, 
+  onOpenHelpGuide,
+  stepsValidation = {} 
+}) {
   const { t } = useTranslation();
 
   return (
@@ -20,7 +26,7 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
       className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col justify-between self-stretch bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xs"
     >
       <div className="space-y-6">
-        {/* Header Title & Subtitle matching the design */}
+        {/* Header Title & Subtitle */}
         <div className="space-y-1">
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             {t('reportWizard.shell.reportAConcern', 'Report a concern')}
@@ -35,7 +41,10 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
           <ol className="relative space-y-0">
             {REPORT_STEPS.map((step, idx) => {
               const isCurrent = step.id === currentStep;
-              const isFinished = step.id < currentStep;
+              const stepValidation = stepsValidation[step.id];
+              const isValid = stepValidation ? stepValidation.valid : false;
+              const hasErrorsAfterVisited = step.id < currentStep && !isValid;
+              const isFinishedAndValid = step.id < currentStep && isValid;
               const isClickable = step.id <= maxStepReached;
               const isLast = idx === REPORT_STEPS.length - 1;
               const label = t(`reportWizard.steps.${step.key}`, step.defaultLabel);
@@ -47,8 +56,10 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
                   {!isLast && (
                     <div
                       className={`absolute left-[15px] top-[30px] bottom-[-2px] w-[2px] transition-colors duration-200 ${
-                        isFinished
+                        isFinishedAndValid
                           ? 'bg-[#ff6b00]'
+                          : hasErrorsAfterVisited
+                          ? 'bg-amber-400 dark:bg-amber-600'
                           : 'bg-slate-200 dark:bg-slate-800'
                       }`}
                       aria-hidden="true"
@@ -58,24 +69,26 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
                   {/* Step Button / Item */}
                   <button
                     type="button"
-                    onClick={() => isClickable && onStepClick(step.id)}
-                    disabled={!isClickable}
+                    onClick={() => onStepClick(step.id)}
                     aria-current={isCurrent ? 'step' : undefined}
-                    className={`w-full flex items-start gap-3.5 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl ${
-                      isClickable ? 'cursor-pointer' : 'cursor-default'
-                    }`}
+                    aria-label={`Step ${step.id}: ${label}. ${hasErrorsAfterVisited ? 'Needs attention' : isFinishedAndValid ? 'Completed' : ''}`}
+                    className={`w-full flex items-start gap-3.5 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl cursor-pointer`}
                   >
                     {/* Circle Indicator */}
                     <div
                       className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold transition-all duration-200 ${
                         isCurrent
-                          ? 'bg-[#ff6b00] text-white shadow-xs'
-                          : isFinished
+                          ? 'bg-[#ff6b00] text-white shadow-xs ring-4 ring-orange-100 dark:ring-orange-950/40'
+                          : hasErrorsAfterVisited
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : isFinishedAndValid
                           ? 'bg-[#ff6b00] text-white'
                           : 'bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400'
                       }`}
                     >
-                      {isFinished ? (
+                      {hasErrorsAfterVisited ? (
+                        <AlertCircle size={16} strokeWidth={2.5} aria-hidden="true" />
+                      ) : isFinishedAndValid ? (
                         <Check size={16} strokeWidth={2.5} aria-hidden="true" />
                       ) : (
                         <span>{step.id}</span>
@@ -83,18 +96,30 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
                     </div>
 
                     {/* Step Title & Subtitle */}
-                    <div className="flex flex-col pt-0.5 leading-snug">
-                      <span
-                        className={`text-sm tracking-tight transition-colors ${
-                          isCurrent
-                            ? 'font-bold text-[#ff6b00] dark:text-[#ff8a3d]'
-                            : isFinished
-                            ? 'font-bold text-slate-900 dark:text-slate-100'
-                            : 'font-bold text-slate-700 dark:text-slate-400'
-                        }`}
-                      >
-                        {label}
-                      </span>
+                    <div className="flex flex-col pt-0.5 leading-snug flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span
+                          className={`text-sm tracking-tight transition-colors ${
+                            isCurrent
+                              ? 'font-bold text-[#ff6b00] dark:text-[#ff8a3d]'
+                              : hasErrorsAfterVisited
+                              ? 'font-bold text-amber-700 dark:text-amber-400'
+                              : isFinishedAndValid
+                              ? 'font-bold text-slate-900 dark:text-slate-100'
+                              : 'font-bold text-slate-700 dark:text-slate-400'
+                          }`}
+                        >
+                          {label}
+                        </span>
+
+                        {/* Orange "Fix" label with icon when step needs attention */}
+                        {hasErrorsAfterVisited && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-[10px] font-extrabold uppercase tracking-wide">
+                            <AlertCircle size={10} aria-hidden="true" />
+                            <span>{t('reportWizard.validation.fixLabel', 'Fix')}</span>
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         {subtitle}
                       </span>

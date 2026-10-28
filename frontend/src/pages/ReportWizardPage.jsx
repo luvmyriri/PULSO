@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
@@ -14,9 +14,21 @@ import Step3EvidenceUpload from '../components/report-wizard/Step3EvidenceUpload
 import Step4DetailsDuplicate from '../components/report-wizard/Step4DetailsDuplicate';
 import Step5ContactPreferences from '../components/report-wizard/Step5ContactPreferences';
 import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
-import { Home } from 'lucide-react';
+import { 
+  validateStep, 
+  validateAllSteps, 
+  validateCategory,
+  validateLocation,
+  validateEvidence,
+  validateDetails,
+  validateContact,
+  normalizeMobileNumber, 
+  ACCEPTED_CATEGORIES 
+} from '../utils/reportWizardValidation';
+import { Home, AlertCircle } from 'lucide-react';
 
 const DRAFT_STORAGE_KEY = 'pulso_report_wizard_draft_v1';
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function ReportWizardPage() {
   const { t } = useTranslation();
@@ -25,9 +37,21 @@ export default function ReportWizardPage() {
   // Centralized Google Maps API loader state
   const { isLoaded: isMapLoaded } = useGoogleMaps();
 
+  // Form initiation time for anti-spam verification
+  const formStartedAtRef = useRef(Date.now());
+
+  // One-time idempotency key per wizard session
+  const idempotencyKeyRef = useRef(`pulso-req-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+
   const [restoredDraft] = useState(() => {
     try {
       const draft = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || 'null');
+      if (!draft) return null;
+      // 7-day expiration check
+      if (draft.savedAt && (Date.now() - draft.savedAt > SEVEN_DAYS_MS)) {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        return null;
+      }
       return [1, 2].includes(draft?.version) && draft.formData && typeof draft.formData === 'object' ? draft : null;
     } catch { return null; }
   });
@@ -40,52 +64,90 @@ export default function ReportWizardPage() {
   const [submissionError, setSubmissionError] = useState(null);
   const [isHelpGuideOpen, setIsHelpGuideOpen] = useState(false);
 
+  // Per-step validation error tracking
+  const [stepErrors, setStepErrors] = useState([]);
+
   // Consolidated Form State
   const [formData, setFormData] = useState(() => {
     const initial = {
-    category: '',
-    location: {
-      lat: null,
-      lng: null,
-      address: '',
-      barangay: '',
-      landmark: '',
-      isInCaloocan: false,
-      confirmed: false,
-    },
-    evidence: {
-      file: null,
-      previewUrl: null,
-      fileName: '',
-      fileSize: 0,
-      mimeType: '',
-      aiCategorySuggestion: null,
-      aiConfidence: null,
-      isAiScanning: false,
-    },
-    details: {
-      description: '',
-      urgency: 'medium',
-    },
-    contact: {
-      type: 'anonymous', // 'anonymous' | 'notify' | 'authenticated'
-      email: '',
-      phone: '',
-    },
-    consentAccepted: false,
+      category: '',
+      location: {
+        lat: null,
+        lng: null,
+        address: '',
+        barangay: '',
+        landmark: '',
+        isInCaloocan: false,
+        confirmed: false,
+        accuracy: null,
+        pinConfirmed: false,
+      },
+      evidence: {
+        file: null,
+        photos: [],
+        previewUrl: null,
+        fileName: '',
+        fileSize: 0,
+        mimeType: '',
+        aiCategorySuggestion: null,
+        aiConfidence: null,
+        isAiScanning: false,
+      },
+      details: {
+        description: '',
+        urgency: 'medium',
+      },
+      contact: {
+        type: 'notify',
+        name: '',
+        email: '',
+        phone: '',
+        website_hp: '',
+        consentAccepted: false,
+      },
+      consentAccepted: false,
     };
+
     const saved = restoredDraft?.formData || {};
+    // Category validity check: clear if category no longer exists
+    const safeCategory = (typeof saved.category === 'string' && ACCEPTED_CATEGORIES.includes(saved.category))
+      ? saved.category
+      : '';
+
     return {
       ...initial,
-      category: typeof saved.category === 'string' ? saved.category : '',
+      category: safeCategory,
       location: { ...initial.location, ...saved.location, confirmed: saved.location?.confirmed === true },
       details: { ...initial.details, ...saved.details },
       contact: { ...initial.contact, ...saved.contact },
-      // A File cannot survive JSON storage. Require reattachment and fresh consent.
       evidence: { ...initial.evidence, fileName: saved.evidence?.fileName || '' },
       consentAccepted: false,
     };
   });
+
+  // Multi-step reactive validity assessment
+  const stepsValidation = useMemo(() => {
+    return {
+      1: validateCategory(formData.category),
+      2: validateLocation(formData.location),
+      3: validateEvidence(formData.evidence),
+      4: validateDetails(formData.details),
+      5: validateContact(formData.contact, formData.consentAccepted),
+    };
+  }, [formData]);
+
+  // If current step had errors, clear them as soon as fixed
+  useEffect(() => {
+    if (stepErrors.length > 0) {
+      const liveCheck = validateStep(currentStep, formData);
+      if (liveCheck.valid) {
+        setStepErrors([]);
+      } else {
+        // Update errors to reflect fixed fields
+        setStepErrors(liveCheck.errors);
+      }
+    }
+  }, [formData, currentStep]);
 
   // Auto-Save Draft to LocalStorage (debounced 400ms)
   useEffect(() => {
@@ -120,9 +182,42 @@ export default function ReportWizardPage() {
     return () => clearTimeout(timer);
   }, [formData, currentStep, maxStepReached]);
 
-  // Step Navigation
+  // Unsaved data browser exit guard
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const hasContent = Boolean(
+        formData.category ||
+        formData.location?.lat ||
+        formData.evidence?.file ||
+        formData.evidence?.photos?.length ||
+        formData.details?.description ||
+        formData.contact?.phone ||
+        formData.contact?.email
+      );
+
+      if (hasContent && !isSubmitting) {
+        e.preventDefault();
+        e.returnValue = t('reportWizard.validation.leavePrompt', 'Leave this report? Your answers are saved on this device.');
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [formData, isSubmitting, t]);
+
+  // Step Navigation with Strict Step Validation Gate
   const goToNextStep = () => {
     if (currentStep < 6) {
+      // Validate current step
+      const stepCheck = validateStep(currentStep, formData);
+      if (!stepCheck.valid) {
+        setStepErrors(stepCheck.errors);
+        const count = stepCheck.errors.length;
+        setAnnouncement(t('reportWizard.validation.attentionCount', '{{count}} things need your attention', { count }));
+        return;
+      }
+
+      setStepErrors([]);
       const next = currentStep + 1;
       setCurrentStep(next);
       setMaxStepReached(prev => Math.max(prev, next));
@@ -132,6 +227,7 @@ export default function ReportWizardPage() {
   };
 
   const goToPreviousStep = () => {
+    setStepErrors([]);
     if (currentStep > 1) {
       const prev = currentStep - 1;
       setCurrentStep(prev);
@@ -142,22 +238,69 @@ export default function ReportWizardPage() {
     }
   };
 
+  // Navigating directly to a step
   const jumpToStep = (stepNumber) => {
-    if (stepNumber >= 1 && stepNumber <= 6 && stepNumber <= maxStepReached) {
+    if (stepNumber < 1 || stepNumber > 6) return;
+
+    // Moving backward is always allowed
+    if (stepNumber <= currentStep) {
+      setStepErrors([]);
       setCurrentStep(stepNumber);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setAnnouncement(`Step ${stepNumber} of 6`);
+      return;
     }
+
+    // Moving forward to a later step requires all earlier steps to be valid
+    for (let s = 1; s < stepNumber; s++) {
+      const check = stepsValidation[s];
+      if (check && !check.valid) {
+        // Go to first invalid step
+        setCurrentStep(s);
+        setStepErrors(check.errors);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const stepName = REPORT_STEPS.find(st => st.id === s)?.defaultLabel || `Step ${s}`;
+        setAnnouncement(`Please complete ${stepName} before proceeding.`);
+        return;
+      }
+    }
+
+    setStepErrors([]);
+    setCurrentStep(stepNumber);
+    setMaxStepReached(prev => Math.max(prev, stepNumber));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setAnnouncement(`Step ${stepNumber} of 6`);
   };
 
   // Final Atomic Report Submission
   const handleSubmitReport = async () => {
-    if (!formData.consentAccepted || isSubmitting) return;
-    if (!Number.isFinite(formData.location.lat) || !Number.isFinite(formData.location.lng) || !formData.location.isInCaloocan || !formData.location.confirmed) {
-      setCurrentStep(2);
-      setSubmissionError('Select the issue location before submitting.');
+    if (isSubmitting) return;
+
+    // Anti-bot check: silent drop if honeypot is filled
+    if (formData.contact?.website_hp && formData.contact.website_hp.trim() !== '') {
+      console.warn('Bot submission blocked.');
       return;
     }
+
+    // Minimum time-on-form check: ~5s
+    const elapsed = Date.now() - formStartedAtRef.current;
+    if (elapsed < 5000) {
+      await new Promise(r => setTimeout(r, 1500));
+    }
+
+    // Full pre-submit re-validation across all steps
+    const fullCheck = validateAllSteps(formData);
+    if (!fullCheck.valid) {
+      setSubmissionError(t('reportWizard.validation.server.rejected', 'We couldn\'t accept your report. Please check the marked fields.'));
+      return;
+    }
+
+    // Offline check
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setSubmissionError(t('reportWizard.validation.server.offline', "You're offline. Your report is saved. We'll send it when you're back online."));
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmissionError(null);
 
@@ -172,24 +315,35 @@ export default function ReportWizardPage() {
       submitData.append('urgency', formData.details.urgency || 'medium');
 
       if (formData.location.landmark) {
-        submitData.append('landmark', formData.location.landmark);
+        submitData.append('landmark', formData.location.landmark.trim());
+      }
+
+      if (formData.contact?.name) {
+        submitData.append('reporter_name', formData.contact.name.trim());
+      }
+
+      // Normalize phone number before sending
+      if (formData.contact?.phone) {
+        const phoneNorm = normalizeMobileNumber(formData.contact.phone);
+        submitData.append('contact_phone', phoneNorm.normalized || formData.contact.phone.trim());
       }
 
       if (formData.contact?.email) {
-        submitData.append('contact_email', formData.contact.email.trim());
-      }
-      if (formData.contact?.phone) {
-        submitData.append('contact_phone', formData.contact.phone.trim());
+        submitData.append('contact_email', formData.contact.email.trim().toLowerCase());
       }
 
       const token = getStoredToken();
       submitData.append('submission_source', token ? 'web_resident' : 'web_guest');
 
-      if (formData.evidence.file) {
-        submitData.append('image', formData.evidence.file, formData.evidence.fileName || 'evidence.jpg');
+      // Primary evidence photo
+      const primaryPhoto = formData.evidence.photos?.[0]?.file || formData.evidence.file;
+      if (primaryPhoto) {
+        submitData.append('image', primaryPhoto, formData.evidence.fileName || 'evidence.jpg');
       }
 
-      const headers = {};
+      const headers = {
+        'X-Idempotency-Key': idempotencyKeyRef.current,
+      };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
@@ -224,21 +378,21 @@ export default function ReportWizardPage() {
         
         if (response.status === 400 && errorData.detail?.toLowerCase().includes('outside')) {
           setCurrentStep(2);
-          setSubmissionError(errorData.detail || 'Selected location is outside Caloocan City jurisdiction.');
+          setSubmissionError(t('reportWizard.validation.location.outsideCaloocan', 'This spot is outside Caloocan City. Please move the pin inside the city.'));
         } else if (response.status === 409) {
           const ticket = response.headers.get('X-Canonical-Ticket-ID');
           setSubmissionError(`${typeof errorData.detail === 'string' ? errorData.detail : 'A similar report is already being processed.'}${ticket ? ` Existing ticket: ${ticket}.` : ''} Your draft is saved. Review the location or contact PULSO for assistance.`);
         } else if (response.status === 422) {
-          setSubmissionError(typeof errorData.detail === 'string' ? errorData.detail : 'Form validation failed. Please check your inputs.');
+          setSubmissionError(t('reportWizard.validation.server.rejected', 'We couldn\'t accept your report. Please check the marked fields.'));
         } else if (response.status === 429) {
-          setSubmissionError('Submission rate limit reached. Please wait a moment before trying again.');
+          setSubmissionError(t('reportWizard.validation.server.rateLimit', 'Please wait a minute and try again.'));
         } else {
-          setSubmissionError(errorData.detail || errorData.message || 'Submission failed. Please check your connection.');
+          setSubmissionError(errorData.detail || errorData.message || t('reportWizard.validation.server.generic', 'Something went wrong. Your report is saved. Please try again.'));
         }
       }
     } catch (err) {
       console.error('Submission network error:', err);
-      setSubmissionError('An unexpected network error occurred. Your draft remains safely preserved.');
+      setSubmissionError(t('reportWizard.validation.server.generic', 'Something went wrong. Your report is saved. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -254,9 +408,8 @@ export default function ReportWizardPage() {
         {announcement}
       </div>
 
-      {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
+      {/* ── Top Header: Logo & Theme Toggle ───────────── */}
       <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
-        {/* Logo on top-left linking to home */}
         <Link
           to="/"
           className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
@@ -265,7 +418,6 @@ export default function ReportWizardPage() {
           <Branding size="h-9 w-9 sm:h-10 sm:w-10" />
         </Link>
 
-        {/* Right side: Theme Toggle & Home Navigation */}
         <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
           <Link
@@ -279,9 +431,9 @@ export default function ReportWizardPage() {
         </div>
       </header>
 
-      {/* Main Responsive Container */}
+      {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-6 sm:pb-8 flex flex-col">
-        {/* Step-by-Step Segmented Stepper Bar (<1024px / lg:hidden) */}
+        {/* Step-by-Step Segmented Bar (<1024px) */}
         <nav
           aria-label="Report progress steps"
           className="flex lg:hidden flex-col gap-2 mb-6 px-1"
@@ -295,7 +447,6 @@ export default function ReportWizardPage() {
             </span>
           </div>
 
-          {/* 6 Segmented Progress Bars */}
           <div
             className="grid grid-cols-6 gap-2 sm:gap-2.5 w-full"
             role="progressbar"
@@ -305,24 +456,25 @@ export default function ReportWizardPage() {
             aria-valuetext={`Step ${currentStep} of 6: ${currentStepName}`}
           >
             {REPORT_STEPS.map((step) => {
-              const isPassedOrCurrent = step.id <= currentStep;
               const isCurrent = step.id === currentStep;
-              const isClickable = step.id <= maxStepReached;
+              const isFinishedAndValid = step.id < currentStep && stepsValidation[step.id]?.valid;
+              const hasErrorsAfterVisited = step.id < currentStep && !stepsValidation[step.id]?.valid;
               const label = t(`reportWizard.steps.${step.key}`, step.defaultLabel);
 
               return (
                 <button
                   key={step.id}
                   type="button"
-                  onClick={() => isClickable && jumpToStep(step.id)}
-                  disabled={!isClickable}
+                  onClick={() => jumpToStep(step.id)}
                   title={`${step.id}. ${label}`}
                   aria-label={`Step ${step.id}: ${label}${isCurrent ? ' (current step)' : ''}`}
                   aria-current={isCurrent ? 'step' : undefined}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    isClickable ? 'cursor-pointer hover:opacity-80 active:scale-95' : 'cursor-default'
-                  } ${
-                    isPassedOrCurrent
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                    isCurrent
+                      ? 'bg-[#ff6b00] ring-2 ring-orange-200 dark:ring-orange-950/40'
+                      : hasErrorsAfterVisited
+                      ? 'bg-amber-500'
+                      : isFinishedAndValid
                       ? 'bg-[#ff6b00]'
                       : 'bg-slate-200 dark:bg-slate-800'
                   }`}
@@ -334,13 +486,13 @@ export default function ReportWizardPage() {
 
         {/* Global Submission Error Callout */}
         {submissionError && (
-          <aside aria-label="Error announcement" className="mb-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-sm text-red-800 dark:text-red-300 shadow-xs">
-            <p className="font-bold">Notice:</p>
-            <p>{submissionError}</p>
+          <aside aria-label="Error announcement" className="mb-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-sm text-red-800 dark:text-red-300 shadow-xs flex items-center gap-2.5 animate-fadeIn">
+            <AlertCircle size={18} className="text-red-500 shrink-0" />
+            <p className="font-semibold">{submissionError}</p>
           </aside>
         )}
 
-        {/* Two-Column Layout (Desktop) */}
+        {/* Two-Column Layout */}
         <div className="flex-1 flex flex-col lg:flex-row items-stretch lg:items-start gap-6 lg:gap-8">
           {/* Left Column: Persistent Desktop Sidebar */}
           <WizardSidebar
@@ -348,9 +500,10 @@ export default function ReportWizardPage() {
             maxStepReached={maxStepReached}
             onStepClick={jumpToStep}
             onOpenHelpGuide={() => setIsHelpGuideOpen(true)}
+            stepsValidation={stepsValidation}
           />
 
-          {/* Right Column: Rounded Main Card */}
+          {/* Right Column: Active Step Card */}
           <section
             aria-label={`Step ${currentStep} form content`}
             className="flex-1 w-full rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 md:p-10 shadow-xs min-h-[640px] flex flex-col justify-between"
@@ -364,6 +517,7 @@ export default function ReportWizardPage() {
                 isGuideModalOpen={isHelpGuideOpen}
                 onCloseGuideModal={() => setIsHelpGuideOpen(false)}
                 onOpenGuideModal={() => setIsHelpGuideOpen(true)}
+                stepErrors={stepErrors}
               />
             )}
 
@@ -374,6 +528,8 @@ export default function ReportWizardPage() {
                 onLocationChange={(loc) => setFormData(p => ({ ...p, location: typeof loc === 'function' ? loc(p.location) : loc }))}
                 onBack={goToPreviousStep}
                 onContinue={goToNextStep}
+                stepErrors={stepErrors}
+                stepWarnings={stepsValidation[2]?.warnings || []}
               />
             )}
 
@@ -381,7 +537,7 @@ export default function ReportWizardPage() {
               <Step3EvidenceUpload
                 evidenceData={formData.evidence}
                 category={formData.category}
-                locationData={formData.location}
+                onCategoryChange={(newCat) => setFormData(p => ({ ...p, category: newCat }))}
                 onEvidenceChange={(ev) => {
                   setFormData(p => {
                     const updated = { ...p, evidence: ev };
@@ -397,27 +553,32 @@ export default function ReportWizardPage() {
                 }}
                 onBack={goToPreviousStep}
                 onContinue={goToNextStep}
+                stepErrors={stepErrors}
               />
             )}
 
             {currentStep === 4 && (
               <Step4DetailsDuplicate
                 detailsData={formData.details}
-                locationData={formData.location}
-                category={formData.category}
-                evidenceData={formData.evidence}
                 onDetailsChange={(det) => setFormData(p => ({ ...p, details: det }))}
                 onBack={goToPreviousStep}
                 onContinue={goToNextStep}
+                stepErrors={stepErrors}
               />
             )}
 
             {currentStep === 5 && (
               <Step5ContactPreferences
                 contactData={formData.contact}
-                onContactChange={(cnt) => setFormData(p => ({ ...p, contact: cnt }))}
+                onContactChange={(cnt) => setFormData(p => ({ 
+                  ...p, 
+                  contact: cnt,
+                  consentAccepted: Boolean(cnt.consentAccepted) 
+                }))}
                 onBack={goToPreviousStep}
                 onContinue={goToNextStep}
+                stepErrors={stepErrors}
+                stepWarnings={stepsValidation[5]?.warnings || []}
               />
             )}
 
@@ -426,16 +587,20 @@ export default function ReportWizardPage() {
                 formData={formData}
                 isSubmitting={isSubmitting}
                 onJumpToStep={jumpToStep}
-                onConsentChange={(val) => setFormData(p => ({ ...p, consentAccepted: val }))}
+                onConsentChange={(val) => setFormData(p => ({ 
+                  ...p, 
+                  consentAccepted: val,
+                  contact: { ...p.contact, consentAccepted: val }
+                }))}
                 onBack={goToPreviousStep}
                 onSubmit={handleSubmitReport}
+                reviewErrors={validateAllSteps(formData).errors}
+                submissionError={submissionError}
               />
             )}
           </section>
         </div>
       </main>
-
-
     </div>
   );
 }
