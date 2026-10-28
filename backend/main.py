@@ -2926,7 +2926,7 @@ async def upgrade_resident_kyc(
 async def geocode_reverse(
     lat: float = Query(..., description="Latitude"),
     lng: float = Query(..., description="Longitude"),
-    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
+    current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
     Reverse-geocode GPS coordinates -> human-readable address.
@@ -2940,7 +2940,7 @@ async def geocode_reverse(
 @app.get("/api/geocode/search")
 async def geocode_search(
     q: str = Query(..., min_length=2, description="Search query"),
-    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
+    current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
     Forward geocode / place search.
