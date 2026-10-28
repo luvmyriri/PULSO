@@ -6,6 +6,8 @@ from urllib.parse import quote
 
 PUBLIC_CATEGORIES = frozenset({
     "Water Supply & Distribution",
+    "Water Pipeline",
+    "Water pipeline",
     "Drainage & Flooding",
     "Roads & Bridges",
     "Traffic & Road Signs",
@@ -15,6 +17,7 @@ PUBLIC_CATEGORIES = frozenset({
     "Waste Management",
     "Water & Drainage",
     "Street Lighting",
+    "Electrical Wiring",
     "Traffic & Signage",
     "Public Facilities",
     "Public Buildings",

@@ -31,23 +31,42 @@ import {
     Loader2,
     Maximize2,
     Eye,
-    Trash2
+    Trash2,
+    Lightbulb
 } from 'lucide-react';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getToken } from '../utils/auth';
 import { validateProfanity } from '../utils/profanityFilter';
 
+export const RoadIcon = ({ size = 20, className = '', style = {} }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+        style={style}
+    >
+        <path d="M4 19L9 5M20 19L15 5M12 7V9M12 13V15M12 19V21" />
+    </svg>
+);
+
 export function getCategoryIconComponent(catName) {
     const lower = String(catName || '').toLowerCase();
     if (lower.includes('waste') || lower.includes('garbage') || lower.includes('trash') || lower.includes('basura')) return Trash2;
     if (lower.includes('flood') || lower.includes('drain')) return Waves;
     if (lower.includes('water') || lower.includes('tubig')) return Droplets;
-    if (lower.includes('power') || lower.includes('light') || lower.includes('electr') || lower.includes('kuryente')) return Zap;
+    if (lower.includes('street light') || lower.includes('lighting') || lower.includes('streetlight') || lower.includes('ilaw') || lower.includes('lamp') || lower.includes('bulb')) return Lightbulb;
+    if (lower.includes('wiring') || lower.includes('wire') || lower.includes('cable') || lower.includes('electrical') || lower.includes('power') || lower.includes('electr') || lower.includes('kuryente')) return Zap;
     if (lower.includes('traffic') || lower.includes('sign') || lower.includes('signal')) return Signpost;
     if (lower.includes('building') || lower.includes('facilit') || lower.includes('hall')) return Building2;
     if (lower.includes('safety') || lower.includes('hazard') || lower.includes('danger') || lower.includes('sunog')) return ShieldAlert;
-    if (lower.includes('road') || lower.includes('bridge') || lower.includes('lubak') || lower.includes('kalsada')) return HardHat;
+    if (lower.includes('road') || lower.includes('bridge') || lower.includes('lubak') || lower.includes('kalsada')) return RoadIcon;
     return HelpCircle;
 }
 
@@ -62,8 +81,11 @@ export function mapAiCategoryToCanonical(categoryStr) {
         if (part.includes('drain') || part.includes('flood') || part.includes('canal') || part.includes('sewer') || part.includes('manhole') || part.includes('clog') || part.includes('baha') || part.includes('estero') || part.includes('culvert')) {
             mapped.add('Drainage & Flooding');
         }
-        if (part.includes('light') || part.includes('electric') || part.includes('power') || part.includes('lamp') || part.includes('street')) {
-            mapped.add('Power & Street Lighting');
+        if (part.includes('street light') || part.includes('streetlight') || part.includes('lighting') || part.includes('lamp') || (part.includes('light') && !part.includes('traffic'))) {
+            mapped.add('Street Lighting');
+        }
+        if (part.includes('wiring') || part.includes('wire') || part.includes('cable') || part.includes('electric') || part.includes('power') || part.includes('kuryente')) {
+            mapped.add('Electrical Wiring');
         }
         if (part.includes('traffic') || part.includes('sign') || part.includes('signal') || part.includes('marking')) {
             mapped.add('Traffic & Road Signs');
@@ -71,8 +93,8 @@ export function mapAiCategoryToCanonical(categoryStr) {
         if (part.includes('road') || part.includes('bridge') || part.includes('pothole') || part.includes('asphalt') || part.includes('pavement') || part.includes('kalsada') || part.includes('lubak')) {
             mapped.add('Roads & Bridges');
         }
-        if (part.includes('water') || part.includes('tubig') || part.includes('leak') || part.includes('pipe') || part.includes('burst') || part.includes('pressure') || part.includes('maynilad')) {
-            mapped.add('Water Supply & Distribution');
+        if (part.includes('water') || part.includes('tubig') || part.includes('leak') || part.includes('pipe') || part.includes('pipeline') || part.includes('burst') || part.includes('pressure') || part.includes('maynilad')) {
+            mapped.add('Water Pipeline');
         }
         if (part.includes('safety') || part.includes('regulat') || part.includes('hazard') || part.includes('fire') || part.includes('debris') || part.includes('tree') || part.includes('sunog')) {
             mapped.add('Public Safety & Hazards');
@@ -109,15 +131,32 @@ const DRAFT_STORAGE_KEY = 'pulso_quick_report_draft_v2';
 
 // Unified Categories excluding "All" for reporting
 const REPORTABLE_CATEGORIES = [
-    'Water Supply & Distribution',
-    'Drainage & Flooding',
     'Roads & Bridges',
-    'Traffic & Road Signs',
-    'Power & Street Lighting',
+    'Drainage & Flooding',
+    'Street Lighting',
+    'Water Pipeline',
     'Public Safety & Hazards',
+    'Traffic & Road Signs',
     'Public Buildings & Facilities',
+    'Electrical Wiring',
     'Waste Management'
 ];
+
+export const CATEGORY_SUBTITLES = {
+    'Roads & Bridges': 'Potholes, damaged roads, and sidewalks',
+    'Drainage & Flooding': 'Clogged drains, gutters, and flooding',
+    'Street Lighting': 'Busted, flickering, or damaged lights',
+    'Water Pipeline': 'Pipeline leaks, burst pipes, and low water pressure',
+    'Water Supply & Distribution': 'Pipeline leaks, burst pipes, and low water pressure',
+    'Water Supply': 'Pipeline leaks, burst pipes, and low water pressure',
+    'Public Safety & Hazards': 'Fallen trees, open manholes, hazards',
+    'Public Safety Hazards': 'Fallen trees, open manholes, hazards',
+    'Traffic & Road Signs': 'Missing or damaged traffic signs',
+    'Public Buildings & Facilities': 'Parks, civic centers, and buildings',
+    'Public Facilities': 'Parks, civic centers, and buildings',
+    'Electrical Wiring': 'Dangling cables and exposed wires',
+    'Waste Management': 'Uncollected garbage, illegal dumping, litter'
+};
 
 /**
  * QuickReportWizardModal
@@ -135,13 +174,13 @@ function QuickReportWizardModal({
     requestDeviceLocation,
     isLocating = false,
     isTrackingLocation = false,
-    _onStartLocationTracking,
+    onStartLocationTracking,
     onStopLocationTracking,
     locationPermissionDenied = false,
-    _onOpenLocationPicker,
+    onOpenLocationPicker,
     onSubmitReport,
     onTrackReport,
-    _onViewExistingReport,
+    onViewExistingReport,
     currentUser = null
 }) {
     const { t } = useTranslation();
@@ -150,8 +189,10 @@ function QuickReportWizardModal({
     // -------------------------------------------------------------------------
     const [step, setStep] = useState(1); // 1: Photo, 2: Category, 3: Details, 4: Success
     useEffect(() => {
-        if (!isOpen || step !== 1) onStopLocationTracking?.();
-    }, [isOpen, step, onStopLocationTracking]);
+        if (!isOpen) {
+            onStopLocationTracking?.();
+        }
+    }, [isOpen, onStopLocationTracking]);
     const [photo, setPhoto] = useState(null); // Data URL or Blob URL
     const [photoFile, setPhotoFile] = useState(null);
     const [photoCapturedAt, setPhotoCapturedAt] = useState(null);
@@ -441,8 +482,13 @@ function QuickReportWizardModal({
         if (locationAddress && locationAddress.trim() && !locationAddress.startsWith('Lat:')) {
             return locationAddress;
         }
-        return reportLocation ? `${t('reportWizard.step2Location.selectedCoordinates', 'Selected coordinates')}: ${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}` : t('reportWizard.step2Location.chooseLocation', 'Choose the issue location');
-    }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation, t]);
+        if (reportLocation?.lat && reportLocation?.lng) {
+            const bgy = resolvedBarangay || 'Caloocan';
+            const plus = resolvedPlusCode ? `${resolvedPlusCode}, ` : '';
+            return `${plus}${bgy}, Caloocan, Metro Manila`;
+        }
+        return t('reportWizard.step2Location.chooseLocation', 'Choose the issue location');
+    }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation, isLocating, t]);
 
     const handleCopyAddress = (e) => {
         e?.stopPropagation?.();
@@ -675,7 +721,7 @@ function QuickReportWizardModal({
             ctx.fillRect(20, 20, 480, 70);
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 18px monospace';
-            ctx.fillText(`PULSO VERIFIED FIELD PHOTO`, 35, 50);
+            ctx.fillText(`PULSO VERIFIED FIELD PHOTO - ROAD DAMAGE & STREETLIGHT`, 35, 50);
             ctx.font = '14px monospace';
             ctx.fillStyle = '#94a3b8';
             ctx.fillText(`${resolvedBarangay || 'Caloocan'}, Caloocan • ${new Date().toLocaleDateString()}`, 35, 72);
@@ -1057,9 +1103,10 @@ function QuickReportWizardModal({
                                                         </button>
                                                     )}
                                                 </span>
+
                                             ) : !reportLocation ? (
                                                 <span className="text-xs text-slate-600 dark:text-slate-300">{t('reportWizard.step2Location.noLocationHelp', 'Location not set. Use GPS or choose a place on the map.')}</span>
-                                            ) : (reportLocation?.accuracy && reportLocation.accuracy > 20) ? (
+                                            ) : (reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50">
                                                     <Info size={13} className="text-amber-500 shrink-0" />
                                                     <span>Approximate Location (±{Math.round(reportLocation.accuracy)}m)</span>
@@ -1067,35 +1114,43 @@ function QuickReportWizardModal({
                                             ) : (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50">
                                                     <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                                                    <span>{locationStatusText}{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
+                                                    <span>Accurate GPS{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
                                                 </span>
                                             )}
-                                            {/* Minimal Refresh Icon (Resync GPS) */}
-                                            {reportLocation && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => requestDeviceLocation?.()}
-                                                    disabled={isLocating}
-                                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors cursor-pointer inline-flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600 ml-0.5 disabled:opacity-50"
-                                                    title={t('reportWizard.step2Location.resyncGps', 'Resync GPS')}
-                                                    aria-label={t('reportWizard.step2Location.resyncGps', 'Resync GPS')}
-                                                >
-                                                    <RotateCcw size={14} className={isLocating ? 'animate-spin text-[#ff6b00]' : ''} />
-                                                </button>
-                                            )}
                                         </div>
-                                        {!reportLocation && (
-                                            <div className="flex flex-wrap gap-2 mt-3" aria-label="Location controls">
+                                        {!reportLocation ? (
+                                            <div className="flex flex-wrap items-center gap-2 mt-3" aria-label="Location controls">
+                                                {onOpenLocationPicker && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={onOpenLocationPicker}
+                                                        className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                                                    >
+                                                        <MapPin size={15} />
+                                                        <span>Open location</span>
+                                                    </button>
+                                                )}
+                                                {requestDeviceLocation && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => requestDeviceLocation(true)}
+                                                        className="min-h-10 px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 cursor-pointer"
+                                                    >
+                                                        <span>Use my location</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : onOpenLocationPicker ? (
+                                            <div className="mt-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => requestDeviceLocation?.()}
-                                                    disabled={isLocating}
-                                                    className="min-h-11 px-3 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-800 dark:text-white focus-visible:outline-3 focus-visible:outline-blue-600"
+                                                    onClick={onOpenLocationPicker}
+                                                    className="text-xs font-semibold text-[#ff6b00] hover:underline cursor-pointer inline-flex items-center gap-1"
                                                 >
-                                                    {isLocating ? t('reportWizard.step2Location.locating', 'Finding location…') : t('reportWizard.step2Location.useMyLocation', 'Use my location')}
+                                                    <span>Change or open location on map</span>
                                                 </button>
                                             </div>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
@@ -1402,6 +1457,11 @@ function QuickReportWizardModal({
                                                                 <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
                                                                     {catName}
                                                                 </div>
+                                                                {CATEGORY_SUBTITLES[catName] && (
+                                                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                                        {CATEGORY_SUBTITLES[catName]}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -1455,7 +1515,7 @@ function QuickReportWizardModal({
                                                                 : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-slate-300 dark:hover:border-slate-700'
                                                         }`}
                                                     >
-                                                        <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="flex items-center gap-3 min-w-0 pr-2">
                                                             <div
                                                                 className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                                                                     isSelected
@@ -1465,9 +1525,16 @@ function QuickReportWizardModal({
                                                             >
                                                                 <IconComp size={18} className={isSelected ? 'text-white' : ''} />
                                                             </div>
-                                                            <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                                                                {catName}
-                                                            </span>
+                                                            <div className="min-w-0">
+                                                                <span className="font-bold text-sm text-slate-900 dark:text-white block truncate">
+                                                                    {catName}
+                                                                </span>
+                                                                {CATEGORY_SUBTITLES[catName] && (
+                                                                    <span className="text-xs text-slate-500 dark:text-slate-400 block truncate">
+                                                                        {CATEGORY_SUBTITLES[catName]}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
 
                                                         {/* Checkbox */}
