@@ -4179,9 +4179,9 @@ const MyReports = ({
                                                         <span>Rejected</span>
                                                     </span>
                                                 ) : isPending ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-slate-950 shadow-md">
-                                                        <Clock size={13} strokeWidth={2.5} className="text-slate-950 shrink-0" />
-                                                        <span>Awaiting review</span>
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-white shadow-md">
+                                                        <Clock size={13} strokeWidth={2.5} className="text-white shrink-0" />
+                                                        <span className="text-white">Awaiting review</span>
                                                     </span>
                                                 ) : isInProgress ? (
                                                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500 text-white shadow-md">
@@ -4194,9 +4194,9 @@ const MyReports = ({
                                                         <span>Resolved</span>
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-slate-950 shadow-md">
-                                                        <Clock size={13} strokeWidth={2.5} className="text-slate-950 shrink-0" />
-                                                        <span>Awaiting review</span>
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#f59e0b] text-white shadow-md">
+                                                        <Clock size={13} strokeWidth={2.5} className="text-white shrink-0" />
+                                                        <span className="text-white">Awaiting review</span>
                                                     </span>
                                                 )}
                                             </div>
