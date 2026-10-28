@@ -696,7 +696,7 @@ function QuickReportWizardModal({
             ctx.fillRect(20, 20, 480, 70);
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 18px monospace';
-            ctx.fillText(`PULSO VERIFIED FIELD PHOTO`, 35, 50);
+            ctx.fillText(`PULSO VERIFIED FIELD PHOTO - ROAD DAMAGE & STREETLIGHT`, 35, 50);
             ctx.font = '14px monospace';
             ctx.fillStyle = '#94a3b8';
             ctx.fillText(`${resolvedBarangay || 'Caloocan'}, Caloocan • ${new Date().toLocaleDateString()}`, 35, 72);
