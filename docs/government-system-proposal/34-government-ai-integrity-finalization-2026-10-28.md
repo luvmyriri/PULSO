@@ -24,3 +24,7 @@
 4. Complete the proposed local model evaluation and staff review of bilingual accuracy, unsupported factual additions, and failure behavior before treating AI drafts as production-validated. Humans retain publication, engineering, and lifecycle decisions.
 
 No Figma artifact was changed: this pass repaired server behavior and preserved the existing government interface layout.
+
+## Production check on 2026-10-28
+
+The deployed API is healthy on image `20261028-gov-workflow-refinement-v1`. Its read-only `verify_ai.py --live` check reported `configured: true`, `model: gemini-2.5-flash`, and `live_verified: true`. This verifies provider access from the running container with synthetic input. The privacy approval, staff review, and bilingual model evaluation above remain open; the check does not establish those policy or quality decisions.

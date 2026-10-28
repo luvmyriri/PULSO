@@ -227,5 +227,21 @@ These backups are on the VPS, not an off-site backup service.
   public API health, report route and JVD root returned HTTP 200. No live
   resident report or external inbox/handset delivery test was performed.
 
+On 2026-10-28, the government workflow API release
+`20261028-gov-workflow-refinement-v1` was live with Alembic revision
+`19f0b2c3d4e5`. The subsequent web release
+`20261028-gov-kpi-csv-xlsx-v1` restored separate CSV downloads alongside the
+existing styled Excel workbooks for each Operations overview KPI and chart.
+The web release was copied from the then-current
+`20261028-styled-xlsx-export-v1` source and overlaid only with the export
+changes. A database and file backup is at
+`/opt/pulso/backups/20261028T130659Z`; the previous web image and release
+remain available for rollback. Five focused CSV tests, targeted ESLint, the
+Vite production build and the UI detector passed. The live web, API and DB
+containers were healthy; API health and the government page returned HTTP
+200, anonymous Projects and My Work APIs returned HTTP 401, and the existing
+JVD root returned HTTP 200. The running API passed a synthetic Gemini live
+probe. Authenticated staff role acceptance was not performed.
+
 See `deploy/production/README.md` for architecture, reference-data provenance,
 credential handling, invitation and rollback details. Do not run `docker compose down -v`.
