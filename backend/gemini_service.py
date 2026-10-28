@@ -18,7 +18,14 @@ from collections import OrderedDict
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
 
-load_dotenv()
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+local_env_path = os.path.join(os.path.dirname(__file__), ".env.local")
+if os.path.exists(local_env_path):
+    load_dotenv(local_env_path)
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+else:
+    load_dotenv()
 
 GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google-credentials.json")
 GCP_PROJECT        = os.getenv("GOOGLE_CLOUD_PROJECT", "pulso-509010")
