@@ -2618,14 +2618,18 @@ function DevAppPreviewContent() {
                   {wizardStep === 3 && (
                     <Step3EvidenceUpload
                       evidenceData={{
-                        photos: wizardState === 'invalid' 
-                          ? [{ file: null, previewUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150', fileName: 'selfie.jpg', fileSize: 1024*500, isInappropriate: true, rejectionReason: 'This looks like a personal photo. Please take a clear photo of the problem.' }]
-                          : wizardState === 'warning'
-                          ? [{ file: {}, previewUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=150', fileName: 'street_light.jpg', fileSize: 1024*800, aiCategorySuggestion: 'Street Lighting' }]
-                          : [{ file: {}, previewUrl: 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=150', fileName: 'pothole.jpg', fileSize: 1024*800, aiCategorySuggestion: 'Roads & Bridges' }],
+                        file: wizardState === 'invalid' ? null : { name: 'pothole.jpg' },
+                        previewUrl: wizardState === 'invalid'
+                          ? null
+                          : 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=600',
+                        fileName: wizardState === 'invalid' ? '' : 'pothole.jpg',
+                        fileSize: 1024 * 800,
                         isAiScanning: false,
+                        isInappropriate: false,
+                        aiCategorySuggestion: wizardState === 'warning' ? 'Street Lighting' : 'Roads & Bridges',
                       }}
                       category="Roads & Bridges"
+                      locationData={{ lat: 14.7566, lng: 121.0450, address: 'Barangay 171, Caloocan City' }}
                       onCategoryChange={(c) => addLog(`Changed category to ${c}`)}
                       onEvidenceChange={(ev) => addLog('Evidence updated')}
                       onBack={() => addLog('Back clicked on Step 3')}
