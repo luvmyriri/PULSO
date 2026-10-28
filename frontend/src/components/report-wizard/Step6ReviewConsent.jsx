@@ -19,6 +19,9 @@ export default function Step6ReviewConsent({
 
   const consentAccepted = formData?.consentAccepted || false;
   const { category, location, evidence, details, contact } = formData || {};
+  const safeAddress = typeof location?.address === 'string'
+    ? location.address.replace(/\[object Object\]/g, 'Caloocan City')
+    : 'Caloocan City';
 
   const descriptionText = details?.description || '';
   const isLongDescription = descriptionText.length > 200;
@@ -72,7 +75,7 @@ export default function Step6ReviewConsent({
                 </div>
                 <button
                   type="button"
-                  onClick={() => onJumpToStep(1)}
+                  onClick={() => onJumpToStep(2)}
                   className="min-h-[44px] min-w-[44px] px-2.5 rounded-lg text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 inline-flex items-center gap-1 transition-colors"
                 >
                   <Edit2 size={13} aria-hidden="true" />
@@ -87,7 +90,7 @@ export default function Step6ReviewConsent({
                     {t('reportWizard.step6Review.rowLocation', 'LOCATION')}
                   </span>
                   <p className="font-semibold text-slate-900 dark:text-white leading-snug">
-                    {location?.address || 'Caloocan City'}
+                    {safeAddress}
                   </p>
                   {location?.landmark && (
                     <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -101,7 +104,7 @@ export default function Step6ReviewConsent({
                 </div>
                 <button
                   type="button"
-                  onClick={() => onJumpToStep(2)}
+                  onClick={() => onJumpToStep(1)}
                   className="min-h-[44px] min-w-[44px] px-2.5 rounded-lg text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 inline-flex items-center gap-1 transition-colors"
                 >
                   <Edit2 size={13} aria-hidden="true" />
@@ -140,7 +143,7 @@ export default function Step6ReviewConsent({
                 </div>
                 <button
                   type="button"
-                  onClick={() => onJumpToStep(4)}
+                  onClick={() => onJumpToStep(3)}
                   className="min-h-[44px] min-w-[44px] px-2.5 rounded-lg text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 inline-flex items-center gap-1 transition-colors shrink-0"
                 >
                   <Edit2 size={13} aria-hidden="true" />
@@ -165,7 +168,7 @@ export default function Step6ReviewConsent({
                 </div>
                 <button
                   type="button"
-                  onClick={() => onJumpToStep(3)}
+                  onClick={() => onJumpToStep(1)}
                   className="min-h-[44px] min-w-[44px] px-2.5 rounded-lg text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 inline-flex items-center gap-1 transition-colors"
                 >
                   <Edit2 size={13} aria-hidden="true" />
@@ -197,7 +200,7 @@ export default function Step6ReviewConsent({
                 </div>
                 <button
                   type="button"
-                  onClick={() => onJumpToStep(5)}
+                  onClick={() => onJumpToStep(4)}
                   className="min-h-[44px] min-w-[44px] px-2.5 rounded-lg text-xs font-bold text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40 inline-flex items-center gap-1 transition-colors"
                 >
                   <Edit2 size={13} aria-hidden="true" />
@@ -240,7 +243,7 @@ export default function Step6ReviewConsent({
                 <MapPin size={16} className="text-orange-600 shrink-0 mt-0.5" />
                 <div className="text-xs">
                   <p className="font-bold text-slate-900 dark:text-white leading-tight">
-                    {location?.address || 'Caloocan City'}
+                    {safeAddress}
                   </p>
                   <p className="text-slate-400 font-mono mt-0.5">
                     {location?.lat?.toFixed(5)}, {location?.lng?.toFixed(5)}

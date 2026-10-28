@@ -108,12 +108,12 @@ export function mapAiCategoryToCanonical(categoryStr) {
 
 import {
     CALOOCAN_BARANGAYS,
-    encodeOpenLocationCode,
-    formatFullAddress,
-    getPostalCodeForBarangay
 } from '../utils/philippineAddress';
 import { findBarangayByCoordinates } from '../data/caloocanBoundaries';
 import IDCameraModal from './IDCameraModal';
+import LocationAddressPanel from './maps/LocationAddressPanel';
+import LocationCoordinates from './maps/LocationCoordinates';
+import { normalizeDisplayAddress, parseLegacyDisplayAddress, safeAddressValue, formatFullAddress, cleanResidentAddress } from '../utils/locationPrivacy';
 
 export function formatRejectionReason(reason) {
     if (!reason || typeof reason !== 'string') {
@@ -173,6 +173,7 @@ function QuickReportWizardModal({
     structuredAddress = null,
     requestDeviceLocation,
     isLocating = false,
+    isGeocoding = false,
     isTrackingLocation = false,
     onStartLocationTracking,
     onStopLocationTracking,
@@ -253,7 +254,6 @@ function QuickReportWizardModal({
     const [isDiscardPromptOpen, setIsDiscardPromptOpen] = useState(false);
     const [copiedTrackingId, setCopiedTrackingId] = useState(null);
     const [isAddressCopied, setIsAddressCopied] = useState(false);
-
     // Reset duplicate report state if resident alters category, location, or navigates back
     useEffect(() => {
         if (duplicateReport) {
@@ -451,51 +451,27 @@ function QuickReportWizardModal({
         return '';
     }, [customBarangay, structuredAddress, reportLocation]);
 
-    const resolvedPlusCode = useMemo(() => {
-        if (plusCode && typeof plusCode === 'string' && plusCode.trim()) {
-            return plusCode.trim();
-        }
-        if (structuredAddress?.plusCode && typeof structuredAddress.plusCode === 'string') {
-            return structuredAddress.plusCode.trim();
-        }
-        if (reportLocation?.lat && reportLocation?.lng) {
-            return encodeOpenLocationCode(reportLocation.lat, reportLocation.lng, true);
-        }
-        return '';
-    }, [plusCode, structuredAddress, reportLocation]);
+    const displayStructuredAddress = useMemo(() => {
+        const address = structuredAddress
+            ? normalizeDisplayAddress(structuredAddress, reportLocation)
+            : parseLegacyDisplayAddress(locationAddress, reportLocation);
+        if (customBarangay) address.barangay = safeAddressValue(customBarangay);
+        return address;
+    }, [structuredAddress, locationAddress, customBarangay, reportLocation]);
 
-    const displayAddress = useMemo(() => {
-        if (customBarangay) {
-            const zip = getPostalCodeForBarangay(customBarangay) || '1421';
-            const prefix = resolvedPlusCode ? `${resolvedPlusCode}, ` : '';
-            return `${prefix}${customBarangay}, Caloocan, ${zip} Metro Manila`;
-        }
-        if (structuredAddress && (structuredAddress.barangay || structuredAddress.streetAddress || structuredAddress.subdivision)) {
-            return formatFullAddress({
-                ...structuredAddress,
-                plusCode: resolvedPlusCode || structuredAddress.plusCode,
-                city: structuredAddress.city || 'Caloocan',
-                region: structuredAddress.region || 'Metro Manila',
-                postalCode: structuredAddress.postalCode || getPostalCodeForBarangay(structuredAddress.barangay) || '1421'
-            }, reportLocation);
-        }
-        if (locationAddress && locationAddress.trim() && !locationAddress.startsWith('Lat:')) {
-            return locationAddress;
-        }
-        if (reportLocation?.lat && reportLocation?.lng) {
-            const bgy = resolvedBarangay || 'Caloocan';
-            const plus = resolvedPlusCode ? `${resolvedPlusCode}, ` : '';
-            return `${plus}${bgy}, Caloocan, Metro Manila`;
-        }
-        return t('reportWizard.step2Location.chooseLocation', 'Choose the issue location');
-    }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation, isLocating, t]);
+    const resolvedPlusCode = displayStructuredAddress.plusCode;
+    const displayAddress = formatFullAddress(displayStructuredAddress);
 
-    const handleCopyAddress = (e) => {
+    const handleCopyAddress = async (e) => {
         e?.stopPropagation?.();
         if (displayAddress && navigator?.clipboard) {
-            navigator.clipboard.writeText(displayAddress);
-            setIsAddressCopied(true);
-            setTimeout(() => setIsAddressCopied(false), 2000);
+            try {
+                await navigator.clipboard.writeText(displayAddress);
+                setIsAddressCopied(true);
+                setTimeout(() => setIsAddressCopied(false), 2000);
+            } catch {
+                setSubmitError(t('locationPrivacy.copyFailed'));
+            }
         }
     };
 
@@ -1058,15 +1034,20 @@ function QuickReportWizardModal({
                                     <div className="flex-1 min-w-0">
                                         {/* Address Text + Copy Button */}
                                         <div className="flex items-start justify-between gap-1.5">
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug break-words select-text cursor-text flex-1">
-                                                {displayAddress}
-                                            </p>
+                                            <LocationAddressPanel
+                                                address={displayStructuredAddress}
+                                                coordinates={reportLocation}
+                                                showCoordinates={false}
+                                                status={structuredAddress?.lookupStatus}
+                                                loading={isLocating || isGeocoding}
+                                            />
                                             <button
                                                 type="button"
                                                 onClick={handleCopyAddress}
-                                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
-                                                title={isAddressCopied ? 'Copied!' : 'Copy full address'}
-                                                aria-label="Copy address"
+                                                disabled={!displayAddress}
+                                                className="min-h-11 min-w-11 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg focus-visible:outline-3 focus-visible:outline-blue-600 transition-colors cursor-pointer shrink-0"
+                                                title={isAddressCopied ? t('locationPrivacy.copied') : t('locationPrivacy.copy')}
+                                                aria-label={t('locationPrivacy.copy')}
                                             >
                                                 {isAddressCopied ? (
                                                     <Check size={14} className="text-emerald-500" />
@@ -1077,56 +1058,59 @@ function QuickReportWizardModal({
                                         </div>
 
                                         {/* Location Badges & Accuracy Indicator (Single line) */}
-                                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                            {reportLocation && typeof reportLocation.lat === 'number' && typeof reportLocation.lng === 'number' && (
-                                                <>
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 select-all">
-                                                        <span className="text-slate-500 dark:text-slate-400 font-semibold">Lat</span> {reportLocation.lat.toFixed(5)}
+                                        {(reportLocation || locationPermissionDenied) && (
+                                            <LocationCoordinates coordinates={reportLocation}>
+                                                {locationPermissionDenied ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40 shrink-0 whitespace-nowrap">
+                                                        <AlertTriangle size={13} className="text-red-500 shrink-0" />
+                                                        <span>Location permission denied</span>
+                                                        {requestDeviceLocation && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => requestDeviceLocation(true)}
+                                                                className="underline ml-1 cursor-pointer font-bold hover:text-red-700 dark:hover:text-red-300"
+                                                            >
+                                                                Retry
+                                                            </button>
+                                                        )}
                                                     </span>
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 select-all">
-                                                        <span className="text-slate-500 dark:text-slate-400 font-semibold">Lng</span> {reportLocation.lng.toFixed(5)}
+
+                                                ) : !reportLocation ? null : (reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50 shrink-0 whitespace-nowrap">
+                                                        <Info size={13} className="text-amber-500 shrink-0" />
+                                                        <span>{t('locationPrivacy.approximateAccuracy', { accuracy: Math.round(reportLocation.accuracy) })}</span>
                                                     </span>
-                                                </>
-                                            )}
-
-                                            {locationPermissionDenied ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40">
-                                                    <AlertTriangle size={13} className="text-red-500 shrink-0" />
-                                                    <span>Location permission denied</span>
-                                                    {requestDeviceLocation && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => requestDeviceLocation(true)}
-                                                            className="underline ml-1 cursor-pointer font-bold hover:text-red-700 dark:hover:text-red-300"
-                                                        >
-                                                            Retry
-                                                        </button>
-                                                    )}
-                                                </span>
-
-                                            ) : !reportLocation ? (
-                                                <span className="text-xs text-slate-600 dark:text-slate-300">{t('reportWizard.step2Location.noLocationHelp', 'Location not set. Use GPS or choose a place on the map.')}</span>
-                                            ) : (reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50">
-                                                    <Info size={13} className="text-amber-500 shrink-0" />
-                                                    <span>Approximate Location (±{Math.round(reportLocation.accuracy)}m)</span>
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50">
-                                                    <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                                                    <span>Accurate GPS{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
-                                                </span>
-                                            )}
-                                        </div>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50 shrink-0 whitespace-nowrap">
+                                                        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                                                        <span>{reportLocation?.accuracy ? t('locationPrivacy.accurateAccuracy', { accuracy: Math.round(reportLocation.accuracy) }) : t('locationPrivacy.gpsSelected')}</span>
+                                                    </span>
+                                                )}
+                                            </LocationCoordinates>
+                                        )}
                                         {!reportLocation && requestDeviceLocation && (
                                             <div className="flex flex-wrap items-center gap-2 mt-3" aria-label="Location controls">
                                                 <button
                                                     type="button"
-                                                    onClick={() => requestDeviceLocation(true)}
-                                                    className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                                                    disabled={isLocating}
+                                                    onClick={() => {
+                                                        requestDeviceLocation(true);
+                                                        onStartLocationTracking?.();
+                                                    }}
+                                                    className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] disabled:bg-orange-400 disabled:cursor-not-allowed text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer active:scale-95"
+                                                    aria-busy={isLocating}
                                                 >
-                                                    <MapPin size={14} />
-                                                    <span>{t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
+                                                    {isLocating ? (
+                                                        <>
+                                                            <Loader2 size={15} className="animate-spin text-white shrink-0" />
+                                                            <span>Locating...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <MapPin size={14} className="shrink-0" />
+                                                            <span>{t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
+                                                        </>
+                                                    )}
                                                 </button>
                                             </div>
                                         )}
@@ -1657,7 +1641,7 @@ function QuickReportWizardModal({
                                                 onChange={(e) =>
                                                     setLocationDetails({ ...locationDetails, subdivision: e.target.value })
                                                 }
-                                                placeholder="e.g. Celina Homes 3 or Camarin Commercial Ctr"
+                                                placeholder={t('locationPrivacy.fields.subdivision')}
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             />
                                         </div>
@@ -1672,7 +1656,7 @@ function QuickReportWizardModal({
                                                 onChange={(e) =>
                                                     setLocationDetails({ ...locationDetails, houseNumber: e.target.value })
                                                 }
-                                                placeholder="e.g. Blk 4 Lot 16 Silver Street"
+                                                placeholder={t('locationPrivacy.fields.street')}
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             />
                                         </div>
@@ -1780,7 +1764,7 @@ function QuickReportWizardModal({
                                                 </div>
                                                 <div className="text-[11.5px] text-slate-600 dark:text-slate-400 flex items-center gap-1.5 truncate">
                                                     <MapPin size={12} className="text-slate-400 shrink-0" />
-                                                    <span className="truncate">{duplicateReport.location_string || displayAddress || 'Caloocan City'}</span>
+                                                    <span className="truncate">{cleanResidentAddress(duplicateReport.location_string) || displayAddress || t('locationPrivacy.empty')}</span>
                                                 </div>
                                                 {duplicateReport.description && (
                                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg text-xs text-slate-700 dark:text-slate-300">

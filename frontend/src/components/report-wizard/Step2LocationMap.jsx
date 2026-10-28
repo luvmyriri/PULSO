@@ -14,6 +14,10 @@ import {
 } from '../../utils/geospatial';
 import WizardCardFooter from './WizardCardFooter';
 
+import LocationAddressPanel from '../maps/LocationAddressPanel';
+import { reverseGeocodeLocation } from '../../utils/reverseGeocode';
+import { parseGeocodedAddress, formatFullAddress, parseLegacyDisplayAddress } from '../../utils/locationPrivacy';
+
 const MAP_CONTAINER_STYLE = {
   width: '100%',
   height: '100%',
@@ -55,6 +59,8 @@ export default function Step2LocationMap({
   const [geoError, setGeoError] = useState(null);
   const mapRef = useRef(null);
   const watchRef = useRef(null);
+  const locationChangeRef = useRef(onLocationChange);
+  locationChangeRef.current = onLocationChange;
 
   const stopTracking = useCallback(() => {
     if (watchRef.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchRef.current);
@@ -71,6 +77,9 @@ export default function Step2LocationMap({
   const hasSavedCoordinates = Number.isFinite(locationData?.lat) && Number.isFinite(locationData?.lng);
   const hasSelection = locationData?.confirmed === true && hasSavedCoordinates;
   const inCaloocan = hasSelection && isInCaloocan(currentLat, currentLng);
+  const safeBrgy = typeof locationData?.barangay === 'object' && locationData?.barangay !== null
+    ? (locationData.barangay.name || locationData.barangay.displayName || '')
+    : (locationData?.barangay || '');
 
   useEffect(() => {
     if (locationData?.isInCaloocan !== inCaloocan) {
@@ -81,6 +90,22 @@ export default function Step2LocationMap({
     }
   }, [inCaloocan, locationData, onLocationChange]);
 
+  useEffect(() => {
+    if (!hasSavedCoordinates) return;
+    let active = true;
+    // Debounce manual map selection; cancel old responses after moving the pin.
+    const timer = setTimeout(() => {
+      reverseGeocodeLocation(currentLat, currentLng).then(result => {
+        if (!active) return;
+        locationChangeRef.current(previous => {
+          if (previous.lat !== currentLat || previous.lng !== currentLng) return previous;
+          return { ...previous, address: result.address, structuredAddress: result.structuredAddress, addressStatus: result.status };
+        });
+      });
+    }, 400);
+    return () => { active = false; clearTimeout(timer); };
+  }, [hasSavedCoordinates, currentLat, currentLng]);
+
   const onMapLoad = useCallback((map) => {
     mapRef.current = map;
   }, []);
@@ -88,13 +113,16 @@ export default function Step2LocationMap({
   const updateCoordinates = (lat, lng, addressString = '') => {
     const valid = isInCaloocan(lat, lng);
     const estimatedBarangay = estimateBarangayFromCoords(lat, lng);
-    const newAddress = addressString || (valid ? `Caloocan City (${lat.toFixed(5)}, ${lng.toFixed(5)})` : `External Location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+    const safeAddress = typeof addressString === 'object' ? addressString : parseLegacyDisplayAddress(addressString);
+    const newAddress = formatFullAddress(safeAddress);
 
     onLocationChange(previous => ({
       ...previous,
       lat,
       lng,
       address: newAddress,
+      structuredAddress: safeAddress,
+      addressStatus: 'LOADING',
       barangay: estimatedBarangay,
       isInCaloocan: valid,
       confirmed: true,
@@ -196,7 +224,7 @@ export default function Step2LocationMap({
       stopTracking();
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
-      updateCoordinates(lat, lng, place.formatted_address || searchQuery.trim());
+      updateCoordinates(lat, lng, parseGeocodedAddress(result.results, lat, lng, result.plus_code));
       mapRef.current?.panTo({ lat, lng });
       mapRef.current?.setZoom(16);
       setGeoError(null);
@@ -327,15 +355,12 @@ export default function Step2LocationMap({
                   <MapPin size={18} aria-hidden="true" />
                 </div>
                 <div className="space-y-0.5 min-w-0 flex-1">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug break-words">
-                    {hasSelection ? locationData?.address || t('reportWizard.step2Location.selectedMapLocation', 'Selected map location') : hasSavedCoordinates ? locationData?.address || t('reportWizard.step2Location.savedLocationNeedsConfirmation', 'Saved location needs confirmation') : t('reportWizard.step2Location.chooseLocation', 'Choose the issue location')}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {hasSelection ? locationData?.barangay || t('reportWizard.step2Location.barangayNotRecorded', 'Barangay not recorded') : hasSavedCoordinates ? t('reportWizard.step2Location.reviewSavedLocation', 'Review the saved location before confirming') : t('reportWizard.step2Location.selectToConfirmArea', 'Select the issue location to confirm its area')}
-                  </p>
-                  <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 pt-0.5">
-                    {hasSavedCoordinates ? currentLat.toFixed(5) : '—'}, {hasSavedCoordinates ? currentLng.toFixed(5) : '—'}
-                  </p>
+                  <LocationAddressPanel
+                    address={locationData?.structuredAddress || parseLegacyDisplayAddress(locationData?.address)}
+                    coordinates={locationData}
+                    status={locationData?.addressStatus}
+                    loading={isLocating || locationData?.addressStatus === 'LOADING'}
+                  />
                 </div>
               </div>
 

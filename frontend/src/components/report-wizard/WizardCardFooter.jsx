@@ -12,6 +12,7 @@ export default function WizardCardFooter({
   isSubmit = false,
   isSubmitting = false,
   noteText,
+  compact = false,
 }) {
   const { t } = useTranslation();
 
@@ -28,7 +29,7 @@ export default function WizardCardFooter({
       : t('reportWizard.shell.notSubmittedYet', 'Your report is not submitted until you confirm it in Review.'));
 
   return (
-    <footer className="w-full pt-6 mt-8 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <footer className={`w-full ${compact ? 'pt-3 mt-3' : 'pt-6 mt-8'} border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 shrink-0`}>
       {/* Left: Back Button (if allowed) + Information Note */}
       <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 order-2 sm:order-1 self-start sm:self-auto">
         {onBack && canBack && (
@@ -38,17 +39,17 @@ export default function WizardCardFooter({
             disabled={!canBack || isSubmitting}
             aria-label={resolvedBackText}
             title={resolvedBackText}
-            className={`w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] flex items-center justify-center shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer ${
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] flex items-center justify-center shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer ${
               isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
-            <ArrowLeft size={18} aria-hidden="true" />
+            <ArrowLeft size={17} aria-hidden="true" />
           </button>
         )}
 
         <div className="flex items-center gap-1.5 leading-snug">
-          <Info size={16} className="text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true" />
-          <span>{resolvedNote}</span>
+          <Info size={15} className="text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true" />
+          <span className="text-xs">{resolvedNote}</span>
         </div>
       </div>
 
@@ -58,7 +59,7 @@ export default function WizardCardFooter({
           type="button"
           onClick={onContinue}
           disabled={isContinueDisabled || isSubmitting}
-          className={`w-full sm:w-auto min-h-[46px] h-11 sm:h-12 px-6 sm:px-7 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+          className={`w-full sm:w-auto ${compact ? 'min-h-[42px] h-10 sm:h-11 px-5 sm:px-6 text-xs sm:text-sm' : 'min-h-[46px] h-11 sm:h-12 px-6 sm:px-7 text-sm sm:text-base'} rounded-xl font-bold flex items-center justify-center gap-2 shadow-xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
             !isContinueDisabled && !isSubmitting
               ? 'bg-[#ff6b00] hover:bg-[#ea580c] active:bg-[#c2410c] text-white hover:shadow-md active:scale-[0.98] cursor-pointer'
               : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed shadow-none'
@@ -66,16 +67,16 @@ export default function WizardCardFooter({
         >
           {isSubmitting ? (
             <>
-              <Loader2 size={18} className="animate-spin text-white" aria-hidden="true" />
+              <Loader2 size={16} className="animate-spin text-white" aria-hidden="true" />
               <span>{t('reportWizard.nav.submitting', 'Submitting...')}</span>
             </>
           ) : (
             <>
               <span>{resolvedContinueText}</span>
               {isSubmit ? (
-                <Send size={18} aria-hidden="true" />
+                <Send size={16} aria-hidden="true" />
               ) : (
-                <ArrowRight size={18} aria-hidden="true" />
+                <ArrowRight size={16} aria-hidden="true" />
               )}
             </>
           )}

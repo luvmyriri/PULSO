@@ -235,7 +235,7 @@ export default function Step1CategoryEmergency({
         {/* Header Eyebrow, Title & Subtitle */}
         <div className="space-y-1.5">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            {t('reportWizard.step1Category.stepBadge', 'STEP 1 OF 6')}
+            {t('reportWizard.step1Category.stepBadge', 'STEP 2 OF 5')}
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             {t('reportWizard.step1Category.title', 'What would you like to report?')}
@@ -327,7 +327,7 @@ export default function Step1CategoryEmergency({
                 </strong>
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                {t('reportWizard.step1Category.nextPinpoint', 'Next, pinpoint where the issue is located.')}
+                {t('reportWizard.step1Category.nextDetails', 'Next, provide specific details about the issue.')}
               </p>
             </div>
           </div>
@@ -336,11 +336,10 @@ export default function Step1CategoryEmergency({
 
       {/* Pinned Card Footer */}
       <WizardCardFooter
-        onBack={null}
-        canBack={false}
+        onBack={onBack}
         onContinue={onContinue}
         isContinueDisabled={!selectedCategory}
-        continueLabel={t('reportWizard.step1Category.continueToLocation', 'Continue to location')}
+        continueLabel={t('reportWizard.step1Category.continueToDetails', 'Continue to details')}
         noteText={t('reportWizard.shell.notSubmittedYet', 'Your report is not submitted until you confirm it in Review.')}
       />
 

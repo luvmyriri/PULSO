@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getAuthToken } from '../utils/authSession';
-import { formatFullAddress, parseAddressString } from '../utils/philippineAddress';
+import { formatFullAddress, parseAddressString } from '../utils/locationPrivacy';
 import WizardHeader from '../components/report-wizard/WizardHeader';
 import PulsoPulseLine from '../components/common/PulsoPulseLine';
 
@@ -276,7 +276,7 @@ export default function PublicTrackPage() {
                   <div>
                     <span className="font-bold text-slate-400 dark:text-slate-500 uppercase">Location:</span>
                     <p className="text-slate-800 dark:text-slate-200 font-medium mt-0.5 select-text">
-                      {formatFullAddress(parseAddressString(reportData.location_string)) || reportData.location_string || 'Caloocan City'}
+                      {formatFullAddress(parseAddressString(reportData.location_string)) || 'Caloocan City'}
                     </p>
                   </div>
                 </div>

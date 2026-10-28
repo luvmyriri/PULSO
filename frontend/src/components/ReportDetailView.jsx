@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { GoogleMap } from '@react-google-maps/api';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
-import { encodeOpenLocationCode } from '../utils/philippineAddress';
+import { cleanResidentAddress } from '../utils/locationPrivacy';
 
 const OLC_CHARSET = '23456789CFGHJMPQRVWX';
 
@@ -69,7 +69,7 @@ function decodePlusCode(code) {
  * - Full-width Status Callout Banner (Rejected, Awaiting review, In progress, Resolved)
  * - 2-Column Responsive Grid (Span 2 Left / Span 1 Right):
  *   - Left: Department feedback, Submitted evidence, Report information
- *   - Right: Location (with Celina Homes 3 map graphic), Report activity timeline, Need clarification?
+ *   - Right: Location and clarification help
  */
 function ReportDetailViewContent({
     report,
@@ -89,7 +89,6 @@ function ReportDetailViewContent({
     const containerRef = useRef(null);
     const [imageFailed, setImageFailed] = useState(false);
     const activity = useGovernmentData(Number.isInteger(Number(report.id)) && !report.is_sample ? `/api/reports/${report.id}/timeline` : null);
-    const events = activity.data || report.public_timeline || report.timeline || [];
     useEffect(() => { setImageFailed(false); }, [report.id, report.image_url]);
 
     useEffect(() => {
@@ -156,9 +155,7 @@ function ReportDetailViewContent({
     const reportLat = resolvedLat;
     const reportLng = resolvedLng;
     const isValidCoordinate = Number.isFinite(reportLat) && Number.isFinite(reportLng);
-    const coordDisplay = isValidCoordinate ? `${reportLat.toFixed(6)}, ${reportLng.toFixed(6)}` : 'Coordinates not recorded';
-    const cleanShortPlusCode = isValidCoordinate ? encodeOpenLocationCode(reportLat, reportLng, true) : '';
-    const rawAddress = report.location_string || report.address || report.location_barangay || report.barangay || 'Location not recorded';
+    const rawAddress = cleanResidentAddress(report.location_string || report.address || report.location_barangay || report.barangay) || t('locationPrivacy.empty');
     const locationAccuracyMeters = report.accuracy_m > 0 ? Math.round(report.accuracy_m) : null;
 
     // Google Maps SDK context
@@ -380,16 +377,9 @@ function ReportDetailViewContent({
                             {isMapsLoaded && <div className="h-48 rounded-xl overflow-hidden" aria-label="Reported location map">
                                 <GoogleMap center={{lat:reportLat,lng:reportLng}} zoom={16} mapContainerClassName="w-full h-full" options={{disableDefaultUI:true,gestureHandling:'none',keyboardShortcuts:false,clickableIcons:false}}/>
                             </div>}
-                            <p className="text-xs font-mono text-slate-600 dark:text-slate-300">{coordDisplay}{cleanShortPlusCode ? ` · ${cleanShortPlusCode}` : ''}</p>
                             {locationAccuracyMeters && <p className="text-xs text-slate-600 dark:text-slate-300">Recorded accuracy: ±{locationAccuracyMeters} m</p>}
                             <button type="button" onClick={() => onOpenMap ? onOpenMap({...report,lat:reportLat,lng:reportLng}) : window.open(`https://www.google.com/maps?q=${reportLat},${reportLng}`, '_blank', 'noopener,noreferrer')} className="min-h-11 w-full px-4 border border-slate-200 dark:border-slate-700 rounded-xl font-semibold text-sm focus-visible:outline-3 focus-visible:outline-blue-600">View on map</button>
                         </> : <p className="text-xs text-slate-600 dark:text-slate-300">Coordinates not recorded. The address above remains available.</p>}
-                    </section>
-                    <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
-                        <h2 className="flex items-center gap-2 font-bold text-base text-slate-900 dark:text-white"><Clock size={18}/>Report activity</h2>
-                        {activity.loading ? <p role="status">Loading report activity…</p> : activity.error ? <div role="alert"><p>Report activity could not be loaded.</p><button type="button" onClick={activity.reload} className="min-h-11 underline">Try again</button></div> : !events.length ? <p className="text-sm text-slate-600 dark:text-slate-300">No public activity has been recorded yet.</p> : <ol className="divide-y divide-slate-200 dark:divide-slate-800">
-                            {events.map((event,index) => <li key={event.id || index} className="py-3 space-y-1"><p className="font-semibold text-sm">{event.label || event.stage || event.status?.replaceAll('_',' ')}</p>{event.note && <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{event.note}</p>}<time className="text-xs text-slate-500 dark:text-slate-400">{event.created_at || event.timestamp ? new Date(event.created_at || event.timestamp).toLocaleString() : 'Time not recorded'}</time></li>)}
-                        </ol>}
                     </section>
 
                     {/* Block 6: Need clarification? */}

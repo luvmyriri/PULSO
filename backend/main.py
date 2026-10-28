@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import hashlib
 import hmac
@@ -2924,23 +2924,23 @@ async def upgrade_resident_kyc(
 
 @app.get("/api/geocode/reverse")
 async def geocode_reverse(
-    lat: float = Query(..., description="Latitude"),
-    lng: float = Query(..., description="Longitude"),
-    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
+    lat: float = Query(..., ge=-90, le=90, description="Latitude"),
+    lng: float = Query(..., ge=-180, le=180, description="Longitude"),
+    current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
     Reverse-geocode GPS coordinates -> human-readable address.
     Proxies through the backend so the Maps API key is never exposed to clients.
     """
-    # Reverse geocode GPS coordinates with standard Caloocan formatting
-    address = await maps_service.reverse_geocode(lat, lng)
-    return {"address": address, "lat": lat, "lng": lng}
+    # Return safe components alongside the existing address/coordinate keys.
+    result = await maps_service.reverse_geocode_details(lat, lng)
+    return JSONResponse({**result, "lat": lat, "lng": lng}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/geocode/search")
 async def geocode_search(
     q: str = Query(..., min_length=2, description="Search query"),
-    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
+    current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
     Forward geocode / place search.

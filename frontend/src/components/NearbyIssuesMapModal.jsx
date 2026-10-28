@@ -49,6 +49,7 @@ import {
     getCaloocanDistrict
 } from '../data/caloocanBoundaries';
 import { CALOOCAN_ALL_BARANGAYS_OPTIONS, CALOOCAN_BARANGAYS } from '../utils/philippineAddress';
+import { cleanResidentAddress } from '../utils/locationPrivacy';
 import { API_BASE_URL } from '../utils/apiBase';
 import PhotoMapPin from './MapPin';
 
@@ -1626,7 +1627,7 @@ export default function NearbyIssuesMapModal({
                                                     {report.title}
                                                 </div>
                                                 <div className="text-[10.5px] text-slate-400 font-mono truncate">
-                                                    {report.ticket_id || String(report.id)} · {report.location_string || report.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
+                                                    {report.ticket_id || String(report.id)} · {cleanResidentAddress(report.location_string) || cleanResidentAddress(report.barangay) || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
                                                 </div>
                                             </div>
                                             <ChevronRight size={14} className="text-slate-400 shrink-0" />
@@ -1915,7 +1916,7 @@ export default function NearbyIssuesMapModal({
                                                 {report.title || 'Civic infrastructure report'}
                                             </h3>
                                             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                                                {report.location_string || report.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
+                                                {cleanResidentAddress(report.location_string) || cleanResidentAddress(report.barangay) || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
                                             </p>
                                             {distanceText && (
                                                 <span className="text-[10.5px] font-mono text-slate-400 dark:text-slate-500 block mt-0.5">
@@ -2252,7 +2253,7 @@ export default function NearbyIssuesMapModal({
                                                     </span>
                                                     <span className="text-[10.5px] text-slate-500 dark:text-slate-400 min-w-0 flex items-center gap-1">
                                                         <MapPin size={11} className="text-slate-400 shrink-0" />
-                                                        <span className="break-words line-clamp-1">{selectedHazard.location_string || selectedHazard.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}</span>
+                                                        <span className="break-words line-clamp-1">{cleanResidentAddress(selectedHazard.location_string) || cleanResidentAddress(selectedHazard.barangay) || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}</span>
                                                     </span>
                                                 </div>
                                                 {!selectedHazard.isOwnReport && <p className="mt-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200">{publicStatusLabel}</p>}
@@ -2363,7 +2364,7 @@ export default function NearbyIssuesMapModal({
                                                         {report.title || 'Civic infrastructure report'}
                                                     </h4>
                                                     <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                                                        {report.location_string || report.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
+                                                        {cleanResidentAddress(report.location_string) || cleanResidentAddress(report.barangay) || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
                                                     </p>
                                                     {distanceText && (
                                                         <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
@@ -2434,7 +2435,7 @@ export default function NearbyIssuesMapModal({
                                     <MapPin size={15} className="text-slate-400 shrink-0" />
                                     <span className="font-semibold text-slate-500 w-20">Location</span>
                                     <span className="font-medium text-slate-900 dark:text-white break-words min-w-0">
-                                        {selectedHazard.location_string || selectedHazard.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
+                                        {cleanResidentAddress(selectedHazard.location_string) || cleanResidentAddress(selectedHazard.barangay) || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
                                     </span>
                                 </div>
                                 {selectedHazard.accuracy_m > 0 && <div className="pl-[25px] text-slate-600 dark:text-slate-300">Reported map accuracy: ±{Math.round(selectedHazard.accuracy_m)} m</div>}

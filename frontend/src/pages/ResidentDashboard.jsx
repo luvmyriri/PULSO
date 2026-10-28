@@ -146,6 +146,7 @@ import {
 import { API_BASE_URL } from '../utils/apiBase';
 import { apiFetch, dedupeFetch, checkServerHealth, logApiFailure } from '../utils/apiFetch';
 import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
+import { reverseGeocodeLocation } from '../utils/reverseGeocode';
 import ClaimReportModal from '../components/modals/ClaimReportModal';
 import IDCameraModal from '../components/IDCameraModal';
 import AvatarCropModal, { validateAvatarFile } from '../components/AvatarCropModal';
@@ -181,14 +182,9 @@ import {
     getPostalCodeForBarangay,
     encodeOpenLocationCode,
     extractCleanPlusCode,
-    parseGeocodedAddress,
-    parseAddressString,
-    formatFullAddress,
-    formatCardAddress,
-    formatNearbyAddress,
-    formatNearbyIssueLocation,
     isMinimumViableAddress
 } from '../utils/philippineAddress';
+import { cleanResidentAddress, parseAddressString, formatFullAddress, formatCardAddress, formatNearbyAddress, formatNearbyIssueLocation } from '../utils/locationPrivacy';
 import { isUsingNameFallback } from '../utils/greetingHelper';
 import { validateProfanity } from '../utils/profanityFilter';
 
@@ -2691,7 +2687,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                                                 Recorded Location
                                             </p>
                                             <p className="text-slate-800 dark:text-slate-200 font-medium select-text cursor-text">
-                                                {formatFullAddress(parseAddressString(report.location_string)) || report.location_string || 'Caloocan City'}
+                                                {formatFullAddress(parseAddressString(report.location_string)) || 'Caloocan City'}
                                             </p>
                                         </div>
                                         {report.lat && report.lng && (
@@ -2742,7 +2738,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                                             Recorded Location
                                         </p>
                                         <p className="text-slate-800 dark:text-slate-200 font-medium select-text cursor-text">
-                                            {formatFullAddress(parseAddressString(report.location_string)) || report.location_string || 'Caloocan City'}
+                                            {formatFullAddress(parseAddressString(report.location_string)) || 'Caloocan City'}
                                         </p>
                                     </div>
                                     {report.lat && report.lng && (
@@ -2898,7 +2894,7 @@ const SAMPLE_REPORTS_LIST = [
         title: 'Reported public safety hazard',
         category: 'Public Safety & Hazards',
         status: 'rejected',
-        subdivision: 'Celina Homes 3',
+        subdivision: 'Sample subdivision',
         barangay: 'Barangay 171',
         location_string: 'Barangay 171, Caloocan City',
         latitude: 14.7518,
@@ -7358,6 +7354,7 @@ const ResidentModals = ({
                     structuredAddress={structuredAddress}
                     requestDeviceLocation={requestDeviceLocation}
                     isLocating={isLocating}
+                    isGeocoding={geocodingAddress}
                     isTrackingLocation={isTrackingLocation}
                     onStartLocationTracking={startDeviceLocationTracking}
                     onStopLocationTracking={stopDeviceLocationTracking}
@@ -10788,11 +10785,15 @@ export default function ResidentDashboard() {
         setIsTrackingLocation(false);
     }, []);
 
-    const acceptDevicePosition = (position) => {
+    const acceptDevicePosition = (position, isForced = false) => {
         const { latitude, longitude, accuracy } = position.coords || {};
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-        // Don't degrade an already locked accurate fix with a jittery reading
-        if (reportLocation?.accuracy && Number.isFinite(accuracy) && accuracy > reportLocation.accuracy * 1.8) {
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            setIsLocating(false);
+            return;
+        }
+        // Don't degrade an already locked accurate fix with a jittery reading unless explicitly requested
+        if (!isForced && reportLocation?.accuracy && Number.isFinite(accuracy) && accuracy > reportLocation.accuracy * 1.8) {
+            setIsLocating(false);
             return;
         }
         const loc = {
@@ -10808,7 +10809,7 @@ export default function ResidentDashboard() {
         setIsLocating(false);
         const previous = lastGeocodedPositionRef.current;
         const moved = !previous || Math.abs(previous.lat - latitude) > 0.0002 || Math.abs(previous.lng - longitude) > 0.0002;
-        if (moved) {
+        if (moved || isForced) {
             lastGeocodedPositionRef.current = loc;
             setLocationAddress('');
             setStructuredAddress(null);
@@ -10829,7 +10830,7 @@ export default function ResidentDashboard() {
         navigator.geolocation.getCurrentPosition(
             position => {
                 if (requestId === locationRequestRef.current) {
-                    acceptDevicePosition(position);
+                    acceptDevicePosition(position, force);
                 }
             },
             error => {
@@ -10842,7 +10843,7 @@ export default function ResidentDashboard() {
                 // Fallback to network/WiFi position if high-accuracy GPS hardware times out
                 navigator.geolocation.getCurrentPosition(
                     fallbackPos => {
-                        if (requestId === locationRequestRef.current) acceptDevicePosition(fallbackPos);
+                        if (requestId === locationRequestRef.current) acceptDevicePosition(fallbackPos, force);
                     },
                     () => {
                         if (requestId === locationRequestRef.current) {
@@ -10850,10 +10851,10 @@ export default function ResidentDashboard() {
                             showToast('Could not refresh GPS. Choose the issue location on the map or retry.', 'info');
                         }
                     },
-                    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+                    { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
                 );
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 }
         );
     };
 
@@ -10870,10 +10871,12 @@ export default function ResidentDashboard() {
                 acceptDevicePosition(position);
             },
             error => {
+                setIsLocating(false);
                 if (error?.code === 1) {
-                    setIsLocating(false);
                     setLocationPermissionDenied(true);
                     stopDeviceLocationTracking();
+                } else {
+                    showToast(t(error?.code === 3 ? 'locationPrivacy.gpsTimeout' : error?.code === 2 ? 'locationPrivacy.gpsUnavailable' : 'locationPrivacy.gpsError'), 'info');
                 }
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -10881,7 +10884,10 @@ export default function ResidentDashboard() {
     };
 
     useEffect(() => {
-        if (activeModal !== 'file-report') {
+        if (activeModal === 'file-report') {
+            requestDeviceLocation();
+            startDeviceLocationTracking();
+        } else {
             stopDeviceLocationTracking();
         }
         return () => {
@@ -11020,128 +11026,17 @@ export default function ResidentDashboard() {
     const reverseGeocode = async (lat, lng) => {
         const requestId = ++geocodeRequest.current;
         setGeocodingAddress(true);
-
-        let primaryAddress = '';
-        let resolvedStructured = null;
-        const autoPlusCode = encodeOpenLocationCode(lat, lng, true);
-        let plusCodeStr = autoPlusCode;
-
-        // 1. Try backend reverse geocoding first (avoids browser referrer/key restrictions)
-        try {
-            const res = await apiFetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`, {
-                timeout: 4000
-            });
-            if (res.ok && res.data?.address && !res.data.address.startsWith("Lat:")) {
-                resolvedStructured = parseAddressString(res.data.address) || parseGeocodedAddress([], lat, lng, autoPlusCode);
-                if (!resolvedStructured.plusCode) resolvedStructured.plusCode = autoPlusCode;
-                primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-                if (resolvedStructured.plusCode) plusCodeStr = resolvedStructured.plusCode;
-            }
-        } catch (backendErr) {
-            console.debug("[PULSO] Backend reverse geocode skipped/failed, falling back to client geocoder:", backendErr);
-        }
-
-        // 2. Fall back to browser Google Maps Geocoder if backend was unreachable or returned empty
-        if (!primaryAddress && isLoaded && window.google?.maps?.Geocoder) {
-            try {
-                const geocoder = new window.google.maps.Geocoder();
-                const response = await Promise.race([
-                    geocoder.geocode({ location: { lat, lng } }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Browser geocode timeout')), 4000))
-                ]);
-                if (response.results && response.results.length > 0) {
-                    const googlePlusCode = response.plus_code?.compound_code || response.plus_code?.global_code || autoPlusCode;
-                    resolvedStructured = parseGeocodedAddress(response.results, lat, lng, googlePlusCode);
-                    primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-                    if (resolvedStructured.plusCode) plusCodeStr = resolvedStructured.plusCode;
-                }
-            } catch (browserErr) {
-                console.debug("[PULSO] Browser Google geocoding failed or timed out:", browserErr);
-            }
-        }
-
-        // 3. Fallback to OpenStreetMap (Nominatim) if still unresolved
-        if (!primaryAddress && navigator.onLine) {
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
-                    signal: AbortSignal.timeout(4000)
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.display_name) {
-                        const addr = data.address || {};
-                        const brgyCandidate = addr.suburb || addr.quarter || addr.neighbourhood || addr.village || '';
-                        resolvedStructured = {
-                            subdivision: '',
-                            plusCode: autoPlusCode,
-                            streetAddress: [addr.house_number, addr.road].filter(Boolean).join(' ') || 'Address unavailable',
-                            barangay: brgyCandidate.includes('Barangay') ? brgyCandidate : (brgyCandidate ? `Barangay ${brgyCandidate}` : ''),
-                            city: 'Caloocan',
-                            postalCode: addr.postcode || getPostalCodeForBarangay(brgyCandidate),
-                            region: 'Metro Manila'
-                        };
-                        primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-                        plusCodeStr = autoPlusCode;
-                    }
-                }
-            } catch (osmErr) {
-                // non-fatal
-            }
-        }
-
-        // 4. Fallback to BigDataCloud Plus Code if needed
-        if ((!plusCodeStr || plusCodeStr === autoPlusCode) && navigator.onLine) {
-            try {
-                const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`, {
-                    signal: AbortSignal.timeout(3000)
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data?.plusCode) {
-                        const cleanCode = extractCleanPlusCode(data.plusCode, lat, lng);
-                        if (cleanCode) plusCodeStr = cleanCode;
-                    }
-                }
-            } catch {
-                // non-fatal
-            }
-        }
-
+        const result = await reverseGeocodeLocation(lat, lng);
         if (requestId !== geocodeRequest.current) return;
-
-        // 5. Final fallback: Known Caloocan barangay polygon or Coordinates with "Address unavailable"
-        if (!resolvedStructured) {
-            const autoBrgy = findBarangayByCoordinates(lat, lng);
-            const brgyName = autoBrgy ? autoBrgy.name : '';
-            resolvedStructured = {
-                subdivision: '',
-                plusCode: plusCodeStr || autoPlusCode,
-                streetAddress: 'Address unavailable',
-                barangay: brgyName,
-                city: 'Caloocan',
-                postalCode: brgyName ? getPostalCodeForBarangay(brgyName) : '1421',
-                region: 'Metro Manila'
-            };
-            primaryAddress = `Address unavailable (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
-        } else if (!resolvedStructured.barangay || !resolvedStructured.barangay.trim()) {
-            const autoBrgy = findBarangayByCoordinates(lat, lng);
-            if (autoBrgy) {
-                resolvedStructured.barangay = autoBrgy.name;
-                resolvedStructured.postalCode = getPostalCodeForBarangay(autoBrgy.name);
-                primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-            }
-        }
-
-        setStructuredAddress(resolvedStructured);
-        const finalAddress = primaryAddress || `Address unavailable (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
-        setLocationAddress(finalAddress);
-        const finalPlus = plusCodeStr || autoPlusCode;
-        setPlusCode(finalPlus);
+        setStructuredAddress({ ...result.structuredAddress, lookupStatus: result.status });
+        setLocationAddress(result.address);
+        setPlusCode(result.structuredAddress.plusCode);
         setGeocodingAddress(false);
+        // Do not persist geocoded addresses or precise Plus Codes in sessionStorage.
         try {
-            sessionStorage.setItem('pulso_user_address', finalAddress);
-            if (finalPlus) sessionStorage.setItem('pulso_user_plus_code', finalPlus);
-            if (resolvedStructured) sessionStorage.setItem('pulso_user_structured_address', JSON.stringify(resolvedStructured));
+            sessionStorage.removeItem('pulso_user_address');
+            sessionStorage.removeItem('pulso_user_plus_code');
+            sessionStorage.removeItem('pulso_user_structured_address');
         } catch (_) {}
     };
 

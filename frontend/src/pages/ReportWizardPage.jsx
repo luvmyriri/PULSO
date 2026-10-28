@@ -9,8 +9,7 @@ import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
 import WizardSidebar, { REPORT_STEPS } from '../components/report-wizard/WizardSidebar';
 import Step1CategoryEmergency from '../components/report-wizard/Step1CategoryEmergency';
-import Step2LocationMap from '../components/report-wizard/Step2LocationMap';
-import Step3EvidenceUpload from '../components/report-wizard/Step3EvidenceUpload';
+import Step2CameraLocation from '../components/report-wizard/Step2CameraLocation';
 import Step4DetailsDuplicate from '../components/report-wizard/Step4DetailsDuplicate';
 import Step5ContactPreferences from '../components/report-wizard/Step5ContactPreferences';
 import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
@@ -32,9 +31,9 @@ export default function ReportWizardPage() {
     } catch { return null; }
   });
 
-  // Stepper State (1 - 6)
-  const [currentStep, setCurrentStep] = useState(() => Math.min(6, Math.max(1, Number(restoredDraft?.currentStep) || 1)));
-  const [maxStepReached, setMaxStepReached] = useState(() => Math.min(6, Math.max(1, Number(restoredDraft?.maxStepReached) || 1)));
+  // Stepper State (1 - 5)
+  const [currentStep, setCurrentStep] = useState(() => Math.min(5, Math.max(1, Number(restoredDraft?.currentStep) || 1)));
+  const [maxStepReached, setMaxStepReached] = useState(() => Math.min(5, Math.max(1, Number(restoredDraft?.maxStepReached) || 1)));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [submissionError, setSubmissionError] = useState(null);
@@ -43,42 +42,59 @@ export default function ReportWizardPage() {
   // Consolidated Form State
   const [formData, setFormData] = useState(() => {
     const initial = {
-    category: '',
-    location: {
-      lat: null,
-      lng: null,
-      address: '',
-      barangay: '',
-      landmark: '',
-      isInCaloocan: false,
-      confirmed: false,
-    },
-    evidence: {
-      file: null,
-      previewUrl: null,
-      fileName: '',
-      fileSize: 0,
-      mimeType: '',
-      aiCategorySuggestion: null,
-      aiConfidence: null,
-      isAiScanning: false,
-    },
-    details: {
-      description: '',
-      urgency: 'medium',
-    },
-    contact: {
-      type: 'anonymous', // 'anonymous' | 'notify' | 'authenticated'
-      email: '',
-      phone: '',
-    },
-    consentAccepted: false,
+      category: '',
+      location: {
+        lat: null,
+        lng: null,
+        address: '',
+        barangay: '',
+        landmark: '',
+        isInCaloocan: false,
+        confirmed: false,
+      },
+      evidence: {
+        file: null,
+        previewUrl: null,
+        fileName: '',
+        fileSize: 0,
+        mimeType: '',
+        aiCategorySuggestion: null,
+        aiConfidence: null,
+        isAiScanning: false,
+      },
+      details: {
+        description: '',
+        urgency: 'medium',
+      },
+      contact: {
+        type: 'anonymous', // 'anonymous' | 'notify' | 'authenticated'
+        email: '',
+        phone: '',
+      },
+      consentAccepted: false,
     };
     const saved = restoredDraft?.formData || {};
+    const savedLoc = saved.location || {};
+    const rawBrgy = savedLoc.barangay;
+    const cleanBrgy = (typeof rawBrgy === 'object' && rawBrgy !== null)
+      ? (rawBrgy.name || rawBrgy.displayName || '')
+      : (typeof rawBrgy === 'string' ? rawBrgy : '');
+    const cleanAddress = typeof savedLoc.address === 'string'
+      ? (savedLoc.address.includes('[object Object]')
+          ? (cleanBrgy ? `${cleanBrgy}, Caloocan City, Metro Manila` : 'Caloocan City')
+          : savedLoc.address)
+      : '';
+
     return {
       ...initial,
       category: typeof saved.category === 'string' ? saved.category : '',
-      location: { ...initial.location, ...saved.location, confirmed: saved.location?.confirmed === true },
+      location: {
+        ...initial.location,
+        ...savedLoc,
+        barangay: cleanBrgy,
+        address: cleanAddress || savedLoc.address || '',
+        confirmed: savedLoc.confirmed === true,
+      },
       details: { ...initial.details, ...saved.details },
       contact: { ...initial.contact, ...saved.contact },
       // A File cannot survive JSON storage. Require reattachment and fresh consent.
@@ -122,12 +138,12 @@ export default function ReportWizardPage() {
 
   // Step Navigation
   const goToNextStep = () => {
-    if (currentStep < 6) {
+    if (currentStep < 5) {
       const next = currentStep + 1;
       setCurrentStep(next);
       setMaxStepReached(prev => Math.max(prev, next));
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      setAnnouncement(`Step ${next} of 6`);
+      setAnnouncement(`Step ${next} of 5`);
     }
   };
 
@@ -136,17 +152,17 @@ export default function ReportWizardPage() {
       const prev = currentStep - 1;
       setCurrentStep(prev);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      setAnnouncement(`Step ${prev} of 6`);
+      setAnnouncement(`Step ${prev} of 5`);
     } else {
       navigate('/');
     }
   };
 
   const jumpToStep = (stepNumber) => {
-    if (stepNumber >= 1 && stepNumber <= 6 && stepNumber <= maxStepReached) {
+    if (stepNumber >= 1 && stepNumber <= 5 && stepNumber <= maxStepReached) {
       setCurrentStep(stepNumber);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      setAnnouncement(`Step ${stepNumber} of 6`);
+      setAnnouncement(`Step ${stepNumber} of 5`);
     }
   };
 
@@ -156,6 +172,11 @@ export default function ReportWizardPage() {
     if (!Number.isFinite(formData.location.lat) || !Number.isFinite(formData.location.lng) || !formData.location.isInCaloocan || !formData.location.confirmed) {
       setCurrentStep(2);
       setSubmissionError('Select the issue location before submitting.');
+      return;
+    }
+    if (!formData.evidence.file && !formData.evidence.previewUrl) {
+      setCurrentStep(2);
+      setSubmissionError('Please attach or take a photo of the concern before submitting.');
       return;
     }
     setIsSubmitting(true);
@@ -223,7 +244,7 @@ export default function ReportWizardPage() {
         const errorData = await response.json().catch(() => ({}));
         
         if (response.status === 400 && errorData.detail?.toLowerCase().includes('outside')) {
-          setCurrentStep(2);
+          setCurrentStep(1);
           setSubmissionError(errorData.detail || 'Selected location is outside Caloocan City jurisdiction.');
         } else if (response.status === 409) {
           const ticket = response.headers.get('X-Canonical-Ticket-ID');
@@ -255,22 +276,22 @@ export default function ReportWizardPage() {
       </div>
 
       {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
-      <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
+      <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 w-full flex justify-between items-center">
         {/* Logo on top-left linking to home */}
         <Link
           to="/"
           className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
           title="Caloocan City PULSO Home"
         >
-          <Branding size="h-9 w-9 sm:h-10 sm:w-10" />
+          <Branding size="h-8 w-8 sm:h-9 sm:w-9" />
         </Link>
 
         {/* Right side: Theme Toggle & Home Navigation */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <ThemeToggle />
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
             title="Return to Home Section"
           >
             <Home size={14} className="text-[#ff6b00]" />
@@ -280,29 +301,29 @@ export default function ReportWizardPage() {
       </header>
 
       {/* Main Responsive Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-6 sm:pb-8 flex flex-col">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-2 sm:pt-3 pb-3 sm:pb-4 flex flex-col justify-center">
         {/* Step-by-Step Segmented Stepper Bar (<1024px / lg:hidden) */}
         <nav
           aria-label="Report progress steps"
-          className="flex lg:hidden flex-col gap-2 mb-6 px-1"
+          className="flex lg:hidden flex-col gap-1.5 mb-3 px-1"
         >
           <div className="flex items-center justify-between text-xs">
             <span className="font-bold text-xs uppercase tracking-wider text-orange-600 dark:text-[#ff8a3d]">
-              {t('reportWizard.stepCountUppercase', 'STEP {{current}} OF {{total}}', { current: currentStep, total: 6 })}
+              {t('reportWizard.stepCountUppercase', 'STEP {{current}} OF {{total}}', { current: currentStep, total: 5 })}
             </span>
             <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
               {currentStepName}
             </span>
           </div>
 
-          {/* 6 Segmented Progress Bars */}
+          {/* 5 Segmented Progress Bars */}
           <div
-            className="grid grid-cols-6 gap-2 sm:gap-2.5 w-full"
+            className="grid grid-cols-5 gap-2 sm:gap-2.5 w-full"
             role="progressbar"
             aria-valuenow={currentStep}
             aria-valuemin={1}
-            aria-valuemax={6}
-            aria-valuetext={`Step ${currentStep} of 6: ${currentStepName}`}
+            aria-valuemax={5}
+            aria-valuetext={`Step ${currentStep} of 5: ${currentStepName}`}
           >
             {REPORT_STEPS.map((step) => {
               const isPassedOrCurrent = step.id <= currentStep;
@@ -334,14 +355,14 @@ export default function ReportWizardPage() {
 
         {/* Global Submission Error Callout */}
         {submissionError && (
-          <aside aria-label="Error announcement" className="mb-6 p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-sm text-red-800 dark:text-red-300 shadow-xs">
+          <aside aria-label="Error announcement" className="mb-3 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-xs sm:text-sm text-red-800 dark:text-red-300 shadow-xs">
             <p className="font-bold">Notice:</p>
             <p>{submissionError}</p>
           </aside>
         )}
 
         {/* Two-Column Layout (Desktop) */}
-        <div className="flex-1 flex flex-col lg:flex-row items-stretch lg:items-start gap-6 lg:gap-8">
+        <div className="flex-1 flex flex-col lg:flex-row items-stretch lg:items-start gap-4 lg:gap-6">
           {/* Left Column: Persistent Desktop Sidebar */}
           <WizardSidebar
             currentStep={currentStep}
@@ -353,9 +374,52 @@ export default function ReportWizardPage() {
           {/* Right Column: Rounded Main Card */}
           <section
             aria-label={`Step ${currentStep} form content`}
-            className="flex-1 w-full rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 md:p-10 shadow-xs min-h-[640px] flex flex-col justify-between"
+            className="flex-1 w-full rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 md:p-6 shadow-2xs flex flex-col justify-between"
           >
             {currentStep === 1 && (
+              <Step2CameraLocation
+                isMapLoaded={isMapLoaded}
+                evidenceData={formData.evidence}
+                locationData={formData.location}
+                category={formData.category}
+                onEvidenceChange={(ev) => {
+                  setFormData(p => {
+                    const resolvedEv = typeof ev === 'function' ? ev(p.evidence) : ev;
+                    const updated = { ...p, evidence: resolvedEv };
+                    if (resolvedEv?.autoDescription && !p.details.description) {
+                      updated.details = {
+                        ...p.details,
+                        description: resolvedEv.autoDescription,
+                        urgency: resolvedEv.urgency || p.details.urgency || 'medium',
+                      };
+                    }
+                    if (resolvedEv?.aiCategorySuggestion && !p.category) {
+                      updated.category = resolvedEv.aiCategorySuggestion;
+                    }
+                    return updated;
+                  });
+                }}
+                onLocationChange={(loc) => setFormData(p => {
+                  const nextLoc = typeof loc === 'function' ? loc(p.location) : loc;
+                  if (!nextLoc) return p;
+                  const rawB = nextLoc.barangay;
+                  const cleanB = (typeof rawB === 'object' && rawB !== null)
+                    ? (rawB.name || rawB.displayName || '')
+                    : (typeof rawB === 'string' ? rawB : '');
+                  return {
+                    ...p,
+                    location: {
+                      ...nextLoc,
+                      barangay: cleanB,
+                    },
+                  };
+                })}
+                onBack={goToPreviousStep}
+                onContinue={goToNextStep}
+              />
+            )}
+
+            {currentStep === 2 && (
               <Step1CategoryEmergency
                 selectedCategory={formData.category}
                 onSelectCategory={(cat) => setFormData(p => ({ ...p, category: cat }))}
@@ -367,40 +431,7 @@ export default function ReportWizardPage() {
               />
             )}
 
-            {currentStep === 2 && (
-              <Step2LocationMap
-                isMapLoaded={isMapLoaded}
-                locationData={formData.location}
-                onLocationChange={(loc) => setFormData(p => ({ ...p, location: typeof loc === 'function' ? loc(p.location) : loc }))}
-                onBack={goToPreviousStep}
-                onContinue={goToNextStep}
-              />
-            )}
-
             {currentStep === 3 && (
-              <Step3EvidenceUpload
-                evidenceData={formData.evidence}
-                category={formData.category}
-                locationData={formData.location}
-                onEvidenceChange={(ev) => {
-                  setFormData(p => {
-                    const updated = { ...p, evidence: ev };
-                    if (ev.autoDescription && !p.details.description) {
-                      updated.details = {
-                        ...p.details,
-                        description: ev.autoDescription,
-                        urgency: ev.urgency || p.details.urgency || 'medium',
-                      };
-                    }
-                    return updated;
-                  });
-                }}
-                onBack={goToPreviousStep}
-                onContinue={goToNextStep}
-              />
-            )}
-
-            {currentStep === 4 && (
               <Step4DetailsDuplicate
                 detailsData={formData.details}
                 locationData={formData.location}
@@ -412,7 +443,7 @@ export default function ReportWizardPage() {
               />
             )}
 
-            {currentStep === 5 && (
+            {currentStep === 4 && (
               <Step5ContactPreferences
                 contactData={formData.contact}
                 onContactChange={(cnt) => setFormData(p => ({ ...p, contact: cnt }))}
@@ -421,7 +452,7 @@ export default function ReportWizardPage() {
               />
             )}
 
-            {currentStep === 6 && (
+            {currentStep === 5 && (
               <Step6ReviewConsent
                 formData={formData}
                 isSubmitting={isSubmitting}
@@ -434,8 +465,6 @@ export default function ReportWizardPage() {
           </section>
         </div>
       </main>
-
-
     </div>
   );
 }

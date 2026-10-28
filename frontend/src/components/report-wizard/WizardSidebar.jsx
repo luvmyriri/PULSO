@@ -3,12 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Check, Lightbulb } from 'lucide-react';
 
 export const REPORT_STEPS = [
-  { id: 1, key: 'category', defaultLabel: 'Category', subtitle: 'Choose the type of issue' },
-  { id: 2, key: 'location', defaultLabel: 'Location', subtitle: 'Pin the exact spot' },
-  { id: 3, key: 'evidence', defaultLabel: 'Evidence', subtitle: 'Add photos' },
-  { id: 4, key: 'details', defaultLabel: 'Details', subtitle: 'Describe the concern' },
-  { id: 5, key: 'contact', defaultLabel: 'Contact', subtitle: 'How we can reach you' },
-  { id: 6, key: 'review', defaultLabel: 'Review', subtitle: 'Check before submitting' },
+  { id: 1, key: 'evidence_location', defaultLabel: 'Photo & Location', subtitle: 'Capture photo and auto-locate' },
+  { id: 2, key: 'category', defaultLabel: 'Category', subtitle: 'Choose the type of issue' },
+  { id: 3, key: 'details', defaultLabel: 'Details', subtitle: 'Describe the concern' },
+  { id: 4, key: 'contact', defaultLabel: 'Contact', subtitle: 'How we can reach you' },
+  { id: 5, key: 'review', defaultLabel: 'Review', subtitle: 'Check before submitting' },
 ];
 
 export default function WizardSidebar({ currentStep, maxStepReached, onStepClick, onOpenHelpGuide }) {
@@ -19,20 +18,20 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
       aria-label="Report Steps Navigation"
       className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col justify-between self-stretch bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xs"
     >
-      <div className="space-y-6">
-        {/* Header Title & Subtitle matching the design */}
+      <div className="space-y-5">
+        {/* Header Title & Subtitle */}
         <div className="space-y-1">
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             {t('reportWizard.shell.reportAConcern', 'Report a concern')}
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             {t('reportWizard.shell.tellUsWhatNeedsAttention', 'Tell us what needs attention.')}
           </p>
         </div>
 
-        {/* Vertical Stepper with connected nodes */}
-        <nav aria-label="Steps progress" className="py-2">
-          <ol className="relative space-y-0">
+        {/* Vertical Stepper with natural top-anchored flow */}
+        <nav aria-label="Steps progress" className="pt-1">
+          <ol className="relative space-y-4 xl:space-y-5">
             {REPORT_STEPS.map((step, idx) => {
               const isCurrent = step.id === currentStep;
               const isFinished = step.id < currentStep;
@@ -43,10 +42,10 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
 
               return (
                 <li key={step.id} className="relative flex items-start group">
-                  {/* Vertical Connecting Line */}
+                  {/* Vertical Connecting Line spanning to next node */}
                   {!isLast && (
                     <div
-                      className={`absolute left-[15px] top-[30px] bottom-[-2px] w-[2px] transition-colors duration-200 ${
+                      className={`absolute left-[15px] top-[34px] bottom-[-16px] xl:bottom-[-20px] w-[2px] transition-colors duration-200 ${
                         isFinished
                           ? 'bg-[#ff6b00]'
                           : 'bg-slate-200 dark:bg-slate-800'
@@ -61,7 +60,7 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
                     onClick={() => isClickable && onStepClick(step.id)}
                     disabled={!isClickable}
                     aria-current={isCurrent ? 'step' : undefined}
-                    className={`w-full flex items-start gap-3.5 py-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl ${
+                    className={`w-full flex items-start gap-3.5 py-1 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl ${
                       isClickable ? 'cursor-pointer' : 'cursor-default'
                     }`}
                   >
@@ -90,7 +89,7 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
                             ? 'font-bold text-[#ff6b00] dark:text-[#ff8a3d]'
                             : isFinished
                             ? 'font-bold text-slate-900 dark:text-slate-100'
-                            : 'font-bold text-slate-700 dark:text-slate-400'
+                            : 'font-semibold text-slate-700 dark:text-slate-400'
                         }`}
                       >
                         {label}
@@ -111,7 +110,7 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
       <button
         type="button"
         onClick={onOpenHelpGuide}
-        className="w-full text-left bg-[#f0f5fa] dark:bg-slate-800/80 hover:bg-[#e4eff8] dark:hover:bg-slate-800 border border-blue-100/60 dark:border-slate-700/60 rounded-2xl p-4 flex items-start gap-3 mt-6 transition-all duration-200 cursor-pointer group shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        className="w-full text-left bg-[#f0f5fa] dark:bg-slate-800/80 hover:bg-[#e4eff8] dark:hover:bg-slate-800 border border-blue-100/60 dark:border-slate-700/60 rounded-2xl p-4 flex items-start gap-3 mt-4 transition-all duration-200 cursor-pointer group shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
       >
         <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
           <Lightbulb size={18} strokeWidth={2.2} aria-hidden="true" />

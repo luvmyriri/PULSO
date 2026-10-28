@@ -3,20 +3,13 @@ import { ChevronDown, MapPin, Wrench } from 'lucide-react';
 import ReportStatusPill from './ReportStatusPill';
 import { REPORT_WORKFLOW_STEPS, getReportWorkflowIndex } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
+import { cleanResidentAddress as privacySafeAddress } from '../utils/locationPrivacy';
 
 /**
  * Clean readable address removing Plus Codes (e.g. 8Q4X+9V) and GPS coordinates
  */
 export function cleanResidentAddress(raw) {
-    if (!raw || typeof raw !== 'string') return '';
-    return raw
-        .replace(/\b[A-Z0-9]{4,8}\+[A-Z0-9]{2,4}\b/g, '') // remove plus codes
-        .replace(/Lat:?[\s\d.-]+Lng:?[\s\d.-]+/gi, '') // remove lat/lng
-        .replace(/\b(Lat|Lng|Latitude|Longitude)[:\s\d.-]+/gi, '')
-        .replace(/\(\s*[\d.-]+\s*,\s*[\d.-]+\s*\)/g, '')
-        .replace(/\s*,\s*,+/g, ', ')
-        .replace(/^\s*,\s*|\s*,\s*$/g, '')
-        .trim();
+    return privacySafeAddress(raw);
 }
 
 /**
@@ -62,7 +55,7 @@ function ReportHistoryCardContent({
 
     // Clean address (no plus codes or raw GPS)
     const rawAddress = report.location_string || report.address || report.barangay || 'Caloocan City';
-    const displayAddress = cleanResidentAddress(rawAddress) || report.barangay || 'Caloocan City';
+    const displayAddress = cleanResidentAddress(rawAddress) || cleanResidentAddress(report.barangay) || 'Caloocan City';
 
     // Image URL resolution: match ResidentDashboard pattern `${API_BASE_URL}${report.image_url}`
     const rawImageUrl = report.image_url || report.photo_url || null;

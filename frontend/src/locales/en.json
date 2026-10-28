@@ -1,5 +1,38 @@
 {
   "translation": {
+    "locationPrivacy": {
+      "title": "Current location",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "fields": {
+        "plusCode": "Plus Code (coarse area)",
+        "subdivision": "Village/Subdivision",
+        "neighborhood": "Neighborhood / Community",
+        "street": "Street/Road",
+        "barangay": "Barangay",
+        "city": "City/Municipality",
+        "postalCode": "Postal code",
+        "region": "Region"
+      },
+      "loading": "Looking up address details… GPS and the map remain available.",
+      "unavailable": "Address details are unavailable or incomplete. Your selected location is kept; retry GPS to look up the address again.",
+      "empty": "Select a location to see available address details.",
+      "privacy": "Residential identifiers are omitted. The area code is generalized; streets and villages can still identify a small area. The map pin and submitted report keep the selected coordinates.",
+      "source": "Address source: Google Maps.",
+      "copy": "Copy displayed address",
+      "copied": "Address copied",
+      "copyFailed": "Could not copy the address. Select the displayed text to copy it.",
+      "gpsDenied": "Location permission was denied. Allow location access in your browser or select the issue location manually.",
+      "gpsUnavailable": "GPS is unavailable. Select the issue location manually or retry.",
+      "gpsTimeout": "GPS timed out. Your previous selection is kept. Retry or select the issue location manually.",
+      "gpsError": "Could not acquire GPS. Your previous selection is kept. Retry or select the issue location manually.",
+      "copyCoordinates": "Copy latitude and longitude",
+      "coordinatesCopied": "Coordinates copied",
+      "copyCoordinatesFailed": "Could not copy coordinates. Select the numbers to copy them.",
+      "approximateAccuracy": "Approx. ±{{accuracy}}m",
+      "accurateAccuracy": "GPS ±{{accuracy}}m",
+      "gpsSelected": "GPS selected"
+    },
     "mapPublicReports": {
       "loading": "Loading public reports…",
       "error": "Public reports could not be loaded.",
@@ -44,29 +77,29 @@
       "loadOlder": "Load older notifications"
     },
     "reportLink": {
-        "loading": "Opening your report…",
-        "error": "This report could not be opened. Check your connection and try again. It may be unavailable, or your account may not have access.",
-        "retry": "Try again",
-        "back": "Back to My reports"
+      "loading": "Opening your report…",
+      "error": "This report could not be opened. Check your connection and try again. It may be unavailable, or your account may not have access.",
+      "retry": "Try again",
+      "back": "Back to My reports"
     },
     "informationReply": {
-        "title": "Information requested",
-        "banner": "Read the department’s request below and send your response.",
-        "loading": "Loading the department’s request…",
-        "loadError": "The request details could not be loaded. Try again before replying.",
-        "label": "Your response",
-        "hint": "Provide 10–2,000 characters. Your response goes to the department for review and is not shown publicly.",
-        "send": "Send information",
-        "sending": "Sending…",
-        "success": "Your response was recorded. The report is back in the department’s review queue.",
-        "tooShort": "Please provide at least 10 characters of additional information.",
-        "expired": "Your session has expired. Sign in again before sending.",
-        "denied": "Your account does not have permission to reply to this report.",
-        "unavailable": "This report is unavailable or does not belong to your account.",
-        "changed": "This report is no longer awaiting information. Refresh the report to see its current status.",
-        "rateLimit": "Too many attempts. Wait a moment before trying again.",
-        "sendFailed": "We could not confirm your response. Your text is kept here. Refresh the report status before trying again.",
-        "refresh": "Refresh report status"
+      "title": "Information requested",
+      "banner": "Read the department’s request below and send your response.",
+      "loading": "Loading the department’s request…",
+      "loadError": "The request details could not be loaded. Try again before replying.",
+      "label": "Your response",
+      "hint": "Provide 10–2,000 characters. Your response goes to the department for review and is not shown publicly.",
+      "send": "Send information",
+      "sending": "Sending…",
+      "success": "Your response was recorded. The report is back in the department’s review queue.",
+      "tooShort": "Please provide at least 10 characters of additional information.",
+      "expired": "Your session has expired. Sign in again before sending.",
+      "denied": "Your account does not have permission to reply to this report.",
+      "unavailable": "This report is unavailable or does not belong to your account.",
+      "changed": "This report is no longer awaiting information. Refresh the report to see its current status.",
+      "rateLimit": "Too many attempts. Wait a moment before trying again.",
+      "sendFailed": "We could not confirm your response. Your text is kept here. Refresh the report status before trying again.",
+      "refresh": "Refresh report status"
     },
     "auth": {
       "strength": {
@@ -346,7 +379,8 @@
         "evidence": "Evidence",
         "details": "Details",
         "contact": "Contact",
-        "review": "Review"
+        "review": "Review",
+        "evidence_location": "Photo & Location"
       },
       "step1Category": {
         "title": "What would you like to report?",
@@ -601,6 +635,25 @@
         "submitReport": "Submit Report",
         "continue": "Continue",
         "back": "Back"
+      },
+      "subtitles": {
+        "category": "Choose the type of issue",
+        "evidence_location": "Capture photo and auto-locate",
+        "details": "Describe the concern",
+        "contact": "How we can reach you",
+        "review": "Check before submitting"
+      },
+      "step2CameraLocation": {
+        "badge": "STEP 1 OF 5 / EVIDENCE & LOCATION",
+        "title": "Take photo and auto-locate",
+        "subtitle": "Capture a clear photo of the concern. Your location will be automatically tagged.",
+        "cameraHeading": "Capture the issue with your camera",
+        "cameraDesc": "Photos taken with the PULSO camera automatically record the verified GPS coordinates and time.",
+        "openCameraBtn": "Open Camera",
+        "uploadBtn": "Upload from device",
+        "continue": "Continue to category",
+        "continueToCategory": "Continue to category",
+        "takePhotoNote": "Please take or upload a photo of the concern to continue."
       }
     },
     "receipt": {
