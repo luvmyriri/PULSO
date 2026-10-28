@@ -1116,22 +1116,7 @@ function QuickReportWizardModal({
                                                 </span>
                                             )}
 
-                                            {/* Recenter & Detect Current Location Button */}
-                                            {requestDeviceLocation && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        requestDeviceLocation(true);
-                                                        onStartLocationTracking?.();
-                                                    }}
-                                                    disabled={isLocating}
-                                                    className="text-slate-500 hover:text-[#ff6b00] dark:text-slate-400 dark:hover:text-[#ff6b00] p-1 rounded-lg hover:bg-orange-500/10 transition-colors cursor-pointer inline-flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[#ff6b00] ml-1 disabled:opacity-50 active:scale-95"
-                                                    title="Recenter and detect current location"
-                                                    aria-label="Recenter and detect current location"
-                                                >
-                                                    <RotateCcw size={13} className={isLocating ? 'animate-spin text-[#ff6b00]' : ''} />
-                                                </button>
-                                            )}
+
                                         </div>
                                         {!reportLocation && requestDeviceLocation && (
                                             <div className="flex flex-wrap items-center gap-2 mt-3" aria-label="Location controls">
