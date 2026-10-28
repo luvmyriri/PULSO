@@ -945,23 +945,6 @@ const ResidentHomeView = ({
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3 shrink-0">
-                            {isLocalhost && userReportCount > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const ok = exportReportsToCSV(userReports);
-                                        if (ok && showToast) {
-                                            showToast(`Exported ${userReports.length} report(s) to CSV.`);
-                                        }
-                                    }}
-                                    className="px-4 py-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-2xs transition-all cursor-pointer focus-visible:outline-3 focus-visible:outline-[#ff6b00]"
-                                    title="Export your reports as CSV (Localhost only)"
-                                    aria-label="Export your reports as CSV"
-                                >
-                                    <Download size={15} className="text-slate-500 dark:text-slate-400" />
-                                    <span>Export CSV</span>
-                                </button>
-                            )}
                             <button
                                 type="button"
                                 onClick={() => setActiveModal('file-report')}
@@ -3343,18 +3326,6 @@ const MyReports = ({
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0">
-                    {isLocalhost && (
-                        <button
-                            type="button"
-                            onClick={handleExportCSV}
-                            className="px-3.5 py-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-2xs transition-all cursor-pointer focus-visible:outline-3 focus-visible:outline-[#ff6b00]"
-                            title="Export reports as CSV (Localhost only)"
-                            aria-label="Export reports as CSV"
-                        >
-                            <Download size={15} className="text-slate-500 dark:text-slate-400" />
-                            <span>Export CSV</span>
-                        </button>
-                    )}
                     <button
                         type="button"
                         onClick={() => handleSetModal('file-report')}
