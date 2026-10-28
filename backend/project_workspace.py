@@ -17,7 +17,7 @@ import gov_models as gm
 import staff_accounts
 from auth import get_current_user
 from database import get_db
-from government_access import jurisdiction_ids, require_scope, require_report_scope, scoped
+from government_access import jurisdiction_ids, require_scope, require_report_scope, scoped, scoped_reports
 
 router = APIRouter(prefix='/api/gov/project-workspace',tags=['Project coordination'])
 MANAGERS={'city_engineer','asst_city_engineer','division_chief','project_engineer','dispatcher','manager','admin_officer','admin_clerk','system_admin'}
@@ -96,6 +96,28 @@ def accessible_source(db,user,project):
     return report
 
 
+def related_reports(db,user,project):
+    from government_access import can
+    if not can(user,'reports'): return []
+    result=[]
+    for link,report in db.query(gm.ProjectReportLink,models.Report).join(models.Report,gm.ProjectReportLink.report_id==models.Report.id).filter(gm.ProjectReportLink.project_id==project.id).order_by(gm.ProjectReportLink.id).all():
+        try: require_report_scope(db,user,report)
+        except HTTPException as error:
+            if error.status_code==403: continue
+            raise
+        result.append(dict(id=report.id,ticket=report.ticket_id,status=report.status,version=report.version,linked_at=link.linked_at,linked_by=person_name(db,link.linked_by_id)))
+    return result
+
+
+def open_project_for_report(db,report_id,exclude_project_id=None):
+    query=db.query(gm.ProjectRequest.id).filter(gm.ProjectRequest.status.notin_(CLOSED)).filter(or_(
+        gm.ProjectRequest.source_report_id==report_id,
+        gm.ProjectRequest.id.in_(db.query(gm.ProjectReportLink.project_id).filter_by(report_id=report_id)),
+    ))
+    if exclude_project_id: query=query.filter(gm.ProjectRequest.id!=exclude_project_id)
+    return query.first()
+
+
 def actions(db,user,project):
     result=[]
     if project.status in CLOSED:
@@ -135,10 +157,13 @@ def project_row(db,user,project):
         allowed_actions=actions(db,user,project))
 
 
-def event(db,user,project,action,reason,details=None):
+def event(db,user,project,action,reason,details=None,related_report_id=None):
     payload=dict(reason=reason,**(details or {}))
-    db.add(gm.AuditLog(trigger_type='project_coordination',actor_id=user.id,actor_role=user.role,project_id=project.id,action=action,details=json.dumps(payload)))
+    db.add(gm.AuditLog(trigger_type='project_coordination',actor_id=user.id,actor_role=user.role,project_id=project.id,report_id=related_report_id,action=action,details=json.dumps(payload)))
     db.add(gm.ProcessTimeline(project_id=project.id,status=project.status,actor_id=user.id,actor_role=user.role,note=f'{action}: {reason}',is_public=False))
+    if related_report_id:
+        related=db.get(models.Report,related_report_id)
+        db.add(gm.ProcessTimeline(report_id=related_report_id,status=related.status,actor_id=user.id,actor_role=user.role,note=f'{action} with project {project.proj_number}: {reason}. The report status is unchanged.',is_public=False))
     if project.source_report_id:
         report=db.get(models.Report,project.source_report_id)
         if report:
@@ -210,6 +235,11 @@ class Command(Reason):
     dependency_id: Optional[int]=None
 
 
+class ReportLinkCommand(Reason):
+    expected_version: int=Field(ge=0)
+    expected_report_version: Optional[int]=Field(None,ge=1)
+
+
 def create(db,user,payload):
     staff_accounts.lock_accounts(db,user)
     require(user,'manage')
@@ -228,7 +258,7 @@ def create(db,user,payload):
         require_report_scope(db,user,report)
         if payload.expected_source_version!=report.version: raise HTTPException(409,'The source report changed. Reload it before creating this project.')
         if report.status in {'resolved','completed','rejected','cancelled','spam','duplicate'}: raise HTTPException(409,'A closed report cannot start new project coordination.')
-        if db.query(gm.ProjectRequest.id).filter(gm.ProjectRequest.source_report_id==report.id,gm.ProjectRequest.status.notin_(CLOSED)).first():
+        if open_project_for_report(db,report.id):
             raise HTTPException(409,'This report already has an open project. Review its linked project before creating another record.')
         source_area=db.get(models.Barangay,report.barangay_id) if report.barangay_id else None
         if not source_area or source_area.district_id!=area.district_id or area_name(source_area.name)!=area_name(area.name):
@@ -238,7 +268,7 @@ def create(db,user,payload):
         project.project_engineer_id=payload.owner_id
         project.next_review_at=future(payload.next_review_at)
     db.add(project);db.flush()
-    event(db,user,project,'Project coordination opened',payload.reason)
+    event(db,user,project,'Project coordination opened',payload.reason,dict(source_report_id=project.source_report_id,owner_id=project.project_engineer_id))
     if project.project_engineer_id: notify_owner(db,project)
     db.commit()
     return project
@@ -268,9 +298,17 @@ def update_metadata(db,user,project_id,payload):
             from math import isfinite
             if not isfinite(values[field]) or abs(values[field])>limit: raise HTTPException(422,'Provide valid coordinates.')
     if 'next_review_at' in values: future(values['next_review_at'])
+    previous_owner_id=project.project_engineer_id
     for key,value in values.items(): setattr(project,key,value)
     project.coordination_version+=1
-    event(db,user,project,'Project metadata updated',payload.reason.strip(),dict(fields=sorted(values)))
+    details=dict(fields=sorted(values))
+    if 'project_engineer_id' in values:
+        details.update(previous_owner_id=previous_owner_id,previous_owner=person_name(db,previous_owner_id),owner_id=project.project_engineer_id,owner=person_name(db,project.project_engineer_id))
+        if previous_owner_id!=project.project_engineer_id:
+            if not project.next_review_at: raise HTTPException(422,'Choose a future follow-up date when changing the engineering owner.')
+            future(project.next_review_at)
+            notify_owner(db,project)
+    event(db,user,project,'Project metadata updated',payload.reason.strip(),details)
     db.commit()
     return project
 
@@ -295,10 +333,13 @@ def execute(db,user,project_id,payload):
         project.title=payload.title;project.description=payload.description;project.location_string=payload.location_string
     elif payload.action=='assign':
         eligible_owner(db,user,project,payload.owner_id)
+        if project.project_engineer_id==payload.owner_id:
+            raise HTTPException(409,'This person already owns the project. Reload the record before assigning again.')
+        previous_owner_id=project.project_engineer_id
         project.project_engineer_id=payload.owner_id
         project.next_review_at=future(payload.next_review_at)
         notify_owner(db,project)
-        details=dict(owner_id=payload.owner_id,next_review_at=payload.next_review_at.isoformat())
+        details=dict(previous_owner_id=previous_owner_id,previous_owner=person_name(db,previous_owner_id),owner_id=payload.owner_id,owner=person_name(db,payload.owner_id),next_review_at=payload.next_review_at.isoformat())
     elif payload.action=='add_dependency':
         if not payload.description or len(payload.description)<10 or not payload.office or len(payload.office)<3:
             raise HTTPException(422,'Describe the dependency and name the responsible external office.')
@@ -354,7 +395,7 @@ def execute(db,user,project_id,payload):
         require_report_scope(db,user,report)
         if payload.expected_report_version!=report.version: raise HTTPException(409,'The source report changed. Refresh the record and inspect its latest evidence.')
         active_work=db.query(gm.WorkOrder.id).filter(gm.WorkOrder.report_id==report.id,gm.WorkOrder.status.notin_({'completed','resolved','cancelled','rejected'})).first()
-        active_project=db.query(gm.ProjectRequest.id).filter(gm.ProjectRequest.source_report_id==report.id,gm.ProjectRequest.status.notin_(CLOSED)).first()
+        active_project=open_project_for_report(db,report.id)
         if active_work or active_project: raise HTTPException(409,'Other linked work or project coordination remains open.')
         if not project.completion_reviewed_by_id: raise HTTPException(409,'Independent project completion review is not recorded.')
         from gov_crud import _sync_report_status
@@ -389,7 +430,10 @@ def report_context(report_id:int,db:Session=Depends(get_db),user=Depends(get_cur
     from report_review_router import get_report
     report=get_report(db,user,report_id)
     area=db.get(models.Barangay,report.barangay_id) if report.barangay_id else None
-    linked=scoped(db.query(gm.ProjectRequest),gm.ProjectRequest.district_id,user).filter(gm.ProjectRequest.source_report_id==report.id,gm.ProjectRequest.status.notin_(CLOSED)).all()
+    linked=scoped(db.query(gm.ProjectRequest),gm.ProjectRequest.district_id,user).filter(gm.ProjectRequest.status.notin_(CLOSED)).filter(or_(
+        gm.ProjectRequest.source_report_id==report.id,
+        gm.ProjectRequest.id.in_(db.query(gm.ProjectReportLink.project_id).filter_by(report_id=report.id)),
+    )).all()
     choices=canonical_areas(db.query(models.Barangay).filter_by(district_id=area.district_id).all()) if area else []
     normalized=next((choice for choice in choices if area_name(choice['name'])==area_name(area.name)),None) if area else None
     return dict(report_id=report.id,version=report.version,ticket=report.ticket_id,description=report.description,
@@ -425,8 +469,19 @@ def opening(payload:Create,db:Session=Depends(get_db),user=Depends(get_current_u
 def detail(project_id:int,db:Session=Depends(get_db),user=Depends(get_current_user)):
     project=target(db,user,project_id)
     from records_workspace import documents_query,document_projection
+    from government_access import can
     import roles_service
     documents=[]
+    from gov_router import _require_work_order_view
+    work_orders=[]
+    for work in db.query(gm.WorkOrder).filter_by(project_id=project.id).order_by(gm.WorkOrder.id.desc()).all():
+        try: _require_work_order_view(work,user)
+        except HTTPException as error:
+            if error.status_code==403: continue
+            raise
+        work_orders.append(dict(id=work.id,reference=work.wo_number,title=work.title,status=work.status,
+            priority=work.priority,owner=person_name(db,work.assigned_to_id),report_id=work.report_id,
+            updated_at=work.updated_at or work.created_at))
     can_view=allowed(user,'evidence_view')
     if can_view:
         accessible=db.query(gm.SystemDocument).filter_by(target_model='ProjectRequest',target_id=project.id)
@@ -437,6 +492,9 @@ def detail(project_id:int,db:Session=Depends(get_db),user=Depends(get_current_us
             accessible=accessible.filter(gm.SystemDocument.confidentiality!='Confidential')
         documents=[document_projection(d) for d in accessible.order_by(gm.SystemDocument.id.desc())]
     return dict(**project_row(db,user,project),documents=documents,can_upload=allowed(user,'evidence_upload'),
+        can_manage_report_links=allowed(user,'manage') and can(user,'reports') and project.coordination_started_at is not None and project.status not in CLOSED,
+        can_create_work_order=allowed(user,'manage') and user.role in {'dispatcher','project_engineer','asst_city_engineer','city_engineer','manager','system_admin'} and project.coordination_started_at is not None and project.status not in CLOSED,
+        related_reports=related_reports(db,user,project),work_orders=work_orders,
         dependencies=[dict(id=d.id,description=d.description,office=d.office,reference=d.reference,owner_id=d.owner_id,
             owner=person_name(db,d.owner_id),next_review_at=d.next_review_at,status=d.status,resolved_at=d.resolved_at,resolution_reference=d.resolution_reference) for d in dependencies(db,project)])
 
@@ -452,4 +510,65 @@ def history(project_id:int,page:int=Query(1,ge=1),db:Session=Depends(get_db),use
 @router.post('/{project_id}/commands')
 def command(project_id:int,payload:Command,db:Session=Depends(get_db),user=Depends(get_current_user)):
     project=execute(db,user,project_id,payload)
+    return project_row(db,user,project)
+
+
+@router.post('/{project_id}/related-reports/{report_id}',status_code=201)
+def link_report(project_id:int,report_id:int,payload:ReportLinkCommand,db:Session=Depends(get_db),user=Depends(get_current_user)):
+    staff_accounts.lock_accounts(db,user)
+    require(user,'manage')
+    project=target(db,user,project_id,True)
+    if project.coordination_version!=payload.expected_version: raise HTTPException(409,'This project changed. Refresh it before linking a report.')
+    if not project.coordination_started_at or project.status in CLOSED: raise HTTPException(409,'Only an open coordination project can link reports.')
+    from government_access import can
+    if not can(user,'reports'): raise HTTPException(403,'Report access is required to link a report.')
+    report=db.query(models.Report).filter_by(id=report_id).populate_existing().with_for_update().first()
+    if not report: raise HTTPException(404,'Report record not found.')
+    require_report_scope(db,user,report)
+    if payload.expected_report_version!=report.version: raise HTTPException(409,'This report changed. Refresh it before linking.')
+    area=db.get(models.Barangay,report.barangay_id) if report.barangay_id else None
+    if not area or area.district_id!=project.district_id: raise HTTPException(422,'A related report must have a recorded barangay in the project district.')
+    if project.source_report_id==report.id or db.query(gm.ProjectReportLink.id).filter_by(project_id=project.id,report_id=report.id).first():
+        raise HTTPException(409,'This report is already linked to the project.')
+    if open_project_for_report(db,report.id): raise HTTPException(409,'This report is already linked to another open project.')
+    db.add(gm.ProjectReportLink(project_id=project.id,report_id=report.id,linked_by_id=user.id,reason=payload.reason))
+    project.coordination_version+=1
+    event(db,user,project,'Related report linked',payload.reason,dict(report_id=report.id,report_version=report.version),related_report_id=report.id)
+    db.commit()
+    return project_row(db,user,project)
+
+
+@router.get('/{project_id}/related-report-options')
+def related_report_options(project_id:int,search:str=Query('',min_length=2,max_length=100),db:Session=Depends(get_db),user=Depends(get_current_user)):
+    require(user,'manage')
+    from government_access import can
+    if not can(user,'reports'): raise HTTPException(403,'Report access is required to link a report.')
+    project=target(db,user,project_id)
+    if not project.coordination_started_at or project.status in CLOSED: return dict(items=[])
+    query=scoped_reports(db.query(models.Report),user).join(models.Barangay,models.Report.barangay_id==models.Barangay.id).filter(
+        models.Barangay.district_id==project.district_id,
+        models.Report.ticket_id.ilike(f'%{search}%'),
+    )
+    return dict(items=[dict(id=report.id,ticket=report.ticket_id,version=report.version,description=(report.description or '')[:120])
+        for report in query.order_by(models.Report.id.desc()).limit(20).all()
+        if report.id!=project.source_report_id and not open_project_for_report(db,report.id)])
+
+
+@router.delete('/{project_id}/related-reports/{report_id}')
+def unlink_report(project_id:int,report_id:int,payload:ReportLinkCommand,db:Session=Depends(get_db),user=Depends(get_current_user)):
+    staff_accounts.lock_accounts(db,user)
+    require(user,'manage')
+    project=target(db,user,project_id,True)
+    if project.coordination_version!=payload.expected_version: raise HTTPException(409,'This project changed. Refresh it before removing a link.')
+    if not project.coordination_started_at or project.status in CLOSED: raise HTTPException(409,'Only an open coordination project can change report links.')
+    link=db.query(gm.ProjectReportLink).filter_by(project_id=project.id,report_id=report_id).with_for_update().first()
+    if not link: raise HTTPException(404,'This related report link was not found.')
+    report=db.query(models.Report).filter_by(id=report_id).populate_existing().with_for_update().first()
+    if not report: raise HTTPException(409,'The linked report record is unavailable.')
+    require_report_scope(db,user,report)
+    if payload.expected_report_version!=report.version: raise HTTPException(409,'This report changed. Refresh it before removing the link.')
+    db.delete(link)
+    project.coordination_version+=1
+    event(db,user,project,'Related report unlinked',payload.reason,dict(report_id=report.id,report_version=report.version),related_report_id=report.id)
+    db.commit()
     return project_row(db,user,project)

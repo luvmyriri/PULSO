@@ -20,7 +20,7 @@ def disposable_engine():
             f"test_name={bool(name and 'test' in name)})"
         )
     with engine.connect() as connection:
-        if connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() != "18efa117cb09":
+        if connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() != "19f0b2c3d4e5":
             raise RuntimeError("Disposable database is not at the expected Alembic head")
         connection.execute(text("SELECT PostGIS_Version()"))
     return engine

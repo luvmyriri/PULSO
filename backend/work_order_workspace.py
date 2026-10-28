@@ -44,6 +44,7 @@ def actions(db,user,work_id):
     owner=work.assigned_to_id==user.id
     dispatch=user.role in DISPATCH_ROLES
     if dispatch and work.status=='open': allowed.append('assign')
+    if dispatch and work.assigned_to_id and work.status in {'assigned','in_progress','blocked','rework_required'}: allowed.append('reassign')
     if owner and user.role in FIELD_ROLES and work.status in ['assigned','rework_required']: allowed.append('start')
     if owner and user.role in FIELD_ROLES and work.status=='in_progress': allowed.append('submit_completion')
     if user.role in FIELD_ROLES and (owner or dispatch) and work.status in ['assigned','in_progress']: allowed.append('block')

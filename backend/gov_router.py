@@ -35,6 +35,7 @@ import report_review
 import legacy_operations
 import os
 import io
+import json
 import uuid
 import re
 
@@ -243,6 +244,10 @@ def list_eligible_assignees(
     if wo_id and not wo:
         raise HTTPException(404, 'Work order not found.')
     if wo: require_scope(current_user, wo)
+    active_counts=dict(db.query(gov_models.WorkOrder.assigned_to_id,func.count(gov_models.WorkOrder.id)).filter(
+        gov_models.WorkOrder.assigned_to_id.isnot(None),
+        gov_models.WorkOrder.status.notin_({'completed','resolved','cancelled','rejected'}),
+    ).group_by(gov_models.WorkOrder.assigned_to_id).all())
     eligible = []
     for person in officials:
         try:
@@ -251,8 +256,8 @@ def list_eligible_assignees(
             continue
         if wo and ids and wo.district_id not in ids:
             continue
-        eligible.append({'id': person.id, 'full_name': person.full_name, 'role': person.role})
-    return eligible
+        eligible.append({'id': person.id, 'full_name': person.full_name, 'role': person.role,'active_work_count':active_counts.get(person.id,0)})
+    return sorted(eligible,key=lambda person:(person['active_work_count'],person['full_name'].casefold(),person['id']))
 
 
 @router.post('/work-orders/{wo_id}/assignment', response_model=gov_schemas.WorkOrderResponse)
@@ -270,8 +275,43 @@ def assign_work_order_owner(wo_id: int, payload: gov_schemas.WorkOrderAssignment
     ids = jurisdiction_ids(person)
     if ids and wo.district_id not in ids: raise HTTPException(403, 'This work is outside the selected official’s configured district scope.')
     wo.assigned_to_id, wo.assigned_by_id = person.id, current_user.id
-    wo = gov_crud.update_work_order_status(db, wo.id, 'assigned', current_user.id, current_user.role, note=f'Owner assigned to {person.full_name}. Reason: {payload.reason.strip()}')
+    wo.assignment_version += 1
+    gov_crud._append_audit(db,trigger_type='work_order_assignment',action='Work order owner assigned',actor_id=current_user.id,actor_role=current_user.role,work_order_id=wo.id,
+        details=json.dumps(dict(previous_owner_id=None,owner_id=person.id,reason=payload.reason.strip(),assignment_version=wo.assignment_version)))
+    wo = gov_crud.update_work_order_status(db, wo.id, 'assigned', current_user.id, current_user.role, note='A field work owner was assigned.')
     return gov_crud.enrich_work_order(wo, db)
+
+
+@router.post('/work-orders/{wo_id}/reassignment',response_model=gov_schemas.WorkOrderResponse)
+def reassign_work_order_owner(wo_id:int,payload:gov_schemas.WorkOrderReassignment,db:Session=Depends(get_db),current_user=Depends(get_current_user)):
+    _assert_role(current_user,*DISPATCH_ROLES)
+    from government_access import require_scope,jurisdiction_ids
+    import staff_accounts
+    staff_accounts.lock_accounts(db,current_user)
+    wo=db.query(gov_models.WorkOrder).filter_by(id=wo_id).populate_existing().with_for_update().first()
+    if not wo: raise HTTPException(404,'Work order not found.')
+    require_scope(current_user,wo)
+    if wo.assignment_version!=payload.expected_assignment_version: raise HTTPException(409,'The assignment changed. Reload the work order before reassigning.')
+    if wo.status not in {'assigned','in_progress','blocked','rework_required'} or not wo.assigned_to_id:
+        raise HTTPException(409,'This work order is not in a transferable stage. Review its current status.')
+    if wo.assigned_to_id==payload.assigned_to_id: raise HTTPException(409,'This employee already owns the work order.')
+    gov_crud._validate_assignee(db,payload.assigned_to_id)
+    person=db.get(models.Official,payload.assigned_to_id)
+    ids=jurisdiction_ids(person)
+    if ids and wo.district_id not in ids: raise HTTPException(422,'The selected employee does not cover this work order district.')
+    previous_owner_id=wo.assigned_to_id
+    previous_owner=db.get(models.Official,previous_owner_id)
+    wo.assigned_to_id=person.id
+    wo.assigned_by_id=current_user.id
+    wo.assignment_version+=1
+    gov_crud._append_audit(db,trigger_type='work_order_assignment',action='Work order owner reassigned',actor_id=current_user.id,actor_role=current_user.role,work_order_id=wo.id,
+        details=json.dumps(dict(previous_owner_id=previous_owner_id,owner_id=person.id,reason=payload.reason.strip(),status=wo.status,assignment_version=wo.assignment_version)))
+    gov_crud._append_timeline(db,status=wo.status,previous_status=wo.status,actor_id=current_user.id,actor_role=current_user.role,
+        note=f'Field work ownership transferred from {previous_owner.full_name if previous_owner else "previous owner"} to {person.full_name}. Reason: {payload.reason.strip()}. Existing progress and evidence remain on this work order.',work_order_id=wo.id,is_public=False)
+    db.add(models.Notification(official_id=person.id,title='Work order assigned to you',message=f'{wo.wo_number}: {wo.title}',target_url=f'/gov/work-orders?wo={wo.id}'))
+    db.commit()
+    db.refresh(wo)
+    return gov_crud.enrich_work_order(wo,db)
 
 @router.post("/work-orders", response_model=gov_schemas.WorkOrderResponse)
 def create_work_order(
@@ -289,14 +329,41 @@ def create_work_order(
     - wo_type = "preemptive"  : Created proactively (FR-11)
     """
     _assert_role(current_user, *DISPATCH_ROLES)
-    from government_access import require_report_scope
+    from government_access import require_report_scope,jurisdiction_ids
+    import project_workspace
+    project=None
+    if data.project_id:
+        project_workspace.require(current_user,'manage')
+        project=project_workspace.target(db,current_user,data.project_id,True)
+        if not project.coordination_started_at or project.status in project_workspace.CLOSED:
+            raise HTTPException(409,'Open project coordination before adding a work order.')
+        if data.assigned_to_id:
+            person=db.get(models.Official,data.assigned_to_id)
+            if person:
+                ids=jurisdiction_ids(person)
+                if ids and project.district_id not in ids:
+                    raise HTTPException(422,'The selected employee does not cover this project district.')
+        if data.report_id and data.report_id!=project.source_report_id and not db.query(gov_models.ProjectReportLink.id).filter_by(project_id=project.id,report_id=data.report_id).first():
+            raise HTTPException(422,'Link the report to this project before creating its work order.')
     if data.report_id:
         report = db.get(models.Report, data.report_id)
         if not report: raise HTTPException(404, 'Source report not found')
         require_report_scope(db, current_user, report)
     key = command_integrity.validate_key(idempotency_key)
-    expected = command_integrity.parse_version(if_match)
-    if (key or expected is not None) and data.report_id is None:
+    if project and not data.report_id:
+        if if_match is not None and not re.fullmatch(r'0|[1-9][0-9]*',if_match.strip()):
+            raise HTTPException(422,'If-Match must contain the current project version.')
+        expected=int(if_match.strip()) if if_match is not None else None
+    else:
+        expected = command_integrity.parse_version(if_match)
+    if project and not data.report_id:
+        if key: raise HTTPException(422,'Use the project version for duplicate protection when opening a project work order.')
+        if expected is None: raise HTTPException(428,'Provide the current project version in If-Match.')
+        if expected!=project.coordination_version: raise HTTPException(409,'The project changed. Refresh it before creating a work order.')
+        if not data.title or len(data.title.strip())<3 or not data.description or len(data.description.strip())<10 or not data.notes or len(data.notes.strip())<10:
+            raise HTTPException(422,'Provide a task title, scope, and reason of at least 10 characters.')
+        project.coordination_version+=1
+    elif (key or expected is not None) and data.report_id is None:
         raise HTTPException(status_code=422, detail="Versioned retries require a source report")
     digest = command_integrity.request_hash(data.model_dump(mode="json")) if key else None
     wo = gov_crud.create_work_order(
@@ -2694,6 +2761,7 @@ def get_report_docket(
     if project_workspace.allowed(current_user):
         linked=scoped(db.query(gov_models.ProjectRequest),gov_models.ProjectRequest.district_id,current_user).filter(or_(
             gov_models.ProjectRequest.source_report_id==report_id,
+            gov_models.ProjectRequest.id.in_(db.query(gov_models.ProjectReportLink.project_id).filter_by(report_id=report_id)),
             gov_models.ProjectRequest.id.in_([work.project_id for work in work_orders if work.project_id])))
         projects=[dict(id=project.id,reference=project.proj_number,title=project.title,
             status=project.status if project.coordination_started_at else 'historical_record',open=project.status not in project_workspace.CLOSED) for project in linked]

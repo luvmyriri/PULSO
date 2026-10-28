@@ -11,6 +11,7 @@ from fastapi import HTTPException
 import secrets
 import os
 import logging
+import json
 
 import gov_models
 import gov_schemas
@@ -388,6 +389,7 @@ def create_work_order(
         project_id=data.project_id,
         assigned_by_id=actor_id,
         assigned_to_id=assigned_to_id,
+        assignment_version=1 if assigned_to_id else 0,
         wo_type=data.wo_type,
         priority=data.priority,
         priority_score=priority_score,
@@ -410,6 +412,11 @@ def create_work_order(
             brgy = db.query(models.Barangay).filter(models.Barangay.id == report.barangay_id).first()
             if brgy:
                 wo.district_id = brgy.district_id
+    elif data.project_id:
+        project=db.get(gov_models.ProjectRequest,data.project_id)
+        if project:
+            wo.district_id=project.district_id
+            wo.barangay_id=project.barangay_id
     elif asset:
         wo.barangay_id = asset.barangay_id
         if asset.barangay_ref and asset.barangay_ref.district:
@@ -419,7 +426,7 @@ def create_work_order(
 
     # 3. Timeline & Audit
     _append_timeline(
-        db, status="open", actor_id=actor_id, actor_role=actor_role,
+        db, status=wo.status, actor_id=actor_id, actor_role=actor_role,
         note=f"Work order created ({data.wo_type}) | Type: {assignment_type}", work_order_id=wo.id,
         report_id=data.report_id, project_id=data.project_id,
     )
@@ -429,6 +436,10 @@ def create_work_order(
         actor_id=actor_id, actor_role=actor_role,
         work_order_id=wo.id, report_id=data.report_id, project_id=data.project_id,
     )
+    if assigned_to_id:
+        _append_audit(db,trigger_type='work_order_assignment',action='Work order owner assigned',
+            actor_id=actor_id,actor_role=actor_role,work_order_id=wo.id,
+            details=json.dumps(dict(previous_owner_id=None,owner_id=assigned_to_id,reason=data.notes or 'Assigned when the work order was created.',assignment_version=1)))
 
     # A queued work order is not a dispatched field team.
     if data.report_id and assigned_to_id:
@@ -545,9 +556,7 @@ def update_work_order(
     if {"status", "completed_date", "citizen_feedback", "estimated_cost", "actual_cost"} & update_data.keys():
         raise HTTPException(status_code=422, detail="Use the governed lifecycle, cost, or resident feedback endpoint")
     if "assigned_to_id" in update_data:
-        if wo.status != "open":
-            raise HTTPException(status_code=409, detail="An active work order cannot be reassigned through a general edit")
-        _validate_assignee(db, update_data["assigned_to_id"])
+        raise HTTPException(status_code=422, detail="Use the governed work-order assignment or reassignment endpoint")
     changed_fields = [key for key, value in update_data.items() if getattr(wo, key) != value]
     for k, v in update_data.items():
         setattr(wo, k, v)

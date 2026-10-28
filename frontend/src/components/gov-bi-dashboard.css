@@ -43,9 +43,13 @@
 .gov-bi-kpi:hover { border-color: #cbd5e1; box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.05); }
 .dark .gov-bi-kpi:hover { border-color: #334155; }
 .gov-bi-kpi__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.gov-bi-kpi__head h2 { margin: 0; color: var(--bi-muted); font-size: 12px; line-height: 1.35; font-weight: 700; }
+.gov-bi-kpi__head h2 { min-width: 0; margin: 0; color: var(--bi-muted); font-size: 12px; line-height: 1.35; font-weight: 700; }
 .gov-bi-kpi__head a { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 7px; color: var(--bi-blue); background: var(--bi-canvas); }
 .gov-bi-kpi__head a:hover { background: var(--bi-blue-soft); }
+.gov-bi-head-actions { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; flex: none; }
+.gov-bi-csv-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 32px; padding: 5px 8px; border: 1px solid var(--bi-rule); border-radius: 7px; background: var(--bi-canvas); color: var(--bi-blue); font-size: 11px; line-height: 1; font-weight: 750; cursor: pointer; }
+.gov-bi-csv-button:hover:not(:disabled) { background: var(--bi-blue-soft); border-color: var(--bi-blue); }
+.gov-bi-csv-button:disabled { color: var(--bi-muted); cursor: not-allowed; opacity: .65; }
 .gov-bi-kpi__value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 8px; }
 .gov-bi-kpi__value strong { color: var(--bi-ink); font-size: clamp(1.65rem, 2.3cqi, 2rem); line-height: 1; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
 .gov-bi-kpi__value span { color: var(--bi-muted); font-size: 11px; line-height: 1.35; }
@@ -72,7 +76,7 @@
 .gov-bi-text-link:hover { text-decoration-thickness: 2px; }
 
 .gov-bi-attention { align-self: start; }
-.gov-bi-attention .gov-bi-surface__head > svg { color: var(--gov-warning); flex: none; }
+.gov-bi-attention .gov-bi-head-actions > svg { color: var(--gov-warning); flex: none; }
 .gov-bi-attention__list { margin-top: 8px; }
 .gov-bi-attention__row { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 40px; padding: 6px 0; border-bottom: 1px solid var(--bi-rule); color: var(--bi-ink); text-decoration: none; }
 .gov-bi-attention__row:hover strong { color: var(--bi-blue); text-decoration: underline; text-underline-offset: 3px; }

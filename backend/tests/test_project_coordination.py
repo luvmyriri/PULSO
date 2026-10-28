@@ -4,6 +4,7 @@ from unittest.mock import patch
 import json
 import pytest
 from sqlalchemy import text
+import auth
 import models
 import gov_models as gm
 from tests.test_government_workspace import context as core_context
@@ -54,6 +55,92 @@ def advance(client,tokens,project):
     result=command(client,tokens,project,'advance',next_review_at=future(),**extra)
     assert result.status_code==200,result.text
     return result.json()
+
+
+def test_related_reports_keep_independent_records_and_reject_duplicate_or_unauthorized_links(context):
+    client,sessions,tokens=context
+    project=opening(client,tokens,source_report_id=1)
+    with sessions() as db:
+        source_before=db.get(models.Report,1).status
+        related_before=db.get(models.Report,2).status
+        related_version=db.get(models.Report,2).version
+    payload=dict(expected_version=project['version'],expected_report_version=related_version,reason='FAKE related drainage investigation')
+    forbidden=client.post(f'/api/gov/project-workspace/{project["id"]}/related-reports/2',json=payload,headers=tokens['field'])
+    assert forbidden.status_code==403
+    linked=client.post(f'/api/gov/project-workspace/{project["id"]}/related-reports/2',json=payload,headers=tokens['chief'])
+    assert linked.status_code==201,linked.text
+    detail=client.get(f'/api/gov/project-workspace/{project["id"]}',headers=tokens['chief']).json()
+    assert [item['id'] for item in detail['related_reports']]==[2]
+    assert client.post(f'/api/gov/project-workspace/{project["id"]}/related-reports/2',json={**payload,'expected_version':linked.json()['version']},headers=tokens['chief']).status_code==409
+    other=client.get('/api/gov/project-workspace/report/2/context',headers=tokens['chief']).json()
+    assert other['can_create'] is False
+    with sessions() as db:
+        assert db.get(models.Report,1).status==source_before
+        assert db.get(models.Report,2).status==related_before
+        assert db.query(gm.ProjectReportLink).filter_by(project_id=project['id'],report_id=2).count()==1
+    removed=client.request('DELETE',f'/api/gov/project-workspace/{project["id"]}/related-reports/2',json={**payload,'expected_version':linked.json()['version'],'reason':'FAKE report belongs to a separate case'},headers=tokens['chief'])
+    assert removed.status_code==200,removed.text
+    with sessions() as db:
+        assert db.query(gm.ProjectReportLink).filter_by(project_id=project['id'],report_id=2).count()==0
+        assert db.query(gm.AuditLog).filter_by(project_id=project['id'],action='Related report unlinked').count()==1
+
+
+def test_project_detail_uses_linked_work_orders_as_tasks_without_copying_them(context):
+    client,sessions,tokens=context
+    project=opening(client,tokens)
+    with sessions() as db:
+        db.add(gm.WorkOrder(id=402,wo_number='FAKE-PROJECT-WORK',title='FAKE drainage field task',project_id=project['id'],district_id=1,assigned_to_id=4,assigned_by_id=1,assignment_version=1,status='assigned',priority='normal'))
+        db.commit()
+    detail=client.get(f'/api/gov/project-workspace/{project["id"]}',headers=tokens['chief'])
+    assert detail.status_code==200,detail.text
+    assert [item['id'] for item in detail.json()['work_orders']]==[402]
+    assert detail.json()['work_orders'][0]['owner']=='FAKE field'
+    assert client.get('/api/gov/work-orders/402',headers=tokens['chief']).json()['status']=='assigned'
+
+
+def test_project_task_creation_requires_scope_reason_and_current_project_version(context):
+    client,sessions,tokens=context
+    project=opening(client,tokens)
+    body=dict(project_id=project['id'],title='FAKE drainage survey',description='FAKE inspect the drainage channel',notes='FAKE scoped engineering task',priority='normal')
+    path='/api/gov/work-orders'
+    assert client.post(path,json=body,headers=tokens['field']).status_code==403
+    assert client.post(path,json=body,headers=tokens['chief']).status_code==428
+    headers={**tokens['chief'],'If-Match':str(project['version'])}
+    assert client.post(path,json={**body,'notes':'short'},headers=headers).status_code==422
+    opened=client.post(path,json=body,headers=headers)
+    assert opened.status_code==200,opened.text
+    assert opened.json()['status']=='open' and opened.json()['project_id']==project['id']
+    assert client.post(path,json=body,headers=headers).status_code==409
+    detail=client.get(f'/api/gov/project-workspace/{project["id"]}',headers=tokens['chief']).json()
+    assert [item['id'] for item in detail['work_orders']]==[opened.json()['id']]
+    with sessions() as db:
+        work=db.get(gm.WorkOrder,opened.json()['id'])
+        assert work.district_id==1 and work.barangay_id==1
+        assert db.get(gm.ProjectRequest,project['id']).coordination_version==project['version']+1
+
+
+def test_project_owner_reassignment_is_audited_and_duplicate_is_rejected(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.add(models.Official(id=7,full_name='FAKE project engineer',email='engineer@test.invalid',password_hash='test-not-login',role='project_engineer',is_active=True))
+        db.commit()
+    project=assigned(client,tokens)
+    reassigned=command(client,tokens,project,'assign',owner_id=7,next_review_at=future())
+    assert reassigned.status_code==200,reassigned.text
+    assert reassigned.json()['owner_id']==7
+    engineer_token={'Authorization':f'Bearer {auth.create_access_token({"sub":"engineer@test.invalid"})}'}
+    chief_items=client.get('/api/gov/operations/today',headers=tokens['chief']).json()['needs_attention']
+    engineer_items=client.get('/api/gov/operations/today',headers=engineer_token).json()['needs_attention']
+    assert not any(item['entity_type']=='project' and item['id']==project['id'] for item in chief_items)
+    assert any(item['entity_type']=='project' and item['id']==project['id'] for item in engineer_items)
+    repeated=command(client,tokens,reassigned.json(),'assign',owner_id=7,next_review_at=future())
+    assert repeated.status_code==409
+    with sessions() as db:
+        event=db.query(gm.AuditLog).filter_by(project_id=project['id'],action='Assign').one()
+        details=json.loads(event.details)
+        assert details['previous_owner_id']==1 and details['owner_id']==7
+        assert details['previous_owner']=='FAKE chief' and details['owner']=='FAKE project engineer'
+        assert db.query(models.Notification).filter_by(official_id=7).count()==1
 
 
 def test_project_has_real_assignment_personal_queue_and_no_financial_controls(context):

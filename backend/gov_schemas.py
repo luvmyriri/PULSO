@@ -57,6 +57,10 @@ class WorkOrderAssignment(BaseModel):
     assigned_to_id: int
     reason: str = Field(min_length=10, max_length=2000)
 
+
+class WorkOrderReassignment(WorkOrderAssignment):
+    expected_assignment_version: int = Field(ge=1)
+
 class WorkOrderResponse(BaseModel):
     id: int
     wo_number: str
@@ -64,6 +68,7 @@ class WorkOrderResponse(BaseModel):
     project_id: Optional[int] = None
     assigned_by_id: Optional[int] = None
     assigned_to_id: Optional[int] = None
+    assignment_version: int = 0
     title: str
     description: Optional[str] = None
     location_string: Optional[str] = None

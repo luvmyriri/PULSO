@@ -76,6 +76,8 @@ def ask_pulseai_stateless(
     current_user: Union[models.Resident, models.Official] = Depends(get_current_user)
 ):
     """Stateless PULSEAI endpoint that returns a grounded AI response even without a conversation session."""
+    if _is_staff_user(current_user):
+        raise HTTPException(status_code=410, detail="Staff assistance has moved to /api/gov/assistant/messages.")
     query_text = (req.query or "").strip()
     if not query_text:
         raise HTTPException(status_code=400, detail="Query message cannot be empty.")
@@ -305,6 +307,8 @@ def append_message_and_respond(
     with database tool-grounding, stores both user and assistant messages,
     and auto-titles the conversation if it still carries the default name.
     """
+    if _is_staff_user(current_user):
+        raise HTTPException(status_code=410, detail="Staff assistance has moved to /api/gov/assistant/messages.")
     conv = db.query(models.ChatConversation).filter(models.ChatConversation.id == conversation_id).first()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation not found.")

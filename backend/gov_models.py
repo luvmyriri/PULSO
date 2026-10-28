@@ -71,6 +71,7 @@ class WorkOrder(Base):
     # Who assigned it and who is responsible
     assigned_by_id = Column(Integer, ForeignKey("officials.id"))   # Dispatcher / City Engineer
     assigned_to_id = Column(Integer, ForeignKey("officials.id"), nullable=True)  # Field crew
+    assignment_version = Column(Integer, nullable=False, default=0, server_default='0')
 
     title          = Column(String)
     description    = Column(Text, nullable=True)
@@ -521,6 +522,19 @@ class ProjectRequest(Base):
     certificate_issued_by = relationship("Official", foreign_keys=[certificate_issued_by_id])
     barangay_ref          = relationship("Barangay", foreign_keys=[barangay_id])
     district_ref          = relationship("District", foreign_keys=[district_id])
+
+
+class ProjectReportLink(Base):
+    """A related report remains an independent civic record after project linkage."""
+    __tablename__ = 'project_report_links'
+    __table_args__ = (UniqueConstraint('project_id', 'report_id', name='uq_project_report_link'),)
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey('project_requests.id', ondelete='CASCADE'), nullable=False, index=True)
+    report_id = Column(Integer, ForeignKey('reports.id', ondelete='RESTRICT'), nullable=False, index=True)
+    linked_by_id = Column(Integer, ForeignKey('officials.id'), nullable=False)
+    linked_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    reason = Column(Text, nullable=False)
 
 
 class ProjectDependency(Base):

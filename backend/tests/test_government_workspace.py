@@ -732,13 +732,39 @@ def test_map_docket_actions_use_authoritative_status_versions_and_scope(context)
     next_data = client.get('/api/gov/reports/1/docket',headers=tokens['platform']).json()
     assert 'approve' in next_data['allowed_actions'] and 'verify' not in next_data['allowed_actions']
     with sessions() as db:
-        assert db.query(gm.ProcessTimeline).filter_by(report_id=1).count() == 1
+        # Status transition and public-detail review are separate recorded actions;
+        # replaying the same command must not add another copy of either.
+        timeline = db.query(gm.ProcessTimeline).filter_by(report_id=1).all()
+        assert len([entry for entry in timeline if entry.status == 'pending_approval']) == 1
+        assert len([entry for entry in timeline if entry.status == 'public_details_approved']) == 1
         assert db.query(gm.OutboxEvent).filter_by(event_type='resident_in_app_notification').count() == 1
         db.get(models.Official,6).primary_jurisdiction=[2]
         db.commit()
     assert client.get('/api/gov/reports/1/docket',headers=tokens['platform']).status_code == 403
     assert client.post('/api/gov/reports/1/approve-for-work',json={'reason':'FAKE reviewed evidence'},headers=tokens['platform']).status_code == 403
     assert client.get('/api/gov/reports/1/docket',headers=tokens['owner']).status_code == 403
+
+
+def test_active_work_reassignment_moves_personal_queue_and_keeps_history(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.add(gm.WorkOrder(id=401,wo_number='FAKE-WO-TRANSFER',title='FAKE field repair',status='in_progress',district_id=1,assigned_by_id=1,assigned_to_id=4,assignment_version=1,priority='normal'))
+        db.commit()
+    payload={'assigned_to_id':5,'reason':'FAKE field capacity transfer','expected_assignment_version':1}
+    assert client.post('/api/gov/work-orders/401/reassignment',json=payload,headers=tokens['field']).status_code==403
+    transferred=client.post('/api/gov/work-orders/401/reassignment',json=payload,headers=tokens['chief'])
+    assert transferred.status_code==200,transferred.text
+    assert transferred.json()['assigned_to_id']==5 and transferred.json()['assignment_version']==2
+    assert transferred.json()['status']=='in_progress'
+    assert client.post('/api/gov/work-orders/401/reassignment',json=payload,headers=tokens['chief']).status_code==409
+    old_work=client.get('/api/gov/operations/today',headers=tokens['field']).json()['needs_attention']
+    new_work=client.get('/api/gov/operations/today',headers=tokens['other']).json()['needs_attention']
+    assert not any(item['entity_type']=='work_order' and item['id']==401 for item in old_work)
+    assert any(item['entity_type']=='work_order' and item['id']==401 for item in new_work)
+    with sessions() as db:
+        event=db.query(gm.AuditLog).filter_by(work_order_id=401,action='Work order owner reassigned').one()
+        assert '"previous_owner_id": 4' in event.details and '"owner_id": 5' in event.details
+        assert db.query(gm.ProcessTimeline).filter_by(work_order_id=401,is_public=False).count()==1
 
 
 def transition(client, tokens, item, status, role='chief'):
@@ -938,12 +964,14 @@ def test_manual_maintenance_creates_assignable_work_without_ai_and_retry_is_safe
     eligible = client.get(f'/api/gov/dispatch/eligible-assignees?wo_id={wo_id}', headers=tokens['chief'])
     assert eligible.status_code == 200, eligible.text
     assert 4 in {p['id'] for p in eligible.json()}
+    assert all('active_work_count' in person for person in eligible.json())
+    assert [person['active_work_count'] for person in eligible.json()] == sorted(person['active_work_count'] for person in eligible.json())
     path = f'/api/gov/work-orders/{wo_id}/assignment'
     body = {'assigned_to_id':4,'reason':'FAKE assign the inspection to the eligible field worker'}
     assert client.post(path, json=body, headers=tokens['field']).status_code == 403
     first = client.post(path, json=body, headers=tokens['chief'])
     assert first.status_code == 200, first.text
-    assert first.json()['assigned_to_id'] == 4 and first.json()['status'] == 'assigned'
+    assert first.json()['assigned_to_id'] == 4 and first.json()['status'] == 'assigned' and first.json()['assignment_version'] == 1
     with sessions() as db: events = db.query(gm.AuditLog).count()
     assert client.post(path, json=body, headers=tokens['chief']).status_code == 200
     with sessions() as db: assert db.query(gm.AuditLog).count() == events

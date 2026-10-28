@@ -151,7 +151,7 @@ def my_work(db, user):
                 action_url=f'/gov/projects?project={project.id}',recommended_action='Verify report resolution' if closing else 'Review completion evidence' if reviewing else 'Open project coordination',
                 task_bucket=bucket,assigned_to_id=project.project_engineer_id,assigned_to_name=project_workspace.person_name(db,project.project_engineer_id),
                 why_in_inbox='The project is complete; its source report still needs an explicit resolution decision.' if closing else 'Independent completion review is available.' if reviewing else 'You own a pending external follow-up.' if waiting else 'You are the recorded engineering owner.',
-                work_bundle='engineering_field',updated_at=project.updated_at or project.created_at))
+                work_bundle='engineering_field',updated_at=project.updated_at or project.created_at,next_review_at=project.next_review_at))
     from referral_models import ExternalReferral, ReferralRecipient
     from external_referrals import grant as referral_grant, CLOSED as REFERRAL_CLOSED
     if referral_grant(user,'view'):

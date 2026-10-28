@@ -507,22 +507,18 @@ def generate_ai_plan(
         asset = matches[0]
 
     require_asset_scope(db, current_user, asset)
-    ahs = _resolve_asset_health_score(db, asset)
-    env = db.query(EnvironmentalContext).filter_by(barangay_id=asset.barangay_id).first()
-    lgbm_pred = lightgbm_service.predict_for_asset(db, asset)
+    last_maintenance = db.query(func.max(MaintenanceHistory.completion_date)).filter(
+        MaintenanceHistory.asset_id == asset.asset_id
+    ).scalar()
     asset_data = {
         "asset_name": asset.asset_name,
+        "asset_id": asset.asset_id,
         "category": asset.category,
         "barangay": str(asset.barangay),
-        "health_score": ahs,
+        "recorded_condition_score": asset.condition_score,
         "material_type": asset.material_type,
         "design_life": asset.design_life,
-        "environmental_risks": env.flood_risk_level if env else "Unknown",
-        "lgbm_failure_probability_30d": lgbm_pred["lgbm_failure_probability_30d"],
-        "predicted_repair_days_p50": lgbm_pred["predicted_repair_days_p50"],
-        "predicted_repair_days_p90": lgbm_pred["predicted_repair_days_p90"],
-        "risk_drivers": lgbm_pred["risk_drivers"],
-        "spatial_telemetry": lgbm_pred["spatial_telemetry"],
+        "last_recorded_maintenance": last_maintenance.isoformat() if last_maintenance else None,
     }
 
     plan = gemini_service.generate_maintenance_plan(asset_data)
@@ -532,19 +528,20 @@ def generate_ai_plan(
     return {
         "barangay": str(asset.barangay),
         "category": asset.category,
-        "health_score": asset_data["health_score"],
+        "health_score": asset.condition_score,
+        "condition_source": "recorded" if asset.condition_score is not None else "not_recorded",
         "asset_id": asset.asset_id,
-        "priority": plan.get("priority"),
+        "priority": None,
         "maintenance_plan": plan["maintenance_plan"],
         "steps": plan.get("steps", []),
         "technical_justification": plan["technical_justification"],
-        "generated_by": f"Vertex AI {gemini_service.GEMINI_MODEL}",
+        "generated_by": f"Gemini {gemini_service.GEMINI_MODEL}",
         "generated_at": datetime.datetime.now(timezone.utc).isoformat(),
         "review_state": "draft_unreviewed",
         "source": "infrastructure_asset_registry",
-        "estimated_cost": plan.get("estimated_cost"),
-        "estimated_duration_days": plan.get("estimated_duration_days") or lgbm_pred["predicted_repair_days_p50"],
-        "lgbm_insights": lgbm_pred,
+        "estimated_cost": None,
+        "estimated_duration_days": None,
+        "lgbm_insights": None,
     }
 
 

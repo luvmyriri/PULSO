@@ -486,9 +486,11 @@ async def ai_omni_assistant(
     db: Session = Depends(get_db)
 ):
     """
-    PULSO Omni-Assistant: AI integration for all screens and inputs.
-    Contextual assistance for citizens and LGU engineers grounded in real PULSO database records.
+    Legacy resident assistant. Staff use the scoped government assistant.
     """
+    if isinstance(current_user, models.Official):
+        raise HTTPException(410, 'Staff assistance has moved to /api/gov/assistant/messages.')
+
     # Auto-inject user identity into context
     user_ctx = f"User: {current_user.full_name} ({current_user.role}). Context: {req.context or 'General Dashboard'}"
     return gemini_service.get_ai_assistant_response(
@@ -3162,7 +3164,11 @@ async def generate_ai_advisory(report_id: int,db: Session=Depends(get_db),curren
     from report_review_router import get_report
     require(current_user,'announcements','create')
     report=get_report(db,current_user,report_id)
-    draft=gemini_service.generate_advisory_content(dict(category=report.category,ai_summary=report.ai_summary or report.description,location_string=report.location_string,severity_score=report.severity_score))
+    draft=gemini_service.generate_advisory_content(dict(
+        category=report.category,
+        description=report.description,
+        location_string=report.location_string,
+    ))
     if not isinstance(draft,dict) or not draft:
         raise HTTPException(503,'Draft assistance is unavailable. Write an advisory in Updates instead.')
     return {**draft,'source_report_id':report.id,'review_required':True,'published':False}
