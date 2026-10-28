@@ -1671,7 +1671,7 @@ function QuickReportWizardModal({
                                                 onChange={(e) =>
                                                     setLocationDetails({ ...locationDetails, subdivision: e.target.value })
                                                 }
-                                                placeholder="e.g. Celina Homes 3 or Camarin Commercial Ctr"
+                                                placeholder="e.g. Subdivision, Village, or Commercial Center"
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             />
                                         </div>
@@ -1686,7 +1686,7 @@ function QuickReportWizardModal({
                                                 onChange={(e) =>
                                                     setLocationDetails({ ...locationDetails, houseNumber: e.target.value })
                                                 }
-                                                placeholder="e.g. Blk 4 Lot 16 Silver Street"
+                                                placeholder="e.g. House No., Bldg No., or Street Name"
                                                 className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                                             />
                                         </div>

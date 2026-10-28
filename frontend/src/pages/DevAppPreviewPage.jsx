@@ -600,7 +600,7 @@ const CAMERA_ADDRESS_PRESETS = {
   standard: {
     id: 'standard',
     label: 'Standard (Celina Homes 3)',
-    address: 'Celina Homes 3, Blk 4 Lot 16 Silver, Barangay 171, Caloocan City, 1421 Metro Manila',
+    address: 'Celina Homes 3, Silver Street, Barangay 171, Caloocan City, 1421 Metro Manila',
     coordinates: { lat: 14.7523, lng: 121.0421, accuracy: 6 },
     expectedLines: '2 lines (no Plus Codes)'
   },
@@ -2741,7 +2741,7 @@ function DevAppPreviewContent() {
                         : 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=800&auto=format&fit=crop&q=80'
                     }
                     metadata={{
-                      locationAddress: CAMERA_ADDRESS_PRESETS[cameraAddressPreset]?.address || 'Celina Homes 3, Blk 4 Lot 16 Silver, Barangay 171, Caloocan City, 1421 Metro Manila',
+                      locationAddress: CAMERA_ADDRESS_PRESETS[cameraAddressPreset]?.address || 'Celina Homes 3, Silver Street, Barangay 171, Caloocan City, 1421 Metro Manila',
                       coordinates: CAMERA_ADDRESS_PRESETS[cameraAddressPreset]?.coordinates || { lat: 14.7523, lng: 121.0421, accuracy: 6 }
                     }}
                     onClose={() => {

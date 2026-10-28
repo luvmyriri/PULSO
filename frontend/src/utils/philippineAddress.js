@@ -229,14 +229,18 @@ export function parseGeocodedAddress(results, lat, lng, apiPlusCode = '') {
         return structured;
     }
 
-    // Identify best result from Google Maps array
+    // Identify best result from Google Maps array:
+    // Prioritize street_address, then route/intersection, avoiding private subpremise overrides
     let bestRes = results[0];
-    for (const r of results) {
-        const types = r.types || [];
-        if (types.includes('premise') || types.includes('street_address') || types.includes('subpremise')) {
-            bestRes = r;
-            break;
-        }
+    const streetRes = results.find(r => (r.types || []).includes('street_address'));
+    const routeRes = results.find(r => (r.types || []).includes('route'));
+    const premiseRes = results.find(r => (r.types || []).includes('premise') && !(r.types || []).includes('subpremise'));
+    if (streetRes) {
+        bestRes = streetRes;
+    } else if (routeRes) {
+        bestRes = routeRes;
+    } else if (premiseRes) {
+        bestRes = premiseRes;
     }
 
     const compMap = {};
