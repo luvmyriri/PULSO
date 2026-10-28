@@ -156,13 +156,13 @@ function QuickReportWizardModal({
     requestDeviceLocation,
     isLocating = false,
     isTrackingLocation = false,
-    _onStartLocationTracking,
+    onStartLocationTracking,
     onStopLocationTracking,
     locationPermissionDenied = false,
-    _onOpenLocationPicker,
+    onOpenLocationPicker,
     onSubmitReport,
     onTrackReport,
-    _onViewExistingReport,
+    onViewExistingReport,
     currentUser = null
 }) {
     const { t } = useTranslation();
@@ -170,9 +170,20 @@ function QuickReportWizardModal({
     // Wizard State
     // -------------------------------------------------------------------------
     const [step, setStep] = useState(1); // 1: Photo, 2: Category, 3: Details, 4: Success
+    // Auto reload and track GPS location immediately upon opening
     useEffect(() => {
-        if (!isOpen || step !== 1) onStopLocationTracking?.();
-    }, [isOpen, step, onStopLocationTracking]);
+        if (!isOpen) {
+            onStopLocationTracking?.();
+            return;
+        }
+        if (!locationPermissionDenied) {
+            requestDeviceLocation?.();
+            onStartLocationTracking?.();
+        }
+        return () => {
+            onStopLocationTracking?.();
+        };
+    }, [isOpen, locationPermissionDenied, requestDeviceLocation, onStartLocationTracking, onStopLocationTracking]);
     const [photo, setPhoto] = useState(null); // Data URL or Blob URL
     const [photoFile, setPhotoFile] = useState(null);
     const [photoCapturedAt, setPhotoCapturedAt] = useState(null);
@@ -462,8 +473,16 @@ function QuickReportWizardModal({
         if (locationAddress && locationAddress.trim() && !locationAddress.startsWith('Lat:')) {
             return locationAddress;
         }
-        return reportLocation ? `${t('reportWizard.step2Location.selectedCoordinates', 'Selected coordinates')}: ${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}` : t('reportWizard.step2Location.chooseLocation', 'Choose the issue location');
-    }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation, t]);
+        if (reportLocation?.lat && reportLocation?.lng) {
+            const bgy = resolvedBarangay || 'Caloocan';
+            const plus = resolvedPlusCode ? `${resolvedPlusCode}, ` : '';
+            return `${plus}${bgy}, Caloocan, Metro Manila`;
+        }
+        if (isLocating) {
+            return 'Detecting accurate GPS location…';
+        }
+        return t('reportWizard.step2Location.chooseLocation', 'Choose the issue location');
+    }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation, isLocating, t]);
 
     const handleCopyAddress = (e) => {
         e?.stopPropagation?.();
@@ -1078,9 +1097,14 @@ function QuickReportWizardModal({
                                                         </button>
                                                     )}
                                                 </span>
+                                            ) : isLocating && !reportLocation ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/10 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-500/40 animate-pulse">
+                                                    <Loader2 size={13} className="animate-spin text-[#ff6b00] shrink-0" />
+                                                    <span>Detecting accurate GPS…</span>
+                                                </span>
                                             ) : !reportLocation ? (
                                                 <span className="text-xs text-slate-600 dark:text-slate-300">{t('reportWizard.step2Location.noLocationHelp', 'Location not set. Use GPS or choose a place on the map.')}</span>
-                                            ) : (reportLocation?.accuracy && reportLocation.accuracy > 20) ? (
+                                            ) : (reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50">
                                                     <Info size={13} className="text-amber-500 shrink-0" />
                                                     <span>Approximate Location (±{Math.round(reportLocation.accuracy)}m)</span>
@@ -1088,32 +1112,32 @@ function QuickReportWizardModal({
                                             ) : (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50">
                                                     <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                                                    <span>{locationStatusText}{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
+                                                    <span>Accurate GPS{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
                                                 </span>
                                             )}
-                                            {/* Minimal Refresh Icon (Resync GPS) */}
-                                            {reportLocation && (
+                                            {/* Auto-Reload / Resync GPS Button */}
+                                            {requestDeviceLocation && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => requestDeviceLocation?.()}
+                                                    onClick={() => requestDeviceLocation(true)}
                                                     disabled={isLocating}
-                                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors cursor-pointer inline-flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600 ml-0.5 disabled:opacity-50"
-                                                    title={t('reportWizard.step2Location.resyncGps', 'Resync GPS')}
-                                                    aria-label={t('reportWizard.step2Location.resyncGps', 'Resync GPS')}
+                                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600 ml-0.5 disabled:opacity-50"
+                                                    title="Reload accurate GPS location"
+                                                    aria-label="Reload accurate GPS location"
                                                 >
                                                     <RotateCcw size={14} className={isLocating ? 'animate-spin text-[#ff6b00]' : ''} />
                                                 </button>
                                             )}
                                         </div>
-                                        {!reportLocation && (
+                                        {!reportLocation && !isLocating && (
                                             <div className="flex flex-wrap gap-2 mt-3" aria-label="Location controls">
                                                 <button
                                                     type="button"
-                                                    onClick={() => requestDeviceLocation?.()}
-                                                    disabled={isLocating}
-                                                    className="min-h-11 px-3 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-800 dark:text-white focus-visible:outline-3 focus-visible:outline-blue-600"
+                                                    onClick={() => requestDeviceLocation?.(true)}
+                                                    className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
                                                 >
-                                                    {isLocating ? t('reportWizard.step2Location.locating', 'Finding location…') : t('reportWizard.step2Location.useMyLocation', 'Use my location')}
+                                                    <RotateCcw size={14} />
+                                                    <span>Reload location</span>
                                                 </button>
                                             </div>
                                         )}

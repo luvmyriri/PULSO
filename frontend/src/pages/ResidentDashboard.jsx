@@ -10824,7 +10824,7 @@ export default function ResidentDashboard() {
         }
     };
 
-    const requestDeviceLocation = () => {
+    const requestDeviceLocation = (force = false) => {
         if (!navigator.geolocation) {
             setIsLocating(false);
             setLocationPermissionDenied(true);
@@ -10834,14 +10834,33 @@ export default function ResidentDashboard() {
         setIsLocating(true);
         setLocationPermissionDenied(false);
         navigator.geolocation.getCurrentPosition(
-            position => { if (requestId === locationRequestRef.current) acceptDevicePosition(position); },
+            position => {
+                if (requestId === locationRequestRef.current) {
+                    acceptDevicePosition(position);
+                }
+            },
             error => {
                 if (requestId !== locationRequestRef.current) return;
-                setIsLocating(false);
-                setLocationPermissionDenied(error?.code === 1);
-                showToast('Could not refresh GPS. Choose the issue location on the map or retry.', 'info');
+                if (error?.code === 1) {
+                    setIsLocating(false);
+                    setLocationPermissionDenied(true);
+                    return;
+                }
+                // Fallback to network/WiFi position if high-accuracy GPS hardware times out
+                navigator.geolocation.getCurrentPosition(
+                    fallbackPos => {
+                        if (requestId === locationRequestRef.current) acceptDevicePosition(fallbackPos);
+                    },
+                    () => {
+                        if (requestId === locationRequestRef.current) {
+                            setIsLocating(false);
+                            showToast('Could not refresh GPS. Choose the issue location on the map or retry.', 'info');
+                        }
+                    },
+                    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+                );
             },
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     };
 
@@ -10854,19 +10873,27 @@ export default function ResidentDashboard() {
         setIsLocating(true);
         setIsTrackingLocation(true);
         locationWatchRef.current = navigator.geolocation.watchPosition(
-            acceptDevicePosition,
-            error => {
-                setIsLocating(false);
-                setLocationPermissionDenied(error?.code === 1);
-                stopDeviceLocationTracking();
-                showToast('Live location stopped. Refresh GPS or choose the issue location on the map.', 'info');
+            position => {
+                acceptDevicePosition(position);
             },
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+            error => {
+                if (error?.code === 1) {
+                    setIsLocating(false);
+                    setLocationPermissionDenied(true);
+                    stopDeviceLocationTracking();
+                }
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     };
 
     useEffect(() => {
-        if (activeModal !== 'file-report') stopDeviceLocationTracking();
+        if (activeModal === 'file-report') {
+            requestDeviceLocation();
+            startDeviceLocationTracking();
+        } else {
+            stopDeviceLocationTracking();
+        }
         return () => {
             if (locationWatchRef.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(locationWatchRef.current);
             locationWatchRef.current = null;
