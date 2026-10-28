@@ -48,7 +48,7 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy', on
                                 </h3>
                                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
                                     {activeTab === 'privacy'
-                                        ? 'PULSO Citizen Data Protection & R.A. 10173 Compliance'
+                                        ? 'Resident information and Google sign-in'
                                         : 'Resident User Agreement & Reporting Guidelines'}
                                 </p>
                             </div>
@@ -99,7 +99,7 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy', on
                                     </div>
                                     <div className="leading-relaxed">
                                         <span className="font-bold text-slate-900 dark:text-white mr-1">Republic Act No. 10173 (Data Privacy Act of 2012):</span>
-                                        <span>PULSO is committed to safeguarding citizen data. All resident information collected is strictly governed by municipal data protection laws.</span>
+                                        <span>This notice explains how the current PULSO service handles resident information. You can ask project support about access, correction, or deletion.</span>
                                     </div>
                                 </div>
 
@@ -108,16 +108,16 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy', on
                                         <span className="w-2 h-2 rounded-full bg-[#ff6b00]" /> 1. Information Collection &amp; Purpose
                                     </h4>
                                     <p className="pl-4 border-l-2 border-slate-200 dark:border-slate-800">
-                                        PULSO collects resident registration data (Full Name, Date of Birth, Address, Contact details, and Government-issued ID photos) exclusively for verifying residency within Caloocan City. Report submission data includes precise GPS coordinates and photographic evidence of public infrastructure hazards.
+                                        PULSO may collect the information you provide when registering, verifying an account, or reporting an issue. This can include your name, contact and address details, identification images, report descriptions, photographs, and location details. Google Sign-In supplies your name, email, and Google account identifier to connect an existing verified resident account.
                                     </p>
                                 </section>
 
                                 <section>
                                     <h4 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-[#ff6b00]" /> 2. Government-Grade Encryption &amp; Stewardship
+                                        <span className="w-2 h-2 rounded-full bg-[#ff6b00]" /> 2. Access and retention
                                     </h4>
                                     <p className="pl-4 border-l-2 border-slate-200 dark:border-slate-800">
-                                        Your personal data is encrypted at rest and in transit using modern AES-256 standards. PULSO does not sell, lease, or distribute resident records to third-party commercial entities or advertising networks. Access is strictly limited to authorized City Engineering dispatchers.
+                                        The site uses HTTPS and limits staff access by account permissions. Authorized personnel may see information needed for their assigned work. PULSO does not sell resident information to advertisers. A fixed retention or deletion schedule for resident and report records has not yet been published.
                                     </p>
                                 </section>
 
@@ -126,7 +126,7 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy', on
                                         <span className="w-2 h-2 rounded-full bg-[#ff6b00]" /> 3. Automated AI Processing Disclosure
                                     </h4>
                                     <p className="pl-4 border-l-2 border-slate-200 dark:border-slate-800">
-                                        PULSO uses automated OCR document parsing during registration to confirm document authenticity and prevent identity fraud. Facial biometric templates are evaluated in real time during ID verification and are never stored for surveillance or tracking.
+                                        Identity images or report evidence may be processed by configured OCR and AI providers when you use those features. Their results support review but do not establish a final identity, location, or engineering decision by themselves. Google also provides sign-in, maps, and CAPTCHA functions; relevant data may be sent when you use them.
                                     </p>
                                 </section>
 
@@ -135,7 +135,7 @@ export default function LegalModal({ isOpen, onClose, initialTab = 'privacy', on
                                         <span className="w-2 h-2 rounded-full bg-[#ff6b00]" /> 4. Resident Data Rights
                                     </h4>
                                     <p className="pl-4 border-l-2 border-slate-200 dark:border-slate-800">
-                                        In accordance with RA 10173, residents maintain the right to access, request correction, or request account deactivation of their personal records by contacting the LGU Caloocan City Data Privacy Officer.
+                                        To ask about your information or request access, correction, or deletion, contact PULSO project support at <a href="mailto:gene.tabios13@gmail.com" className="underline">gene.tabios13@gmail.com</a>. Requests are reviewed against applicable law and records duties. Read the full <a href="/privacy.html" className="underline">English and Filipino privacy policy</a>.
                                     </p>
                                 </section>
                             </>

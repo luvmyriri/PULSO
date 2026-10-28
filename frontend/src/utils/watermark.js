@@ -41,7 +41,7 @@ export function formatWatermarkTimestamp(dateInput) {
  * 4. Content:
  *    - Line 1: Left "PULSO · Caloocan City" (PULSO in #ff6b00, rest in white bold)
  *              Right timestamp ("Oct 16, 2026 · 3:02 PM")
- *    - Next lines: FULL readable address in white bold (NO Plus Codes)
+ *    - Next lines: FULL readable address, including the selected location's Plus Code, in white bold
  *    - Last line: Coordinates ("14.7520, 121.0263") in soft white small text
  * 5. Contrast & Scrim:
  *    - Dark vertical gradient panel anchored to bottom (fade to clear at top, 78% opacity at bottom).
@@ -63,7 +63,7 @@ export function drawEvidenceWatermark(canvas, metadata = {}) {
     const brandingCity = " · Caloocan City";
     const timestamp = formatWatermarkTimestamp(metadata.timestamp || metadata.capturedAt);
 
-    // Full Address source (clean of any Plus Codes)
+    // Full address uses the same Plus Code shown in the location card.
     const addressSource = metadata.structuredAddress || metadata.locationAddress || metadata.address;
     const addressText = formatWatermarkAddress(addressSource, metadata.location || metadata.coordinates);
 

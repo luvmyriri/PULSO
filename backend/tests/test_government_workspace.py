@@ -290,7 +290,7 @@ def test_other_reviewers_cannot_grade_or_verify_someone_elses_report(context):
     client,sessions,tokens=context
     body={'expected_version':1,'priority_grade':'P4','reason':'FAKE severe hazard assessment'}
     assert client.post('/api/gov/report-review/1/priority',json=body,headers=tokens['inspector']).status_code==403
-    assert client.patch('/api/reports/1/status',json={'status':'pending_approval'},headers=tokens['inspector']).status_code==403
+    assert client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers=tokens['inspector']).status_code==403
 
 
 def test_immediate_response_grade_is_highest_without_automatic_dispatch(context):
@@ -726,9 +726,9 @@ def test_map_docket_actions_use_authoritative_status_versions_and_scope(context)
     data = response.json()
     assert set(data['allowed_actions']) == {'verify','reject','request_info'}
     command = {**tokens['platform'],'If-Match':str(data['report']['version']),'Idempotency-Key':'fake-map-verify-123'}
-    verified = client.patch('/api/reports/1/status',json={'status':'pending_approval'},headers=command)
+    verified = client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers=command)
     assert verified.status_code == 200, verified.text
-    assert client.patch('/api/reports/1/status',json={'status':'pending_approval'},headers=command).status_code == 200
+    assert client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers=command).status_code == 200
     next_data = client.get('/api/gov/reports/1/docket',headers=tokens['platform']).json()
     assert 'approve' in next_data['allowed_actions'] and 'verify' not in next_data['allowed_actions']
     with sessions() as db:

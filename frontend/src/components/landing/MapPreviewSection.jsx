@@ -11,7 +11,10 @@ import {
   MapPin,
   Droplets,
   Zap,
-  Route as RoadIcon,
+  Waves,
+  Lightbulb,
+  Signpost,
+  Trash2,
   Search,
   SlidersHorizontal,
   ListFilter,
@@ -127,44 +130,42 @@ function formatRelativeTime(dateString) {
   }
 }
 
-const getMarkerSVG = (category, status, isSelected = false) => {
-  const color = '#ff6b00'; // All pin locations are PULSO orange per civic standard
-
+const getPinCategoryKey = (category) => {
   const cat = (category || '').toLowerCase();
-  let svgIcon = '';
-  if (cat.includes('water') || cat.includes('leak') || cat.includes('drain')) {
-    svgIcon = `<path d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.14-7.5-12.5-7.5-12.5S4.5 10.36 4.5 14.5A7.5 7.5 0 0 0 12 22z" fill="white"/>`;
-  } else if (cat.includes('power') || cat.includes('light') || cat.includes('electric') || cat.includes('zap')) {
-    svgIcon = `<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>`;
-  } else if (cat.includes('safety') || cat.includes('hazard')) {
-    svgIcon = `<path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v6h-2V7zm0 8h2v2h-2v-2z" fill="white"/>`;
-  } else if (cat.includes('facilit') || cat.includes('building')) {
-    svgIcon = `<path d="M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17h-2v-4h-7v4H4zm13-8h3a1 1 0 0 1 1 1v7h-4v-8zm-9-6h2v2H8V7zm0 4h2v2H8v-2zm4-4h2v2h-2V7zm0 4h2v2h-2v-2z" fill="white"/>`;
-  } else if (cat.includes('traffic') || cat.includes('sign')) {
-    svgIcon = `<path d="M12 2L1 21h22L12 2zm0 4l7.53 13H4.47L12 6zm-1 5h2v4h-2v-4zm0 6h2v2h-2v-2z" fill="white"/>`;
-  } else {
-    svgIcon = `<path d="M12 2a6 6 0 0 0-6 6v2H4v2h16v-2h-2V8a6 6 0 0 0-6-6zm0 2a4 4 0 0 1 4 4v2H8V8a4 4 0 0 1 4-4z" fill="white"/>`;
-  }
+  return /traffic|road sign|signage/.test(cat) ? 'traffic'
+    : /safety|hazard/.test(cat) ? 'safety'
+    : /street light|streetlight|lighting|lamp/.test(cat) ? 'lighting'
+    : /electric|wiring|cable|power line/.test(cat) ? 'electrical'
+    : /drain|flood|gutter/.test(cat) ? 'drainage'
+    : /water|pipe/.test(cat) ? 'water'
+    : /waste|garbage/.test(cat) ? 'waste'
+    : /building|facilit/.test(cat) ? 'buildings' : 'roads';
+};
 
-  const strokeColor = isSelected ? '#ff6b00' : '#ffffff';
-  const strokeWidth = isSelected ? '3' : '2';
+const PIN_CATEGORY_COLORS = {
+  roads: '#EA580C', drainage: '#06B6D4', lighting: '#F59E0B',
+  water: '#0EA5E9', safety: '#F43F5E', traffic: '#A855F7',
+  buildings: '#6366F1', electrical: '#EAB308', waste: '#10B981',
+};
 
-  const svgString = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 48" width="40" height="48">
-      <defs>
-        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,0.35)"/>
-        </filter>
-      </defs>
-      <path d="M20 46 C20 46, 36 28, 36 18 A16 16 0 0 0 4 18 C4 28, 20 46, 20 46 Z" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" filter="url(#shadow)"/>
-      <circle cx="20" cy="18" r="11" fill="rgba(0,0,0,0.18)"/>
-      <g transform="translate(10, 8) scale(0.8)">
-        ${svgIcon}
-      </g>
-    </svg>
-  `.trim().replace(/\n/g, '').replace(/\s+/g, ' ');
-
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svgString)}`;
+const getMarkerSVG = (category, isSelected = false) => {
+  const road = `<path d="M4 19L9 5M20 19L15 5M12 7V9M12 13V15M12 19V21" stroke="white" stroke-width="2.3" stroke-linecap="round" fill="none"/>`;
+  const variants = {
+    roads: { color: PIN_CATEGORY_COLORS.roads, icon: road },
+    drainage: { color: PIN_CATEGORY_COLORS.drainage, icon: `<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>` },
+    lighting: { color: PIN_CATEGORY_COLORS.lighting, icon: `<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4.5 12.4c.9.8 1.5 2 1.5 3.1h6c0-1.1.6-2.3 1.5-3.1A7 7 0 0 0 12 2z" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>` },
+    water: { color: PIN_CATEGORY_COLORS.water, icon: `<path d="M12 22a7.5 7.5 0 0 0 7.5-7.5c0-4.14-7.5-12.5-7.5-12.5S4.5 10.36 4.5 14.5A7.5 7.5 0 0 0 12 22z" fill="white"/>` },
+    safety: { color: PIN_CATEGORY_COLORS.safety, icon: `<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` },
+    traffic: { color: PIN_CATEGORY_COLORS.traffic, icon: `<path d="M12 3v3M18.5 6H5.5a1.5 1.5 0 0 0-1.5 1.5v3A1.5 1.5 0 0 0 5.5 12H18.5l3.5-3-3.5-3zM12 12v9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` },
+    buildings: { color: PIN_CATEGORY_COLORS.buildings, icon: `<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18ZM6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2ZM18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2ZM10 6h4M10 10h4M10 14h4M10 18h4" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>` },
+    electrical: { color: PIN_CATEGORY_COLORS.electrical, icon: `<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white"/>` },
+    waste: { color: PIN_CATEGORY_COLORS.waste, icon: `<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` },
+  };
+  const key = getPinCategoryKey(category);
+  const { color, icon } = variants[key];
+  const strokeWidth = isSelected ? 3 : 2.5;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 46" width="40" height="46"><path d="M20 44c0 0 16-15.5 16-24a16 16 0 0 0-32 0c0 8.5 16 24 16 24z" fill="${color}" stroke="white" stroke-width="${strokeWidth}"/><g transform="translate(10,8) scale(0.8)">${icon}</g></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
 const ISSUE_CATEGORIES = [
@@ -191,16 +192,23 @@ const MAP_VIEW_LABELS = {
   both: 'Heatmap + pins',
 };
 
-const getCategoryIcon = (group, category = '') => {
-  const g = (group || '').toLowerCase();
-  const c = (category || '').toLowerCase();
-  if (g === 'water' || c.includes('water') || c.includes('drain') || c.includes('leak') || c.includes('pipe')) return Droplets;
-  if (g === 'power' || c.includes('light') || c.includes('power') || c.includes('electric') || c.includes('lamp')) return Zap;
-  if (g === 'safety' || c.includes('safety') || c.includes('hazard') || c.includes('danger')) return AlertTriangle;
-  if (g === 'facilities' || c.includes('facilit') || c.includes('building') || c.includes('park') || c.includes('hall')) return Building2;
-  if (g === 'traffic' || c.includes('traffic') || c.includes('sign') || c.includes('signal')) return Compass;
-  return RoadIcon;
-};
+const getCategoryIcon = (category) => ({
+  roads: RoadLaneIcon,
+  drainage: Waves,
+  lighting: Lightbulb,
+  water: Droplets,
+  safety: AlertTriangle,
+  traffic: Signpost,
+  buildings: Building2,
+  electrical: Zap,
+  waste: Trash2,
+})[getPinCategoryKey(category)];
+
+const RoadLaneIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M4 19L9 5M20 19L15 5M12 7V9M12 13V15M12 19V21" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" />
+  </svg>
+);
 
 const DISTRICT_OPTIONS = [
   {
@@ -300,7 +308,9 @@ export default function MapPreviewSection() {
         const data = await res.json();
         setHeatmapData(data);
         if (data.reports && data.reports.length > 0) {
-          setSelectedIncident((prev) => prev ? (data.reports.find(r => r.id === prev.id) || data.reports[0]) : data.reports[0]);
+          setSelectedIncident((prev) => prev ? (data.reports.find(r => r.id === prev.id) || null) : null);
+        } else {
+          setSelectedIncident(null);
         }
       }
     } catch (err) {
@@ -733,8 +743,7 @@ export default function MapPreviewSection() {
         (r.ticket_id && r.ticket_id.toLowerCase().includes(q)) ||
         (r.barangay && r.barangay.toLowerCase().includes(q)) ||
         (r.full_address && r.full_address.toLowerCase().includes(q)) ||
-        (r.location_string && r.location_string.toLowerCase().includes(q)) ||
-        (r.description && r.description.toLowerCase().includes(q))
+        (r.location_string && r.location_string.toLowerCase().includes(q))
       );
     }
 
@@ -1193,22 +1202,20 @@ export default function MapPreviewSection() {
                 {/* ── 5. Real Individual Report Pins (When in Pins or Both or Density mode) ── */}
                 {(mapViewMode === 'pins' || mapViewMode === 'both' || mapViewMode === 'density') && filteredReports.map((rep) => {
                   const isSelected = selectedIncident?.id === rep.id;
+                  const width = isSelected ? 30 : 28;
+                  const height = isSelected ? 36 : 34;
                   return (
                     <MarkerF
                       key={`pin-${rep.id}`}
                       position={{ lat: rep.lat, lng: rep.lng }}
-                      zIndex={isSelected ? 600 : 250}
-                      title={`${rep.ticket_id}: ${rep.title}`}
+                      zIndex={isSelected ? 500 : 200}
+                      title={`${rep.category} · ${rep.ticket_id}`}
                       onClick={() => handleSelectIncident(rep)}
-                      icon={
-                        window.google && window.google.maps
-                          ? {
-                              url: getMarkerSVG(rep.category, rep.status, isSelected),
-                              scaledSize: new window.google.maps.Size(isSelected ? 42 : 32, isSelected ? 50 : 38),
-                              anchor: new window.google.maps.Point(isSelected ? 21 : 16, isSelected ? 50 : 38),
-                            }
-                          : undefined
-                      }
+                      icon={window.google?.maps ? {
+                        url: getMarkerSVG(rep.category, isSelected),
+                        scaledSize: new window.google.maps.Size(width, height),
+                        anchor: new window.google.maps.Point(width / 2, height),
+                      } : undefined}
                     />
                   );
                 })}
@@ -1360,8 +1367,9 @@ export default function MapPreviewSection() {
 
             {/* Selected Pin Bottom Info Bar (When pin is active and no barangay overlay) */}
             {!selectedBarangay && selectedIncident && (
-              <div className="absolute bottom-3 left-3 right-3 z-10 pointer-events-auto bg-white/95 dark:bg-slate-950/90 backdrop-blur-md border border-slate-200/90 dark:border-white/15 rounded-xl p-2.5 sm:p-3 text-slate-900 dark:text-white flex flex-col justify-between gap-1.5 text-left shadow-lg transition-colors">
-                <div className="flex-1 min-w-0">
+              <div className="absolute bottom-3 left-3 right-3 sm:right-auto sm:w-[420px] max-w-[calc(100%-1.5rem)] z-10 pointer-events-auto bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 sm:p-3 text-slate-900 dark:text-white text-left shadow-md transition-colors">
+                <button type="button" onClick={() => setSelectedIncident(null)} aria-label="Close report preview" className="absolute top-1 right-1 w-11 h-11 flex items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline focus-visible:outline-3 focus-visible:outline-blue-600"><X size={16} aria-hidden="true" /></button>
+                <div className="flex-1 min-w-0 pr-10">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-[9px] sm:text-[10px] font-mono-data font-bold text-[#ff6b00] uppercase">
                       {selectedIncident.district}
@@ -1381,7 +1389,7 @@ export default function MapPreviewSection() {
                   <div className="text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-1.5 font-mono-data">
                     <MapPin size={11} className="text-[#ff6b00] shrink-0" />
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      Lat: {Number(selectedIncident.lat).toFixed(6)}, Lng: {Number(selectedIncident.lng).toFixed(6)}
+                      {selectedIncident.public_details_approved ? 'Reported pin' : 'Approximate area'}: {Number(selectedIncident.lat).toFixed(selectedIncident.public_details_approved ? 6 : 3)}, {Number(selectedIncident.lng).toFixed(selectedIncident.public_details_approved ? 6 : 3)}
                     </span>
                     <span className="opacity-40">•</span>
                     <span>{selectedIncident.barangay}</span>
@@ -1432,8 +1440,8 @@ export default function MapPreviewSection() {
                 ) : (
                   filteredReports.map((rep) => {
                     const isSelected = selectedIncident?.id === rep.id;
-                    const catGroup = rep.category_group || 'road';
-                    const Icon = getCategoryIcon(catGroup, rep.category);
+                    const Icon = getCategoryIcon(rep.category);
+                    const iconColor = PIN_CATEGORY_COLORS[getPinCategoryKey(rep.category)];
 
                     return (
                       <button
@@ -1448,7 +1456,7 @@ export default function MapPreviewSection() {
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                            <div className="w-7 h-7 rounded-lg bg-orange-500/10 text-[#ff6b00] flex items-center justify-center shrink-0 mt-0.5">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ color: iconColor, backgroundColor: `${iconColor}14` }}>
                               <Icon size={13} />
                             </div>
                             <div className="flex-1 min-w-0">

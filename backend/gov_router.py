@@ -2591,6 +2591,55 @@ def request_citizen_info(
     )
 
 
+class PublicDetailsReview(BaseModel):
+    public_content_reviewed: bool
+    expected_version: int
+
+
+@router.post("/reports/{report_id}/publish-details")
+def publish_verified_report_details(
+    report_id: int,
+    decision: PublicDetailsReview,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Authorize legacy verified incident details after a fresh privacy review."""
+    if not decision.public_content_reviewed:
+        raise HTTPException(422, "Review the public incident address, pin, description, and photo first.")
+    report = db.query(models.Report).filter(models.Report.id == report_id).with_for_update().first()
+    if not report:
+        raise HTTPException(404, "Citizen report not found")
+    from report_review_router import require_report_access
+    require_report_access(db, current_user, report)
+    report_review.require_decision(db, current_user, report, 'review')
+    if report.version != decision.expected_version:
+        raise HTTPException(409, "Report changed. Reload it before publishing.")
+    if report.status not in {'pending_approval', 'validated', 'approved_internal', 'dispatched', 'in_progress', 'resolved'}:
+        raise HTTPException(409, "Report requires government verification before public details can be released.")
+    already_approved = db.query(gov_models.ProcessTimeline.id).filter(
+        gov_models.ProcessTimeline.report_id == report_id,
+        gov_models.ProcessTimeline.status == 'public_details_approved',
+    ).first()
+    if already_approved:
+        return {"report_id": report_id, "public_details_approved": True}
+    db.add(gov_models.ProcessTimeline(
+        report_id=report_id,
+        status='public_details_approved',
+        actor_id=current_user.id,
+        actor_role='reviewer',
+        note='Incident address, coordinates, description, and photo reviewed for public release.',
+        is_public=False,
+    ))
+    db.add(gov_models.AuditLog(
+        trigger_type='public_details_approved',
+        report_id=report_id,
+        actor_id=current_user.id,
+        action=f'Public incident details approved for {report.ticket_id}.',
+    ))
+    db.commit()
+    return {"report_id": report_id, "public_details_approved": True}
+
+
 @router.get("/reports/{report_id}/docket")
 def get_report_docket(
     report_id: int,
@@ -2619,6 +2668,7 @@ def get_report_docket(
     actions = []
     can_review = report_review.permitted(current_user,'review') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id)
     if can_review and report.status in intake: actions.append('verify')
+    public_details_approved = report.status in {'pending_approval', 'validated', 'approved_internal', 'dispatched', 'in_progress', 'resolved'}
     if current_user.role in {'dispatcher', 'manager', 'system_admin', 'admin'}:
         if report.status in intake | {'pending_approval'}: actions.append('reject')
     if can_review and report.status in (intake - {'needs_information'}) | {'validated', 'pending_approval'}: actions.append('request_info')
@@ -2651,6 +2701,7 @@ def get_report_docket(
         "projects": projects,
         "can_create_project": project_workspace.allowed(current_user,'manage') and bool(report.barangay_id) and report.status not in {'resolved','completed','rejected','cancelled','spam','duplicate'} and not any(project['open'] for project in projects),
         "allowed_actions": actions,
+        "public_details_approved": public_details_approved,
         "review_operations": report_review.projection(db, report),
         "review_history": report_review.history(db, report),
         "referral_permissions": external_referrals.permissions(current_user, report),

@@ -942,6 +942,7 @@ const DispatcherDashboard = () => {
                         <p class="text-slate-400 text-sm mb-8">
                             Are you authorized to advance <span class="text-orange-500 font-bold">${ticketId}</span> to the next operational phase?
                         </p>
+                        ${endpoint === '/status' ? '<label class="flex items-start gap-2 text-left text-sm text-slate-200"><input id="public-content-reviewed" type="checkbox" class="mt-1" />I checked the incident address, pin, description, and photo for personal information. Verification makes these details public.</label>' : ''}
                         
                         <div class="flex w-full gap-3 mt-4">
                             <button id="cancel-btn" class="flex-1 py-3.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 transition-all focus:outline-none">Cancel</button>
@@ -960,7 +961,13 @@ const DispatcherDashboard = () => {
                 didOpen: () => {
                     const confirmBtn = Swal.getPopup().querySelector('#confirm-btn');
                     const cancelBtn = Swal.getPopup().querySelector('#cancel-btn');
-                    confirmBtn.onclick = () => Swal.clickConfirm();
+                    confirmBtn.onclick = () => {
+                        if (endpoint === '/status' && !Swal.getPopup().querySelector('#public-content-reviewed')?.checked) {
+                            Swal.showValidationMessage('Review and confirm the public content before verifying.');
+                            return;
+                        }
+                        Swal.clickConfirm();
+                    };
                     cancelBtn.onclick = () => Swal.clickCancel();
                 }
             });
@@ -975,7 +982,7 @@ const DispatcherDashboard = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: endpoint === '/status' ? JSON.stringify({ status: targetStatus || 'pending_approval' }) : undefined
+                body: endpoint === '/status' ? JSON.stringify({ status: targetStatus || 'pending_approval', public_content_reviewed: true }) : undefined
             });
             if (response.ok) {
                 Swal.fire({

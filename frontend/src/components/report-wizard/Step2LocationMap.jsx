@@ -51,16 +51,29 @@ export default function Step2LocationMap({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isLocating, setIsLocating] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
   const [geoError, setGeoError] = useState(null);
   const mapRef = useRef(null);
+  const watchRef = useRef(null);
+
+  const stopTracking = useCallback(() => {
+    if (watchRef.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchRef.current);
+    watchRef.current = null;
+    setIsTracking(false);
+  }, []);
+
+  useEffect(() => () => {
+    if (watchRef.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchRef.current);
+  }, []);
 
   const currentLat = locationData?.lat ?? CALOOCAN_CENTERS.north.lat;
   const currentLng = locationData?.lng ?? CALOOCAN_CENTERS.north.lng;
-  const hasSelection = locationData?.confirmed === true && Number.isFinite(locationData?.lat) && Number.isFinite(locationData?.lng);
+  const hasSavedCoordinates = Number.isFinite(locationData?.lat) && Number.isFinite(locationData?.lng);
+  const hasSelection = locationData?.confirmed === true && hasSavedCoordinates;
   const inCaloocan = hasSelection && isInCaloocan(currentLat, currentLng);
 
   useEffect(() => {
-    if (locationData.isInCaloocan !== inCaloocan) {
+    if (locationData?.isInCaloocan !== inCaloocan) {
       onLocationChange({
         ...locationData,
         isInCaloocan: inCaloocan,
@@ -77,18 +90,21 @@ export default function Step2LocationMap({
     const estimatedBarangay = estimateBarangayFromCoords(lat, lng);
     const newAddress = addressString || (valid ? `Caloocan City (${lat.toFixed(5)}, ${lng.toFixed(5)})` : `External Location (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
 
-    onLocationChange({
-      ...locationData,
+    onLocationChange(previous => ({
+      ...previous,
       lat,
       lng,
       address: newAddress,
       barangay: estimatedBarangay,
       isInCaloocan: valid,
       confirmed: true,
-    });
+      source: addressString ? 'place-search' : 'selected-map-or-device',
+      capturedAt: Date.now(),
+    }));
   };
 
   const handleMarkerDragEnd = (e) => {
+    stopTracking();
     if (!e.latLng) return;
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
@@ -96,10 +112,22 @@ export default function Step2LocationMap({
   };
 
   const handleMapClick = (e) => {
+    stopTracking();
     if (!e.latLng) return;
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
     updateCoordinates(lat, lng);
+  };
+
+  const acceptPosition = (position) => {
+    const { latitude, longitude } = position.coords;
+    updateCoordinates(latitude, longitude);
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat: latitude, lng: longitude });
+      mapRef.current.setZoom(16);
+    }
+    setIsLocating(false);
+    setGeoError(null);
   };
 
   const handleGeolocate = () => {
@@ -112,15 +140,7 @@ export default function Step2LocationMap({
     setGeoError(null);
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        updateCoordinates(latitude, longitude);
-        if (mapRef.current) {
-          mapRef.current.panTo({ lat: latitude, lng: longitude });
-          mapRef.current.setZoom(16);
-        }
-        setIsLocating(false);
-      },
+      acceptPosition,
       (error) => {
         console.warn('Geolocation acquisition failed:', error);
         setIsLocating(false);
@@ -130,33 +150,58 @@ export default function Step2LocationMap({
     );
   };
 
-  const handleSearchSubmit = (e) => {
+  const handleLiveLocation = () => {
+    if (isTracking) { stopTracking(); return; }
+    if (!navigator.geolocation) {
+      setGeoError(t('reportWizard.step2Location.unsupported', 'Location is not available on this device. Choose the place on the map.'));
+      return;
+    }
+    setGeoError(null);
+    setIsLocating(true);
+    setIsTracking(true);
+    try {
+      watchRef.current = navigator.geolocation.watchPosition(
+        acceptPosition,
+        () => {
+          stopTracking();
+          setIsLocating(false);
+          setGeoError(t('reportWizard.step2Location.locationError', 'Unable to acquire GPS. Choose the place on the map or retry.'));
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    } catch {
+      stopTracking();
+      setIsLocating(false);
+      setGeoError(t('reportWizard.step2Location.locationError', 'Unable to acquire GPS. Choose the place on the map or retry.'));
+    }
+  };
+
+  useEffect(() => {
+    const stopWhenHidden = () => { if (document.visibilityState === 'hidden' && watchRef.current !== null) stopTracking(); };
+    document.addEventListener('visibilitychange', stopWhenHidden);
+    return () => document.removeEventListener('visibilitychange', stopWhenHidden);
+  }, [stopTracking]);
+
+  const handleSearchSubmit = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-
-    const queryLower = searchQuery.toLowerCase();
-    let target = null;
-
-    if (queryLower.includes('south') || queryLower.includes('monumento') || queryLower.includes('grace park') || queryLower.includes('8th ave') || queryLower.includes('10th ave')) {
-      target = { lat: 14.6500, lng: 120.9800, name: `${searchQuery}, South Caloocan` };
-    } else if (queryLower.includes('bagong silang') || queryLower.includes('176')) {
-      target = { lat: 14.7780, lng: 121.0500, name: `Barangay 176 (Bagong Silang), Caloocan` };
-    } else if (queryLower.includes('camarin') || queryLower.includes('174') || queryLower.includes('175')) {
-      target = { lat: 14.7565, lng: 121.0450, name: `Camarin, North Caloocan` };
-    } else if (queryLower.includes('deparo') || queryLower.includes('168')) {
-      target = { lat: 14.7380, lng: 121.0200, name: `Barangay 168 (Deparo), North Caloocan` };
-    } else if (queryLower.includes('tala') || queryLower.includes('180') || queryLower.includes('holy redeemer')) {
-      target = { lat: 14.7650, lng: 121.0650, name: `Tala, North Caloocan` };
-    } else if (queryLower.includes('manila') || queryLower.includes('quezon city') || queryLower.includes('valenzuela')) {
-      target = { lat: 14.6400, lng: 121.0300, name: `${searchQuery} (Outside Caloocan)` };
-    } else {
-      target = { lat: CALOOCAN_CENTERS.north.lat, lng: CALOOCAN_CENTERS.north.lng, name: `${searchQuery}, North Caloocan` };
+    if (!window.google?.maps?.Geocoder) {
+      setGeoError(t('reportWizard.step2Location.searchUnavailable', 'Place search is unavailable. Choose a place on the map or use GPS.'));
+      return;
     }
-
-    updateCoordinates(target.lat, target.lng, target.name);
-    if (mapRef.current) {
-      mapRef.current.panTo({ lat: target.lat, lng: target.lng });
-      mapRef.current.setZoom(16);
+    try {
+      const result = await new window.google.maps.Geocoder().geocode({ address: `${searchQuery.trim()}, Caloocan City, Philippines` });
+      const place = result.results?.[0];
+      if (!place?.geometry?.location) throw new Error('No place found');
+      stopTracking();
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      updateCoordinates(lat, lng, place.formatted_address || searchQuery.trim());
+      mapRef.current?.panTo({ lat, lng });
+      mapRef.current?.setZoom(16);
+      setGeoError(null);
+    } catch {
+      setGeoError(t('reportWizard.step2Location.searchFailed', 'No matching place was found. Try another address or choose the place on the map.'));
     }
   };
 
@@ -211,11 +256,15 @@ export default function Step2LocationMap({
               ) : (
                 <>
                   <Navigation size={16} className="text-orange-600 dark:text-orange-400" aria-hidden="true" />
-                  <span>{t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
+                  <span>{hasSelection ? t('reportWizard.step2Location.resyncGps', 'Resync GPS') : t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
                 </>
               )}
             </button>
+            <button type="button" onClick={handleLiveLocation} className="min-h-[48px] px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold text-slate-700 dark:text-slate-200 focus-visible:outline-3 focus-visible:outline-blue-600">
+              {isTracking ? t('reportWizard.step2Location.stopLive', 'Stop live location') : t('reportWizard.step2Location.startLive', 'Track while reporting')}
+            </button>
           </form>
+          <p className="text-xs text-slate-600 dark:text-slate-300">{t('reportWizard.step2Location.liveHelp', 'Live location updates only while this step is open. Review the pin before continuing.')}</p>
 
           {geoError && (
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
@@ -249,12 +298,12 @@ export default function Step2LocationMap({
                   },
                 }}
               >
-                <MarkerF
+                {hasSavedCoordinates && <MarkerF
                   position={{ lat: currentLat, lng: currentLng }}
                   draggable={true}
                   onDragEnd={handleMarkerDragEnd}
                   animation={window.google?.maps?.Animation?.DROP}
-                />
+                />}
               </GoogleMap>
             ) : (
               <div className="w-full h-full min-h-[360px] flex flex-col items-center justify-center p-6 text-center space-y-2">
@@ -279,20 +328,20 @@ export default function Step2LocationMap({
                 </div>
                 <div className="space-y-0.5 min-w-0 flex-1">
                   <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug break-words">
-                    {hasSelection ? locationData?.address || 'Selected map location' : 'Choose or confirm the issue location'}
+                    {hasSelection ? locationData?.address || t('reportWizard.step2Location.selectedMapLocation', 'Selected map location') : hasSavedCoordinates ? locationData?.address || t('reportWizard.step2Location.savedLocationNeedsConfirmation', 'Saved location needs confirmation') : t('reportWizard.step2Location.chooseLocation', 'Choose the issue location')}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {hasSelection ? locationData?.barangay || 'Barangay not recorded' : 'Select the issue location to confirm its area'}
+                    {hasSelection ? locationData?.barangay || t('reportWizard.step2Location.barangayNotRecorded', 'Barangay not recorded') : hasSavedCoordinates ? t('reportWizard.step2Location.reviewSavedLocation', 'Review the saved location before confirming') : t('reportWizard.step2Location.selectToConfirmArea', 'Select the issue location to confirm its area')}
                   </p>
                   <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 pt-0.5">
-                    {hasSelection ? currentLat.toFixed(5) : '—'}, {hasSelection ? currentLng.toFixed(5) : '—'}
+                    {hasSavedCoordinates ? currentLat.toFixed(5) : '—'}, {hasSavedCoordinates ? currentLng.toFixed(5) : '—'}
                   </p>
                 </div>
               </div>
 
 
 
-              {!hasSelection && Number.isFinite(locationData?.lat) && Number.isFinite(locationData?.lng) && <button type="button" onClick={() => updateCoordinates(locationData.lat, locationData.lng, locationData.address)} className="min-h-11 px-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm">Confirm saved location</button>}
+              {!hasSelection && hasSavedCoordinates && <button type="button" onClick={() => updateCoordinates(locationData.lat, locationData.lng, locationData.address)} className="min-h-11 px-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus-visible:outline-3 focus-visible:outline-blue-600">{t('reportWizard.step2Location.confirmSavedLocation', 'Confirm saved location')}</button>}
               {/* Nearby Landmark Field */}
               <div className="space-y-1.5 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <label htmlFor="location-landmark" className="block text-xs font-bold text-slate-800 dark:text-slate-200">

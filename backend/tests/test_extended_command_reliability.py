@@ -122,13 +122,15 @@ def test_verification_command_integrity(client, test_context):
     db = TestingSessionLocal()
     report = models.Report(
         ticket_id="PUL-VER-INT-01", category="Roads", description="Street light broken near corner",
-        status="pending", resident_id=701,
+        status="pending", resident_id=701, location_lat=14.7562, location_lng=121.0423,
+        location_barangay="Barangay 171",
     )
     db.add(report)
     db.commit()
     db.refresh(report)
     report_id, version = report.id, report.version
     db.close()
+    assert "PUL-VER-INT-01" not in {item["ticket_id"] for item in client.get("/api/reports/public").json()}
 
     url = f"/api/reports/{report_id}/status"
     headers = {
@@ -136,7 +138,8 @@ def test_verification_command_integrity(client, test_context):
         "If-Match": str(version),
         "Idempotency-Key": "verify-key-001",
     }
-    body = {"status": "pending_approval"}
+    body = {"status": "pending_approval", "public_content_reviewed": True}
+    assert client.patch(url, json={"status": "pending_approval"}, headers=headers).status_code == 422
 
     # 1. Stale version returns 409
     stale_headers = {**headers, "If-Match": str(version + 10)}
@@ -149,6 +152,8 @@ def test_verification_command_integrity(client, test_context):
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "pending_approval"
     assert resp.json()["version"] == version + 1
+    public_items = client.get("/api/reports/public").json()
+    assert "PUL-VER-INT-01" in {item["ticket_id"] for item in public_items}
 
     # 3. Same key replays result
     replay = client.patch(url, json=body, headers=headers)

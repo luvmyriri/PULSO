@@ -84,7 +84,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     )
     unverified_exception = HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Account not verified. Please check your email for the verification code.",
+        detail="Account not confirmed. Check your email or text messages for the registration code.",
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

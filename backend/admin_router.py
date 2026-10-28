@@ -378,8 +378,10 @@ def update_resident_status(resident_id: int,payload: ResidentStatusCommand,db: S
 
 @router.post('/residents/{resident_id}/resend-confirmation')
 def resend_resident_confirmation(resident_id: int,payload: ResidentCommand,db: Session = Depends(get_db),admin: models.Official = Depends(admin_action('residents_manage'))):
-    from main import send_otp_email
-    return resident_accounts.send_confirmation(db,resident_accounts.target(db,admin,resident_id),send_otp_email,admin,payload)
+    from main import send_resident_confirmation
+    resident = resident_accounts.target(db, admin, resident_id)
+    return resident_accounts.send_confirmation(db, resident,
+        lambda email, code, kind: send_resident_confirmation(resident, code), admin, payload)
 
 
 @router.get('/residents/{resident_id}/verification')

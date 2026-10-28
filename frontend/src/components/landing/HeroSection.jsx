@@ -98,6 +98,23 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
               </button>
             </div>
 
+            {isInstalledApp() && (
+              <nav aria-label="Resident account" className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+                <Link
+                  to="/login"
+                  className="inline-flex min-h-11 items-center text-sm font-semibold text-[#0f2347] underline underline-offset-4 hover:text-[#ff6b00] dark:text-slate-100 dark:hover:text-[#ff8a3d] focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  className="inline-flex min-h-11 items-center text-sm font-semibold text-[#0f2347] underline underline-offset-4 hover:text-[#ff6b00] dark:text-slate-100 dark:hover:text-[#ff8a3d] focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
+                >
+                  Create Account
+                </Link>
+              </nav>
+            )}
+
             {/* Mobile App Installation Card with Scannable QR Code */}
             {!isInstalledApp() && (
               <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/90 dark:border-slate-800 w-full max-w-[620px]">

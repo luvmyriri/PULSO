@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Bell, FileText, CheckCircle2, Clock, AlertTriangle, Megaphone, Info, X } from 'lucide-react';
 
 /**
@@ -95,6 +96,7 @@ export default function NotificationDropdown({
     activeTriggerRef,
     className = ''
 }) {
+    const { t } = useTranslation();
     const panelRef = useRef(null);
     const [liveAnnouncement, setLiveAnnouncement] = useState('');
 
@@ -370,7 +372,7 @@ export default function NotificationDropdown({
                 </div>
 
                 {/* ── Footer: See all updates link (min 48px tap area) ── */}
-                {!loading && !error && visibleNotifications.length > 0 && (
+                {!loading && !error && (
                     <div className="p-2 border-t border-slate-100 dark:border-slate-800 shrink-0 relative z-20 bg-white dark:bg-slate-900">
                         <button
                             type="button"
@@ -382,7 +384,7 @@ export default function NotificationDropdown({
                             }}
                             className="w-full min-h-[48px] flex items-center justify-center font-semibold text-sm text-[#b83a00] dark:text-[#ff6b00] hover:bg-orange-500/5 active:bg-orange-500/10 rounded-xl transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                         >
-                            See all updates
+                            {t('notificationCenter.seeAll', 'See all notifications')}
                         </button>
                     </div>
                 )}

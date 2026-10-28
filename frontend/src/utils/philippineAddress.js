@@ -651,10 +651,10 @@ export function isMinimumViableAddress(structured) {
 }
 /**
  * Formats full address for Evidence Photo Watermark.
- * Output: [Subdivision/Village], [Street / Block-Lot], [Plus Code], [Barangay], [City], [ZIP] [Region]
+ * Output: [Subdivision/Village], [Plus Code], [Street / Block-Lot], [Barangay], [City], [ZIP] [Region]
  * Example:
  *   B6-L14, P2X6+65, Barangay 171, Caloocan, 1421 Metro Manila
- *   Celina Homes 3, Blk 4 Lot 16 Silver, Q22G+QGP, Barangay 171, Caloocan, 1421 Metro Manila
+ *   Celina Homes 3, Q22G+QGP, Blk 4 Lot 16 Silver, Barangay 171, Caloocan, 1421 Metro Manila
  * Gracefully degrades with zero empty comma gaps.
  */
 export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates = null) {
@@ -678,7 +678,7 @@ export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates 
 
     if (!s) {
         const raw = typeof addressOrStructured === 'string' ? addressOrStructured : 'Caloocan City';
-        return raw.replace(/\b[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4}\b,?\s*/gi, '').trim().replace(/,\s*$/, '');
+        return raw.trim().replace(/,\s*$/, '');
     }
 
     // Resolve Barangay
@@ -699,14 +699,19 @@ export function formatWatermarkAddress(addressOrStructured, fallbackCoordinates 
 
     const city = s.city ? s.city.replace(/\s*City$/i, '') : 'Caloocan';
 
-    // Assemble components in standard order:
-    // [Subdivision / Building], [Street / Block-Lot], [Barangay], [City], [ZIP Region]
-    // STRICT RULE: Do NOT put a Plus Code in the address.
+    // Match the location card: [Subdivision], [Plus Code], [Street], [Barangay], [City], [ZIP Region].
     const parts = [];
 
     if (s.subdivision) {
         parts.push(s.subdivision);
     }
+
+    const plusCode = extractCleanPlusCode(
+        s.plusCode || s.streetAddress || s.subdivision,
+        fallbackCoordinates?.lat,
+        fallbackCoordinates?.lng
+    );
+    if (plusCode) parts.push(plusCode);
 
     if (s.streetAddress && (!s.subdivision || !s.streetAddress.includes(s.subdivision))) {
         // Strip any inline plus code

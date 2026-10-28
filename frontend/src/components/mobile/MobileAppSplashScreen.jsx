@@ -1,32 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 
-/**
- * MobileAppSplashScreen
- * ─────────────────────────────────────────────────────────────────────────────
- * Branded cold-start animated loading screen for the PULSO mobile app.
- *
- * Requirements & Specifications:
- * - Wordmark: "PULSO" in Inter Bold (700), clamp(2rem, 11vw, 3rem), -0.02em tracking.
- *   - "P" in PULSO orange (#ff6b00).
- *   - "ULSO" in navy (#0c2436, Light Mode) or white (#ffffff, Dark Mode).
- * - Underline: 3px thick, orange (#ff6b00), width matched to the wordmark.
- * - Pulse blip: Heartbeat blip (~1.5rem wide) traveling along the underline from left to right.
- * - Caption: "Caloocan City Engineering" in Inter 14px soft gray at bottom (safe area aware).
- * - Backgrounds: Light (#f8f7f5) and Dark (#070a12). No gradients, no glows.
- * - Optical Center: ~46% from top.
- *
- * Timeline (1.6s initial cycle):
- * - 0 - 0.5s: Letters P-U-L-S-O fade up one by one (8px translateY, 60ms stagger).
- * - 0.5 - 1.2s: Underline appears; traveling pulse sweeps across line.
- * - 1.2 - 1.6s: Line settles flat; holds.
- * - > 1.6s: Loop ONLY traveling pulse blip along the underline. Letters remain steady.
- * - Slow / Offline Handling:
- *   - > 5s: "Still loading. Please wait a moment."
- *   - > 12s or offline: "We can't connect right now. Check your internet and try again." + "Try again" CTA (>= 48px).
- * - Exit: Smooth 250ms fade-out once ready.
- * ─────────────────────────────────────────────────────────────────────────────
- */
+/** The same loading identity is painted in index.html before React starts. */
 export default function MobileAppSplashScreen({
   onFinish,
   minDurationMs = 1200,
@@ -37,39 +13,26 @@ export default function MobileAppSplashScreen({
   themeModeOverride = null,
   reducedMotion = false
 }) {
-  const themeContext = useTheme();
-  const activeSetting = themeModeOverride || themeContext?.theme || 'system';
-
-  const [osPrefersDark, setOsPrefersDark] = useState(() => {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return true;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e) => setOsPrefersDark(e.matches);
-    media.addEventListener('change', handler);
-    return () => media.removeEventListener('change', handler);
-  }, []);
-
-  const isDark = activeSetting === 'dark' || (activeSetting === 'system' && osPrefersDark);
-
-  // Animation & timeout states
-  const [animationPhase, setAnimationPhase] = useState('initial'); // 'initial' | 'underlined' | 'looping'
+  const { theme } = useTheme();
+  const { t } = useTranslation();
+  const [osPrefersDark, setOsPrefersDark] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
+  );
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [isOffline, setIsOffline] = useState(() => {
-    if (forceOffline) return true;
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
-    return false;
-  });
-
+  const [isOffline, setIsOffline] = useState(() =>
+    forceOffline || (typeof navigator !== 'undefined' && !navigator.onLine)
+  );
   const mountTimeRef = useRef(Date.now());
 
-  // Listen to network status changes
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!media) return;
+    const handleChange = (event) => setOsPrefersDark(event.matches);
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
+  }, []);
+
   useEffect(() => {
     if (forceOffline) {
       setIsOffline(true);
@@ -85,259 +48,95 @@ export default function MobileAppSplashScreen({
     };
   }, [forceOffline]);
 
-  // Track elapsed time for 5s (slow) and 12s (offline/error) messages
   useEffect(() => {
-    if (forceOffline) {
-      setIsOffline(true);
-      return;
-    }
-
+    if (forceOffline) return;
     const timer = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - mountTimeRef.current) / 1000);
-      setElapsedSeconds(elapsed);
+      setElapsedSeconds(Math.floor((Date.now() - mountTimeRef.current) / 1000));
     }, 500);
-
     return () => clearInterval(timer);
   }, [forceOffline]);
 
-  // Main sequence timer: Underline at 0.5s, Looping mode at 1.6s
   useEffect(() => {
-    if (reducedMotion) {
-      setAnimationPhase('looping');
-      return;
-    }
-
-    const t1 = setTimeout(() => {
-      setAnimationPhase('underlined');
-    }, 500);
-
-    const t2 = setTimeout(() => {
-      setAnimationPhase('looping');
-    }, 1600);
-
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [reducedMotion]);
-
-  // Handle dismissal: must wait at least minDurationMs (1200ms) before fading out
-  useEffect(() => {
-    if (forceSlow || forceOffline) return; // Stay in test state
-    if (!isReady) return;
-
-    const timeSinceMount = Date.now() - mountTimeRef.current;
-    const remainingTime = Math.max(0, minDurationMs - timeSinceMount);
-
+    if (forceSlow || forceOffline || !isReady) return;
+    const remainingTime = Math.max(0, minDurationMs - (Date.now() - mountTimeRef.current));
+    let finishTimeout;
     const dismissTimeout = setTimeout(() => {
       setIsFadingOut(true);
-      const finishTimeout = setTimeout(() => {
-        if (!isTestMode && typeof sessionStorage !== 'undefined') {
-          sessionStorage.setItem('pulso_session_started', 'true');
-        }
+      finishTimeout = setTimeout(() => {
+        if (!isTestMode) sessionStorage.setItem('pulso_session_started', 'true');
         onFinish?.();
-      }, 250); // 250ms fade-out transition
-      return () => clearTimeout(finishTimeout);
+      }, reducedMotion ? 0 : 250);
     }, remainingTime);
+    return () => {
+      clearTimeout(dismissTimeout);
+      clearTimeout(finishTimeout);
+    };
+  }, [forceSlow, forceOffline, isReady, minDurationMs, isTestMode, onFinish, reducedMotion]);
 
-    return () => clearTimeout(dismissTimeout);
-  }, [isReady, minDurationMs, isTestMode, onFinish, forceSlow, forceOffline]);
-
-  // Retry action for 12s / offline timeout
   const handleRetry = () => {
     if (isTestMode) {
       mountTimeRef.current = Date.now();
       setElapsedSeconds(0);
       setIsOffline(false);
-      setAnimationPhase('initial');
-      setTimeout(() => setAnimationPhase('underlined'), 500);
-      setTimeout(() => setAnimationPhase('looping'), 1600);
       return;
     }
-    if (typeof window !== 'undefined') {
-      window.location.reload();
-    }
+    window.location.reload();
   };
 
-  const skyColor = isDark ? '#020617' : '#f1f5f9';
-  const textColor = isDark ? '#ffffff' : '#0f172a';
-  const captionColor = isDark ? '#94a3b8' : '#64748b';
-  const orange = '#EA580C';
-
-  // Slow connection message (> 5s) and offline error (> 12s or offline)
-  const showSlowMessage = (elapsedSeconds >= 5 || forceSlow) && !isOffline && elapsedSeconds < 12 && !forceOffline;
-  const showErrorMessage = isOffline || elapsedSeconds >= 12 || forceOffline;
+  const selectedTheme = themeModeOverride || theme || 'light';
+  const isDark = selectedTheme === 'dark' || (selectedTheme === 'system' && osPrefersDark);
+  const showError = isOffline || elapsedSeconds >= 12 || forceOffline;
+  const showSlow = !showError && (elapsedSeconds >= 5 || forceSlow);
 
   return (
     <div
       role="status"
       aria-live="polite"
-      aria-label="Loading PULSO"
+      aria-label={t('loadingScreen.ariaLabel', 'Loading PULSO')}
       data-theme={isDark ? 'dark' : 'light'}
       style={{
-        backgroundColor: skyColor,
-        '--bg-scrim-rgb': isDark ? '11, 17, 32' : '245, 249, 255',
-        transition: reducedMotion ? 'none' : 'opacity 250ms ease-out',
-        opacity: isFadingOut ? 0 : 1
+        backgroundColor: isDark ? '#080D19' : '#F7F9FC',
+        color: isDark ? '#F8FAFC' : '#0B1630',
+        opacity: isFadingOut ? 0 : 1,
+        transition: reducedMotion ? 'none' : 'opacity 250ms ease-out'
       }}
-      className={`${
-        isTestMode
-          ? 'absolute inset-0 z-30 w-full h-full'
-          : 'fixed inset-0 z-[99999] w-full min-h-[100vh] min-h-[100dvh]'
-      } flex flex-col justify-between items-center select-none overflow-hidden font-sans`}
+      className={`${isTestMode ? 'absolute inset-0 z-30 h-full' : 'fixed inset-0 z-[99999] min-h-[100dvh]'} flex w-full flex-col items-center overflow-y-auto select-none font-sans`}
     >
+      <main className="flex w-full min-h-0 flex-1 flex-col items-center justify-center px-6 py-8 text-center">
+        <img
+          src="/pulso-loading-mark.png"
+          alt=""
+          aria-hidden="true"
+          className="mb-3 h-[clamp(190px,55vw,240px)] w-[clamp(190px,55vw,240px)] object-contain"
+        />
+        <div className="text-[clamp(2.5rem,12vw,3.5rem)] font-extrabold leading-none tracking-[-0.035em]">PULSO</div>
+        <div className={`mt-2 text-[clamp(1rem,4.3vw,1.3rem)] ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{t('loadingScreen.city', 'Caloocan City')}</div>
 
-      {/* Invisible screen reader announcement */}
-      <span className="sr-only">Loading PULSO</span>
-
-      {/* Top spacer to balance optical center at ~46% from top */}
-      <div className="w-full h-12 shrink-0" aria-hidden="true" />
-
-      {/* ── CENTERED WORDMARK & TRAVELING PULSE LINE ── */}
-      <div className="flex flex-col items-center justify-center w-full px-6 -mt-8 sm:-mt-10">
-        
-        {/* Wordmark: "PULSO" */}
-        <div
-          className="flex items-baseline justify-center tracking-[-0.02em] font-bold font-sans whitespace-nowrap"
-          style={{
-            fontSize: isTestMode ? '2.5rem' : 'clamp(2rem, 11vw, 3rem)',
-            lineHeight: 1.1
-          }}
-        >
-          {/* Letter P: PULSO Orange */}
-          <span
-            style={{
-              color: orange,
-              animation: reducedMotion
-                ? 'none'
-                : 'pulsoLetterFadeUp 260ms cubic-bezier(0, 0, 0.2, 1) 0ms forwards'
-            }}
-            className="inline-block"
-          >
-            P
-          </span>
-
-          {/* Letter U */}
-          <span
-            style={{
-              color: textColor,
-              animation: reducedMotion
-                ? 'none'
-                : 'pulsoLetterFadeUp 260ms cubic-bezier(0, 0, 0.2, 1) 60ms forwards'
-            }}
-            className="inline-block"
-          >
-            U
-          </span>
-
-          {/* Letter L */}
-          <span
-            style={{
-              color: textColor,
-              animation: reducedMotion
-                ? 'none'
-                : 'pulsoLetterFadeUp 260ms cubic-bezier(0, 0, 0.2, 1) 120ms forwards'
-            }}
-            className="inline-block"
-          >
-            L
-          </span>
-
-          {/* Letter S */}
-          <span
-            style={{
-              color: textColor,
-              animation: reducedMotion
-                ? 'none'
-                : 'pulsoLetterFadeUp 260ms cubic-bezier(0, 0, 0.2, 1) 180ms forwards'
-            }}
-            className="inline-block"
-          >
-            S
-          </span>
-
-          {/* Letter O */}
-          <span
-            style={{
-              color: textColor,
-              animation: reducedMotion
-                ? 'none'
-                : 'pulsoLetterFadeUp 260ms cubic-bezier(0, 0, 0.2, 1) 240ms forwards'
-            }}
-            className="inline-block"
-          >
-            O
-          </span>
-        </div>
-
-
-
-        {/* ── SLOW CONNECTION / OFFLINE STATUS MESSAGES ── */}
-        <div className="min-h-[48px] mt-4 flex flex-col items-center justify-center text-center max-w-[280px]">
-          {/* 5s Slow Connection Line */}
-          {showSlowMessage && (
-            <p
-              className="text-xs sm:text-sm font-normal animate-fadeIn transition-colors"
-              style={{ color: captionColor }}
-            >
-              Still loading. Please wait a moment.
+        <div className="mt-12 flex min-h-[112px] flex-col items-center justify-start gap-5">
+          {!showError && (
+            <span
+              className={`h-10 w-10 rounded-full border-[3px] border-t-[#ff6b00] border-r-[#ff6b00] ${isDark ? 'border-b-slate-700 border-l-slate-700' : 'border-b-slate-200 border-l-slate-200'} ${reducedMotion ? '' : 'animate-spin'}`}
+              aria-hidden="true"
+            />
+          )}
+          {showError ? (
+            <div className="flex max-w-[290px] flex-col items-center gap-4">
+              <p className={isDark ? 'text-sm text-red-300' : 'text-sm text-red-700'}>{t('loadingScreen.connectionError', "We can't connect right now. Check your internet and try again.")}</p>
+              <button type="button" onClick={handleRetry} className="min-h-12 rounded-xl bg-[#EA580C] px-6 py-2.5 text-sm font-bold text-white focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#ff6b00]">{t('loadingScreen.retry', 'Try again')}</button>
+            </div>
+          ) : (
+            <p className={`text-[clamp(0.875rem,3.7vw,1rem)] ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
+              {showSlow ? t('loadingScreen.slow', 'Still loading. Please wait a moment.') : t('loadingScreen.readying', 'Getting things ready...')}
             </p>
           )}
-
-          {/* 12s / Offline Error State */}
-          {showErrorMessage && (
-            <div className="flex flex-col items-center gap-3 animate-fadeIn">
-              <p
-                className="text-xs sm:text-sm font-medium leading-snug transition-colors"
-                style={{ color: isDark ? '#fca5a5' : '#b91c1c' }}
-              >
-                We can&apos;t connect right now. Check your internet and try again.
-              </p>
-              <button
-                type="button"
-                onClick={handleRetry}
-                className="min-h-[48px] px-6 py-2.5 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.98] text-white font-bold text-sm shadow-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-400 focus-visible:ring-offset-2"
-                style={{
-                  outlineOffset: '2px'
-                }}
-              >
-                Try again
-              </button>
-            </div>
-          )}
         </div>
-      </div>
+      </main>
 
-      {/* ── BOTTOM CAPTION: Caloocan City Engineering (Inter 14px, Soft Gray) ── */}
-      <footer
-        className="w-full text-center pb-6 sm:pb-8 shrink-0"
-        style={{
-          paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))'
-        }}
-      >
-        <span
-          className="text-sm font-normal tracking-normal transition-colors"
-          style={{ color: captionColor }}
-        >
-          Caloocan City Engineering
-        </span>
+      <footer className="w-full shrink-0 px-4 pt-3 text-center" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
+        <span className="mx-auto mb-4 block h-1 w-9 rounded-full bg-[#ff6b00]" aria-hidden="true" />
+        <div className="text-sm font-semibold">{t('loadingScreen.department', 'City Engineering Department')}</div>
+        <div className={`mt-1 text-sm ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{t('loadingScreen.government', 'Caloocan City Government')}</div>
       </footer>
-
-      {/* Inline Keyframes & Animations (< 2 KB CSS) */}
-      <style>{`
-        @keyframes pulsoLetterFadeUp {
-          0% {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-
-      `}</style>
     </div>
   );
 }

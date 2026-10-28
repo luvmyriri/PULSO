@@ -122,12 +122,18 @@ def test_public_spatial_feed_excludes_pending_reports(clean_postgis):
                                  reporter_type, contact_verified, submission_source,
                                  location_lat, location_lng, location, location_string)
             VALUES
-              ('FAKE-VALIDATED', 'Roads', 'Public test report', 'validated',
+              ('FAKE-VALIDATED', 'Roads', 'Private description with phone 09171234567', 'validated',
                'guest', false, 'web', 14.7562, 121.0423,
                ST_SetSRID(ST_MakePoint(121.0423, 14.7562), 4326), 'Private exact address'),
+              ('FAKE-VERIFIED', 'Roads', 'Another private description', 'pending_approval',
+               'guest', false, 'web', 14.7562, 121.0423,
+               ST_SetSRID(ST_MakePoint(121.0423, 14.7562), 4326), 'Another private address'),
               ('FAKE-PENDING', 'Roads', 'Private test report', 'pending',
                'guest', false, 'web', 14.7562, 121.0423,
-               ST_SetSRID(ST_MakePoint(121.0423, 14.7562), 4326), 'Private exact address')
+               ST_SetSRID(ST_MakePoint(121.0423, 14.7562), 4326), 'Private exact address'),
+              ('FAKE-LEGACY', 'Roads', 'Old private narrative', 'validated',
+               'guest', false, 'web', 14.7562, 121.0423,
+               ST_SetSRID(ST_MakePoint(121.0423, 14.7562), 4326), 'Old exact address')
         """))
         db.commit()
     finally:
@@ -135,13 +141,27 @@ def test_public_spatial_feed_excludes_pending_reports(clean_postgis):
 
     nearby = client.get(f"/api/reports/nearby?lat={CAMARIN_LAT}&lng={CAMARIN_LNG}")
     assert nearby.status_code == 200
-    assert [row["ticket_id"] for row in nearby.json()["reports"]] == ["FAKE-VALIDATED"]
-    assert nearby.json()["reports"][0]["location_string"] is None
+    assert {row["ticket_id"] for row in nearby.json()["reports"]} == {"FAKE-VALIDATED", "FAKE-VERIFIED", "FAKE-LEGACY"}
+    assert {row["location_string"] for row in nearby.json()["reports"]} == {"Private exact address", "Another private address", "Old exact address"}
+    assert all(row["location_lat"] == 14.7562 and row["location_lng"] == 121.0423 and row["public_details_approved"] for row in nearby.json()["reports"])
+    legacy = next(row for row in nearby.json()["reports"] if row["ticket_id"] == "FAKE-LEGACY")
+    assert legacy["location_lat"] == 14.7562 and legacy["location_string"] == "Old exact address" and legacy["description"] == "Old private narrative"
+    assert "09171234567" not in nearby.text
 
     viewport = client.get("/api/reports/map?bbox=121.000,14.700,121.070,14.780")
     assert viewport.status_code == 200
-    assert [item["properties"]["ticket_id"] for item in viewport.json()["features"]] == ["FAKE-VALIDATED"]
-    assert viewport.json()["features"][0]["geometry"]["coordinates"] == [121.042, 14.756]
+    assert {item["properties"]["ticket_id"] for item in viewport.json()["features"]} == {"FAKE-VALIDATED", "FAKE-VERIFIED", "FAKE-LEGACY"}
+    assert all(item["geometry"]["coordinates"] == [121.0423, 14.7562] and item["properties"]["description"] and item["properties"]["public_details_approved"] for item in viewport.json()["features"])
+    legacy_feature = next(item for item in viewport.json()["features"] if item["properties"]["ticket_id"] == "FAKE-LEGACY")
+    assert legacy_feature["geometry"]["coordinates"] == [121.0423, 14.7562] and legacy_feature["properties"]["description"] == "Old private narrative"
+
+    heatmap = client.get("/api/reports/heatmap")
+    assert heatmap.status_code == 200
+    assert {item["ticket_id"] for item in heatmap.json()["reports"]} == {"FAKE-VALIDATED", "FAKE-VERIFIED", "FAKE-LEGACY"}
+    assert "09171234567" not in heatmap.text
+    assert "Private exact address" in heatmap.text
+    assert "Old exact address" in heatmap.text
+    assert "FAKE-PENDING" not in heatmap.text
 
 
 def test_staff_spatial_routes_require_authentication(clean_postgis):

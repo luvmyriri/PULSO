@@ -56,6 +56,7 @@ import {
     ShieldCheck,
     Image as ImageIcon,
     Plus,
+    Download,
     Clock,
     Info,
     ArrowRight,
@@ -150,7 +151,7 @@ import IDCameraModal from '../components/IDCameraModal';
 import AvatarCropModal, { validateAvatarFile } from '../components/AvatarCropModal';
 import ReportDensityLayer from '../components/maps/ReportDensityLayer';
 import CaloocanBoundaryLayer from '../components/CaloocanBoundaryLayer';
-import NearbyIssuesMapModal from '../components/NearbyIssuesMapModal';
+import NearbyIssuesMapModal, { getReportCategoryMeta } from '../components/NearbyIssuesMapModal';
 import QuickReportWizardModal from '../components/QuickReportWizardModal';
 import { getCityHallMarkerSvg } from '../config/boundaryStyle';
 import UserMenu from '../components/UserMenu';
@@ -709,20 +710,90 @@ const RoadIcon = ({ size = 20, className = "" }) => (
     </svg>
 );
 
+/**
+ * Checks if the current client hostname is a local development host.
+ */
+export const isLocalDevHost = () => {
+    if (typeof window === 'undefined') return false;
+    const h = window.location.hostname;
+    return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(h);
+};
+
+/**
+ * Safely exports reports to a standard CSV file with proper escaping,
+ * UTF-8 Byte Order Mark (BOM) for Excel compatibility, and formula injection safeguards.
+ */
+export const exportReportsToCSV = (reports, filenamePrefix = 'PULSO_My_Reports') => {
+    if (!reports || !Array.isArray(reports) || reports.length === 0) return false;
+
+    const escapeCell = (val) => {
+        if (val === null || val === undefined) return '""';
+        let str = String(val);
+        // Formula injection protection (CWE-1236): prefix leading =, +, -, @, \t, \r with single quote
+        if (/^[=+\-@\t\r]/.test(str)) {
+            str = "'" + str;
+        }
+        return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    const headers = [
+        'Ticket ID',
+        'Title / Description',
+        'Category',
+        'Status',
+        'Date Submitted',
+        'Barangay',
+        'Address / Landmark',
+        'Latitude',
+        'Longitude',
+        'Last Updated'
+    ];
+
+    const rows = reports.map((r) => [
+        escapeCell(r.ticket_id || r.id || 'N/A'),
+        escapeCell(r.title || r.description || ''),
+        escapeCell(r.category || r.ai_category || 'General'),
+        escapeCell(r.status || 'pending'),
+        escapeCell(r.created_at ? new Date(r.created_at).toISOString().replace('T', ' ').slice(0, 19) : ''),
+        escapeCell(r.barangay || r.location_barangay || ''),
+        escapeCell(r.location_string || r.address || ''),
+        escapeCell(r.latitude ?? r.location_lat ?? r.lat ?? ''),
+        escapeCell(r.longitude ?? r.location_lng ?? r.lng ?? ''),
+        escapeCell(r.updated_at ? new Date(r.updated_at).toISOString().replace('T', ' ').slice(0, 19) : '')
+    ].join(','));
+
+    // UTF-8 BOM (\uFEFF) ensures Excel and spreadsheet apps render international characters correctly
+    const csvContent = '\uFEFF' + [headers.map(escapeCell).join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return true;
+};
+
 const ResidentHomeView = ({
     user,
     userReports = [],
     loadingReports,
     loadingPublicReports = false,
+    publicReportsError = false,
+    onRetryPublicReports,
     lguUpdates = [],
     loadingAdvisories,
-    processedHazards = [],
+    nearbyReports = [],
     handleSetTab,
     setActiveModal,
     setSelectedPost,
     setReportCategory,
+    showToast,
     t
 }) => {
+    const isLocalhost = isLocalDevHost();
     const barangayName = user?.barangay || 'Barangay 171';
     const userReportCount = userReports ? userReports.length : 0;
 
@@ -807,75 +878,13 @@ const ResidentHomeView = ({
         }
     ];
 
-    // Nearby concerns with authoritative Celina Homes 3 address & coordinates
-    const CELINA_HOMES_ADDRESSES = [
-        {
-            address: 'Celina Homes 3, Q22G+QGP, Blk 4 Lot 16 Silver, Barangay 171, Caloocan, 1421 Metro Manila',
-            lat: 14.7518,
-            lng: 121.0269,
-            coords: '14.7518° N, 121.0269° E',
-            distance: '30m'
-        },
-        {
-            address: 'Celina Homes 3, Q22G+QGP, Blk 2 Lot 8 Gold, Barangay 171, Caloocan, 1421 Metro Manila',
-            lat: 14.7521,
-            lng: 121.0274,
-            coords: '14.7521° N, 121.0274° E',
-            distance: '30m'
-        },
-        {
-            address: 'Celina Homes 3, Q22G+QGP, Blk 5 Lot 22 Platinum, Barangay 171, Caloocan, 1421 Metro Manila',
-            lat: 14.7515,
-            lng: 121.0263,
-            coords: '14.7515° N, 121.0263° E',
-            distance: '30m'
-        }
-    ];
-
-    const nearbyItems = (processedHazards && processedHazards.length > 0)
-        ? processedHazards.slice(0, 3).map((issue, idx) => {
-            const fallback = CELINA_HOMES_ADDRESSES[idx % CELINA_HOMES_ADDRESSES.length];
-            const issueLat = !isNaN(issue.lat) ? issue.lat : fallback.lat;
-            const issueLng = !isNaN(issue.lng) ? issue.lng : fallback.lng;
-            const coordsStr = `${Math.abs(issueLat).toFixed(4)}° ${issueLat >= 0 ? 'N' : 'S'}, ${Math.abs(issueLng).toFixed(4)}° ${issueLng >= 0 ? 'E' : 'W'}`;
-
-            let addr = issue.location_string || issue.location;
-            if (!addr || addr === 'Caloocan City' || addr === 'Barangay 171, Caloocan' || !addr.includes('Barangay')) {
-                addr = fallback.address;
-            }
-
-            return {
-                id: issue.id || `nb-${idx}`,
-                title: issue.title || issue.category || (idx === 0 ? 'Power & Street Lighting' : idx === 1 ? 'Roads & Bridges' : 'Roads & Bridges, Water & Drainage'),
-                location: addr,
-                coordinates: coordsStr,
-                distance: issue.dynamicDistance || fallback.distance,
-                raw: issue
-            };
-        })
-        : [
-            {
-                id: 'nb-1',
-                title: 'Power & Street Lighting',
-                location: 'Celina Homes 3, Q22G+QGP, Blk 4 Lot 16 Silver, Barangay 171, Caloocan, 1421 Metro Manila',
-                coordinates: '14.7518° N, 121.0269° E',
-                distance: '30m'
-            },
-            {
-                id: 'nb-2',
-                title: 'Roads & Bridges',
-                location: 'Celina Homes 3, Q22G+QGP, Blk 2 Lot 8 Gold, Barangay 171, Caloocan, 1421 Metro Manila',
-                coordinates: '14.7521° N, 121.0274° E',
-                distance: '30m'
-            },
-            {
-                id: 'nb-3',
-                title: 'Roads & Bridges, Water & Drainage',
-                location: 'Celina Homes 3, Q22G+QGP, Blk 5 Lot 22 Platinum, Barangay 171, Caloocan, 1421 Metro Manila',
-                coordinates: '14.7515° N, 121.0263° E',
-                distance: '30m'
-            },
-        ];
+    // The public feed is the authority for this list. Pending private reports belong in My reports.
+    const nearbyItems = nearbyReports.slice(0, 3).map(issue => ({
+        id: issue.id,
+        title: issue.title || issue.category || t('dashboard.publicConcerns.report', { defaultValue: 'Civic report' }),
+        location: issue.location_string || issue.barangay || t('dashboard.publicConcerns.locationUnavailable', { defaultValue: 'Location unavailable' }),
+        raw: issue
+    }));
 
     return (
         <div className="w-full pb-32 sm:pb-36 lg:pb-16 pt-2 sm:pt-4 px-3 sm:px-4 lg:px-5 xl:px-6">
@@ -931,6 +940,23 @@ const ResidentHomeView = ({
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3 shrink-0">
+                            {isLocalhost && userReportCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const ok = exportReportsToCSV(userReports);
+                                        if (ok && showToast) {
+                                            showToast(`Exported ${userReports.length} report(s) to CSV.`);
+                                        }
+                                    }}
+                                    className="px-4 py-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-2xs transition-all cursor-pointer focus-visible:outline-3 focus-visible:outline-[#ff6b00]"
+                                    title="Export your reports as CSV (Localhost only)"
+                                    aria-label="Export your reports as CSV"
+                                >
+                                    <Download size={15} className="text-slate-500 dark:text-slate-400" />
+                                    <span>Export CSV</span>
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => setActiveModal('file-report')}
@@ -1066,10 +1092,10 @@ const ResidentHomeView = ({
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <MapPin size={20} className="text-[#EA580C] shrink-0" />
                                 <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                                    Nearby concerns
+                                    {t('dashboard.publicConcerns.title', { defaultValue: 'Public concerns' })}
                                 </h3>
                                 <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                                    {nearbyItems.length} nearby
+                                    {t('dashboard.publicConcerns.count', { count: nearbyReports.length, defaultValue: '{{count}} public' })}
                                 </span>
                             </div>
                             <button
@@ -1077,20 +1103,21 @@ const ResidentHomeView = ({
                                 onClick={() => setActiveModal('map')}
                                 className="text-xs font-bold text-[#EA580C] hover:text-orange-700 dark:text-[#ff6b00] dark:hover:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
                             >
-                                <span>View map</span>
+                                <span>{t('dashboard.publicConcerns.viewMap', { defaultValue: 'View map' })}</span>
                                 <ChevronRight size={14} />
                             </button>
                         </div>
 
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {nearbyItems.map((item, idx) => (
-                                <div
+                            {nearbyItems.map((item) => (
+                                <button
+                                    type="button"
                                     key={item.id}
                                     onClick={() => {
                                         if (setSelectedPost && item.raw) setSelectedPost(item.raw);
                                         setActiveModal('map');
                                     }}
-                                    className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group"
+                                    className="w-full p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between gap-3 cursor-pointer group text-left focus-visible:outline-3 focus-visible:outline-offset-[-3px] focus-visible:outline-[#ff6b00]"
                                 >
                                     <div className="flex items-start gap-3 min-w-0 flex-1">
                                         <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 group-hover:bg-orange-50 dark:group-hover:bg-orange-950/40 group-hover:text-[#EA580C] flex items-center justify-center shrink-0 transition-colors mt-0.5">
@@ -1103,21 +1130,27 @@ const ResidentHomeView = ({
                                             <p className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 font-medium truncate mt-0.5" title={item.location}>
                                                 {item.location}
                                             </p>
-                                            <div className="flex items-center gap-1.5 mt-1 text-[10.5px] font-mono font-medium text-slate-400 dark:text-slate-500">
-                                                <Crosshair size={11} className="text-[#EA580C] shrink-0" />
-                                                <span>{item.coordinates}</span>
-                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                            <MapPin size={11} className="text-slate-400" />
-                                            <span>{item.distance}</span>
-                                        </span>
                                         <ChevronRight size={15} className="text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200" />
                                     </div>
-                                </div>
+                                </button>
                             ))}
+                            {nearbyItems.length === 0 && (
+                                <div className="p-5 text-sm text-slate-600 dark:text-slate-300" role={publicReportsError ? 'alert' : 'status'}>
+                                    {loadingPublicReports
+                                        ? t('dashboard.publicConcerns.loading', { defaultValue: 'Loading public reports…' })
+                                        : publicReportsError
+                                            ? t('dashboard.publicConcerns.error', { defaultValue: 'Public reports could not be loaded.' })
+                                            : t('dashboard.publicConcerns.empty', { defaultValue: 'No reports are public yet. Reports awaiting government review appear in My reports for their authors.' })}
+                                    {publicReportsError && onRetryPublicReports && (
+                                        <button type="button" onClick={onRetryPublicReports} className="ml-2 min-h-11 px-3 rounded-lg font-semibold text-[#EA580C] focus-visible:outline-3 focus-visible:outline-[#ff6b00]">
+                                            {t('dashboard.publicConcerns.retry', { defaultValue: 'Try again' })}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -2988,8 +3021,10 @@ const MyReports = ({
     handleCancelReport,
     onSelectReportForDetails,
     onOpenMap,
+    showToast,
     t
 }) => {
+    const isLocalhost = isLocalDevHost();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All categories');
     const [selectedDateFilter, setSelectedDateFilter] = useState('All dates');
@@ -3132,6 +3167,18 @@ const MyReports = ({
         { id: 'resolved', label: 'Resolved', count: resolvedCount, icon: CheckCircle2, color: 'text-emerald-500' },
         { id: 'rejected', label: 'Rejected', count: rejectedCount, icon: XCircle, color: 'text-rose-500' }
     ];
+
+    const handleExportCSV = () => {
+        const reportsToExport = (filteredReports && filteredReports.length > 0) ? filteredReports : baseReports;
+        if (!reportsToExport || reportsToExport.length === 0) {
+            showToast?.('No reports available to export.', 'warning');
+            return;
+        }
+        const ok = exportReportsToCSV(reportsToExport);
+        if (ok && showToast) {
+            showToast(`Exported ${reportsToExport.length} report(s) to CSV.`);
+        }
+    };
 
     const getCategoryIcon = (categoryStr) => {
         const cat = (categoryStr || '').toLowerCase();
@@ -3291,6 +3338,18 @@ const MyReports = ({
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0">
+                    {isLocalhost && (
+                        <button
+                            type="button"
+                            onClick={handleExportCSV}
+                            className="px-3.5 py-2.5 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 active:scale-95 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-2xs transition-all cursor-pointer focus-visible:outline-3 focus-visible:outline-[#ff6b00]"
+                            title="Export reports as CSV (Localhost only)"
+                            aria-label="Export reports as CSV"
+                        >
+                            <Download size={15} className="text-slate-500 dark:text-slate-400" />
+                            <span>Export CSV</span>
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={() => handleSetModal('file-report')}
@@ -7097,14 +7156,14 @@ const ResidentModals = ({
     activeModal, setActiveModal, selectedPost, setSelectedPost, isLoaded, loadError, map, setMap, panorama, setPanorama, reportLocation, setReportLocation,
     locationAddress, setLocationAddress, plusCode, setPlusCode, geocodingAddress, structuredAddress, setStructuredAddress, reportCategory, setReportCategory, reportNotes, setReportNotes, selectedImage, setSelectedImage,
     submittingReport, handleFileReport, isSelectingLocation, setIsSelectingLocation, isIDCameraOpen, setIsIDCameraOpen, checkJurisdiction,
-    reverseGeocode, mapOptions, pulseRadius, processedHazards, selectedHazard, setSelectedHazard, svLocation, handleStreetViewClick,
+    reverseGeocode, mapOptions, pulseRadius, processedHazards, reportsLoading, reportsError, onRetryReports, selectedHazard, setSelectedHazard, svLocation, handleStreetViewClick,
     getIconForCategory, getMarkerSVG, getCategoryColor, mapFilter, setMapFilter,
     isAnalyzing, aiFeedback, setAiFeedback,
     reportToCancel, setReportToCancel, confirmCancelReport,
     isSubmitConfirmOpen, setIsSubmitConfirmOpen, actuallySubmitReport,
     setZoomedImage,
     photoPinIcons, getCachedIcon, theme, borderData,
-    isLocating, locatingStep, requestDeviceLocation,
+    isLocating, locatingStep, requestDeviceLocation, isTrackingLocation, startDeviceLocationTracking, stopDeviceLocationTracking,
     locationPermissionDenied, photoMetadata, setPhotoMetadata,
     showHeatmap, setShowHeatmap,
     mapLayerType, setMapLayerType,
@@ -7334,8 +7393,12 @@ const ResidentModals = ({
                     structuredAddress={structuredAddress}
                     requestDeviceLocation={requestDeviceLocation}
                     isLocating={isLocating}
+                    isTrackingLocation={isTrackingLocation}
+                    onStartLocationTracking={startDeviceLocationTracking}
+                    onStopLocationTracking={stopDeviceLocationTracking}
                     locationPermissionDenied={locationPermissionDenied}
                     onOpenLocationPicker={() => {
+                        stopDeviceLocationTracking();
                         setIsSelectingLocation(true);
                         setActiveModal('map');
                     }}
@@ -7364,6 +7427,9 @@ const ResidentModals = ({
                     isLoaded={isLoaded}
                     loadError={loadError}
                     reports={processedHazards}
+                    reportsLoading={reportsLoading}
+                    reportsError={reportsError}
+                    onRetryReports={onRetryReports}
                     reportLocation={reportLocation}
                     setReportLocation={setReportLocation}
                     reverseGeocode={reverseGeocode}
@@ -9302,6 +9368,7 @@ const TopNavigation = ({
                     unreadCount={unreadCount}
                     onOpenAccount={() => handleSetTab('profile')}
                     onOpenUpdates={() => handleSetTab('updates')}
+                    onOpenAllNotifications={() => handleSetModal('all-notifications')}
                     onSignIn={() => handleSetModal('login')}
                     onOpenAIChat={() => setIsAIChatOpen && setIsAIChatOpen(prev => !prev)}
                     isAIChatOpen={isAIChatOpen}
@@ -9867,6 +9934,7 @@ export default function ResidentDashboard() {
     }, []);
 
     const [publicReports, setPublicReports] = useState([]);
+    const [publicReportsError, setPublicReportsError] = useState(false);
 
     const allAvailableReports = useMemo(() => {
         const map = new Map();
@@ -9883,6 +9951,8 @@ export default function ResidentDashboard() {
 
     const fetchPublicReports = useCallback(async () => {
         return dedupeFetch('public_reports', async () => {
+            setLoadingPublicReports(true);
+            setPublicReportsError(false);
             try {
                 const res = await apiFetch('/api/reports/public?limit=300');
                 if (res.ok && Array.isArray(res.data)) {
@@ -9894,12 +9964,16 @@ export default function ResidentDashboard() {
                         }
                         return list;
                     });
-                } else if (res.isServerUnreachable) {
-                    logApiFailure('/api/reports/public', res);
+                } else {
+                    setPublicReportsError(true);
+                    setPublicReports([]);
+                    if (res.isServerUnreachable) logApiFailure('/api/reports/public', res);
                 }
                 return res;
             } catch (error) {
                 console.error("PULSO: Error fetching public reports:", error);
+                setPublicReportsError(true);
+                setPublicReports([]);
                 return { ok: false, error };
             } finally {
                 setLoadingPublicReports(false);
@@ -9910,6 +9984,9 @@ export default function ResidentDashboard() {
     const [notifications, setNotifications] = useState([]);
     const [loadingNotifications, setLoadingNotifications] = useState(false);
     const [notificationsError, setNotificationsError] = useState(null);
+    const [notificationsHasMore, setNotificationsHasMore] = useState(false);
+    const [loadingOlderNotifications, setLoadingOlderNotifications] = useState(false);
+    const [olderNotificationsError, setOlderNotificationsError] = useState(null);
 
     const unreadCount = Array.isArray(notifications)
         ? notifications.filter(n => !n.is_read && !n.is_hidden).length
@@ -9922,8 +9999,10 @@ export default function ResidentDashboard() {
             setLoadingNotifications(true);
             setNotificationsError(null);
             try {
-                const res = await apiFetch(`/api/notifications/user/${userId}`);
+                const res = await apiFetch(`/api/notifications/user/${userId}?skip=0&limit=20`);
                 if (res.ok && Array.isArray(res.data)) {
+                    setNotificationsHasMore(res.data.length === 20);
+                    setOlderNotificationsError(null);
                     setNotifications(prev => {
                         if (Array.isArray(prev) && prev.length === res.data.length) {
                             const unchanged = prev.every((p, i) => p.id === res.data[i]?.id && p.is_read === res.data[i]?.is_read);
@@ -9947,6 +10026,25 @@ export default function ResidentDashboard() {
             }
         });
     }, []);
+
+    const fetchOlderNotifications = async () => {
+        if (!currentUser?.id || !notificationsHasMore || loadingOlderNotifications || loadingNotifications) return;
+        setLoadingOlderNotifications(true);
+        setOlderNotificationsError(null);
+        try {
+            const res = await apiFetch(`/api/notifications/user/${currentUser.id}?skip=${notifications.length}&limit=20`);
+            if (!res.ok || !Array.isArray(res.data)) throw new Error('Unable to load older notifications.');
+            setNotifications(previous => {
+                const seen = new Set(previous.map(item => item.id));
+                return [...previous, ...res.data.filter(item => !seen.has(item.id))];
+            });
+            setNotificationsHasMore(res.data.length === 20);
+        } catch {
+            setOlderNotificationsError('Unable to load older notifications.');
+        } finally {
+            setLoadingOlderNotifications(false);
+        }
+    };
 
     const fetchAdvisories = useCallback(async () => {
         return dedupeFetch('advisories', async () => {
@@ -10214,25 +10312,13 @@ export default function ResidentDashboard() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [submittingReport, setSubmittingReport] = useState(false);
     const [aiFeedback, setAiFeedback] = useState(null);
-    const DEFAULT_CALOOCAN_REPORT_LOCATION = {
-        lat: 14.751952,
-        lng: 121.026277,
-        accuracy: 12,
-        confirmed: true,
-        source: 'device-gps',
-        timestamp: Date.now()
-    };
-
-    const [reportLocation, setReportLocation] = useState(() => {
-        try {
-            const saved = sessionStorage.getItem('pulso_user_location');
-            if (saved) return JSON.parse(saved);
-        } catch (_) {}
-        return DEFAULT_CALOOCAN_REPORT_LOCATION;
-    });
+    const [reportLocation, setReportLocation] = useState(null);
     const [isLocating, setIsLocating] = useState(false);
+    const [isTrackingLocation, setIsTrackingLocation] = useState(false);
+    const locationWatchRef = useRef(null);
+    const locationRequestRef = useRef(0);
+    const lastGeocodedPositionRef = useRef(null);
     const [locatingStep, setLocatingStep] = useState(0);
-    const locatingStepTimers = useRef([]);
     const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
     const [photoMetadata, setPhotoMetadata] = useState(null);
     const [showHeatmap, setShowHeatmap] = useState(true);
@@ -10275,17 +10361,7 @@ export default function ResidentDashboard() {
             });
     }, []);
 
-    const getCategoryColor = (category) => {
-        const cat = (category || '').toLowerCase();
-        if (cat.includes('road') || cat.includes('bridge') || cat.includes('pothole')) return '#f97316';
-        if (cat.includes('water') || cat.includes('drainage') || cat.includes('flood')) return '#3b82f6';
-        if (cat.includes('lighting') || cat.includes('street') || cat.includes('electric') || cat.includes('power')) return '#eab308';
-        if ((cat.includes('facilit') || cat.includes('build') || cat.includes('park') || cat.includes('court') || cat.includes('hall')) && !cat.includes('safety') && !cat.includes('works')) return '#22c55e';
-        if (cat.includes('safety') || cat.includes('regulatory') || cat.includes('emergency') || cat.includes('hazard')) return '#ef4444';
-        if (cat.includes('traffic') || cat.includes('sign')) return '#06b6d4';
-        if (cat.includes('other')) return '#8b5cf6';
-        return '#94a3b8';
-    };
+    const getCategoryColor = (category) => getReportCategoryMeta({ category }).color;
 
     // SVG Marker Pin Generator for Map Symbols
     // Beautiful Dynamic SVG Pin Generator (matching government DispatcherDashboard)
@@ -10367,8 +10443,6 @@ export default function ResidentDashboard() {
     };
 
     const processedHazards = React.useMemo(() => {
-        if (!isLoaded) return [];
-
         const userReportKeys = new Set(
             (userReports || []).flatMap(ur => [
                 ur.id != null ? String(ur.id) : null,
@@ -10453,6 +10527,11 @@ export default function ResidentDashboard() {
             };
         }).sort((a, b) => a.distanceValue - b.distanceValue);
     }, [reportLocation, userReports, publicReports, isLoaded, currentUser?.id]);
+
+    const publicHazards = React.useMemo(() => {
+        const publicIds = new Set((publicReports || []).map(report => String(report.id)));
+        return processedHazards.filter(report => publicIds.has(String(report.id)));
+    }, [processedHazards, publicReports]);
 
     const heatmapPoints = React.useMemo(() => {
         if (!processedHazards || processedHazards.length === 0) return [];
@@ -10652,15 +10731,7 @@ export default function ResidentDashboard() {
                         const cy = size / 2 + 1;
                         const radius = (size - 4) / 2;
 
-                        let borderColor = '#ff6b00';
-                        if (hazard.status === 'resolved') borderColor = '#22c55e';
-                        else if (hazard.status === 'pending' || hazard.status === 'unverified') {
-                            borderColor = hazard.ai_urgency === 'CRITICAL' ? '#ef4444' : '#ff6b00';
-                        } else if (hazard.status === 'rejected') {
-                            borderColor = '#64748b';
-                        } else if (hazard.status === 'cancelled') {
-                            borderColor = '#0f172a';
-                        }
+                        const borderColor = getReportCategoryMeta(hazard).color;
 
                         // Pointer Arrow
                         ctx.beginPath();
@@ -10675,7 +10746,7 @@ export default function ResidentDashboard() {
                         if (isSelected) {
                             ctx.beginPath();
                             ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
-                            ctx.fillStyle = 'rgba(255, 107, 0, 0.35)';
+                            ctx.fillStyle = `${borderColor}59`;
                             ctx.fill();
                         }
 
@@ -10751,149 +10822,93 @@ export default function ResidentDashboard() {
     }, [processedHazards]);
 
 
-    const clearLocatingTimers = () => {
-        if (locatingStepTimers.current) {
-            locatingStepTimers.current.forEach(t => clearTimeout(t));
-            locatingStepTimers.current = [];
+    const stopDeviceLocationTracking = useCallback(() => {
+        if (locationWatchRef.current !== null && navigator.geolocation) {
+            navigator.geolocation.clearWatch(locationWatchRef.current);
+            locationWatchRef.current = null;
+        }
+        setIsTrackingLocation(false);
+    }, []);
+
+    const acceptDevicePosition = (position) => {
+        const { latitude, longitude, accuracy } = position.coords || {};
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+        const loc = {
+            lat: latitude,
+            lng: longitude,
+            accuracy: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
+            confirmed: true,
+            source: 'device-gps',
+            timestamp: position.timestamp || Date.now()
+        };
+        setReportLocation(loc);
+        setLocationPermissionDenied(false);
+        setIsLocating(false);
+        const previous = lastGeocodedPositionRef.current;
+        const moved = !previous || Math.abs(previous.lat - latitude) > 0.0002 || Math.abs(previous.lng - longitude) > 0.0002;
+        if (moved) {
+            lastGeocodedPositionRef.current = loc;
+            setLocationAddress('');
+            setStructuredAddress(null);
+            setPlusCode('');
+            reverseGeocode(latitude, longitude);
         }
     };
 
-    const requestDeviceLocation = (force = false) => {
-        clearLocatingTimers();
+    const requestDeviceLocation = () => {
         if (!navigator.geolocation) {
             setIsLocating(false);
             setLocationPermissionDenied(true);
             return;
         }
-
-        // Only mark isLocating if we don't already have a valid position
-        if (!reportLocation?.lat || force) {
-            setIsLocating(true);
-        }
+        const requestId = ++locationRequestRef.current;
+        setIsLocating(true);
         setLocationPermissionDenied(false);
-
-        let bestAcc = Infinity;
-        let bestCoords = null;
-        let watchId = null;
-        let settledTimer = null;
-
-        const finalize = (coords) => {
-            clearLocatingTimers();
-            const finalCoords = coords || bestCoords;
-            if (finalCoords) {
-                let finalLat = finalCoords.latitude;
-                let finalLng = finalCoords.longitude;
-                const actualAccuracy = Math.round(finalCoords.accuracy || bestAcc || 15);
-
-                // Calibrate Wi-Fi drift to Celina Homes 3, Brgy 171 if within vicinity
-                if (finalLat >= 14.7505 && finalLat <= 14.7535 && finalLng >= 121.0250 && finalLng <= 121.0275) {
-                    finalLat = 14.751952;
-                    finalLng = 121.026277;
-                }
-
-                const loc = {
-                    lat: finalLat,
-                    lng: finalLng,
-                    accuracy: actualAccuracy,
-                    confirmed: true,
-                    source: 'device-gps',
-                    timestamp: Date.now()
-                };
-                setReportLocation(loc);
-                try {
-                    sessionStorage.setItem('pulso_user_location', JSON.stringify(loc));
-                } catch (_) {}
-                reverseGeocode(loc.lat, loc.lng);
-            }
-            setIsLocating(false);
-        };
-
-        const stopWatching = () => {
-            if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-            }
-            if (settledTimer) {
-                clearTimeout(settledTimer);
-                settledTimer = null;
-            }
-        };
-
-        // Safety fallback timer — 1.5s max instead of 4s
-        settledTimer = setTimeout(() => {
-            stopWatching();
-            finalize();
-        }, 1500);
-
-        try {
-            // First check fast cached position (sub-50ms)
-            navigator.geolocation.getCurrentPosition(
-                cachedPos => {
-                    if (cachedPos?.coords) {
-                        finalize(cachedPos.coords);
-                    }
-                },
-                () => {},
-                { enableHighAccuracy: true, timeout: 1200, maximumAge: 60000 }
-            );
-
-            watchId = navigator.geolocation.watchPosition(
-                pos => {
-                    const acc = pos.coords.accuracy || 100;
-                    if (acc < bestAcc) {
-                        bestAcc = acc;
-                        bestCoords = pos.coords;
-                    }
-                    // Finalize immediately on first reading
-                    finalize(pos.coords);
-                    if (acc <= 15) {
-                        stopWatching();
-                    }
-                },
-                err => {
-                    console.warn("High-accuracy watch fallback:", err);
-                    if (err.code === 1) { // PERMISSION_DENIED
-                        stopWatching();
-                        clearLocatingTimers();
-                        setIsLocating(false);
-                        setLocationPermissionDenied(true);
-                        return;
-                    }
-                    stopWatching();
-                    navigator.geolocation.getCurrentPosition(
-                        pos => finalize(pos.coords),
-                        fallbackErr => {
-                            clearLocatingTimers();
-                            setIsLocating(false);
-                            if (fallbackErr?.code === 1) {
-                                setLocationPermissionDenied(true);
-                            }
-                            if (force) showToast('Could not retrieve live GPS. Please pinpoint your location on the map.', 'info');
-                        },
-                        { enableHighAccuracy: true, timeout: 3000, maximumAge: 60000 }
-                    );
-                },
-                { enableHighAccuracy: true, timeout: 4000, maximumAge: 60000 }
-            );
-        } catch (e) {
-            stopWatching();
-            finalize();
-        }
+        navigator.geolocation.getCurrentPosition(
+            position => { if (requestId === locationRequestRef.current) acceptDevicePosition(position); },
+            error => {
+                if (requestId !== locationRequestRef.current) return;
+                setIsLocating(false);
+                setLocationPermissionDenied(error?.code === 1);
+                showToast('Could not refresh GPS. Choose the issue location on the map or retry.', 'info');
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
     };
 
-    // Auto-request device location once on mount
-    useEffect(() => {
-        requestDeviceLocation(false);
-        return () => clearLocatingTimers();
-    }, []);
-
-    // Automatically sample fresh high-accuracy location whenever Quick Report modal is opened
-    useEffect(() => {
-        if (activeModal === 'file-report') {
-            setLocationPermissionDenied(false);
-            requestDeviceLocation(false);
+    const startDeviceLocationTracking = () => {
+        if (!navigator.geolocation) {
+            setLocationPermissionDenied(true);
+            return;
         }
-    }, [activeModal]);
+        stopDeviceLocationTracking();
+        setIsLocating(true);
+        setIsTrackingLocation(true);
+        locationWatchRef.current = navigator.geolocation.watchPosition(
+            acceptDevicePosition,
+            error => {
+                setIsLocating(false);
+                setLocationPermissionDenied(error?.code === 1);
+                stopDeviceLocationTracking();
+                showToast('Live location stopped. Refresh GPS or choose the issue location on the map.', 'info');
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
+    };
+
+    useEffect(() => {
+        if (activeModal !== 'file-report') stopDeviceLocationTracking();
+        return () => {
+            if (locationWatchRef.current !== null && navigator.geolocation) navigator.geolocation.clearWatch(locationWatchRef.current);
+            locationWatchRef.current = null;
+        };
+    }, [activeModal, stopDeviceLocationTracking]);
+
+    useEffect(() => {
+        const stopWhenHidden = () => { if (document.visibilityState === 'hidden') stopDeviceLocationTracking(); };
+        document.addEventListener('visibilitychange', stopWhenHidden);
+        return () => document.removeEventListener('visibilitychange', stopWhenHidden);
+    }, [stopDeviceLocationTracking]);
 
     // ── AI Triage Logic ───────────────────────────────────────────────────────
 
@@ -11010,40 +11025,9 @@ export default function ResidentDashboard() {
 
 
 
-    // Reverse-geocoded address for the report location picker (preloaded for zero waiting)
-    const DEFAULT_CALOOCAN_STRUCTURED_ADDRESS = {
-        subdivision: 'Celina Homes 3',
-        plusCode: 'Q22G+QGP',
-        streetAddress: 'Blk 4 Lot 16 Silver',
-        barangay: 'Barangay 171',
-        city: 'Caloocan',
-        postalCode: '1421',
-        region: 'Metro Manila'
-    };
-    const DEFAULT_CALOOCAN_ADDRESS = 'Blk 4 Lot 16 Silver, Celina Homes 3, Barangay 171, Caloocan, 1421 Metro Manila';
-    const DEFAULT_CALOOCAN_PLUS_CODE = 'Q22G+QGP';
-
-    const [structuredAddress, setStructuredAddress] = useState(() => {
-        try {
-            const saved = sessionStorage.getItem('pulso_user_structured_address');
-            if (saved) return JSON.parse(saved);
-        } catch (_) {}
-        return DEFAULT_CALOOCAN_STRUCTURED_ADDRESS;
-    });
-    const [locationAddress, setLocationAddress] = useState(() => {
-        try {
-            const saved = sessionStorage.getItem('pulso_user_address');
-            if (saved) return saved;
-        } catch (_) {}
-        return DEFAULT_CALOOCAN_ADDRESS;
-    });
-    const [plusCode, setPlusCode] = useState(() => {
-        try {
-            const saved = sessionStorage.getItem('pulso_user_plus_code');
-            if (saved) return saved;
-        } catch (_) {}
-        return DEFAULT_CALOOCAN_PLUS_CODE;
-    });
+    const [structuredAddress, setStructuredAddress] = useState(null);
+    const [locationAddress, setLocationAddress] = useState('');
+    const [plusCode, setPlusCode] = useState('');
     const [geocodingAddress, setGeocodingAddress] = useState(false);
     const geocodeRequest = useRef(0);
 
@@ -11138,21 +11122,6 @@ export default function ResidentDashboard() {
         }
 
         if (requestId !== geocodeRequest.current) return;
-
-        // Celina Homes 3 calibration
-        if (!resolvedStructured && lat >= 14.7505 && lat <= 14.7535 && lng >= 121.0250 && lng <= 121.0275) {
-            resolvedStructured = {
-                subdivision: 'Celina Homes 3',
-                plusCode: 'Q22G+QGP',
-                streetAddress: 'Blk 4 Lot 16 Silver',
-                barangay: 'Barangay 171',
-                city: 'Caloocan',
-                postalCode: '1421',
-                region: 'Metro Manila'
-            };
-            primaryAddress = formatFullAddress(resolvedStructured, { lat, lng });
-            plusCodeStr = 'Q22G+QGP';
-        }
 
         // 5. Final fallback: Known Caloocan barangay polygon or Coordinates with "Address unavailable"
         if (!resolvedStructured) {
@@ -12048,6 +12017,9 @@ export default function ResidentDashboard() {
                 mapOptions={mapOptions}
                 pulseRadius={pulseRadius}
                 processedHazards={processedHazards}
+                reportsLoading={loadingPublicReports}
+                reportsError={publicReportsError}
+                onRetryReports={fetchPublicReports}
                 selectedHazard={selectedHazard}
                 setSelectedHazard={setSelectedHazard}
                 svLocation={svLocation}
@@ -12077,6 +12049,9 @@ export default function ResidentDashboard() {
                 isLocating={isLocating}
                 locatingStep={locatingStep}
                 requestDeviceLocation={requestDeviceLocation}
+                isTrackingLocation={isTrackingLocation}
+                startDeviceLocationTracking={startDeviceLocationTracking}
+                stopDeviceLocationTracking={stopDeviceLocationTracking}
                 showHeatmap={showHeatmap}
                 setShowHeatmap={setShowHeatmap}
                 mapLayerType={mapLayerType}
@@ -12095,6 +12070,9 @@ export default function ResidentDashboard() {
             {activeModal === 'all-notifications' && (
                 <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setActiveModal(null)}>
                     <motion.div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={t('notificationCenter.title', 'All notifications')}
                         initial={{ y: '100%', opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: '100%', opacity: 0 }}
@@ -12108,9 +12086,9 @@ export default function ResidentDashboard() {
                         </div>
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                             <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                                <Bell className="text-orange-500" /> {t('All Notifications', { defaultValue: 'All Notifications' })}
+                                <Bell className="text-orange-500" /> {t('notificationCenter.title', 'All notifications')}
                             </h2>
-                            <button onClick={() => setActiveModal(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition focus:outline-none">
+                            <button autoFocus type="button" aria-label="Close all notifications" onClick={() => setActiveModal(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition focus-visible:outline-3 focus-visible:outline-blue-600">
                                 <X size={18} />
                             </button>
                         </div>
@@ -12123,8 +12101,15 @@ export default function ResidentDashboard() {
                                     Mark all as read
                                 </button>
                             </div>
-                            {notifications.length === 0 ? (
-                                <p className="text-center text-slate-500 py-8">No notifications available.</p>
+                            {loadingNotifications ? (
+                                <p className="text-center text-slate-500 py-8" role="status">Loading notifications…</p>
+                            ) : notificationsError ? (
+                                <div className="text-center py-8" role="alert">
+                                    <p className="text-slate-600 dark:text-slate-300">{t('notificationCenter.loadError', 'Unable to load notifications.')}</p>
+                                    <button type="button" onClick={() => currentUser?.id && fetchNotifications(currentUser.id)} className="mt-3 min-h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 focus-visible:outline-3 focus-visible:outline-blue-600">{t('notificationCenter.tryAgain', 'Try again')}</button>
+                                </div>
+                            ) : notifications.length === 0 ? (
+                                <p className="text-center text-slate-500 py-8">{t('notificationCenter.empty', 'No notifications available.')}</p>
                             ) : (
                                 notifications.map(notif => (
                                     <div key={notif.id} className={`p-4 rounded-xl border ${notif.is_read ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800/80' : 'bg-white dark:bg-slate-800/80 border-blue-100 dark:border-blue-900/60 shadow-sm'} ${notif.is_hidden ? 'opacity-50' : ''}`}>
@@ -12176,6 +12161,14 @@ export default function ResidentDashboard() {
                                         </div>
                                     </div>
                                 ))
+                            )}
+                            {!loadingNotifications && !notificationsError && notificationsHasMore && (
+                                <div className="pt-3 text-center">
+                                    {olderNotificationsError && <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{t('notificationCenter.olderError', 'Unable to load older notifications.')}</p>}
+                                    <button type="button" onClick={fetchOlderNotifications} disabled={loadingOlderNotifications} className="min-h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-semibold focus-visible:outline-3 focus-visible:outline-blue-600 disabled:opacity-60">
+                                        {loadingOlderNotifications ? t('notificationCenter.loadingOlder', 'Loading older notifications…') : t('notificationCenter.loadOlder', 'Load older notifications')}
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </motion.div>
@@ -12250,13 +12243,16 @@ export default function ResidentDashboard() {
                                 userReports={userReports}
                                 loadingReports={loadingReports}
                                 loadingPublicReports={loadingPublicReports}
+                                publicReportsError={publicReportsError}
+                                onRetryPublicReports={fetchPublicReports}
                                 lguUpdates={lguUpdates}
                                 loadingAdvisories={loadingAdvisories}
-                                processedHazards={processedHazards}
+                                nearbyReports={publicHazards}
                                 handleSetTab={handleSetTab}
                                 setActiveModal={handleSetModal}
                                 setSelectedPost={setSelectedPost}
                                 setReportCategory={setReportCategory}
+                                showToast={showToast}
                                 t={t}
                             />
                         )}
@@ -12310,6 +12306,7 @@ export default function ResidentDashboard() {
                                             handleSetModal('map');
                                             setSelectedPost(rep);
                                         }}
+                                        showToast={showToast}
                                         t={t}
                                     />
                                 )}

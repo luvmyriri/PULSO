@@ -1,5 +1,48 @@
 {
   "translation": {
+    "mapPublicReports": {
+      "loading": "Kinukuha ang mga pampublikong ulat…",
+      "error": "Hindi makuha ang mga pampublikong ulat.",
+      "empty": "Wala pang pampublikong ulat. Hindi ipinapakita sa mapang ito ang mga ulat na hinihintay ang pagsusuri ng pamahalaan.",
+      "filteredEmpty": "Walang ulat na tumutugma sa mga filter.",
+      "retry": "Subukan muli",
+      "clearFilters": "Alisin ang mga filter",
+      "locationUnavailable": "Hindi available ang lokasyon",
+      "photoPrivate": "Walang available na larawan ng ulat",
+      "basicOnly": "Sinuri muna ng pamahalaan ang ulat bago ito ipinakita rito. Pribado pa rin ang pagkakakilanlan at contact details ng nag-ulat.",
+      "openApproximateArea": "Buksan ang tinatayang lugar",
+      "openReportLocation": "Buksan ang lokasyon ng ulat",
+      "awaitingDetailReview": "Napatunayan ang ulat sa ilalim ng dating patakaran para sa pangunahing detalye. Hinihintay pa ang hiwalay na pagsusuri bago ilathala ang eksaktong lokasyon, paglalarawan, at larawan.",
+      "descriptionUnavailable": "Walang naitalang paglalarawan.",
+      "status": {
+        "verified": "Napatunayan · Naghihintay ng pag-apruba sa gawain",
+        "validated": "Napatunayan",
+        "approved": "Aprubado para sa gawain",
+        "dispatched": "Naipadala sa pangkat",
+        "inProgress": "Isinasagawa ang gawain",
+        "resolved": "Nalutas"
+      }
+    },
+    "loadingScreen": {
+      "ariaLabel": "Nilo-load ang PULSO",
+      "city": "Lungsod ng Caloocan",
+      "readying": "Inihahanda ang PULSO...",
+      "slow": "Nilo-load pa rin. Sandali lamang.",
+      "connectionError": "Hindi makakonekta ngayon. Suriin ang iyong internet at subukang muli.",
+      "retry": "Subukang muli",
+      "department": "City Engineering Department",
+      "government": "Pamahalaang Lungsod ng Caloocan"
+    },
+    "notificationCenter": {
+      "title": "Lahat ng abiso",
+      "seeAll": "Tingnan ang lahat ng abiso",
+      "loadError": "Hindi makuha ang mga abiso.",
+      "tryAgain": "Subukang muli",
+      "empty": "Walang abisong magagamit.",
+      "olderError": "Hindi makuha ang mga naunang abiso.",
+      "loadingOlder": "Kinukuha ang mga naunang abiso…",
+      "loadOlder": "Kunin ang mga naunang abiso"
+    },
     "reportLink": {
         "loading": "Binubuksan ang iyong ulat…",
         "error": "Hindi mabuksan ang ulat. Suriin ang koneksiyon at subukang muli. Maaaring hindi ito magagamit o wala kang pahintulot na makita ito.",
@@ -357,6 +400,30 @@
         "subtitle": "Maghanap ng lugar, pagkatapos ay itama ang pin sa eksaktong pwesto.",
         "searchPlaceholder": "Kalye, palatandaan, o barangay",
         "useMyLocation": "Gamitin ang aking lokasyon",
+        "chooseOnMap": "Pumili sa mapa",
+        "resyncGps": "I-refresh ang GPS",
+        "startLive": "Subaybayan ang lokasyon habang nag-uulat",
+        "stopLive": "Itigil ang live na lokasyon",
+        "liveHelp": "Ina-update lang ang live na lokasyon habang bukas ang hakbang na ito. Suriin ang pin bago magpatuloy.",
+        "liveReportHelp": "Gumagana lang ang live na lokasyon habang bukas ang hakbang na ito. Suriin ang napiling lugar bago magsumite.",
+        "liveActive": "Aktibo ang live na lokasyon",
+        "locationSelected": "Napili ang lokasyon",
+        "noLocation": "Wala pang lokasyon",
+        "noLocationHelp": "Wala pang lokasyon. Gamitin ang GPS o pumili ng lugar sa mapa.",
+        "chooseLocation": "Piliin ang lokasyon ng problema",
+        "selectedMapLocation": "Napiling lokasyon sa mapa",
+        "savedLocationNeedsConfirmation": "Kailangang kumpirmahin ang naka-save na lokasyon",
+        "barangayNotRecorded": "Hindi nakatala ang barangay",
+        "reviewSavedLocation": "Suriin ang naka-save na lokasyon bago kumpirmahin",
+        "selectToConfirmArea": "Piliin ang lokasyon ng problema upang kumpirmahin ang lugar nito",
+        "confirmSavedLocation": "Kumpirmahin ang naka-save na lokasyon",
+        "selectedCoordinates": "Napiling coordinate",
+        "devicePosition": "Lokasyon mula sa device noong {{time}}.",
+        "searchUnavailable": "Hindi magamit ang paghahanap ng lugar. Pumili sa mapa o gamitin ang GPS.",
+        "searchFailed": "Walang nahanap na katugmang lugar. Sumubok ng ibang address o pumili sa mapa.",
+        "unsupported": "Hindi magamit ang lokasyon sa device na ito. Pumili ng lugar sa mapa.",
+        "photoLocationNote": "Kumuha ng malinaw na larawan. Idaragdag lang ang lokasyon kapag pinili mo ito.",
+        "chooseBeforeSubmit": "Piliin ang lokasyon ng problema gamit ang GPS o mapa bago magsumite.",
         "locating": "Kinukuha ang eksaktong GPS...",
         "locationSuccess": "Nai-tag ang lokasyon ng GPS (katumpakan: {{accuracy}}m)",
         "locationError": "Hindi makuha ang GPS. Mangyaring maghanap o i-drag ang pin.",
@@ -733,6 +800,17 @@
       "signIn": "Mag-sign In"
     },
     "dashboard": {
+      "publicConcerns": {
+        "title": "Mga pampublikong ulat",
+        "count": "{{count}} pampubliko",
+        "viewMap": "Tingnan ang mapa",
+        "report": "Ulat sa komunidad",
+        "locationUnavailable": "Hindi available ang lokasyon",
+        "loading": "Kinukuha ang mga pampublikong ulat…",
+        "error": "Hindi makuha ang mga pampublikong ulat.",
+        "empty": "Wala pang pampublikong ulat. Ang mga ulat na hinihintay ang pagsusuri ng pamahalaan ay makikita ng nagsumite sa Mga ulat ko.",
+        "retry": "Subukan muli"
+      },
       "sidebar": {
         "portal": "Portal ng Residente",
         "overview": "Pangkalahatan",

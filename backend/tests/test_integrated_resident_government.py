@@ -124,12 +124,13 @@ def test_unverified_bearer_payload_cannot_select_rate_limit_identity():
     assert error.value.status_code == 429
 
 
-def test_email_confirmation_secret_is_not_sent_to_unverified_phone():
+def test_registration_confirmation_requests_same_code_on_email_and_sms():
     resident = SimpleNamespace(full_name='FAKE Resident', email='fake@test.invalid', phone_number='09171234567')
-    with patch('main.send_otp_email', return_value=True) as email, patch('main.sms_utils.send_plain_sms') as sms:
-        assert main.send_resident_confirmation(resident, '456789')
+    with patch('main.send_otp_email', return_value=True) as email, patch('main.sms_utils.send_registration_sms') as sms:
+        sms.return_value.accepted = True
+        assert main.send_resident_confirmation(resident, '456789') == {'email': True, 'sms': True}
     email.assert_called_once()
-    sms.assert_not_called()
+    assert '456789' in sms.call_args.args[1]
 
 
 def test_password_recovery_uses_confirmed_email_not_unverified_profile_phone(context):

@@ -63,7 +63,7 @@ export default function GovLanding() {
                     if (GOV_ROLES.includes(data.user.role) || data.user.account_type === 'staff') {
                         const returnTo=new URLSearchParams(window.location.search).get('returnTo');
                         const fallback=GOV_ROLES.includes(data.user.role)?'/gov/my-dashboard':adminAllows(data.user,'view')?'/gov/administration':'/gov/account';
-                        navigate(returnTo && /^\/gov\/(?:account|reports|map|dashboard|my-work|today|work-orders|assets|records-workspace|insights|announcements|administration)(?:[/?#]|$)/.test(returnTo) && !returnTo.includes('\\') ? returnTo : fallback);
+                        navigate(returnTo && /^\/gov\/(?:account|reports|map|dashboard|my-work|today|work-orders|assets|records-workspace|insights|announcements|administration)(?:[/?#]|$)/.test(returnTo) && !returnTo.includes('\\') ? returnTo : fallback, { replace: true });
                     } else {
                         setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');
                         clearAuthSession();

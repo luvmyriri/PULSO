@@ -212,6 +212,21 @@ a.gov-bi-stage__item:hover .gov-bi-stage__bar { filter: brightness(1.18); }
     .gov-bi-workbench .gov-assistant__starters button {min-height:44px;}
     .gov-bi-kpi__breakdown {row-gap:8px;}
 }
+@container gov-bi-layout (max-width:900px) {
+    .gov-bi-charts { grid-template-columns:minmax(0,1fr); gap:16px; }
+    .gov-bi-kpis { gap:16px; }
+    .gov-bi-kpi { min-height:134px; padding:16px; }
+    .gov-bi-kpi__head h2 { font-size:13px; }
+    .gov-bi-kpi__value span,.gov-bi-kpi__breakdown { font-size:12px; }
+    .gov-bi-kpi__breakdown :is(a,span) { white-space:normal; }
+    .gov-bi-surface { padding:16px; }
+    .gov-bi-surface__head p,.gov-bi-text-link { font-size:12px; }
+    .gov-bi-attention__row strong { font-size:12px; }
+    .gov-bi-attention__row small { font-size:11px; }
+}
+@container gov-bi-layout (max-width:639px) {
+    .gov-bi-kpis { grid-template-columns:minmax(0,1fr); }
+}
 @media(max-width:639px) {
     .gov-overview-workspace .gov-page-content {padding-inline:12px;}
     .gov-overview-welcome__city {display:none;}

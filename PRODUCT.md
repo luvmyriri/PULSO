@@ -29,6 +29,7 @@ PULSO presents one civic record through two purpose-built views: a calm, legible
 ## Capabilities and Constraints
 
 - Separate resident and government portals must preserve a canonical report lifecycle and consistent status language.
+- Resident reports become visible to other residents after authorized government verification. The shared view contains the ticket, category, status, recorded report coordinates, full incident address, issue description, and report photo when available. Government reviewers must check public content for personal information as part of verification. Resident identity, account and contact details remain private. The report author retains their own full view.
 - Resident-facing experiences require English and Filipino support.
 - Light and dark modes must carry identical meaning, hierarchy, content, and accessibility.
 - Permission checks must be consistent at route, navigation, page, data, and action levels; the backend remains the authority.

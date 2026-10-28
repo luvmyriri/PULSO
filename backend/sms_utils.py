@@ -288,6 +288,22 @@ def send_plain_sms(phone_number: str, message: str) -> SmsSendResult:
     return SmsSendResult(False)
 
 
+def send_registration_sms(phone_number: str, message: str) -> SmsSendResult:
+    """Use TextBee for registration without enabling unrelated outbound SMS."""
+    if os.getenv("REGISTRATION_SMS_PROVIDER", "none").strip().lower() == "textbee":
+        return _send_textbee_sms(phone_number, message)
+    _LOG.warning("Registration SMS is not configured")
+    return SmsSendResult(False)
+
+
+def send_report_receipt_sms(phone_number: str, message: str) -> SmsSendResult:
+    """Use TextBee for submitted-report receipts without enabling unrelated SMS."""
+    if os.getenv("REPORT_RECEIPT_SMS_PROVIDER", "none").strip().lower() == "textbee":
+        return _send_textbee_sms(phone_number, message)
+    _LOG.warning("Report receipt SMS is not configured")
+    return SmsSendResult(False)
+
+
 def send_emergency_sms(phone_number: str, title: str, message: str) -> SmsSendResult:
     """Alert staff without disclosing case details in the SMS body."""
     sms_text = "Urgent PULSO engineering alert. Open your staff workspace for details."

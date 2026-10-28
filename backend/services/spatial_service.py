@@ -19,8 +19,9 @@ from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import json
+from public_reports import safe_public_area, safe_public_category, public_incident_description, public_report_photo
 
-PUBLIC_REPORT_STATUSES = ("validated", "dispatched", "approved_internal", "in_progress", "resolved")
+PUBLIC_REPORT_STATUSES = ("pending_approval", "validated", "dispatched", "approved_internal", "in_progress", "resolved")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -188,7 +189,7 @@ def find_nearby_reports(
 ) -> List[Dict[str, Any]]:
     """
     Returns nearby reports within radius_m metres, sorted nearest-first.
-    Applies RA 10173 privacy fuzzing for non-staff viewers.
+    Public results contain government-verified incident details, without reporter identity.
     """
     valid, err = validate_coordinates(lat, lng)
     if not valid:
@@ -197,7 +198,9 @@ def find_nearby_reports(
     radius_m = max(10.0, min(float(radius_m), 15000.0)) # 10m to 15km
     limit = max(1, min(int(limit), 200))
 
-    query = text("""
+    approved = "(r.status IN ('pending_approval', 'validated', 'dispatched', 'approved_internal', 'in_progress', 'resolved'))"
+    visible_location = "r.location"
+    query = text(f"""
         SELECT 
             r.id,
             r.ticket_id,
@@ -208,19 +211,26 @@ def find_nearby_reports(
             r.location_lng,
             r.location_string,
             r.image_url,
+            r.accuracy_m,
+            r.contact_email,
+            r.contact_phone,
+            res.full_name AS reporter_name,
+            {approved} AS details_approved,
             r.created_at,
             r.barangay_id,
             r.sector,
             b.display_name AS barangay_name,
-            ROUND(ST_Distance(r.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)::numeric, 1) AS distance_meters
+            ROUND(ST_Distance(({visible_location})::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography)::numeric, 1) AS distance_meters
         FROM reports r
         LEFT JOIN barangays b ON r.barangay_id = b.id
+        LEFT JOIN residents res ON r.resident_id = res.id
         WHERE r.location IS NOT NULL
-          AND (:is_staff OR r.status IN ('validated', 'dispatched', 'approved_internal', 'in_progress', 'resolved'))
-          AND ST_DWithin(r.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius_m)
+          AND r.location && ST_Expand(ST_SetSRID(ST_MakePoint(:lng, :lat), 4326), :radius_m / 100000.0 + 0.002)
+          AND (:is_staff OR r.status IN ('pending_approval', 'validated', 'dispatched', 'approved_internal', 'in_progress', 'resolved'))
+          AND ST_DWithin(({visible_location})::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius_m)
           AND (:category IS NULL OR r.category = :category)
           AND (:status IS NULL OR r.status = :status)
-        ORDER BY r.location <-> ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+        ORDER BY distance_meters
         LIMIT :limit;
     """)
 
@@ -236,23 +246,25 @@ def find_nearby_reports(
 
     results = []
     for row in rows:
+        show_details = is_staff or row.details_approved
         r_lat, r_lng = row.location_lat, row.location_lng
-        if not is_staff:
+        if not show_details:
             r_lat, r_lng = mask_coordinates_for_privacy(r_lat, r_lng)
-
         results.append({
             "id": row.id,
             "ticket_id": row.ticket_id,
-            "category": row.category,
+            "category": row.category if is_staff else safe_public_category(row.category),
             "status": row.status,
-            "description": row.description,
+            "description": row.description if is_staff else (public_incident_description(row.description, (row.reporter_name, row.contact_email, row.contact_phone)) if show_details else None),
             "location_lat": r_lat,
             "location_lng": r_lng,
-            "location_string": row.location_string if is_staff else row.barangay_name,
-            "image_url": row.image_url,
+            "location_string": row.location_string if is_staff else ((public_incident_description(row.location_string, (row.reporter_name, row.contact_email, row.contact_phone)) if show_details else "") or safe_public_area(row.barangay_name)),
+            "image_url": row.image_url if is_staff else (public_report_photo(row.image_url) if show_details else None),
+            "accuracy_m": row.accuracy_m if show_details and row.accuracy_m and row.accuracy_m > 0 else None,
+            "public_details_approved": bool(row.details_approved),
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "barangay_id": row.barangay_id,
-            "barangay_name": row.barangay_name,
+            "barangay_name": row.barangay_name if is_staff else safe_public_area(row.barangay_name),
             "sector": row.sector,
             "distance_meters": float(row.distance_meters),
             "distance_display": f"{int(row.distance_meters)} m" if row.distance_meters < 1000 else f"{round(row.distance_meters / 1000, 2)} km",
@@ -360,23 +372,34 @@ def get_reports_in_viewport(
 
     limit = max(10, min(int(limit), 2000))
 
-    query = text("""
+    approved = "(r.status IN ('pending_approval', 'validated', 'dispatched', 'approved_internal', 'in_progress', 'resolved'))"
+    visible_location = "r.location"
+    query = text(f"""
         SELECT 
             r.id,
             r.ticket_id,
             r.category,
             r.status,
             r.description,
+            r.location_string,
+            r.image_url,
+            r.accuracy_m,
+            r.contact_email,
+            r.contact_phone,
+            res.full_name AS reporter_name,
+            {approved} AS details_approved,
             r.location_lat,
             r.location_lng,
             r.sector,
             r.created_at,
             b.display_name AS barangay_name,
-            ST_AsGeoJSON(r.location) AS geom_geojson
+            ST_AsGeoJSON(({visible_location})) AS geom_geojson
         FROM reports r
         LEFT JOIN barangays b ON r.barangay_id = b.id
-        WHERE r.location && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
-          AND (:is_staff OR r.status IN ('validated', 'dispatched', 'approved_internal', 'in_progress', 'resolved'))
+        LEFT JOIN residents res ON r.resident_id = res.id
+        WHERE r.location && ST_Expand(ST_MakeEnvelope(:west, :south, :east, :north, 4326), 0.001)
+          AND ({visible_location}) && ST_MakeEnvelope(:west, :south, :east, :north, 4326)
+          AND (:is_staff OR r.status IN ('pending_approval', 'validated', 'dispatched', 'approved_internal', 'in_progress', 'resolved'))
           AND (:category IS NULL OR r.category = :category)
           AND (:status IS NULL OR r.status = :status)
         LIMIT :limit;
@@ -398,24 +421,24 @@ def get_reports_in_viewport(
         if not row.geom_geojson:
             continue
         geom = json.loads(row.geom_geojson)
+        show_details = is_staff or row.details_approved
 
         r_lat, r_lng = row.location_lat, row.location_lng
-        if not is_staff:
-            r_lat, r_lng = mask_coordinates_for_privacy(r_lat, r_lng)
-            if geom.get("coordinates") and len(geom["coordinates"]) >= 2:
-                geom["coordinates"] = [r_lng, r_lat]
-
         features.append({
             "type": "Feature",
             "geometry": geom,
             "properties": {
                 "id": row.id,
                 "ticket_id": row.ticket_id,
-                "category": row.category,
+                "category": row.category if is_staff else safe_public_category(row.category),
                 "status": row.status,
-                "description": row.description[:100] if row.description else "",
+                "description": (row.description or "")[:100] if is_staff else (public_incident_description(row.description, (row.reporter_name, row.contact_email, row.contact_phone)) if show_details else ""),
+                "location_string": row.location_string if is_staff else ((public_incident_description(row.location_string, (row.reporter_name, row.contact_email, row.contact_phone)) if show_details else "") or safe_public_area(row.barangay_name)),
+                "image_url": row.image_url if is_staff else (public_report_photo(row.image_url) if show_details else None),
+                "accuracy_m": row.accuracy_m if show_details and row.accuracy_m and row.accuracy_m > 0 else None,
+                "public_details_approved": bool(row.details_approved),
                 "sector": row.sector,
-                "barangay_name": row.barangay_name,
+                "barangay_name": row.barangay_name if is_staff else safe_public_area(row.barangay_name),
                 "created_at": row.created_at.isoformat() if row.created_at else None,
             }
         })

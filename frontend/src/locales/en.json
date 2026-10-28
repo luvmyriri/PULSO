@@ -1,5 +1,48 @@
 {
   "translation": {
+    "mapPublicReports": {
+      "loading": "Loading public reports…",
+      "error": "Public reports could not be loaded.",
+      "empty": "No reports are public yet. Reports awaiting government review are not shown on this map.",
+      "filteredEmpty": "No reports match these filters.",
+      "retry": "Try again",
+      "clearFilters": "Clear filters",
+      "locationUnavailable": "Location unavailable",
+      "photoPrivate": "No report photo available",
+      "basicOnly": "Government verified this report before it appeared here. The reporter’s identity and contact details remain private.",
+      "openApproximateArea": "Open approximate area",
+      "openReportLocation": "Open report location",
+      "awaitingDetailReview": "The report was verified under the earlier basic-view policy. Its exact location, description, and photo are awaiting a separate public-content review.",
+      "descriptionUnavailable": "No description recorded.",
+      "status": {
+        "verified": "Verified · Awaiting work approval",
+        "validated": "Verified",
+        "approved": "Approved for work",
+        "dispatched": "Dispatched",
+        "inProgress": "Work in progress",
+        "resolved": "Resolved"
+      }
+    },
+    "loadingScreen": {
+      "ariaLabel": "Loading PULSO",
+      "city": "Caloocan City",
+      "readying": "Getting things ready...",
+      "slow": "Still loading. Please wait a moment.",
+      "connectionError": "We can't connect right now. Check your internet and try again.",
+      "retry": "Try again",
+      "department": "City Engineering Department",
+      "government": "Caloocan City Government"
+    },
+    "notificationCenter": {
+      "title": "All notifications",
+      "seeAll": "See all notifications",
+      "loadError": "Unable to load notifications.",
+      "tryAgain": "Try again",
+      "empty": "No notifications available.",
+      "olderError": "Unable to load older notifications.",
+      "loadingOlder": "Loading older notifications…",
+      "loadOlder": "Load older notifications"
+    },
     "reportLink": {
         "loading": "Opening your report…",
         "error": "This report could not be opened. Check your connection and try again. It may be unavailable, or your account may not have access.",
@@ -360,6 +403,30 @@
         "subtitle": "Search for a place, then adjust the pin to the right spot.",
         "searchPlaceholder": "Street, landmark or barangay",
         "useMyLocation": "Use my location",
+        "chooseOnMap": "Choose on map",
+        "resyncGps": "Resync GPS",
+        "startLive": "Track while reporting",
+        "stopLive": "Stop live location",
+        "liveHelp": "Live location updates only while this step is open. Review the pin before continuing.",
+        "liveReportHelp": "Live location runs only while this step is open. Review the selected place before submitting.",
+        "liveActive": "Live location active",
+        "locationSelected": "Location selected",
+        "noLocation": "Location not set",
+        "noLocationHelp": "Location not set. Use GPS or choose a place on the map.",
+        "chooseLocation": "Choose the issue location",
+        "selectedMapLocation": "Selected map location",
+        "savedLocationNeedsConfirmation": "Saved location needs confirmation",
+        "barangayNotRecorded": "Barangay not recorded",
+        "reviewSavedLocation": "Review the saved location before confirming",
+        "selectToConfirmArea": "Select the issue location to confirm its area",
+        "confirmSavedLocation": "Confirm saved location",
+        "selectedCoordinates": "Selected coordinates",
+        "devicePosition": "Device position from {{time}}.",
+        "searchUnavailable": "Place search is unavailable. Choose a place on the map or use GPS.",
+        "searchFailed": "No matching place was found. Try another address or choose the place on the map.",
+        "unsupported": "Location is not available on this device. Choose the place on the map.",
+        "photoLocationNote": "Capture a clear photo. Location is added only when you select it.",
+        "chooseBeforeSubmit": "Choose the issue location with GPS or the map before submitting.",
         "locating": "Acquiring accurate GPS...",
         "locationSuccess": "GPS location tagged (accuracy: {{accuracy}}m)",
         "locationError": "Unable to acquire GPS. Please search or drag the pin manually.",
@@ -736,6 +803,17 @@
       "signIn": "Sign In"
     },
     "dashboard": {
+      "publicConcerns": {
+        "title": "Public concerns",
+        "count": "{{count}} public",
+        "viewMap": "View map",
+        "report": "Civic report",
+        "locationUnavailable": "Location unavailable",
+        "loading": "Loading public reports…",
+        "error": "Public reports could not be loaded.",
+        "empty": "No reports are public yet. Reports awaiting government review appear in My reports for their authors.",
+        "retry": "Try again"
+      },
       "sidebar": {
         "portal": "Resident Portal",
         "overview": "Overview",

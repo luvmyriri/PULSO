@@ -37,7 +37,7 @@ const disableTransitions = () => {
  * Detects the current operating system / browser preferred color scheme.
  */
 const getSystemTheme = () => {
-    if (typeof window === 'undefined' || !window.matchMedia) return 'dark';
+    if (typeof window === 'undefined' || !window.matchMedia) return 'light';
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 };
 
@@ -52,7 +52,7 @@ const resolveTheme = (mode) => {
 export function ThemeProvider({ children }) {
     // 1. Initial Theme Mode ('light' | 'dark' | 'system')
     const [themeMode, setThemeModeState] = useState(() => {
-        if (typeof window === 'undefined') return 'system';
+        if (typeof window === 'undefined') return 'light';
         const savedMode = localStorage.getItem('pulso_theme_mode');
         if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'system') {
             return savedMode;
@@ -61,7 +61,7 @@ export function ThemeProvider({ children }) {
         if (legacy === 'light' || legacy === 'dark') {
             return legacy;
         }
-        return 'system';
+        return 'light';
     });
 
     // 2. Resolved Active Theme ('light' | 'dark')

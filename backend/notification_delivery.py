@@ -116,7 +116,9 @@ def deliver_email(sessions=SessionLocal,limit=25,sender=send_email):
         db.commit()
     for _ in range(limit):
         with sessions() as db:
-            query=db.query(gm.ResidentNotificationDelivery).filter(gm.ResidentNotificationDelivery.status.in_(['pending','retry','waiting_configuration']),
+            query=db.query(gm.ResidentNotificationDelivery).join(gm.OutboxEvent,gm.OutboxEvent.id==gm.ResidentNotificationDelivery.event_id).filter(
+                gm.OutboxEvent.event_type.notin_(['report_creation_receipt_email','report_creation_receipt_sms']),
+                gm.ResidentNotificationDelivery.status.in_(['pending','retry','waiting_configuration']),
                 or_(gm.ResidentNotificationDelivery.next_attempt_at.is_(None),gm.ResidentNotificationDelivery.next_attempt_at<=now()))
             item=query.order_by(gm.ResidentNotificationDelivery.id).with_for_update(skip_locked=True).first()
             if not item:break
@@ -204,14 +206,16 @@ def operations(page:int=1,status:str='all',db:Session=Depends(get_db),user=Depen
     if page<1:raise HTTPException(422,'Choose a positive page number.')
     query=scoped_deliveries(db,user)
     if status!='all':
-        if status not in {'pending','retry','waiting_configuration','sending','smtp_accepted','failed','uncertain','cancelled'}:raise HTTPException(422,'Choose a delivery state.')
+        if status not in {'pending','retry','waiting_configuration','sending','smtp_accepted','sms_accepted','failed','uncertain','cancelled'}:raise HTTPException(422,'Choose a delivery state.')
         query=query.filter(gm.ResidentNotificationDelivery.status==status)
     total=query.count();items=[]
     for delivery in query.order_by(gm.ResidentNotificationDelivery.id.desc()).offset((page-1)*15).limit(15):
         event=db.get(gm.OutboxEvent,delivery.event_id);payload=event.payload
         announcement=payload.get('announcement_id');report=payload.get('report_id')
         reference=f'Update #{announcement}' if announcement else f'Report #{report}'
+        from report_receipts import SMS as RECEIPT_SMS
         items.append(dict(id=delivery.id,reference=reference,status=delivery.status,attempts=delivery.attempts,
+            channel='sms' if event.event_type==RECEIPT_SMS else 'email',
             next_attempt_at=delivery.next_attempt_at,accepted_at=delivery.accepted_at,error_code=delivery.error_code,
             can_retry=delivery.status=='failed' and operational_access(user,True),
             target_url=f'/gov/announcements?selected={announcement}' if announcement else f'/gov/reports?reportId={report}'))
@@ -233,11 +237,19 @@ def retry_delivery(delivery_id:int,payload:RetryDelivery,db:Session=Depends(get_
     item=scoped_deliveries(db,user).filter(gm.ResidentNotificationDelivery.id==delivery_id).with_for_update(of=gm.ResidentNotificationDelivery).first()
     if not item:raise HTTPException(404,'Delivery record not found in your scope.')
     if item.status!='failed' or item.attempts!=payload.expected_attempts:raise HTTPException(409,'This delivery changed or cannot be safely retried. Refresh its status.')
-    if not config()['ready']:raise HTTPException(409,'Connect the email service before retrying delivery.')
     event=db.get(gm.OutboxEvent,item.event_id);resident=db.get(models.Resident,item.resident_id)
-    if not event_valid(db,event) or not category_allowed(resident,event) or not preferences(resident)['email'] or email_hash(resident.email)!=item.recipient_hash:
-        raise HTTPException(409,'The notice is no longer eligible for email delivery. The resident or report relationship changed.')
+    from report_receipts import EVENTS as RECEIPT_EVENTS, EMAIL as RECEIPT_EMAIL, eligible as receipt_eligible, recipient as receipt_recipient, smtp_ready, sms_ready
+    if event.event_type in RECEIPT_EVENTS:
+        address=receipt_recipient(resident,event.event_type) if resident else None
+        if not receipt_eligible(db,event,resident) or not address or email_hash(address)!=item.recipient_hash:
+            raise HTTPException(409,'The report receipt is no longer eligible for delivery.')
+        if not (smtp_ready() if event.event_type==RECEIPT_EMAIL else sms_ready()):
+            raise HTTPException(409,'Connect the receipt delivery service before retrying.')
+    else:
+        if not config()['ready']:raise HTTPException(409,'Connect the email service before retrying delivery.')
+        if not event_valid(db,event) or not category_allowed(resident,event) or not preferences(resident)['email'] or email_hash(resident.email)!=item.recipient_hash:
+            raise HTTPException(409,'The notice is no longer eligible for email delivery. The resident or report relationship changed.')
     item.status='pending';item.next_attempt_at=now();item.error_code=None
-    staff_accounts.audit(db,user,'Notification email retry queued',dict(delivery_id=item.id,event_id=item.event_id,reason=payload.reason,previous_attempts=item.attempts))
+    staff_accounts.audit(db,user,'Report receipt retry queued' if event.event_type in RECEIPT_EVENTS else 'Notification email retry queued',dict(delivery_id=item.id,event_id=item.event_id,reason=payload.reason,previous_attempts=item.attempts))
     db.commit()
     return dict(status='pending',message='Retry queued. No delivery is confirmed yet.')

@@ -1158,6 +1158,7 @@ export default function Register() {
 
     // OTP Verification State
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
+    const [confirmationChannels, setConfirmationChannels] = useState(['email']);
     const [verifying, setVerifying] = useState(false);
     const [verifyError, setVerifyError] = useState('');
     const [verifySuccess, setVerifySuccess] = useState('');
@@ -1776,14 +1777,15 @@ export default function Register() {
         setVerifyError('');
         setVerifySuccess('');
         try {
-            await axios.post(`${API_BASE_URL}/api/auth/resend-code`, {
+            const response = await axios.post(`${API_BASE_URL}/api/auth/resend-code`, {
                 email: formData.email,
                 code: '000000'
             });
-            setVerifySuccess(formData.mobile
-                ? "A new 6-digit verification code has been dispatched to your email and mobile number."
-                : "A new 6-digit verification code has been dispatched to your email address."
-            );
+            const channels = response.data.confirmation_channels || ['email'];
+            setConfirmationChannels(channels);
+            setVerifySuccess(channels.length === 2
+                ? 'The same new code was requested by email and text. Enter either copy.'
+                : `A new code was requested by ${channels[0] === 'sms' ? 'text message' : 'email'}.`);
             setResendTimer(60);
             setCanResend(false);
             setOtp(['', '', '', '', '', '']);
@@ -1796,36 +1798,15 @@ export default function Register() {
         }
     };
 
-    // Auto-focus first OTP box and activate WebOTP SMS autofill on mobile
+    // Auto-focus the email verification code field.
     React.useEffect(() => {
         if (step !== 5) return;
         const timer = setTimeout(() => {
             otpRefs[0]?.current?.focus();
         }, 120);
 
-        let ac;
-        if (typeof window !== 'undefined' && 'OTPCredential' in window && navigator.credentials) {
-            try {
-                ac = new AbortController();
-                navigator.credentials.get({
-                    otp: { transport: ['sms'] },
-                    signal: ac.signal
-                }).then(content => {
-                    if (content && content.code) {
-                        const digits = content.code.replace(/\D/g, '').slice(0, 6);
-                        if (digits.length === 6) {
-                            const newOtp = digits.split('');
-                            setOtp(newOtp);
-                            triggerVerifyCode(digits);
-                        }
-                    }
-                }).catch(() => { });
-            } catch (e) { }
-        }
-
         return () => {
             clearTimeout(timer);
-            if (ac) ac.abort();
         };
     }, [step]);
 
@@ -1914,6 +1895,7 @@ export default function Register() {
             const res = await axios.post(`${API_BASE_URL}/api/auth/register`, payload);
             if (res.status === 200 || res.status === 201) {
                 clearAuthSession();
+                setConfirmationChannels(res.data.confirmation_channels || ['email']);
                 setResendTimer(60);
                 setCanResend(false);
                 setStep(5); // Step 5 is OTP!
@@ -3991,19 +3973,19 @@ export default function Register() {
                                             Enter your 6-digit code
                                         </h1>
                                         <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
-                                            We sent a verification code to confirm your registration:
+                                            {confirmationChannels.length === 2
+                                                ? 'The same code was requested by email and text. Enter either copy to confirm your account:'
+                                                : `A verification code was requested by ${confirmationChannels.includes('sms') ? 'text message' : 'email'}:`}
                                         </p>
                                         <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2.5 pt-2 text-slate-900 dark:text-white font-mono font-bold text-xs sm:text-sm">
-                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 max-w-full truncate" title={formData.email}>
+                                            {confirmationChannels.includes('email') && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 max-w-full truncate" title={formData.email}>
                                                 <Mail size={13} className="text-[#ff6b00] shrink-0" />
                                                 <span className="truncate">{maskEmail(formData.email) || formData.email}</span>
-                                            </span>
-                                            {formData.mobile ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" title={formData.mobile}>
-                                                    <Phone size={13} className="text-[#ff6b00] shrink-0" />
-                                                    <span>{maskPhoneNumber(formData.mobile) || formData.mobile}</span>
-                                                </span>
-                                            ) : null}
+                                            </span>}
+                                            {confirmationChannels.includes('sms') && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 max-w-full">
+                                                <Phone size={13} className="text-[#ff6b00] shrink-0" />
+                                                <span>{maskPhoneNumber(formData.mobile)}</span>
+                                            </span>}
                                         </div>
                                     </div>
 
@@ -4071,10 +4053,12 @@ export default function Register() {
                                     <div className="mt-2 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex flex-col items-center gap-1 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 text-center">
                                         <p className="flex items-center justify-center gap-1">
                                             <Info size={12} className="text-slate-400 shrink-0" />
-                                            <span>Check your spam or junk folder if you can't find the email.</span>
+                                            <span>{confirmationChannels.includes('email')
+                                                ? "Check your spam or junk folder if you can't find the email."
+                                                : 'Text delivery may take a few minutes; provider acceptance does not guarantee handset arrival.'}</span>
                                         </p>
                                         <p>
-                                            Wrong email or number?{' '}
+                                            Wrong email or mobile number?{' '}
                                             <button
                                                 type="button"
                                                 onClick={() => setStep(4)}
@@ -4150,7 +4134,7 @@ export default function Register() {
                                         Welcome to PULSO! 🎉
                                     </h2>
                                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-sm mt-1 leading-relaxed">
-                                        Your Caloocan residency has been successfully verified. You're ready to report hazards and track city works.
+                                        Your account has been confirmed. Sign in to report issues and track city work. ID and residency review are separate.
                                     </p>
                                 </div>
                                 <Link

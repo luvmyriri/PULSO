@@ -37,7 +37,7 @@ export default function MapPin({
         return '#EA580C'; // Roads
     };
 
-    const pinColor = categoryColor || report.categoryColor || getCategoryColorFallback(report);
+    const categoryPinColor = categoryColor || getCategoryColorFallback(report);
 
     const rawImg = (
         report.photo_url ||
@@ -54,6 +54,7 @@ export default function MapPin({
             ? rawImg
             : `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
     }
+    const pinColor = categoryPinColor;
 
     const categoryName = report.category || report.raw_category || report.report_type || report.title || 'Civic Infrastructure';
     const CategoryIcon = getCategoryIconComponent(categoryName, report.raw_category);
@@ -74,10 +75,11 @@ export default function MapPin({
             aria-label={ariaLabel}
             title={ariaLabel}
             tabIndex={0}
-            className={`group relative w-14 h-14 rounded-full flex items-center justify-center select-none cursor-pointer transition-transform duration-200 focus-visible:outline-none ${
+            className={`group relative w-14 h-14 rounded-full flex items-center justify-center select-none cursor-pointer transition-transform duration-200 focus-visible:outline-3 focus-visible:outline-offset-6 ${
                 isSelected ? 'scale-105 z-50' : 'hover:scale-105 z-30'
             }`}
             style={{
+                outlineColor: pinColor,
                 boxShadow: isSelected
                     ? `0 0 0 3.5px ${pinColor}, 0 0 0 5.5px ${cardBgColor}, 0 10px 25px rgba(0,0,0,0.4)`
                     : `0 0 0 2.5px ${pinColor}, 0 0 0 4.5px ${cardBgColor}, 0 6px 18px rgba(0,0,0,0.3)`

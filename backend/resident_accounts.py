@@ -164,18 +164,24 @@ def send_confirmation(db, resident, sender, actor=None, payload=None):
     if resident.email_code_sent_at and resident.email_code_sent_at > now() - timedelta(seconds=60):
         raise HTTPException(429, 'A code was recently requested. Wait one minute before retrying.')
     code = prepare_code(resident)
-    # Persist before SMTP: a delivered code must be redeemable even if the HTTP response is lost.
-    # Delivery is an external operation; success means SMTP accepted, not mailbox delivery.
+    # Persist before delivery: a received code must be redeemable even if the HTTP response is lost.
+    # Provider acceptance does not prove mailbox or handset arrival.
     resident.administration_version += 1
     if actor: audit(db, actor, resident, 'Resident confirmation requested', reason=payload.reason.strip(), delivery_status='pending')
     db.commit()
-    try: accepted = bool(sender(resident.email, code, 'Verification'))
-    except Exception: accepted = False
+    try:
+        result = sender(resident.email, code, 'Verification')
+        channels = [channel for channel in ('email', 'sms') if result.get(channel)] if isinstance(result, dict) else (['email'] if result else [])
+    except Exception:
+        channels = []
+    accepted = bool(channels)
+    delivery_status = 'smtp_accepted' if 'email' in channels else ('sms_accepted' if 'sms' in channels else 'failed')
     if actor:
-        audit(db, actor, resident, 'Resident confirmation delivery result', reason=payload.reason.strip(), delivery_status='smtp_accepted' if accepted else 'failed')
+        audit(db, actor, resident, 'Resident confirmation delivery result', reason=payload.reason.strip(), delivery_status=delivery_status)
         db.commit()
-    if not accepted: raise HTTPException(503, 'The confirmation email could not be sent. Check the configured email service before retrying.')
-    return dict(status='success',delivery_status='smtp_accepted',message='The email service accepted the confirmation email. Mailbox delivery is not confirmed.')
+    if not accepted: raise HTTPException(503, 'The confirmation code could not be sent. Try again later.')
+    return dict(status='success', delivery_status=delivery_status, confirmation_channels=channels,
+        message='Code requested through ' + ' and '.join(channels) + '. Inbox or handset delivery is not confirmed.')
 
 
 def accept_code(db, resident, code):

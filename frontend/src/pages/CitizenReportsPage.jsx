@@ -264,6 +264,7 @@ export default function CitizenReportsPage({ workspace }) {
     };
 
     const handleVerifyReport = async (report) => {
+        if (!window.confirm('Verify and publish the report location, description, and photo? Check these for personal information first.')) return;
         try {
             const res = await fetch(`${API_BASE_URL}/api/reports/${report.id}/status`, {
                 method: 'PATCH',
@@ -271,7 +272,7 @@ export default function CitizenReportsPage({ workspace }) {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ status: 'pending_approval' }),
+                body: JSON.stringify({ status: 'pending_approval', public_content_reviewed: true }),
             });
             if (res.ok) {
                 showToast(`Report ${reportId(report)} verified and queued for dispatch.`);

@@ -61,3 +61,6 @@ diag_out.json
 
 # Private editorial draft documents
 backend/private_publications/
+
+.impeccable/
+output/

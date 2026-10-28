@@ -371,7 +371,7 @@ export default function ReportWizardPage() {
               <Step2LocationMap
                 isMapLoaded={isMapLoaded}
                 locationData={formData.location}
-                onLocationChange={(loc) => setFormData(p => ({ ...p, location: loc }))}
+                onLocationChange={(loc) => setFormData(p => ({ ...p, location: typeof loc === 'function' ? loc(p.location) : loc }))}
                 onBack={goToPreviousStep}
                 onContinue={goToNextStep}
               />

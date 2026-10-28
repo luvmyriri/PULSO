@@ -647,28 +647,26 @@ class TestPublicPayloadPIIRedaction:
         assert not any("CONFIDENTIAL" in n for n in notes), "Internal private timeline note leaked to public!"
         assert not any("PHP 150,000" in n for n in notes), "Budget detail leaked in public timeline!"
 
-    def test_public_reports_feed_anonymization(self, client):
+    def test_public_reports_feed_anonymization(self, client, resident_maria):
         """
-        Verify that GET /api/reports/public anonymizes citizen names for unauthenticated viewers
-        and excludes pending/unvalidated reports.
+        Every viewer gets the same verified incident projection.
+        Pending reports and reporter identity and contacts stay private.
         """
-        # Seed a validated report with a reporter name
         db = TestingSessionLocal()
-        db.add(models.Resident(
-            id=999, full_name="Private Citizen Juan",
-            email="privacy-feed@example.invalid", password_hash="unused",
-        ))
-        db.flush()
         r_validated = models.Report(
             ticket_id="RPT-20260902-VAL0001",
             category="Roads & Bridges",
-            description="Verified pothole repair in progress.",
-            status="in_progress",
-            reporter_name="Private Citizen Juan",
+            description="Pothole beside Maria Santos at 09171234567.",
+            status="pending_approval",
+            reporter_name="Maria Santos",
             location_lat=14.7565,
             location_lng=121.0450,
-            location_barangay="Barangay 171",
-            resident_id=999
+            location_string="Blk 4 Lot 16, private home address",
+            location_barangay="Barangay 171 (Brgy. 171)",
+            image_url="/api/uploads/reports/report_abcdef0123456789.jpg",
+            resident_id=101,
+            contact_email="maria.santos@example.com",
+            contact_phone="09171234567",
         )
         r_pending = models.Report(
             ticket_id="RPT-20260902-PEND0001",
@@ -679,11 +677,18 @@ class TestPublicPayloadPIIRedaction:
             location_lat=14.7565,
             location_lng=121.0450
         )
-        db.add_all([r_validated, r_pending])
+        r_legacy = models.Report(
+            ticket_id="RPT-20260902-LEGACY1", category="Roads",
+            description="Old private report narrative", status="validated",
+            location_lat=14.7565, location_lng=121.0450,
+            location_string="Old full incident address", location_barangay="Barangay 171",
+            image_url="/api/uploads/reports/report_abcdef0123456789.jpg",
+        )
+        db.add_all([r_validated, r_pending, r_legacy])
+        db.flush()
         db.commit()
         db.close()
 
-        # Public unauthenticated request
         res = client.get("/api/reports/public")
         assert res.status_code == 200
         items = res.json()
@@ -691,7 +696,22 @@ class TestPublicPayloadPIIRedaction:
         ticket_ids = [item["ticket_id"] for item in items]
         assert "RPT-20260902-VAL0001" in ticket_ids
         assert "RPT-20260902-PEND0001" not in ticket_ids, "Pending unvalidated report leaked to public feed!"
+        legacy_item = next(i for i in items if i["ticket_id"] == "RPT-20260902-LEGACY1")
+        assert legacy_item["public_details_approved"] is True
+        assert legacy_item["location_lat"] == 14.7565
+        assert legacy_item["location_string"] == "Old full incident address"
+        assert legacy_item["description"] == "Old private report narrative"
+        assert legacy_item["image_url"].startswith("/api/thumbnails?src=")
 
-        # Anonymization check
         val_item = next(i for i in items if i["ticket_id"] == "RPT-20260902-VAL0001")
-        assert val_item["reporter_name"] == "Anonymous Resident", f"Reporter name was not anonymized: {val_item['reporter_name']}"
+        assert set(val_item) == {"id", "ticket_id", "category", "title", "status", "location_lat", "location_lng", "location_string", "barangay", "description", "image_url", "accuracy_m", "public_details_approved", "created_at", "updated_at"}
+        assert val_item["status"] == "pending_approval"
+        assert val_item["location_string"] == "Blk 4 Lot 16, private home address"
+        assert val_item["location_lat"] == 14.7565
+        assert val_item["location_lng"] == 121.045
+        assert val_item["image_url"].startswith("/api/thumbnails?src=")
+        assert client.get("/api/reports/public", headers=resident_maria["headers"]).json() == items
+        assert "Maria Santos" not in res.text
+        assert "09171234567" not in res.text
+        assert "private home address" in res.text
+        assert '"/api/uploads/reports/report_abcdef0123456789.jpg"' not in res.text

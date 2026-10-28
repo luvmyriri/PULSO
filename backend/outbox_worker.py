@@ -44,14 +44,27 @@ def _publication_is_current(db, payload):
 
 
 def deliver_pending(db: Session, limit: int = 100) -> int:
-    supported = {'resident_in_app_notification', 'publication_in_app_notification', 'publication_related_report_notification'}
+    from report_receipts import EVENTS as RECEIPT_EVENTS
+    supported = {'resident_in_app_notification', 'publication_in_app_notification', 'publication_related_report_notification'} | RECEIPT_EVENTS
     events = db.query(gov_models.OutboxEvent).filter(gov_models.OutboxEvent.status == 'pending', gov_models.OutboxEvent.event_type.in_(supported)).order_by(
         gov_models.OutboxEvent.id,
     ).with_for_update(skip_locked=True).limit(limit).all()
     delivered = 0
     for event in events:
-        if event.event_type not in {"resident_in_app_notification", "publication_in_app_notification", "publication_related_report_notification"}:
-            # Leave unknown types pending for their own registered transport.
+        payload = event.payload
+        if event.event_type in RECEIPT_EVENTS:
+            try:
+                with db.begin_nested():
+                    from report_receipts import queue_delivery
+                    event.status = 'delivered' if queue_delivery(db, event) else 'skipped'
+                event.attempts += 1
+                if event.status == 'delivered':
+                    event.delivered_at = datetime.now(timezone.utc)
+                    delivered += 1
+            except Exception:
+                event.attempts += 1
+                if event.attempts >= 5:
+                    event.status = 'failed'
             continue
         payload = event.payload
         try:
@@ -127,7 +140,9 @@ def main() -> None:
         with SessionLocal() as db:
             delivered = deliver_pending(db)
         from notification_delivery import deliver_email
+        from report_receipts import deliver as deliver_report_receipts
         deliver_email()
+        deliver_report_receipts()
         if args.once:
             print(f"Delivered {delivered} in-app notifications")
             return

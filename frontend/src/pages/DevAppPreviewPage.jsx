@@ -625,7 +625,7 @@ function DevAppPreviewContent() {
   const [isLandscape, setIsLandscape] = useState(false);
   const [screenSize, setScreenSize] = useState({ width: 390, height: 844, label: '390 x 844 (iPhone 12/13/14 native)' });
   const [testStep, setTestStep] = useState(1);
-  const [previewAppearance, setPreviewAppearance] = useState('dark');
+  const [previewAppearance, setPreviewAppearance] = useState('light');
   const [previewTarget, setPreviewTarget] = useState('tutorial'); // 'tutorial' | 'splash' | 'cards' | 'header' | 'settings' | 'map' | 'report' | 'history' | 'details' | 'camera'
   const [cameraPreviewMode, setCameraPreviewMode] = useState('invalid'); // 'invalid' | 'live' | 'checking' | 'accepted' | 'permission_denied' | 'error'
   const [cameraPhotoRatio, setCameraPhotoRatio] = useState('4:3'); // '4:3' | '16:9' | '1:1'

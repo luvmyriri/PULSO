@@ -25,14 +25,17 @@ client = TestClient(app)
 
 class TestGoogleAuth(unittest.TestCase):
     def setUp(self):
+        self.previous_test_env = (os.environ.get('PULSO_ENV'), os.environ.get('PULSO_ALLOW_MOCK_GOOGLE_TOKENS'))
+        os.environ['PULSO_ENV'] = 'test'
+        os.environ['PULSO_ALLOW_MOCK_GOOGLE_TOKENS'] = 'true'
         # Setup clean test users in the database
         db = next(get_db())
         try:
             # Clean up prior test accounts
             test_emails = [
                 "new_google_resident_test@example.com",
-                "existing_verified_resident@example.com",
-                "existing_unverified_resident@example.com"
+                "existing_verified_resident@gmail.com",
+                "existing_unverified_resident@gmail.com"
             ]
             for email in test_emails:
                 u = db.query(models.Resident).filter(models.Resident.email == email).first()
@@ -43,7 +46,7 @@ class TestGoogleAuth(unittest.TestCase):
             # Seed existing verified resident
             verified_resident = models.Resident(
                 full_name="Maria Santos",
-                email="existing_verified_resident@example.com",
+                email="existing_verified_resident@gmail.com",
                 password_hash="fake_hash_123",
                 phone_number="09171112233",
                 is_verified=True,
@@ -58,7 +61,7 @@ class TestGoogleAuth(unittest.TestCase):
             # Seed existing unverified resident
             unverified_resident = models.Resident(
                 full_name="Juan Cruz",
-                email="existing_unverified_resident@example.com",
+                email="existing_unverified_resident@gmail.com",
                 password_hash="fake_hash_456",
                 phone_number="09182223344",
                 is_verified=False,
@@ -76,8 +79,8 @@ class TestGoogleAuth(unittest.TestCase):
         try:
             test_emails = [
                 "new_google_resident_test@example.com",
-                "existing_verified_resident@example.com",
-                "existing_unverified_resident@example.com"
+                "existing_verified_resident@gmail.com",
+                "existing_unverified_resident@gmail.com"
             ]
             for email in test_emails:
                 u = db.query(models.Resident).filter(models.Resident.email == email).first()
@@ -86,6 +89,11 @@ class TestGoogleAuth(unittest.TestCase):
             db.commit()
         finally:
             db.close()
+            for key, value in zip(('PULSO_ENV', 'PULSO_ALLOW_MOCK_GOOGLE_TOKENS'), self.previous_test_env):
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def test_first_time_google_signin(self):
         """First-time Google sign-in should create an unverified account and route to ID verification."""
@@ -93,26 +101,18 @@ class TestGoogleAuth(unittest.TestCase):
         mock_token = f"mock_google_token:{email}:New Resident:google_sub_first_time_999"
 
         response = client.post("/api/auth/google", json={"credential": mock_token})
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-
-        self.assertEqual(data["status"], "new_unverified")
-        self.assertEqual(data["action"], "route_to_id_verification")
-        self.assertEqual(data["user"]["email"], email)
-        self.assertFalse(data["user"]["is_verified"])
-        self.assertNotIn("access_token", data, "Unverified first-time account MUST NOT receive an access_token")
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("access_token", response.json())
 
         # Verify DB entry
         db = next(get_db())
         user_db = db.query(models.Resident).filter(models.Resident.email == email).first()
-        self.assertIsNotNone(user_db)
-        self.assertEqual(user_db.google_id, "google_sub_first_time_999")
-        self.assertFalse(user_db.is_verified)
+        self.assertIsNone(user_db)
         db.close()
 
     def test_existing_verified_account_linking(self):
         """Returning resident who already has a verified account should link Google and get authenticated."""
-        email = "existing_verified_resident@example.com"
+        email = "existing_verified_resident@gmail.com"
         mock_token = f"mock_google_token:{email}:Maria Santos:google_sub_verified_777"
 
         response = client.post("/api/auth/google", json={"credential": mock_token})
@@ -134,33 +134,24 @@ class TestGoogleAuth(unittest.TestCase):
 
     def test_existing_unverified_account_linking(self):
         """Returning resident who hasn't verified ID must see pending verification and not receive portal token."""
-        email = "existing_unverified_resident@example.com"
+        email = "existing_unverified_resident@gmail.com"
         mock_token = f"mock_google_token:{email}:Juan Cruz:google_sub_unverified_555"
 
         response = client.post("/api/auth/google", json={"credential": mock_token})
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-
-        self.assertEqual(data["status"], "pending_verification")
-        self.assertEqual(data["action"], "route_to_id_verification")
-        self.assertFalse(data["user"]["is_verified"])
-        self.assertNotIn("access_token", data, "Unverified account MUST NOT receive an access_token")
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("access_token", response.json())
 
         # Check DB that google_id was linked
         db = next(get_db())
         user_db = db.query(models.Resident).filter(models.Resident.email == email).first()
-        self.assertEqual(user_db.google_id, "google_sub_unverified_555")
+        self.assertIsNone(user_db.google_id)
         self.assertFalse(user_db.is_verified)
         db.close()
 
     def test_google_complete_id_verification(self):
         """After Google sign-in, completing ID verification must verify account and grant portal token."""
-        # 1. First-time sign-in
+        # The legacy endpoint cannot issue a session based on caller-provided ID fields.
         email = "new_google_resident_test@example.com"
-        mock_token = f"mock_google_token:{email}:Alex Rivera:google_sub_complete_test"
-        client.post("/api/auth/google", json={"credential": mock_token})
-
-        # 2. Submit ID verification details (e.g. PhilSys National ID)
         verify_payload = {
             "email": email,
             "full_name": "Alex Rivera",
@@ -173,20 +164,13 @@ class TestGoogleAuth(unittest.TestCase):
             "id_number": "1234-5678-9012-3456"
         }
         res = client.post("/api/auth/google/complete-verification", json=verify_payload)
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-
-        self.assertEqual(data["status"], "verified")
-        self.assertIn("access_token", data)
-        self.assertTrue(data["user"]["is_verified"])
-        self.assertEqual(data["user"]["kyc_level"], "Gold (PhilSys Verified)")
+        self.assertEqual(res.status_code, 410)
+        self.assertNotIn("access_token", res.json())
 
         # Verify DB updated
         db = next(get_db())
         user_db = db.query(models.Resident).filter(models.Resident.email == email).first()
-        self.assertTrue(user_db.is_verified)
-        self.assertEqual(user_db.kyc_level, "Gold (PhilSys Verified)")
-        self.assertEqual(user_db.id_type, "philsys")
+        self.assertIsNone(user_db)
         db.close()
 
     def test_invalid_google_token_rejected(self):

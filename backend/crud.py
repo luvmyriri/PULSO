@@ -298,7 +298,8 @@ def create_report(
     report: schemas.ReportCreate,
     resident_id: Optional[int] = None,
     ai_analysis: Optional[dict] = None,
-    tracking_token_hash: Optional[str] = None
+    tracking_token_hash: Optional[str] = None,
+    queue_resident_receipt: bool = False,
 ) -> models.Report:
     from sqlalchemy.exc import IntegrityError
     import logging
@@ -389,6 +390,9 @@ def create_report(
             db.flush()
             from report_review import auto_route
             auto_route(db, db_report)
+            if queue_resident_receipt:
+                from report_receipts import queue_intents
+                queue_intents(db, db_report)
             db.commit()
             db.refresh(db_report)
             
@@ -420,7 +424,7 @@ def _create_notification(db: Session, title: str, message: str, resident_id: int
     db.add(db_notification)
     db.commit()
 
-def update_report_status(db: Session, report_id: int, status: str, actor_id: int = None, budget: float = None, deployment_date: datetime = None, reason: str = None):
+def update_report_status(db: Session, report_id: int, status: str, actor_id: int = None, budget: float = None, deployment_date: datetime = None, reason: str = None, public_content_reviewed: bool = False):
     db_report = db.query(models.Report).filter(models.Report.id == report_id).first()
     if db_report:
         previous_status = db_report.status
@@ -441,6 +445,16 @@ def update_report_status(db: Session, report_id: int, status: str, actor_id: int
         )
         db.add(timeline_entry)
         db.flush()
+        if public_content_reviewed and status == "pending_approval" and actor_id:
+            db.add(gov_models.ProcessTimeline(
+                report_id=db_report.id,
+                status="public_details_approved",
+                actor_id=actor_id,
+                actor_role="reviewer",
+                note="Incident address, coordinates, description, and photo reviewed for public release.",
+                is_public=False,
+                created_at=datetime.now(timezone.utc),
+            ))
         
         # 2. Immutable Audit Log
         audit_msg = f"Report {db_report.ticket_id} status changed from {previous_status} to {status}."

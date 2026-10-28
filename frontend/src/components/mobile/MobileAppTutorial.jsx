@@ -82,6 +82,8 @@ export default function MobileAppTutorial({
 
   const [currentStep, setCurrentStep] = useState(stepOverride || 1);
   const totalSteps = 5;
+  const homeRoute = getAuthToken() ? '/dashboard' : '/';
+  const reportRoute = getAuthToken() ? '/dashboard?openReport=true' : '/report';
 
   const containerRef = useRef(null);
 
@@ -107,7 +109,7 @@ export default function MobileAppTutorial({
       setCurrentStep(nextStep);
       if (onStepChange) onStepChange(nextStep);
     } else {
-      finishTutorial('/dashboard?openReport=true', 'Start a report tapped');
+      finishTutorial(reportRoute, 'Start a report tapped');
     }
   };
 
@@ -120,7 +122,7 @@ export default function MobileAppTutorial({
   };
 
   const handleSkip = () => {
-    finishTutorial('/dashboard', 'Skip tapped');
+    finishTutorial(homeRoute, 'Skip tapped');
   };
 
   // Keyboard navigation
@@ -417,7 +419,7 @@ export default function MobileAppTutorial({
                 </button>
                 <button
                   type="button"
-                  onClick={() => finishTutorial('/dashboard?openReport=true', 'Start a report tapped')}
+                  onClick={() => finishTutorial(reportRoute, 'Start a report tapped')}
                   className="flex-1 max-w-[240px] h-[48px] sm:h-[50px] rounded-2xl bg-[#EA580C] hover:bg-[#d94e07] active:scale-[0.99] text-white font-bold text-[15px] shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <span>{currentContent.primaryButton}</span>

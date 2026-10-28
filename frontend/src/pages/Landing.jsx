@@ -36,9 +36,10 @@ function SectionSkeleton({ height = 'h-72', title = 'Loading...' }) {
  * Landing (PULSO Civic Portal)
  * ─────────────────────────────────────────────────────────────────────────────
  * - Public Website: Retains full civic portal landing page (Hero, Map, News, etc.)
- * - Installed Mobile App: Does NOT render landing page.
+ * - Installed Mobile App: Shows splash/tutorial before the resident entry.
  *   - First launch: routes to 5-step MobileAppTutorial.
- *   - Returning user: routes to resident dashboard (if signed in) or guest report flow.
+ *   - Returning user: routes to resident dashboard if signed in, or shows the
+ *     public landing so guests can report, track, sign in, or register.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export default function Landing() {
@@ -92,8 +93,8 @@ export default function Landing() {
       return <Navigate to="/dashboard" replace />;
     }
 
-    // Returning unauthenticated app user: send straight to guest Report flow
-    return <Navigate to="/report" replace />;
+    // Returning guests use the public entry below. The report flow remains an
+    // explicit choice and its Home action can return here.
   }
 
 

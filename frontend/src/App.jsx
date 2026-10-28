@@ -4,7 +4,7 @@ import GovAccountPage from './pages/GovAccountPage';
 import GovAssistant from './components/government/GovAssistant';
 import { GovAssistantProvider } from './components/government/GovAssistantHost';
 import StaffPasswordPage from './pages/StaffPasswordPage';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { GoogleMapsProvider } from './contexts/GoogleMapsContext';
@@ -51,7 +51,8 @@ import ProtectedRoute, {
 } from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
-import { initAuthSession } from './utils/authSession';
+import { initAuthSession, getAuthToken, getAuthUser } from './utils/authSession';
+import { isInstalledApp } from './utils/appContext';
 import './index.css';
 import './resident/evangelista.css';
 
@@ -93,7 +94,41 @@ const ResidentSurface = ({ children }) => (
     </div>
 );
 
+function authenticatedDestination() {
+    const token = getAuthToken();
+    const user = getAuthUser();
+    if (!token || !user) return null;
+    try {
+        const encoded = token.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/');
+        if (!encoded) return null;
+        const claims = JSON.parse(window.atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=')));
+        if (!Number.isFinite(claims.exp) || claims.exp * 1000 <= Date.now()) return null;
+    } catch {
+        return null;
+    }
+    if (user.role === 'resident') return '/dashboard';
+    return GOV_ROLES.includes(user.role) ? '/gov/my-dashboard' : '/gov/account';
+}
+
+function ResidentEntry() {
+    const destination = authenticatedDestination();
+    if (isInstalledApp() && destination) return <Navigate to={destination} replace />;
+    return <Landing />;
+}
+
+function AuthEntry({ children }) {
+    const destination = authenticatedDestination();
+    if (destination) return <Navigate to={destination} replace />;
+    return children;
+}
+
 function App() {
+    useEffect(() => {
+        // The first-HTML splash must leave even when an authenticated entry
+        // redirects before Landing mounts.
+        document.getElementById('pulso-initial-splash')?.remove();
+    }, []);
+
     return (
         <ThemeProvider>
             <GoogleMapsProvider>
@@ -102,7 +137,7 @@ function App() {
                     <GovAssistantProvider>
                     <Routes>
                         {/* ── PUBLIC RESIDENT ROUTES ─────────────────────────── */}
-                        <Route path="/"               element={<ResidentSurface><Landing /></ResidentSurface>} />
+                        <Route path="/"               element={<ResidentSurface><ResidentEntry /></ResidentSurface>} />
                         <Route path="/resident-home"  element={<ResidentSurface><Landing /></ResidentSurface>} />
                         <Route path="/tutorial"       element={<ResidentSurface><MobileAppTutorial replayMode={true} /></ResidentSurface>} />
                         <Route path="/report"         element={<ResidentSurface><ReportWizardPage /></ResidentSurface>} />
@@ -110,10 +145,10 @@ function App() {
                         <Route path="/track"          element={<ResidentSurface><PublicTrackPage /></ResidentSurface>} />
                         <Route path="/updates" element={<PublicUpdatesPage />} />
                         <Route path="/updates/:updateId" element={<PublicUpdatesPage />} />
-                        <Route path="/login"          element={<ResidentSurface><Login /></ResidentSurface>} />
+                        <Route path="/login"          element={<AuthEntry><ResidentSurface><Login /></ResidentSurface></AuthEntry>} />
                         <Route path="/register"       element={<ResidentSurface><Register /></ResidentSurface>} />
                         <Route path="/reset-password" element={<ResidentSurface><ResetPassword /></ResidentSurface>} />
-                        <Route path="/gov"            element={<GovLanding />} />
+                        <Route path="/gov"            element={<AuthEntry><GovLanding /></AuthEntry>} />
                         <Route path="/gov/activate" element={<StaffPasswordPage />} />
                         <Route path="/gov/account" element={<ProtectedRoute governmentOnly><GovAccountPage /></ProtectedRoute>} />
 

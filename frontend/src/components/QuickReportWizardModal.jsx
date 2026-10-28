@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -133,17 +134,24 @@ function QuickReportWizardModal({
     structuredAddress = null,
     requestDeviceLocation,
     isLocating = false,
+    isTrackingLocation = false,
+    _onStartLocationTracking,
+    onStopLocationTracking,
     locationPermissionDenied = false,
-    onOpenLocationPicker,
+    _onOpenLocationPicker,
     onSubmitReport,
     onTrackReport,
-    onViewExistingReport,
+    _onViewExistingReport,
     currentUser = null
 }) {
+    const { t } = useTranslation();
     // -------------------------------------------------------------------------
     // Wizard State
     // -------------------------------------------------------------------------
     const [step, setStep] = useState(1); // 1: Photo, 2: Category, 3: Details, 4: Success
+    useEffect(() => {
+        if (!isOpen || step !== 1) onStopLocationTracking?.();
+    }, [isOpen, step, onStopLocationTracking]);
     const [photo, setPhoto] = useState(null); // Data URL or Blob URL
     const [photoFile, setPhotoFile] = useState(null);
     const [photoCapturedAt, setPhotoCapturedAt] = useState(null);
@@ -390,14 +398,8 @@ function QuickReportWizardModal({
     };
 
     // -------------------------------------------------------------------------
-    // Location Computations & GPS Auto-Refresh
+    // Location Computations
     // -------------------------------------------------------------------------
-    useEffect(() => {
-        if (isOpen && requestDeviceLocation && (!reportLocation || !reportLocation.lat)) {
-            requestDeviceLocation(false);
-        }
-    }, [isOpen, requestDeviceLocation, reportLocation]);
-
     const resolvedBarangay = useMemo(() => {
         if (customBarangay) return customBarangay;
         if (structuredAddress?.barangay) return structuredAddress.barangay;
@@ -439,11 +441,8 @@ function QuickReportWizardModal({
         if (locationAddress && locationAddress.trim() && !locationAddress.startsWith('Lat:')) {
             return locationAddress;
         }
-        const brgy = resolvedBarangay || 'Barangay 171';
-        const zip = getPostalCodeForBarangay(brgy) || '1421';
-        const prefix = resolvedPlusCode ? `${resolvedPlusCode}, ` : '';
-        return `${prefix}${brgy}, Caloocan, ${zip} Metro Manila`;
-    }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation]);
+        return reportLocation ? `${t('reportWizard.step2Location.selectedCoordinates', 'Selected coordinates')}: ${reportLocation.lat.toFixed(5)}, ${reportLocation.lng.toFixed(5)}` : t('reportWizard.step2Location.chooseLocation', 'Choose the issue location');
+    }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation, t]);
 
     const handleCopyAddress = (e) => {
         e?.stopPropagation?.();
@@ -459,9 +458,9 @@ function QuickReportWizardModal({
         if (reportLocation?.accuracy && reportLocation.accuracy > 20) {
             return 'Approximate location';
         }
-        if (reportLocation?.lat) return 'Location confirmed';
-        return 'Location confirmed';
-    }, [locationPermissionDenied, reportLocation]);
+        if (reportLocation?.lat) return isTrackingLocation ? t('reportWizard.step2Location.liveActive', 'Live location active') : t('reportWizard.step2Location.locationSelected', 'Location selected');
+        return t('reportWizard.step2Location.noLocation', 'Location not set');
+    }, [locationPermissionDenied, reportLocation, isTrackingLocation, t]);
 
     // Filter Caloocan barangays for the location picker
     const filteredBarangays = useMemo(() => {
@@ -1031,20 +1030,19 @@ function QuickReportWizardModal({
                                             </button>
                                         </div>
 
-                                        {/* Technical Badges: Separate Latitude and Longitude (Plus Code removed) */}
-                                        {reportLocation && typeof reportLocation.lat === 'number' && typeof reportLocation.lng === 'number' && (
-                                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 select-all">
-                                                    <span className="text-slate-500 dark:text-slate-400 font-semibold">Lat</span> {reportLocation.lat.toFixed(5)}
-                                                </span>
-                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 select-all">
-                                                    <span className="text-slate-500 dark:text-slate-400 font-semibold">Lng</span> {reportLocation.lng.toFixed(5)}
-                                                </span>
-                                            </div>
-                                        )}
+                                        {/* Location Badges & Accuracy Indicator (Single line) */}
+                                        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                            {reportLocation && typeof reportLocation.lat === 'number' && typeof reportLocation.lng === 'number' && (
+                                                <>
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 select-all">
+                                                        <span className="text-slate-500 dark:text-slate-400 font-semibold">Lat</span> {reportLocation.lat.toFixed(5)}
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 select-all">
+                                                        <span className="text-slate-500 dark:text-slate-400 font-semibold">Lng</span> {reportLocation.lng.toFixed(5)}
+                                                    </span>
+                                                </>
+                                            )}
 
-                                        {/* Accuracy Indicator Pill */}
-                                        <div className="mt-2">
                                             {locationPermissionDenied ? (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/40">
                                                     <AlertTriangle size={13} className="text-red-500 shrink-0" />
@@ -1059,6 +1057,8 @@ function QuickReportWizardModal({
                                                         </button>
                                                     )}
                                                 </span>
+                                            ) : !reportLocation ? (
+                                                <span className="text-xs text-slate-600 dark:text-slate-300">{t('reportWizard.step2Location.noLocationHelp', 'Location not set. Use GPS or choose a place on the map.')}</span>
                                             ) : (reportLocation?.accuracy && reportLocation.accuracy > 20) ? (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50">
                                                     <Info size={13} className="text-amber-500 shrink-0" />
@@ -1067,10 +1067,35 @@ function QuickReportWizardModal({
                                             ) : (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50">
                                                     <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                                                    <span>Confirmed Location (±{Math.round(reportLocation?.accuracy || 8)}m)</span>
+                                                    <span>{locationStatusText}{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
                                                 </span>
                                             )}
+                                            {/* Minimal Refresh Icon (Resync GPS) */}
+                                            {reportLocation && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => requestDeviceLocation?.()}
+                                                    disabled={isLocating}
+                                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors cursor-pointer inline-flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600 ml-0.5 disabled:opacity-50"
+                                                    title={t('reportWizard.step2Location.resyncGps', 'Resync GPS')}
+                                                    aria-label={t('reportWizard.step2Location.resyncGps', 'Resync GPS')}
+                                                >
+                                                    <RotateCcw size={14} className={isLocating ? 'animate-spin text-[#ff6b00]' : ''} />
+                                                </button>
+                                            )}
                                         </div>
+                                        {!reportLocation && (
+                                            <div className="flex flex-wrap gap-2 mt-3" aria-label="Location controls">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => requestDeviceLocation?.()}
+                                                    disabled={isLocating}
+                                                    className="min-h-11 px-3 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-800 dark:text-white focus-visible:outline-3 focus-visible:outline-blue-600"
+                                                >
+                                                    {isLocating ? t('reportWizard.step2Location.locating', 'Finding location…') : t('reportWizard.step2Location.useMyLocation', 'Use my location')}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1096,7 +1121,7 @@ function QuickReportWizardModal({
                                             Take a photo of the problem
                                         </h3>
                                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
-                                            Camera only, so every report is timestamped and verified.
+                                            {t('reportWizard.step2Location.photoLocationNote', 'Capture a clear photo. Location is added only when you select it.')}
                                         </p>
                                     </div>
 
@@ -1298,7 +1323,7 @@ function QuickReportWizardModal({
                                         </div>
                                         <div className="flex items-start gap-2">
                                             <span className="text-[#ff6b00] font-bold">•</span>
-                                            <span>Your location is tagged automatically within Caloocan City.</span>
+                                            <span>{t('reportWizard.step2Location.chooseBeforeSubmit', 'Choose the issue location with GPS or the map before submitting.')}</span>
                                         </div>
                                     </div>
                                 )}
@@ -2162,7 +2187,9 @@ function QuickReportWizardModal({
                     metadata={{
                         location: reportLocation,
                         reportLocation,
-                        structuredAddress: { ...structuredAddress, barangay: resolvedBarangay },
+                        structuredAddress: structuredAddress
+                            ? { ...structuredAddress, barangay: resolvedBarangay, plusCode: resolvedPlusCode }
+                            : null,
                         locationAddress: displayAddress,
                         user: currentUser
                     }}

@@ -63,6 +63,7 @@ from database import get_db
 import spatial_router                    # PostGIS Spatial Queries & GeoEngine
 import admin_router                      # Staff, Residents, Settings & Governance
 from services.spatial_service import PUBLIC_REPORT_STATUSES
+from public_reports import safe_public_area, safe_public_category, public_incident_description, public_report_photo
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter, availability_check_limiter
@@ -101,13 +102,15 @@ async def application_lifespan(app):
                 pass
     async def email_loop():
         from notification_delivery import deliver_email
+        from report_receipts import deliver as deliver_report_receipts
         from referral_transport import deliver_referrals
         while not stop.is_set():
             try:
                 await asyncio.to_thread(deliver_email,limit=5)
+                await asyncio.to_thread(deliver_report_receipts,limit=5)
                 await asyncio.to_thread(deliver_referrals,limit=3)
             except Exception:
-                logging.getLogger(__name__).exception('Email notification processing failed; outcomes remain recorded for review.')
+                logging.getLogger(__name__).exception('Outbound notification processing failed; outcomes remain recorded for review.')
             try:await asyncio.wait_for(stop.wait(),timeout=5)
             except asyncio.TimeoutError:pass
     worker = asyncio.create_task(notification_loop())
@@ -311,7 +314,10 @@ async def get_thumbnail(src: str = Query(..., description="Relative path to uplo
             from PIL import Image, ImageOps
             with Image.open(full_path) as img:
                 img = ImageOps.exif_transpose(img)
-                img = ImageOps.fit(img, (size, size), Image.Resampling.LANCZOS)
+                if size >= 512:
+                    img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                else:
+                    img = ImageOps.fit(img, (size, size), Image.Resampling.LANCZOS)
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")
                 img.save(thumb_path, "JPEG", quality=85, optimize=True)
@@ -558,8 +564,14 @@ def verify_google_id_token(token_str: str) -> dict:
     if not clean_token:
         raise ValueError("Missing Google ID token credential.")
 
-    # Support mock test tokens in development/test harnesses: mock_google_token:email:name:sub
+    # Synthetic credentials are only for an explicitly opted-in test process.
+    # Never let a deployed API exchange them for a resident session.
     if clean_token.startswith("mock_google_token:"):
+        if not (
+            os.getenv("PULSO_ENV", "").lower() == "test"
+            and os.getenv("PULSO_ALLOW_MOCK_GOOGLE_TOKENS", "").lower() == "true"
+        ):
+            raise ValueError("Synthetic Google credentials are disabled.")
         parts = clean_token.split(":")
         email = parts[1].strip().lower() if len(parts) > 1 else "testresident@example.com"
         name = parts[2].strip() if len(parts) > 2 else "Test Resident"
@@ -638,12 +650,41 @@ async def google_auth(
             detail="This email is associated with a City Government Official account. Please sign in via the Government Portal at /gov."
         )
 
-    # Check if a resident already exists with this email
-    resident = db.query(models.Resident).filter(func.lower(models.Resident.email) == email).first()
+    # Google's stable subject identifies a returning linked resident. Email can
+    # change and is not a safe substitute for the subject identifier.
+    resident = db.query(models.Resident).filter(models.Resident.google_id == google_sub).first()
+    if not resident:
+        resident = db.query(models.Resident).filter(func.lower(models.Resident.email) == email).first()
+
+    # The older Google-first registration flow issued sessions after accepting
+    # only client-supplied identity fields. Keep OAuth limited to already
+    # verified resident accounts until that flow has server-side proof/review.
+    if not resident:
+        raise HTTPException(
+            status_code=403,
+            detail="Create and verify a resident account before using Google sign-in.",
+        )
+    if not resident.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Complete resident account verification before using Google sign-in.",
+        )
 
     if resident:
+        if not resident.is_active or resident.status in {"inactive", "suspended", "deactivated"}:
+            raise HTTPException(status_code=403, detail="This resident account is not active.")
+        if resident.google_id and resident.google_id != google_sub:
+            raise HTTPException(status_code=409, detail="This email is linked to another Google account.")
         # Link Google account if not yet linked
         if not resident.google_id:
+            google_hosts_email = email.endswith("@gmail.com") or bool(
+                idinfo.get("email_verified") and idinfo.get("hd")
+            )
+            if not google_hosts_email:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This email already has a resident account. Sign in with its existing method before linking Google.",
+                )
             resident.google_id = google_sub
             if not resident.auth_provider:
                 resident.auth_provider = "google"
@@ -745,6 +786,14 @@ async def google_complete_verification(
     Assigns appropriate KYC level based on ID tier and verification mode.
     Grants access only after ID verification parameters are validated.
     """
+    # This legacy route trusted a caller-provided email and ID type without a
+    # Google token or verified identity evidence, then issued an access token.
+    # Disable it until a governed, server-backed verification flow replaces it.
+    raise HTTPException(
+        status_code=410,
+        detail="Google-first verification is unavailable. Use resident registration and its verification flow.",
+    )
+
     auth_limiter.check(request)
     email = req.email.strip().lower()
 
@@ -876,16 +925,23 @@ def format_resident_name(full_name: Optional[str]) -> str:
 
 
 def send_resident_confirmation(resident, code):
-    """Return provider acceptance; preserve the persisted, expiring HMAC code."""
+    """Request the same account code on both configured contact channels."""
     name = format_resident_name(resident.full_name)
     ref = f"PC-{secrets.token_hex(4).upper()}"
     try:
         email_sent = bool(send_otp_email(resident.email, code, 'Verification', ref_id=ref, name=name))
     except Exception:
         email_sent = False
-    # A supplied phone number is not yet an independently verified recovery channel.
-    # Do not send an email-account confirmation secret to an unverified phone.
-    return email_sent
+    sms_sent = False
+    if resident.phone_number:
+        try:
+            sms_sent = bool(sms_utils.send_registration_sms(
+                resident.phone_number,
+                f"PULSO account confirmation code: {code}. Valid for 10 minutes. Do not share this code."
+            ).accepted)
+        except Exception:
+            sms_sent = False
+    return {"email": email_sent, "sms": sms_sent}
 
 
 from pydantic import Field
@@ -951,8 +1007,14 @@ def register_user(user: schemas.ResidentCreate, request: Request, db: Session = 
         db.rollback()
         raise HTTPException(409, "These contact details are already registered. Try signing in.")
     db.refresh(target_user)
-    if not send_resident_confirmation(target_user, code):
-        raise HTTPException(503, "Registration saved, but the verification code could not be sent. Use Resend Code on the verification screen.")
+    delivery = send_resident_confirmation(target_user, code)
+    if isinstance(delivery, dict):
+        channels = [channel for channel in ("email", "sms") if delivery.get(channel)]
+    else:
+        channels = ["email"] if delivery else []
+    if not channels:
+        raise HTTPException(503, "Registration saved, but the code could not be sent. Try requesting a new code.")
+    target_user.confirmation_channels = channels
     return target_user
 
 
@@ -1012,7 +1074,8 @@ async def login(
     if not user.is_verified and user.role == "resident":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account not verified. Please check your email for the verification code.",
+            detail={"require_verification": True, "email": user.email,
+                    "message": "Enter the account code from your email or text messages."},
         )
 
     if not user.is_active:
@@ -1082,6 +1145,8 @@ def resend_code(req: VerificationRequest, request: Request, db: Session = Depend
 
 
 
+
+
 class ForgotPasswordRequest(BaseModel):
     email: str
 
@@ -1119,7 +1184,7 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
     SMTP_PASS = os.getenv("SMTP_PASS")
     
     if not SMTP_USER or not SMTP_PASS:
-        print(f"[MAIL ERROR] SMTP credentials missing in .env. Cannot send {type} email to {to_email}")
+        print("[MAIL ERROR] SMTP credentials are missing.")
         return False
 
     from html import escape
@@ -1340,19 +1405,18 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
         msg.attach(MIMEText(email_html, 'html'))
         
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.set_debuglevel(1) # Added verbose logging for debugging
             server.login(SMTP_USER, clean_pass)
             server.send_message(msg)
-            print(f"[MAIL] {type} email sent successfully to {to_email}")
+            print("[MAIL] SMTP accepted an email message.")
         return True
     except smtplib.SMTPAuthenticationError:
-        print(f"[MAIL ERROR] Authentication failed for {SMTP_USER}. Check SMTP_PASS.")
+        print("[MAIL ERROR] SMTP authentication failed. Check SMTP_PASS.")
         return False
     except smtplib.SMTPException as e:
-        print(f"[MAIL ERROR] SMTP error occurred: {e}")
+        print(f"[MAIL ERROR] SMTP error occurred: {e.__class__.__name__}")
         return False
     except Exception as e:
-        print(f"[MAIL ERROR] Unexpected error: {e}")
+        print(f"[MAIL ERROR] Unexpected email error: {e.__class__.__name__}")
         return False
 
 @app.post("/api/auth/forgot-password")
@@ -1685,10 +1749,6 @@ async def verify_phone_otp(req: VerifyPhoneOTPRequest, db: Session = Depends(get
             detail="Resident account not found."
         )
 
-    # Validating via phone SMS OTP confirms ownership:
-    if not user.is_verified:
-        user.is_verified = True
-
     db.commit()
 
     # Generate JWT
@@ -1812,6 +1872,7 @@ def update_user(
 class ReportStatusUpdate(BaseModel):
     status: Optional[str] = None
     targetStatus: Optional[str] = None # Frontend sends both for compatibility
+    public_content_reviewed: bool = False
     budget: Optional[float] = None
     deployment_date: Optional[datetime] = None
 
@@ -1961,7 +2022,6 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
         models.Report.location_lng.isnot(None),
         models.Report.status.in_(PUBLIC_REPORT_STATUSES)
     ).order_by(models.Report.created_at.desc()).all()
-
     barangay_counts = {}
     barangay_details = {}
     report_items = []
@@ -1991,18 +2051,29 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
             except Exception:
                 pass
 
-        # 3. Fallback regex extraction from string
-        if b_num is None and (r.barangay or b_name):
-            cand = r.barangay or b_name
-            num_match = re.search(r"\b(\d+)\b", cand)
+        # 3. Only accept a whole barangay label, never a number from a street address.
+        if b_num is None:
+            num_match = re.fullmatch(r"Barangay (\d{1,3}), Caloocan City", safe_public_area(r.location_barangay))
             if num_match:
                 b_num = int(num_match.group(1))
-                b_name = f"Brgy. {b_num}"
+        if b_num is not None and 1 <= int(b_num) <= 188:
+            b_name = f"Barangay {int(b_num)}"
+        else:
+            b_num = None
+            b_name = "Caloocan City"
+
+        public_sector = (
+            "North" if b_num is not None and int(b_num) >= 165
+            else "South" if b_num is not None
+            else "North" if r.location_lat is not None and r.location_lat >= 14.70
+            else "South"
+        )
 
         b_key = str(b_num) if b_num is not None else (b_name or "Caloocan City")
         barangay_counts[b_key] = barangay_counts.get(b_key, 0) + 1
 
-        cat_lower = (r.category or "").lower()
+        public_category = safe_public_category(r.category)
+        cat_lower = public_category.lower()
         cat_group = "road"
         if "water" in cat_lower or "drainage" in cat_lower or "pipe" in cat_lower or "leak" in cat_lower or "flood" in cat_lower:
             cat_group = "water"
@@ -2023,7 +2094,7 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
             barangay_details[b_key] = {
                 "brgy_num": b_num,
                 "display_name": b_name or (f"Brgy. {b_num}" if b_num else b_key),
-                "sector": r.sector or ("North" if r.location_lat and r.location_lat >= 14.70 else "South"),
+                "sector": public_sector,
                 "total": 0,
                 "categories": {
                     "road": 0,
@@ -2038,39 +2109,39 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
         barangay_details[b_key]["total"] += 1
         barangay_details[b_key]["categories"][cat_group] = barangay_details[b_key]["categories"].get(cat_group, 0) + 1
 
-        # Format public title safely from description or category
-        report_title = r.description[:90] if r.description else (r.category or "Civic Report")
-        if len(r.description or "") > 90:
-            report_title += "..."
-
-        full_addr = f"{b_name or (f'Brgy. {b_num}' if b_num else 'Caloocan City')}, Caloocan City" if b_num or b_name else "Caloocan City"
-        public_lat, public_lng = mask_coordinates_for_privacy(r.location_lat, r.location_lng)
+        report_title = f"{public_category} report"
+        approved = True  # These reports have already passed government verification.
+        full_addr = (public_incident_description(r.location_string, (r.reporter_name, r.contact_email, r.contact_phone)) if approved else "") or (f"{b_name}, Caloocan City" if b_num else "Caloocan City")
+        public_lat, public_lng = (r.location_lat, r.location_lng) if approved else mask_coordinates_for_privacy(r.location_lat, r.location_lng)
 
         report_items.append({
             "id": r.id,
             "ticket_id": r.ticket_id,
-            "category": r.category or "Infrastructure",
+            "category": public_category,
             "category_group": cat_group,
             "title": report_title,
-            "description": r.description or "",
+            "description": public_incident_description(r.description, (r.reporter_name, r.contact_email, r.contact_phone)) if approved else "",
+            "image_url": public_report_photo(r.image_url) if approved else None,
+            "accuracy_m": r.accuracy_m if approved and r.accuracy_m and r.accuracy_m > 0 else None,
+            "public_details_approved": approved,
             "location_string": full_addr,
             "full_address": full_addr,
             "barangay": b_name or (f"Brgy. {b_num}" if b_num else "Caloocan City"),
             "brgy_num": b_num,
-            "sector": r.sector or ("North" if r.location_lat and r.location_lat >= 14.70 else "South"),
-            "district": r.district or ("North Caloocan" if r.location_lat and r.location_lat >= 14.70 else "South Caloocan"),
+            "sector": public_sector,
+            "district": f"{public_sector} Caloocan",
             "status": (r.status or "In Progress").replace("_", " ").title(),
             "lat": public_lat,
             "lng": public_lng,
             "created_at": r.created_at.isoformat() if r.created_at else None,
-            "urgency": r.urgency
+            "urgency": None
         })
 
         raw_points.append({
             "lat": public_lat,
             "lng": public_lng,
             "weight": 2.0 if r.urgency in ["critical", "high"] else 1.0,
-            "category": r.category,
+            "category": public_category,
             "ticket_id": r.ticket_id
         })
 
@@ -2086,18 +2157,14 @@ def get_reports_heatmap(db: Session = Depends(get_db)):
         "last_updated": datetime.now(timezone.utc).isoformat()
     }
 
-@app.get("/api/reports/public", response_model=List[schemas.ReportResponse])
+@app.get("/api/reports/public", response_model=List[schemas.PublicReportResponse])
 def read_public_reports(
     skip: int = 0,
     limit: int = 300,
     db: Session = Depends(get_db),
-    current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
-    Returns public reports that all residents can see as pin locations on the map.
-    Includes only reports approved for public display after validation.
-    Strictly strips and anonymizes all resident personal information (name, email, phone, user IDs, tracking tokens)
-    so viewers only see the reported pin location, category, status, and evidence.
+    Return verified incident fields to residents without reporter identity or contact fields.
     """
     query = db.query(models.Report).filter(
         models.Report.location_lat.isnot(None),
@@ -2106,36 +2173,30 @@ def read_public_reports(
     ).order_by(models.Report.created_at.desc())
     
     db_reports = query.offset(skip).limit(min(limit, 500)).all()
-    
+    from services.spatial_service import mask_coordinates_for_privacy
     results = []
-    is_official = current_user is not None and isinstance(current_user, models.Official)
-    current_resident_id = current_user.id if (current_user is not None and isinstance(current_user, models.Resident)) else None
-
     for r in db_reports:
-        is_owner = (current_resident_id is not None) and (
-            r.resident_id == current_resident_id or r.claimed_by_user_id == current_resident_id
-        )
-
-        resp = schemas.ReportResponse.model_validate(r)
-
-        # If requester is not an official and not the report author/claimant,
-        # strip all personal resident information so only the pin location & civic details are exposed
-        if not is_official and not is_owner:
-            resp.reporter_name = "Anonymous Resident"
-            resp.contact_email = None
-            resp.contact_phone = None
-            resp.resident_id = None
-            resp.claimed_by_user_id = None
-            resp.tracking_token = None
-            resp.tracking_url = None
-            resp.location_lat = round(resp.location_lat, 3) if resp.location_lat is not None else None
-            resp.location_lng = round(resp.location_lng, 3) if resp.location_lng is not None else None
-            resp.location_string = resp.location_barangay or resp.barangay or "Caloocan City"
-            resp.ai_metadata = None
-            resp.ai_reasoning = None
-            resp.budget = None
-
-        results.append(resp)
+        approved = True  # Verified status is the public publication gate.
+        public_lat, public_lng = (r.location_lat, r.location_lng) if approved else mask_coordinates_for_privacy(r.location_lat, r.location_lng)
+        category = safe_public_category(r.category)
+        area = safe_public_area(r.location_barangay)
+        results.append(schemas.PublicReportResponse(
+            id=r.id,
+            ticket_id=r.ticket_id,
+            category=category,
+            title=f"{category} report",
+            status=r.status,
+            location_lat=public_lat,
+            location_lng=public_lng,
+            location_string=(public_incident_description(r.location_string, (r.reporter_name, r.contact_email, r.contact_phone)) if approved else "") or area,
+            barangay=area,
+            description=public_incident_description(r.description, (r.reporter_name, r.contact_email, r.contact_phone)) if approved else None,
+            image_url=public_report_photo(r.image_url) if approved else None,
+            accuracy_m=r.accuracy_m if approved and r.accuracy_m and r.accuracy_m > 0 else None,
+            public_details_approved=approved,
+            created_at=r.created_at,
+            updated_at=r.updated_at,
+        ))
 
     return results
 
@@ -2344,7 +2405,8 @@ async def create_new_report(
         report=report_dto,
         resident_id=resident_id,
         ai_analysis=ai_analysis,
-        tracking_token_hash=token_hash
+        tracking_token_hash=token_hash,
+        queue_resident_receipt=is_registered_resident,
     )
 
     # 9. Geospatial DBSCAN Clustering
@@ -2923,6 +2985,8 @@ def update_report_status(
     status = status_update.status or status_update.targetStatus
     if status != "pending_approval" or status_update.budget is not None or status_update.deployment_date is not None:
         raise HTTPException(status_code=422, detail="Use the governed report decision endpoint")
+    if not status_update.public_content_reviewed:
+        raise HTTPException(status_code=422, detail="Review the public incident address, description, and photo before verification")
     key = command_integrity.validate_key(idempotency_key)
     expected = command_integrity.parse_version(if_match)
     digest = command_integrity.request_hash(status_update.model_dump(mode="json")) if key else None
@@ -2953,7 +3017,8 @@ def update_report_status(
         status=status, 
         actor_id=current_user.id,
         budget=status_update.budget,
-        deployment_date=status_update.deployment_date
+        deployment_date=status_update.deployment_date,
+        public_content_reviewed=status_update.public_content_reviewed,
     )
     if not updated_report:
         raise HTTPException(status_code=404, detail="Report not found")

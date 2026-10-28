@@ -19,7 +19,7 @@ export default function GovTodayPage() {
     const selected = rows.find(row => key(row) === params.get('selected'));
     function change(name, value) { setParams(p => { const n = new URLSearchParams(p); value ? n.set(name, value) : n.delete(name); return n; }, { replace: name === 'search' }); }
     function close() { change('selected', ''); requestAnimationFrame(() => returnFocus.current?.focus()); }
-    return <GovWorkspace title="My work" description="Assigned tasks and decisions waiting for your review." actions={<>
+    return <GovWorkspace className="gov-today-workspace" title="My work" description="Assigned tasks and decisions waiting for your review." actions={<>
         <GovSearch value={search} onChange={v => change('search', v)} placeholder="Search ticket, task or location" />
         <div className="gov-page-actions__group">{fetchedAt && <span className="gov-muted">Updated {fetchedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>}<GovButton onClick={reload} disabled={loading}><RefreshCw size={15} /> Refresh</GovButton></div>
     </>}>

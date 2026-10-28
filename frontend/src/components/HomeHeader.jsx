@@ -43,6 +43,7 @@ export default function HomeHeader({
     unreadCount = 0,
     onOpenAccount,
     onOpenUpdates,
+    onOpenAllNotifications,
     onSignIn,
     onOpenAIChat,
     isAIChatOpen = false,
@@ -493,8 +494,8 @@ export default function HomeHeader({
                 }}
                 onMarkAllRead={onMarkAllRead}
                 onViewAllUpdates={() => {
-                    if (onOpenUpdates) {
-                        onOpenUpdates();
+                    if (onOpenAllNotifications) {
+                        onOpenAllNotifications();
                     } else if (handleSetTab) {
                         handleSetTab('updates');
                     }

@@ -385,7 +385,7 @@ export default function Login() {
                 }
 
                 setAuthSession(data.access_token, data.user);
-                navigate(residentReturnPath());
+                navigate(residentReturnPath(), { replace: true });
             } else if (data.status === 'new_unverified') {
                 // First-time resident via Google: route directly into ID verification flow!
                 navigate('/register', {
@@ -459,8 +459,8 @@ export default function Login() {
                     setVerificationEmail(data.detail.email || email);
                     setView('verify');
                     setError('');
-                    setResendTimer(60);
-                    setCanResend(false);
+                    setResendTimer(0);
+                    setCanResend(true);
                     return;
                 }
                 throw new Error(data.detail || 'Login failed. Please check your credentials.');
@@ -498,13 +498,13 @@ export default function Login() {
 
             const role = data.user?.role;
             if (role === 'lgu_official' || role === 'admin') {
-                navigate('/gov');
+                navigate('/gov', { replace: true });
             } else if (role === 'field_responder') {
-                navigate('/responder');
+                navigate('/responder', { replace: true });
             } else if (role === 'dispatcher') {
-                navigate('/dispatcher');
+                navigate('/dispatcher', { replace: true });
             } else {
-                navigate(residentReturnPath());
+                navigate(residentReturnPath(), { replace: true });
             }
         } catch (err) {
             setError(err.message);
@@ -545,7 +545,7 @@ export default function Login() {
         const code = verificationOtp.join('');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
+            const response = await fetch(`${API_BASE_URL}/api/auth/verify-registration`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: verificationEmail, code }),
@@ -699,13 +699,13 @@ export default function Login() {
 
                 const role = pendingAuth?.user?.role;
                 if (role === 'lgu_official' || role === 'admin') {
-                    navigate('/gov');
+                    navigate('/gov', { replace: true });
                 } else if (role === 'field_responder') {
-                    navigate('/responder');
+                    navigate('/responder', { replace: true });
                 } else if (role === 'dispatcher') {
-                    navigate('/dispatcher');
+                    navigate('/dispatcher', { replace: true });
                 } else {
-                    navigate(residentReturnPath());
+                    navigate(residentReturnPath(), { replace: true });
                 }
             } else {
                 const err = await res.json();
@@ -716,13 +716,13 @@ export default function Login() {
                 setAuthSession(pendingAuth?.token, pendingAuth?.user);
                 const role = pendingAuth?.user?.role;
                 if (role === 'lgu_official' || role === 'admin') {
-                    navigate('/gov');
+                    navigate('/gov', { replace: true });
                 } else if (role === 'field_responder') {
-                    navigate('/responder');
+                    navigate('/responder', { replace: true });
                 } else if (role === 'dispatcher') {
-                    navigate('/dispatcher');
+                    navigate('/dispatcher', { replace: true });
                 } else {
-                    navigate(residentReturnPath());
+                    navigate(residentReturnPath(), { replace: true });
                 }
             } else {
                 setError('Invalid security code. Please check your Gmail.');
@@ -1135,7 +1135,7 @@ export default function Login() {
                                                             Verify Your Account
                                                         </h2>
                                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                            Enter the 6-digit code sent to <span className="text-[#ff6b00] font-semibold">{verificationEmail}</span>
+                                                            Enter the 6-digit registration code received by email or text. If it expired, request a new code for <span className="text-[#ff6b00] font-semibold">{verificationEmail}</span>.
                                                         </p>
                                                     </div>
 

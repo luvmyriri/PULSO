@@ -145,13 +145,12 @@ export default function CivicFooter({ onOpenLegalModal, onOpenPwaModal }) {
           </div>
 
           <div className="flex items-center gap-6">
-            <button
-              type="button"
-              onClick={() => onOpenLegalModal && onOpenLegalModal('privacy')}
-              className="text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer"
+            <a
+              href="/privacy.html"
+              className="text-slate-400 hover:text-[#ff6b00] transition-colors cursor-pointer focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#93c5fd]"
             >
               Privacy Policy
-            </button>
+            </a>
             <button
               type="button"
               onClick={() => onOpenLegalModal && onOpenLegalModal('terms')}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     GoogleMap,
     MarkerF,
@@ -614,6 +615,9 @@ export default function NearbyIssuesMapModal({
     isLoaded: propIsLoaded,
     loadError: propLoadError,
     reports = [],
+    reportsLoading = false,
+    reportsError = false,
+    onRetryReports,
     reportLocation = null,
     setReportLocation,
     isLocating = false,
@@ -627,6 +631,7 @@ export default function NearbyIssuesMapModal({
     photoPinIcons: externalPhotoPinIcons = null,
     initialSelectedReport = null
 }) {
+    const { t } = useTranslation();
     const { isLoaded: contextLoaded, loadError: contextError } = useGoogleMaps();
     const isLoaded = Boolean(
         (propIsLoaded !== undefined ? propIsLoaded : contextLoaded) &&
@@ -675,7 +680,6 @@ export default function NearbyIssuesMapModal({
     const [activeCategory, setActiveCategory] = useState('all'); // 'all' | 'water' | etc.
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedHazard, setSelectedHazard] = useState(null);
-    const [currentZoom, setCurrentZoom] = useState(14);
 
     // Map layers state (persisted)
     const [mapLayers, setMapLayers] = useState(() => {
@@ -810,7 +814,6 @@ export default function NearbyIssuesMapModal({
             }
         });
         const zoomListener = activeMap.addListener('zoom_changed', () => {
-            setCurrentZoom(activeMap.getZoom() || 14);
             if (isSelectedOpenRef.current) {
                 userInteractedWhilePopupOpenRef.current = true;
             }
@@ -918,6 +921,21 @@ export default function NearbyIssuesMapModal({
         });
     }, [areaFilteredReports, activeCategory, searchQuery]);
 
+    const hasReportFilters = activeSector !== 'all' || selectedBarangay !== 'all' || activeCategory !== 'all' || Boolean(searchQuery.trim());
+    const emptyReportsMessage = reportsLoading
+        ? t('mapPublicReports.loading', { defaultValue: 'Loading public reports…' })
+        : reportsError
+            ? t('mapPublicReports.error', { defaultValue: 'Public reports could not be loaded.' })
+            : reports.length === 0
+                ? t('mapPublicReports.empty', { defaultValue: 'No reports are public yet. Reports awaiting government review are not shown on this map.' })
+                : t('mapPublicReports.filteredEmpty', { defaultValue: 'No reports match these filters.' });
+    const resetReportFilters = () => {
+        setActiveCategory('all');
+        setActiveSector('all');
+        setSelectedBarangay('all');
+        setSearchQuery('');
+    };
+
     // Matching reports for search autocomplete dropdown
     const matchingSearchReports = useMemo(() => {
         if (!searchQuery.trim()) return [];
@@ -948,14 +966,16 @@ export default function NearbyIssuesMapModal({
             if (!photoUrl) return;
 
             const meta = getReportCategoryMeta(report);
-            const borderColor = meta.color || '#EA580C';
+            const borderColor = meta.color;
 
             [false, true].forEach(isSelected => {
                 const cacheKey = `${report.id}-${meta.color}-${isSelected ? 'sel' : 'norm'}`;
                 if (pinIconCache.current.has(cacheKey) || photoPinIcons[cacheKey]) return;
 
                 let thumbUrl = photoUrl;
-                if (!photoUrl.startsWith('http') && !photoUrl.startsWith('data:')) {
+                if (photoUrl.includes('/api/thumbnails?')) {
+                    thumbUrl = photoUrl.replace(/([?&]size=)512(&|$)/, (_, prefix, suffix) => `${prefix}80${suffix}`);
+                } else if (!photoUrl.startsWith('http') && !photoUrl.startsWith('data:')) {
                     const cleanPath = photoUrl.startsWith('/') ? photoUrl : `/${photoUrl}`;
                     thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
                 }
@@ -1237,31 +1257,17 @@ export default function NearbyIssuesMapModal({
 
     const selectedHazardPhotoUrl = useMemo(() => {
         if (!selectedHazard) return '';
-        const photo = getReportPhoto(selectedHazard);
-        if (photo) return photo;
-        const meta = getReportCategoryMeta(selectedHazard);
-        switch (meta.id) {
-            case 'streetlights':
-                return 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=800&q=80';
-            case 'drainage':
-                return 'https://images.unsplash.com/photo-1541888946425-d0fbb186c5f7?auto=format&fit=crop&w=800&q=80';
-            case 'water':
-                return 'https://images.unsplash.com/photo-1542013936693-884638332954?auto=format&fit=crop&w=800&q=80';
-            case 'safety':
-                return 'https://images.unsplash.com/photo-1584483766114-2cea6facdf57?auto=format&fit=crop&w=800&q=80';
-            case 'traffic':
-                return 'https://images.unsplash.com/photo-1572949645841-094f3a9c4c94?auto=format&fit=crop&w=800&q=80';
-            case 'facilities':
-                return 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=800&q=80';
-            case 'electrical':
-                return 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=800&q=80';
-            case 'waste':
-                return 'https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&w=800&q=80';
-            case 'roads':
-            default:
-                return 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=800&q=80';
-        }
+        return getReportPhoto(selectedHazard) || '';
     }, [selectedHazard]);
+
+    const publicStatusLabel = useMemo(() => ({
+        pending_approval: t('mapPublicReports.status.verified', { defaultValue: 'Verified · Awaiting work approval' }),
+        validated: t('mapPublicReports.status.validated', { defaultValue: 'Verified' }),
+        approved_internal: t('mapPublicReports.status.approved', { defaultValue: 'Approved for work' }),
+        dispatched: t('mapPublicReports.status.dispatched', { defaultValue: 'Dispatched' }),
+        in_progress: t('mapPublicReports.status.inProgress', { defaultValue: 'Work in progress' }),
+        resolved: t('mapPublicReports.status.resolved', { defaultValue: 'Resolved' }),
+    })[selectedHazard?.status] || selectedHazard?.status || '', [selectedHazard?.status, t]);
 
     if (!isOpen) return null;
 
@@ -1620,7 +1626,7 @@ export default function NearbyIssuesMapModal({
                                                     {report.title}
                                                 </div>
                                                 <div className="text-[10.5px] text-slate-400 font-mono truncate">
-                                                    {report.ticket_id || `PUL-2026-${String(report.id).padStart(4, '0')}`} · {report.barangay || 'Brgy. 171'}
+                                                    {report.ticket_id || String(report.id)} · {report.location_string || report.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
                                                 </div>
                                             </div>
                                             <ChevronRight size={14} className="text-slate-400 shrink-0" />
@@ -1848,20 +1854,20 @@ export default function NearbyIssuesMapModal({
                             <div className="p-8 text-center space-y-3">
                                 <AlertTriangle size={32} className="mx-auto text-slate-300 dark:text-slate-600" />
                                 <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                                    No reports match these filters.
+                                    {emptyReportsMessage}
                                 </p>
-                                <button
+                                {reportsError && onRetryReports && <button
                                     type="button"
-                                    onClick={() => {
-                                        setActiveCategory('all');
-                                        setActiveSector('all');
-                                        setSelectedBarangay('all');
-                                        setSearchQuery('');
-                                    }}
-                                    className="px-3.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#ea580c] hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                                    onClick={onRetryReports}
+                                    className="min-h-11 px-3.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#ea580c] focus-visible:outline-3 focus-visible:outline-[#ea580c]"
+                                >{t('mapPublicReports.retry', { defaultValue: 'Try again' })}</button>}
+                                {hasReportFilters && !reportsError && !reportsLoading && <button
+                                    type="button"
+                                    onClick={resetReportFilters}
+                                    className="min-h-11 px-3.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#ea580c] hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors focus-visible:outline-3 focus-visible:outline-[#ea580c]"
                                 >
-                                    Clear filters
-                                </button>
+                                    {t('mapPublicReports.clearFilters', { defaultValue: 'Clear filters' })}
+                                </button>}
                             </div>
                         ) : (
                             filteredReports.map(report => {
@@ -1909,7 +1915,7 @@ export default function NearbyIssuesMapModal({
                                                 {report.title || 'Civic infrastructure report'}
                                             </h3>
                                             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                                                {report.barangay || report.location_string || 'Brgy. 171, Caloocan'}
+                                                {report.location_string || report.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
                                             </p>
                                             {distanceText && (
                                                 <span className="text-[10.5px] font-mono text-slate-400 dark:text-slate-500 block mt-0.5">
@@ -2067,20 +2073,6 @@ export default function NearbyIssuesMapModal({
                                     />
                                 </OverlayViewF>
                             )}
-                            {/* Subtle Crisp Center Barangay Label (Zoom 13-16) */}
-                            {currentZoom >= 13 && currentZoom <= 16 && (
-                                <OverlayViewF
-                                    position={activeSector === 'south' ? SOUTH_CALOOCAN_CENTROID : NORTH_CALOOCAN_CENTROID}
-                                    mapPaneName="overlayLayer"
-                                    getPixelPositionOffset={() => ({ x: -60, y: -12 })}
-                                >
-                                    <div className="pointer-events-none select-none text-center">
-                                        <span className="text-xs font-bold text-slate-700/70 dark:text-slate-300/70 tracking-widest uppercase drop-shadow-xs">
-                                            {selectedBarangay !== 'all' ? selectedBarangay : (activeSector === 'south' ? 'South Caloocan' : 'Barangay 171')}
-                                        </span>
-                                    </div>
-                                </OverlayViewF>
-                            )}
                         </GoogleMap>
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 dark:bg-slate-900">
@@ -2193,7 +2185,7 @@ export default function NearbyIssuesMapModal({
                                         Nearby reports ({filteredReports.length})
                                     </h2>
                                     <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                        {selectedHazard ? selectedHazard.title : 'Tap to explore reports or select a marker'}
+                                        {selectedHazard ? selectedHazard.title : filteredReports.length === 0 ? emptyReportsMessage : 'Tap to explore reports or select a marker'}
                                     </p>
                                 </div>
                                 <button
@@ -2240,11 +2232,11 @@ export default function NearbyIssuesMapModal({
                                     <div className="flex-1 overflow-y-auto px-4 py-2.5 pb-2 space-y-2.5 custom-scrollbar">
                                         {/* Top Card: Photo + Title + Meta */}
                                         <div className="flex items-start gap-3">
-                                            <img
+                                            {selectedHazardPhotoUrl ? <img
                                                 src={selectedHazardPhotoUrl}
                                                 alt={selectedHazard.title || 'Report preview'}
                                                 className="w-[100px] h-[80px] rounded-xl object-cover border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shrink-0"
-                                            />
+                                                /> : <div className="w-[100px] h-[80px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300 shrink-0" aria-label={t('mapPublicReports.photoPrivate', { defaultValue: 'No report photo available' })}><FileText size={24} aria-hidden="true" /></div>}
                                             <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
                                                 <div>
                                                     <h3 className="font-bold text-sm text-slate-900 dark:text-white line-clamp-2 leading-snug">
@@ -2260,35 +2252,36 @@ export default function NearbyIssuesMapModal({
                                                     </span>
                                                     <span className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
                                                         <MapPin size={11} className="text-slate-400 shrink-0" />
-                                                        <span className="truncate">{selectedHazard.barangay || 'Barangay 171'}</span>
+                                                        <span className="break-words">{selectedHazard.location_string || selectedHazard.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}</span>
                                                     </span>
                                                 </div>
+                                                {!selectedHazard.isOwnReport && <p className="mt-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200">{publicStatusLabel}</p>}
                                             </div>
                                         </div>
 
                                         {/* Latest Update Box */}
-                                        <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200/80 dark:border-sky-800/60 flex items-start gap-2">
+                                        {(selectedHazard.staff_notes || selectedHazard.latest_update) && <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200/80 dark:border-sky-800/60 flex items-start gap-2">
                                             <FileText size={15} className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
                                             <div className="min-w-0">
                                                 <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300 block">
                                                     Latest update
                                                 </span>
                                                 <p className="text-xs text-slate-800 dark:text-slate-200 mt-0.5 font-medium leading-relaxed line-clamp-2">
-                                                    {selectedHazard.staff_notes || selectedHazard.latest_update || 'Department work is in progress.'}
+                                                    {selectedHazard.staff_notes || selectedHazard.latest_update}
                                                 </p>
                                             </div>
-                                        </div>
+                                        </div>}
 
                                         {/* Next Step Row */}
-                                        <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 px-0.5">
+                                        {selectedHazard.isOwnReport ? <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 px-0.5">
                                             <ArrowRight size={14} className="text-[#ea580c] shrink-0" />
                                             <span className="font-semibold text-slate-900 dark:text-slate-200">Next step:</span>
                                             <span className="truncate">Follow the report for further department updates.</span>
-                                        </div>
+                                        </div> : <p className="text-xs text-slate-600 dark:text-slate-300">{t(selectedHazard.public_details_approved ? 'mapPublicReports.basicOnly' : 'mapPublicReports.awaitingDetailReview')}</p>}
 
                                         {/* Action Buttons: View full report + Open location */}
                                         <div className="flex items-center gap-2 pt-1 pb-1">
-                                            <button
+                                            {selectedHazard.isOwnReport && <button
                                                 type="button"
                                                 onClick={() => {
                                                     if (onOpenReportDetail) onOpenReportDetail(selectedHazard);
@@ -2297,7 +2290,7 @@ export default function NearbyIssuesMapModal({
                                             >
                                                 <ExternalLink size={15} />
                                                 <span>View full report</span>
-                                            </button>
+                                            </button>}
                                             <a
                                                 href={`https://www.google.com/maps?q=${selectedHazard.lat},${selectedHazard.lng}`}
                                                 target="_blank"
@@ -2305,7 +2298,7 @@ export default function NearbyIssuesMapModal({
                                                 className="flex-1 h-11 rounded-xl border-2 border-[#ea580c] text-[#ea580c] dark:text-[#ff6b00] hover:bg-[#ea580c]/10 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
                                             >
                                                 <MapPin size={15} />
-                                                <span>Open location</span>
+                                                <span>{t(selectedHazard.isOwnReport || selectedHazard.public_details_approved ? 'mapPublicReports.openReportLocation' : 'mapPublicReports.openApproximateArea')}</span>
                                             </a>
                                         </div>
                                     </div>
@@ -2344,6 +2337,11 @@ export default function NearbyIssuesMapModal({
                                     </button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                                    {filteredReports.length === 0 && <div className="p-5 text-sm text-slate-600 dark:text-slate-300" role={reportsError ? 'alert' : 'status'}>
+                                        <p>{emptyReportsMessage}</p>
+                                        {reportsError && onRetryReports && <button type="button" onClick={onRetryReports} className="mt-3 min-h-11 px-3 rounded-lg font-semibold text-[#ea580c] focus-visible:outline-3 focus-visible:outline-[#ea580c]">{t('mapPublicReports.retry', { defaultValue: 'Try again' })}</button>}
+                                        {hasReportFilters && !reportsError && !reportsLoading && <button type="button" onClick={resetReportFilters} className="mt-3 min-h-11 px-3 rounded-lg font-semibold text-[#ea580c] focus-visible:outline-3 focus-visible:outline-[#ea580c]">{t('mapPublicReports.clearFilters', { defaultValue: 'Clear filters' })}</button>}
+                                    </div>}
                                     {filteredReports.map(report => {
                                         const isSelected = selectedHazard?.id === report.id;
                                         const meta = getReportCategoryMeta(report);
@@ -2379,7 +2377,7 @@ export default function NearbyIssuesMapModal({
                                                         {report.title || 'Civic infrastructure report'}
                                                     </h4>
                                                     <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                                                        {report.barangay || report.location_string || 'Brgy. 171, Caloocan'}
+                                                        {report.location_string || report.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
                                                     </p>
                                                     {distanceText && (
                                                         <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
@@ -2432,15 +2430,16 @@ export default function NearbyIssuesMapModal({
                                 <span className="text-xs font-mono text-slate-400 dark:text-slate-500 mt-1 block">
                                     {selectedHazard.ticket_id || `PUL-2026-${String(selectedHazard.id || '').padStart(4, '0')}`}
                                 </span>
+                                {!selectedHazard.isOwnReport && <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{publicStatusLabel}</p>}
                             </div>
 
                             {/* Photo Preview */}
                             <div className="w-full h-44 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800">
-                                <img
+                                {selectedHazardPhotoUrl ? <img
                                     src={selectedHazardPhotoUrl}
                                     alt={selectedHazard.title || 'Report photo'}
                                     className="w-full h-full object-cover"
-                                />
+                                /> : <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-300"><FileText size={24} aria-hidden="true" /><span>{t('mapPublicReports.photoPrivate', { defaultValue: 'No report photo available' })}</span></div>}
                             </div>
 
                             {/* Key-Value Metadata Rows */}
@@ -2448,10 +2447,11 @@ export default function NearbyIssuesMapModal({
                                 <div className="flex items-center gap-2.5">
                                     <MapPin size={15} className="text-slate-400 shrink-0" />
                                     <span className="font-semibold text-slate-500 w-20">Location</span>
-                                    <span className="font-medium text-slate-900 dark:text-white truncate">
-                                        {selectedHazard.barangay || selectedHazard.location_string || 'Barangay 171, Caloocan'}
+                                    <span className="font-medium text-slate-900 dark:text-white break-words min-w-0">
+                                        {selectedHazard.location_string || selectedHazard.barangay || t('mapPublicReports.locationUnavailable', { defaultValue: 'Location unavailable' })}
                                     </span>
                                 </div>
+                                {selectedHazard.accuracy_m > 0 && <div className="pl-[25px] text-slate-600 dark:text-slate-300">Reported map accuracy: ±{Math.round(selectedHazard.accuracy_m)} m</div>}
                                 <div className="flex items-center gap-2.5">
                                     <Layers size={15} className="text-slate-400 shrink-0" />
                                     <span className="font-semibold text-slate-500 w-20">Category</span>
@@ -2476,18 +2476,18 @@ export default function NearbyIssuesMapModal({
                             </div>
 
                             {/* Latest Update */}
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                            {(selectedHazard.staff_notes || selectedHazard.latest_update) && <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
                                 <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                                     <FileText size={13} />
                                     <span>Latest update</span>
                                 </span>
                                 <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                                    {selectedHazard.staff_notes || selectedHazard.latest_update || 'Department work is in progress.'}
+                                    {selectedHazard.staff_notes || selectedHazard.latest_update}
                                 </p>
-                            </div>
+                            </div>}
 
                             {/* Next Step */}
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                            {selectedHazard.isOwnReport ? <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
                                 <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
                                     <ChevronRight size={13} />
                                     <span>Next step</span>
@@ -2495,17 +2495,17 @@ export default function NearbyIssuesMapModal({
                                 <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed">
                                     Follow the report for further department updates.
                                 </p>
-                            </div>
+                            </div> : <p className="text-sm text-slate-600 dark:text-slate-300">{t(selectedHazard.public_details_approved ? 'mapPublicReports.basicOnly' : 'mapPublicReports.awaitingDetailReview')}</p>}
 
                             {/* Description */}
-                            <div className="space-y-1">
+                            {(selectedHazard.isOwnReport || selectedHazard.public_details_approved) && <div className="space-y-1">
                                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
                                     Description
                                 </span>
                                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                                    {selectedHazard.description || 'Reported civic issue along the surveyed infrastructure area.'}
+                                    {selectedHazard.description || t('mapPublicReports.descriptionUnavailable', { defaultValue: 'No description recorded.' })}
                                 </p>
-                            </div>
+                            </div>}
 
                             {/* Nearby Landmark (shown only if available) */}
                             {selectedHazard.landmark && (
@@ -2521,7 +2521,7 @@ export default function NearbyIssuesMapModal({
 
                             {/* Action Buttons: View full report (filled orange) + Open location (outlined orange) */}
                             <div className="space-y-2 pt-2">
-                                <button
+                                {selectedHazard.isOwnReport && <button
                                     type="button"
                                     onClick={() => {
                                         if (onOpenReportDetail) onOpenReportDetail(selectedHazard);
@@ -2530,7 +2530,7 @@ export default function NearbyIssuesMapModal({
                                 >
                                     <ExternalLink size={16} />
                                     <span>View full report</span>
-                                </button>
+                                </button>}
                                 <a
                                     href={`https://www.google.com/maps?q=${selectedHazard.lat},${selectedHazard.lng}`}
                                     target="_blank"
@@ -2538,7 +2538,7 @@ export default function NearbyIssuesMapModal({
                                     className="w-full min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-[#ea580c] text-[#ea580c] dark:text-[#ff6b00] hover:bg-[#ea580c]/10 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
                                 >
                                     <MapPin size={16} />
-                                    <span>Open location</span>
+                                    <span>{t(selectedHazard.isOwnReport || selectedHazard.public_details_approved ? 'mapPublicReports.openReportLocation' : 'mapPublicReports.openApproximateArea')}</span>
                                 </a>
                             </div>
                         </div>

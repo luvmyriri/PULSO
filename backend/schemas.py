@@ -49,6 +49,7 @@ class ResidentResponse(ResidentBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     role: str = "resident"
+    confirmation_channels: List[str] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -245,6 +246,25 @@ class ReportResponse(ReportBase):
 
     class Config:
         from_attributes = True
+
+
+class PublicReportResponse(BaseModel):
+    """Verified incident fields only; never include reporter identity or contact data."""
+    id: int
+    ticket_id: str
+    category: str
+    title: str
+    status: str
+    location_lat: float
+    location_lng: float
+    location_string: str
+    barangay: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    accuracy_m: Optional[float] = None
+    public_details_approved: bool = False
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
