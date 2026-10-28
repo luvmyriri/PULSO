@@ -1118,39 +1118,18 @@ function QuickReportWizardModal({
                                                 </span>
                                             )}
                                         </div>
-                                        {!reportLocation ? (
+                                        {!reportLocation && requestDeviceLocation && (
                                             <div className="flex flex-wrap items-center gap-2 mt-3" aria-label="Location controls">
-                                                {onOpenLocationPicker && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={onOpenLocationPicker}
-                                                        className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
-                                                    >
-                                                        <MapPin size={15} />
-                                                        <span>Open location</span>
-                                                    </button>
-                                                )}
-                                                {requestDeviceLocation && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => requestDeviceLocation(true)}
-                                                        className="min-h-10 px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 cursor-pointer"
-                                                    >
-                                                        <span>Use my location</span>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ) : onOpenLocationPicker ? (
-                                            <div className="mt-2">
                                                 <button
                                                     type="button"
-                                                    onClick={onOpenLocationPicker}
-                                                    className="text-xs font-semibold text-[#ff6b00] hover:underline cursor-pointer inline-flex items-center gap-1"
+                                                    onClick={() => requestDeviceLocation(true)}
+                                                    className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
                                                 >
-                                                    <span>Change or open location on map</span>
+                                                    <MapPin size={14} />
+                                                    <span>{t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
                                                 </button>
                                             </div>
-                                        ) : null}
+                                        )}
                                     </div>
                                 </div>
                             </div>
