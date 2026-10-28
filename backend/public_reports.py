@@ -15,6 +15,7 @@ PUBLIC_CATEGORIES = frozenset({
     "Waste Management",
     "Water & Drainage",
     "Street Lighting",
+    "Electrical Wiring",
     "Traffic & Signage",
     "Public Facilities",
     "Public Buildings",

@@ -470,7 +470,8 @@ Intelligence Rules (STRICT SCOPE OF SERVICE):
    - Roads & Bridges: Local city/barangay roads, potholes, broken pavement, sidewalks, gutters, pavement markings (crossings/dividers).
    - Water & Drainage: De-clogging canals/manholes, pumping stations, estero flood control. Public fountains/toilets in parks. 
      *EXCLUSION: Do NOT include potable water supply (Maynilad) or major rivers.*
-   - Street Lighting: Burned-out streetlight bulbs, city-owned electrical wiring/lamp posts.
+   - Street Lighting: Burned-out streetlight bulbs, flickering or damaged lamp posts, unlit intersections.
+   - Electrical Wiring: Dangling cables, exposed wires, sparking utility connections, leaning electrical poles.
    - Public Safety & Regulatory: Structural safety (post-earthquake), building permit compliance, debris/fallen tree clearing, fire/electrical compliance for NEW constructions.
    - Public Facilities: Public schools, health centers, City Hall, basketball courts, plazas, covered courts, parks.
 

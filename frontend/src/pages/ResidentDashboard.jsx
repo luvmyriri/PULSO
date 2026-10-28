@@ -9344,7 +9344,6 @@ const TopNavigation = ({
                     unreadCount={unreadCount}
                     onOpenAccount={() => handleSetTab('profile')}
                     onOpenUpdates={() => handleSetTab('updates')}
-                    onOpenAllNotifications={() => handleSetModal('all-notifications')}
                     onSignIn={() => handleSetModal('login')}
                     onOpenAIChat={() => setIsAIChatOpen && setIsAIChatOpen(prev => !prev)}
                     isAIChatOpen={isAIChatOpen}

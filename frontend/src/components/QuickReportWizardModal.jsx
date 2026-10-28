@@ -31,7 +31,8 @@ import {
     Loader2,
     Maximize2,
     Eye,
-    Trash2
+    Trash2,
+    Lightbulb
 } from 'lucide-react';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import { API_BASE_URL } from '../utils/apiBase';
@@ -43,7 +44,8 @@ export function getCategoryIconComponent(catName) {
     if (lower.includes('waste') || lower.includes('garbage') || lower.includes('trash') || lower.includes('basura')) return Trash2;
     if (lower.includes('flood') || lower.includes('drain')) return Waves;
     if (lower.includes('water') || lower.includes('tubig')) return Droplets;
-    if (lower.includes('power') || lower.includes('light') || lower.includes('electr') || lower.includes('kuryente')) return Zap;
+    if (lower.includes('street light') || lower.includes('lighting') || lower.includes('streetlight') || lower.includes('ilaw') || lower.includes('lamp') || lower.includes('bulb')) return Lightbulb;
+    if (lower.includes('wiring') || lower.includes('wire') || lower.includes('cable') || lower.includes('electrical') || lower.includes('power') || lower.includes('electr') || lower.includes('kuryente')) return Zap;
     if (lower.includes('traffic') || lower.includes('sign') || lower.includes('signal')) return Signpost;
     if (lower.includes('building') || lower.includes('facilit') || lower.includes('hall')) return Building2;
     if (lower.includes('safety') || lower.includes('hazard') || lower.includes('danger') || lower.includes('sunog')) return ShieldAlert;
@@ -62,8 +64,11 @@ export function mapAiCategoryToCanonical(categoryStr) {
         if (part.includes('drain') || part.includes('flood') || part.includes('canal') || part.includes('sewer') || part.includes('manhole') || part.includes('clog') || part.includes('baha') || part.includes('estero') || part.includes('culvert')) {
             mapped.add('Drainage & Flooding');
         }
-        if (part.includes('light') || part.includes('electric') || part.includes('power') || part.includes('lamp') || part.includes('street')) {
-            mapped.add('Power & Street Lighting');
+        if (part.includes('street light') || part.includes('streetlight') || part.includes('lighting') || part.includes('lamp') || (part.includes('light') && !part.includes('traffic'))) {
+            mapped.add('Street Lighting');
+        }
+        if (part.includes('wiring') || part.includes('wire') || part.includes('cable') || part.includes('electric') || part.includes('power') || part.includes('kuryente')) {
+            mapped.add('Electrical Wiring');
         }
         if (part.includes('traffic') || part.includes('sign') || part.includes('signal') || part.includes('marking')) {
             mapped.add('Traffic & Road Signs');
@@ -109,15 +114,31 @@ const DRAFT_STORAGE_KEY = 'pulso_quick_report_draft_v2';
 
 // Unified Categories excluding "All" for reporting
 const REPORTABLE_CATEGORIES = [
-    'Water Supply & Distribution',
-    'Drainage & Flooding',
     'Roads & Bridges',
-    'Traffic & Road Signs',
-    'Power & Street Lighting',
+    'Drainage & Flooding',
+    'Street Lighting',
+    'Water Supply & Distribution',
     'Public Safety & Hazards',
+    'Traffic & Road Signs',
     'Public Buildings & Facilities',
+    'Electrical Wiring',
     'Waste Management'
 ];
+
+export const CATEGORY_SUBTITLES = {
+    'Roads & Bridges': 'Potholes, damaged roads, and sidewalks',
+    'Drainage & Flooding': 'Clogged drains, gutters, and flooding',
+    'Street Lighting': 'Busted, flickering, or damaged lights',
+    'Water Supply & Distribution': 'Pipe leaks and low water pressure',
+    'Water Supply': 'Pipe leaks and low water pressure',
+    'Public Safety & Hazards': 'Fallen trees, open manholes, hazards',
+    'Public Safety Hazards': 'Fallen trees, open manholes, hazards',
+    'Traffic & Road Signs': 'Missing or damaged traffic signs',
+    'Public Buildings & Facilities': 'Parks, civic centers, and buildings',
+    'Public Facilities': 'Parks, civic centers, and buildings',
+    'Electrical Wiring': 'Dangling cables and exposed wires',
+    'Waste Management': 'Uncollected garbage, illegal dumping, litter'
+};
 
 /**
  * QuickReportWizardModal
@@ -1402,6 +1423,11 @@ function QuickReportWizardModal({
                                                                 <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
                                                                     {catName}
                                                                 </div>
+                                                                {CATEGORY_SUBTITLES[catName] && (
+                                                                    <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                                        {CATEGORY_SUBTITLES[catName]}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -1455,7 +1481,7 @@ function QuickReportWizardModal({
                                                                 : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-slate-300 dark:hover:border-slate-700'
                                                         }`}
                                                     >
-                                                        <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="flex items-center gap-3 min-w-0 pr-2">
                                                             <div
                                                                 className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                                                                     isSelected
@@ -1465,9 +1491,16 @@ function QuickReportWizardModal({
                                                             >
                                                                 <IconComp size={18} className={isSelected ? 'text-white' : ''} />
                                                             </div>
-                                                            <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                                                                {catName}
-                                                            </span>
+                                                            <div className="min-w-0">
+                                                                <span className="font-bold text-sm text-slate-900 dark:text-white block truncate">
+                                                                    {catName}
+                                                                </span>
+                                                                {CATEGORY_SUBTITLES[catName] && (
+                                                                    <span className="text-xs text-slate-500 dark:text-slate-400 block truncate">
+                                                                        {CATEGORY_SUBTITLES[catName]}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
 
                                                         {/* Checkbox */}
