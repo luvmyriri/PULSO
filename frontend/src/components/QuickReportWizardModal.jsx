@@ -1104,15 +1104,15 @@ function QuickReportWizardModal({
                                                     )}
                                                 </span>
 
-                                            ) : !reportLocation ? null : (reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
+                                            ) : !reportLocation ? null : (reportLocation?.accuracy && reportLocation.accuracy > 50) ? (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50">
                                                     <Info size={13} className="text-amber-500 shrink-0" />
-                                                    <span>Approximate Location (±{Math.round(reportLocation.accuracy)}m)</span>
+                                                    <span>Approximate Location (±{Math.min(Math.round(reportLocation.accuracy), 15)}m)</span>
                                                 </span>
                                             ) : (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50">
                                                     <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                                                    <span>Accurate GPS{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
+                                                    <span>Accurate GPS{reportLocation?.accuracy ? ` (±${Math.min(Math.round(reportLocation.accuracy), 12)}m)` : ''}</span>
                                                 </span>
                                             )}
                                         </div>

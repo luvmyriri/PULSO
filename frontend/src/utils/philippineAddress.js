@@ -442,7 +442,30 @@ export function parseAddressString(str, lat = null, lng = null) {
     }
 
     if (nonStandardSegments.length > 0) {
-        structured.streetAddress = nonStandardSegments.join(', ');
+        // Deduplicate repeated street names (e.g. '1604 Sampaguita Dr' vs '1604 Sampaguita Drive')
+        const norm = (s) => s.toLowerCase()
+            .replace(/\b(drive|dr\.?)\b/g, 'drive')
+            .replace(/\b(street|st\.?)\b/g, 'street')
+            .replace(/\b(avenue|ave\.?)\b/g, 'avenue')
+            .replace(/\b(boulevard|blvd\.?)\b/g, 'boulevard')
+            .replace(/\b(road|rd\.?)\b/g, 'road')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const deduped = [];
+        for (const seg of nonStandardSegments) {
+            const sn = norm(seg);
+            const idx = deduped.findIndex(ex => {
+                const en = norm(ex);
+                return en === sn || en.includes(sn) || sn.includes(en);
+            });
+            if (idx === -1) {
+                deduped.push(seg);
+            } else if (seg.length > deduped[idx].length) {
+                deduped[idx] = seg;
+            }
+        }
+        structured.streetAddress = deduped.join(', ');
     }
 
     return structured;
