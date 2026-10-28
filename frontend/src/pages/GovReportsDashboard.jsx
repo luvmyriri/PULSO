@@ -8,8 +8,9 @@ import {
     MessageSquare, Phone, Flag, Shield, Lock, FileText,
     Share2, Pin, PinOff, Eye, RefreshCw, Layers, ArrowUpRight,
     Bookmark, Map as MapIcon, CheckCircle2, Sparkles, Truck,
-    Briefcase, Navigation, Menu
+    Briefcase, Navigation, Menu, Download
 } from 'lucide-react';
+import { downloadCsv } from '../utils/csvExport';
 import ReportDocket from '../components/government/ReportDocket';
 import ReportSelectionActions from '../components/government/ReportSelectionActions';
 import { GovPageHeader } from '../components/government/GovWorkspace';
@@ -392,6 +393,48 @@ export default function GovReportsDashboard() {
         });
     }, [reports, searchQuery, statusFilter, severityFilter, barangayFilter, districtFilter, dateFilter, reviewOps.data, reviewQueue, priorityFilter, currentUser?.id]);
 
+    const handleExportCSV = useCallback(() => {
+        if (!filteredReports.length) return;
+        const headers = [
+            'Ticket ID',
+            'Issue',
+            'Category',
+            'Severity',
+            'Status',
+            'District',
+            'Barangay',
+            'Address',
+            'Landmark',
+            'Latitude',
+            'Longitude',
+            'Reporter',
+            'Is Anonymous',
+            'Reporter Contact',
+            'Date Submitted',
+            'Last Updated'
+        ];
+        const rows = filteredReports.map(r => [
+            r.ticket_id || '',
+            r.issue || '',
+            r.report_type || 'General',
+            r.severity || 'Not assessed',
+            r.status || 'Received',
+            r.district || '',
+            r.barangay || '',
+            r.location?.address || '',
+            r.location?.landmark || '',
+            r.location?.lat ?? '',
+            r.location?.lng ?? '',
+            r.reporter?.name || '',
+            r.reporter?.is_private ? 'Yes' : 'No',
+            r.reporter?.contact_method || '',
+            r.steps?.received || '',
+            r.updated || ''
+        ]);
+        const dateStr = new Date().toISOString().slice(0, 10);
+        downloadCsv(headers, rows, `PULSO_Citizen_Reports_${dateStr}`);
+    }, [filteredReports]);
+
     const pageCount = Math.max(1, Math.ceil(filteredReports.length / pageSize));
     const visibleReports = filteredReports.slice((currentPage - 1) * pageSize, currentPage * pageSize);
     useEffect(() => {
@@ -540,6 +583,19 @@ export default function GovReportsDashboard() {
                                     ]}
                                 />
                             </div>
+
+                            {/* Export Filtered Reports as CSV */}
+                            <button
+                                type="button"
+                                onClick={handleExportCSV}
+                                disabled={filteredReports.length === 0}
+                                className="gov-control flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-orange-600 dark:hover:text-orange-400 hover:border-orange-300 dark:hover:border-orange-500/40 transition-all cursor-pointer disabled:opacity-50 min-h-[36px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
+                                title={filteredReports.length ? `Export ${filteredReports.length} report(s) as CSV` : "No reports to export"}
+                                aria-label="Export filtered citizen reports as CSV"
+                            >
+                                <Download size={13} className="text-slate-500 dark:text-slate-400" />
+                                <span className="hidden sm:inline">Export CSV</span>
+                            </button>
 
                             {/* On-demand Live Sync Button */}
                             <button

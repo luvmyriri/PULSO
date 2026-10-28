@@ -1,8 +1,9 @@
 import { useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowUpRight, RefreshCw } from 'lucide-react';
+import { ArrowUpRight, RefreshCw, Download } from 'lucide-react';
 import { GovWorkspace, GovButton, GovSearch, GovStatus, GovState, GovTabs, GovTable, GovDetail, formatDate } from '../components/government/GovWorkspace';
 import { useGovernmentData } from '../utils/governmentApi';
+import { downloadCsv } from '../utils/csvExport';
 import ReportPriority from '../components/government/ReportPriority';
 
 const BUCKETS = [{ value: 'all', label: 'All work' }, { value: 'assigned_to_me', label: 'Assigned to me' }, { value: 'needs_my_review', label: 'Needs review' }, { value: 'waiting_on_others', label: 'Waiting on others' }, { value: 'recently_completed', label: 'Completed recently' }];
@@ -19,9 +20,51 @@ export default function GovTodayPage() {
     const selected = rows.find(row => key(row) === params.get('selected'));
     function change(name, value) { setParams(p => { const n = new URLSearchParams(p); value ? n.set(name, value) : n.delete(name); return n; }, { replace: name === 'search' }); }
     function close() { change('selected', ''); requestAnimationFrame(() => returnFocus.current?.focus()); }
+
+    function handleExportCSV() {
+        if (!rows.length) return;
+        const headers = [
+            'Ticket ID',
+            'Task',
+            'Queue',
+            'Location',
+            'Priority',
+            'Status',
+            'Owner',
+            'Updated',
+            'Review Target',
+            'Review Overdue',
+            'Why in Queue',
+            'Recommended Action'
+        ];
+        const dataRows = rows.map(r => [
+            r.ticket_id || '',
+            r.title || '',
+            BUCKETS.find(b => b.value === r.task_bucket)?.label || r.task_bucket || 'Review',
+            r.barangay || 'Not recorded',
+            r.priority || '',
+            r.status || '',
+            r.assigned_to_name || 'Shared review queue',
+            formatDate(r.updated_at) || '',
+            r.review_target?.due_at ? formatDate(r.review_target.due_at) : '',
+            r.review_target?.overdue ? 'Overdue' : (r.review_target?.due_at ? 'On track' : 'N/A'),
+            r.why_in_inbox || '',
+            r.recommended_action || ''
+        ]);
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const bucketSuffix = bucket !== 'all' ? `_${bucket}` : '';
+        downloadCsv(headers, dataRows, `PULSO_Government_Work_Queue${bucketSuffix}_${dateStr}`);
+    }
+
     return <GovWorkspace className="gov-today-workspace" title="My work" description="Assigned tasks and decisions waiting for your review." actions={<>
         <GovSearch value={search} onChange={v => change('search', v)} placeholder="Search ticket, task or location" />
-        <div className="gov-page-actions__group">{fetchedAt && <span className="gov-muted">Updated {fetchedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>}<GovButton onClick={reload} disabled={loading}><RefreshCw size={15} /> Refresh</GovButton></div>
+        <div className="gov-page-actions__group">
+            {fetchedAt && <span className="gov-muted">Updated {fetchedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}</span>}
+            <GovButton onClick={handleExportCSV} disabled={loading || !rows.length} title={rows.length ? `Export ${rows.length} task(s) to CSV` : 'No tasks to export'}>
+                <Download size={15} aria-hidden="true" /> Export CSV
+            </GovButton>
+            <GovButton onClick={reload} disabled={loading}><RefreshCw size={15} aria-hidden="true" /> Refresh</GovButton>
+        </div>
     </>}>
         <GovTabs label="Work queues" value={bucket} onChange={v => { change('bucket', v); }} items={BUCKETS.map(b => ({ ...b, count: error || !data ? null : b.value === 'all' ? items.length : data.inbox_counts?.[b.value] || 0 }))} />
         {data?.routing_enabled===false&&data?.can_route_reports&&<p className="gov-note" role="status">Automatic report assignment is paused. Incoming reports need a manual review owner.</p>}
