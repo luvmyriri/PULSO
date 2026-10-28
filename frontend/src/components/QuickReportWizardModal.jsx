@@ -496,9 +496,6 @@ function QuickReportWizardModal({
             const plus = resolvedPlusCode ? `${resolvedPlusCode}, ` : '';
             return `${plus}${bgy}, Caloocan, Metro Manila`;
         }
-        if (isLocating) {
-            return 'Detecting accurate GPS location…';
-        }
         return t('reportWizard.step2Location.chooseLocation', 'Choose the issue location');
     }, [customBarangay, structuredAddress, locationAddress, resolvedBarangay, resolvedPlusCode, reportLocation, isLocating, t]);
 
@@ -1115,11 +1112,7 @@ function QuickReportWizardModal({
                                                         </button>
                                                     )}
                                                 </span>
-                                            ) : isLocating && !reportLocation ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/10 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-500/40 animate-pulse">
-                                                    <Loader2 size={13} className="animate-spin text-[#ff6b00] shrink-0" />
-                                                    <span>Detecting accurate GPS…</span>
-                                                </span>
+
                                             ) : !reportLocation ? (
                                                 <span className="text-xs text-slate-600 dark:text-slate-300">{t('reportWizard.step2Location.noLocationHelp', 'Location not set. Use GPS or choose a place on the map.')}</span>
                                             ) : (reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
@@ -1134,15 +1127,15 @@ function QuickReportWizardModal({
                                                 </span>
                                             )}
                                         </div>
-                                        {!reportLocation && !isLocating && (
+                                        {!reportLocation && (
                                             <div className="flex flex-wrap gap-2 mt-3" aria-label="Location controls">
                                                 <button
                                                     type="button"
                                                     onClick={() => requestDeviceLocation?.(true)}
                                                     className="min-h-10 px-4 rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-sm font-bold text-white flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
                                                 >
-                                                    <RotateCcw size={14} />
-                                                    <span>Reload location</span>
+                                                    <MapPin size={14} />
+                                                    <span>{t('reportWizard.step2Location.useMyLocation', 'Use my location')}</span>
                                                 </button>
                                             </div>
                                         )}
