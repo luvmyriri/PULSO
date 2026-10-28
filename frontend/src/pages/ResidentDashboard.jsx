@@ -413,7 +413,8 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
     const navDestinations = [
         { id: 'overview', icon: <Home size={19} strokeWidth={2.2} aria-hidden="true" />, label: 'Home' },
         { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: 'My Reports' },
-        { id: 'updates', icon: <Bell size={19} strokeWidth={2} aria-hidden="true" />, label: 'Updates' },
+        { id: 'updates', icon: <Radio size={19} strokeWidth={2} aria-hidden="true" />, label: 'Updates' },
+        { id: 'notifications', icon: <Bell size={19} strokeWidth={2} aria-hidden="true" />, label: 'Notifications' },
         { id: 'map', icon: <MapIcon size={19} strokeWidth={2} aria-hidden="true" />, label: 'Map' },
     ];
 
@@ -468,7 +469,9 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
                         {navDestinations.map(item => {
                             const isActive = item.id === 'map'
                                 ? activeModal === 'map'
-                                : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map';
+                                : item.id === 'notifications'
+                                ? activeModal === 'all-notifications'
+                                : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map' && activeModal !== 'all-notifications';
                             return (
                                 <button
                                     key={item.id}
@@ -476,6 +479,8 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
                                     onClick={() => {
                                         if (item.id === 'map') {
                                             handleSetModal('map');
+                                        } else if (item.id === 'notifications') {
+                                            handleSetModal('all-notifications');
                                         } else {
                                             handleSetTab(item.id);
                                         }
@@ -491,7 +496,7 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
                                         {item.icon}
                                     </span>
                                     <span className="truncate">{item.label}</span>
-                                    {item.id === 'updates' && unreadCount > 0 && (
+                                    {item.id === 'notifications' && unreadCount > 0 && (
                                         <span
                                             className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#f05a00] text-white tabular-nums shadow-xs"
                                             aria-label={`${unreadCount} unread`}
@@ -9381,6 +9386,7 @@ const TopNavigation = ({
                     showNotifications={showNotifications}
                     setShowNotifications={setShowNotifications}
                     onNotificationClick={handleNotificationClick}
+                    onOpenAllNotifications={() => handleSetModal('all-notifications')}
                     onMarkAllRead={handleMarkAllRead}
                     loadingNotifications={loadingNotifications}
                     notificationsError={notificationsError}
@@ -9408,6 +9414,7 @@ const TopNavigation = ({
                     showNotifications={showNotifications}
                     setShowNotifications={setShowNotifications}
                     onNotificationClick={handleNotificationClick}
+                    onOpenAllNotifications={() => handleSetModal('all-notifications')}
                     onMarkAllRead={handleMarkAllRead}
                     loadingNotifications={loadingNotifications}
                     notificationsError={notificationsError}
@@ -10123,15 +10130,7 @@ export default function ResidentDashboard() {
             setReportStatusFilter('all');
             showToast(`Viewing details for report status update`);
         } else {
-            setSelectedPost({
-                department: 'System Notice',
-                title: notif.title,
-                description: notif.message,
-                created_at: notif.created_at,
-                category: 'Advisory',
-                advisory_id: `NOTIF-${notif.id}`
-            });
-            setActiveModal('post-details');
+            handleSetModal('all-notifications');
         }
         setShowNotifications(false);
     };

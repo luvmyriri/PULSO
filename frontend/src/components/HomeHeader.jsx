@@ -488,16 +488,15 @@ export default function HomeHeader({
                 onNotificationClick={(notif) => {
                     if (onNotificationClick) {
                         onNotificationClick(notif);
-                    } else if (onOpenUpdates) {
-                        onOpenUpdates();
+                    } else if (onOpenAllNotifications) {
+                        onOpenAllNotifications();
                     }
                 }}
                 onMarkAllRead={onMarkAllRead}
+                onOpenAllNotifications={onOpenAllNotifications}
                 onViewAllUpdates={() => {
                     if (onOpenAllNotifications) {
                         onOpenAllNotifications();
-                    } else if (handleSetTab) {
-                        handleSetTab('updates');
                     }
                 }}
                 unreadCount={unreadCount}

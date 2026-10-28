@@ -48,6 +48,7 @@ export default function BrandHeader({
     handleSetTab,
     onGoHome,
     t = (k, o) => o?.defaultValue || k,
+    onOpenAllNotifications,
     hideMobileHeader = false,
     showSearch = false,
     className = ''
@@ -238,8 +239,9 @@ export default function BrandHeader({
                 notifications={notifications}
                 onNotificationClick={onNotificationClick}
                 onMarkAllRead={onMarkAllRead}
+                onOpenAllNotifications={onOpenAllNotifications}
                 onViewAllUpdates={() => {
-                    if (handleSetTab) handleSetTab('updates');
+                    if (onOpenAllNotifications) onOpenAllNotifications();
                 }}
                 unreadCount={unreadCount}
                 loading={loadingNotifications}

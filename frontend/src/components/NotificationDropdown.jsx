@@ -87,6 +87,7 @@ export default function NotificationDropdown({
     notifications = [],
     onNotificationClick,
     onMarkAllRead,
+    onOpenAllNotifications,
     onViewAllUpdates,
     unreadCount = 0,
     loading = false,
@@ -378,7 +379,9 @@ export default function NotificationDropdown({
                             type="button"
                             onClick={() => {
                                 onClose?.();
-                                if (onViewAllUpdates) {
+                                if (onOpenAllNotifications) {
+                                    onOpenAllNotifications();
+                                } else if (onViewAllUpdates) {
                                     onViewAllUpdates();
                                 }
                             }}
