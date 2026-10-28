@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  AlertTriangle, CheckCircle2, Circle, Sparkles,
-  Check, ArrowRight, ShieldAlert
+  AlertCircle, Check
 } from 'lucide-react';
+import { cleanDescription } from '../../utils/reportWizardValidation';
 import WizardCardFooter from './WizardCardFooter';
 
 const SEVERITY_OPTIONS = [
@@ -35,17 +35,23 @@ export default function Step4DetailsDuplicate({
   onDetailsChange,
   onBack,
   onContinue,
+  stepErrors = [],
 }) {
   const { t } = useTranslation();
-  const description = detailsData?.description || '';
+  const textareaRef = useRef(null);
+
+  const rawDescription = detailsData?.description || '';
   const urgency = detailsData?.urgency || 'medium';
-  const charCount = description.trim().length;
-  const isDescriptionValid = charCount >= 10 && charCount <= 5000;
+  const charCount = rawDescription.trim().length;
 
-  const [duplicateDismissed, setDuplicateDismissed] = useState(false);
+  const descError = stepErrors.find(e => e.field === 'description');
+  const hasError = Boolean(descError);
 
-  // Duplicate detection is authoritative at submission; no simulated ticket is shown.
-  const nearbyReport = null;
+  useEffect(() => {
+    if (hasError && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [hasError]);
 
   const handleUrgencySelect = (val) => {
     onDetailsChange({
@@ -61,42 +67,29 @@ export default function Step4DetailsDuplicate({
     });
   };
 
+  const handleDescriptionBlur = () => {
+    // Sanitize on blur
+    const cleaned = cleanDescription(rawDescription);
+    if (cleaned !== rawDescription) {
+      onDetailsChange({
+        ...detailsData,
+        description: cleaned,
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col justify-between h-full space-y-6">
       <div className="space-y-6">
-        {/* Nearby Duplicate Notice if detected */}
-        {nearbyReport && !duplicateDismissed && (
-          <aside
-            aria-label="Nearby duplicate report warning"
-            className="rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 p-4 sm:p-5 flex items-start justify-between gap-4"
-          >
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 shrink-0">
-                <AlertTriangle size={18} />
-              </div>
-              <div className="space-y-0.5">
-                <h2 className="text-sm font-bold text-amber-950 dark:text-amber-200">
-                  {t('reportWizard.step4Details.duplicateBannerTitle', 'Similar Active Report Found Nearby')}
-                </h2>
-                <p className="text-xs text-amber-800 dark:text-amber-300">
-                  {t('reportWizard.step4Details.duplicateBannerDesc', 'A report in this category is already active within {{distance}}m of your pin (Ticket: {{ticketId}}).', {
-                    distance: nearbyReport.distance,
-                    ticketId: nearbyReport.ticketId,
-                  })}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDuplicateDismissed(true)}
-              className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:underline shrink-0"
-            >
-              Dismiss
-            </button>
-          </aside>
+        {/* Inline Step Error Banner */}
+        {hasError && (
+          <div id="description-error-banner" role="alert" className="flex items-center gap-2 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-sm font-semibold text-red-700 dark:text-red-300 animate-fadeIn">
+            <AlertCircle size={18} className="shrink-0 text-red-500" aria-hidden="true" />
+            <span>{descError.message}</span>
+          </div>
         )}
 
-        {/* Top: Severity Section (How much is it affecting the area?) */}
+        {/* Top: Severity Section */}
         <div className="space-y-3">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
@@ -165,38 +158,50 @@ export default function Step4DetailsDuplicate({
             </label>
             <div className="relative">
               <textarea
+                ref={textareaRef}
                 id="report-description"
                 rows={6}
-                value={description}
+                value={rawDescription}
                 onChange={handleDescriptionChange}
+                onBlur={handleDescriptionBlur}
+                aria-invalid={hasError ? 'true' : undefined}
+                aria-describedby={hasError ? 'description-error-msg' : undefined}
                 placeholder={t('reportWizard.step4Details.descriptionPlaceholder', "What did you notice? When did it start?\nInclude any details that could help the team understand the concern.")}
                 className={`w-full min-h-[160px] p-4 sm:p-5 rounded-2xl border bg-white dark:bg-slate-900 text-sm sm:text-base leading-relaxed placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 transition-colors ${
-                  charCount > 0 && charCount < 10
-                    ? 'border-red-400 dark:border-red-600'
+                  hasError
+                    ? 'border-red-500 ring-1 ring-red-500 focus-visible:ring-red-500'
                     : 'border-slate-200 dark:border-slate-800'
                 }`}
               />
             </div>
 
+            {/* Inline Error under field if present */}
+            {hasError && (
+              <p id="description-error-msg" className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 animate-fadeIn">
+                <AlertCircle size={14} className="shrink-0 text-red-500" aria-hidden="true" />
+                <span>{descError.message}</span>
+              </p>
+            )}
+
             {/* Hint and Character Counter Row */}
             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1">
-              <span className={charCount > 0 && charCount < 10 ? 'text-red-500 font-bold' : ''}>
-                {t('reportWizard.step4Details.charLimitMin', 'At least 10 characters')}
+              <span>
+                {t('reportWizard.step4Details.charLimitMin', 'Between 20 and 1000 characters')}
               </span>
-              <span className="font-mono">
-                {charCount.toLocaleString()} / 5,000
+              <span className={`font-mono ${charCount > 1000 ? 'text-red-500 font-bold' : ''}`}>
+                {charCount.toLocaleString()} / 1,000
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Pinned Footer */}
+      {/* Pinned Footer: Primary button stays enabled */}
       <WizardCardFooter
         onBack={onBack}
         canBack={true}
         onContinue={onContinue}
-        isContinueDisabled={!isDescriptionValid}
+        isContinueDisabled={false}
       />
     </div>
   );

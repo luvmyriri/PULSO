@@ -654,6 +654,64 @@
         "continue": "Continue to category",
         "continueToCategory": "Continue to category",
         "takePhotoNote": "Please take or upload a photo of the concern to continue."
+      },
+      "validation": {
+        "attentionCount": "{{count}} things need your attention",
+        "fixCount": "Please fix {{count}} things before sending",
+        "fixLabel": "Fix",
+        "leavePrompt": "Leave this report? Your answers are saved on this device.",
+        "stay": "Stay",
+        "leave": "Leave",
+        "category": {
+          "required": "Please choose the type of problem."
+        },
+        "location": {
+          "required": "Please pin the exact spot of the problem.",
+          "outsideCaloocan": "This spot is outside Caloocan City. Please move the pin inside the city.",
+          "permissionDenied": "We can't find your location. Turn on Location in your phone settings, or pin the spot on the map yourself.",
+          "accuracyWarning": "Location may be off. Tap Change location to fix it.",
+          "confirmPin": "This pin is the right spot",
+          "addressNotReadable": "Please ensure the address is readable or adjust the pin.",
+          "landmarkTooLong": "Please keep the landmark under 100 characters."
+        },
+        "evidence": {
+          "required": "Take at least one photo to continue.",
+          "tooMany": "You can upload up to 5 photos.",
+          "checking": "Checking your photo...",
+          "fileType": "This file type isn't supported. Please use a JPG, PNG or WebP photo.",
+          "fileSize": "This photo is too large. Please take a new one.",
+          "duplicate": "You already added this photo.",
+          "rejected": "This looks like a personal photo. Please take a clear photo of the problem.",
+          "checkFailed": "We couldn't check this photo. Please try again.",
+          "tryAgain": "Try again",
+          "countLabel": "{{current}} of {{max}} photos",
+          "suggestCategory": "This looks like {{category}}. Change category?",
+          "keepMine": "Keep mine",
+          "changeCategory": "Change"
+        },
+        "details": {
+          "required": "Please describe the problem.",
+          "tooShort": "Please add a bit more detail (at least 20 characters).",
+          "tooLong": "Please keep it under 1000 characters.",
+          "gibberish": "Please describe what you see in a few words.",
+          "counter": "{{current}} / {{max}}"
+        },
+        "contact": {
+          "nameRequired": "Please enter your full name.",
+          "phoneInvalid": "Please enter a valid mobile number, like 0917 123 4567.",
+          "emailInvalid": "That email doesn't look right. Please check it.",
+          "contactRequired": "Please provide either a mobile number or an email address so we can reach you.",
+          "consentRequired": "Please confirm to continue.",
+          "consentLabel": "I agree that City Engineering may use these details to follow up on my report",
+          "orDivider": "or",
+          "typoHint": "Did you mean {{suggestion}}?"
+        },
+        "server": {
+          "offline": "You're offline. Your report is saved. We'll send it when you're back online.",
+          "rejected": "We couldn't accept your report. Please check the marked fields.",
+          "rateLimit": "Please wait a minute and try again.",
+          "generic": "Something went wrong. Your report is saved. Please try again."
+        }
       }
     },
     "receipt": {
