@@ -1133,19 +1133,6 @@ function QuickReportWizardModal({
                                                     <span>Accurate GPS{reportLocation?.accuracy ? ` (±${Math.round(reportLocation.accuracy)}m)` : ''}</span>
                                                 </span>
                                             )}
-                                            {/* Auto-Reload / Resync GPS Button */}
-                                            {requestDeviceLocation && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => requestDeviceLocation(true)}
-                                                    disabled={isLocating}
-                                                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer inline-flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600 ml-0.5 disabled:opacity-50"
-                                                    title="Reload accurate GPS location"
-                                                    aria-label="Reload accurate GPS location"
-                                                >
-                                                    <RotateCcw size={14} className={isLocating ? 'animate-spin text-[#ff6b00]' : ''} />
-                                                </button>
-                                            )}
                                         </div>
                                         {!reportLocation && !isLocating && (
                                             <div className="flex flex-wrap gap-2 mt-3" aria-label="Location controls">
