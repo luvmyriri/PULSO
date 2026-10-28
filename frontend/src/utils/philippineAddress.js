@@ -476,16 +476,37 @@ export function formatFullAddress(structured, fallbackCoordinates = null) {
         region = 'Metro Manila'
     } = structured;
 
+    // Deduplicate subdivision and streetAddress if they refer to the same street/number
+    let cleanSubd = (subdivision || '').trim();
+    let cleanStreet = (streetAddress || '').trim();
+    if (cleanSubd && cleanStreet) {
+        const normSubd = cleanSubd.toLowerCase().replace(/\b(drive|dr\.?)\b/g, 'dr').replace(/\b(street|st\.?)\b/g, 'st').replace(/\b(avenue|ave\.?)\b/g, 'ave').replace(/\s+/g, ' ').trim();
+        const normStreet = cleanStreet.toLowerCase().replace(/\b(drive|dr\.?)\b/g, 'dr').replace(/\b(street|st\.?)\b/g, 'st').replace(/\b(avenue|ave\.?)\b/g, 'ave').replace(/\s+/g, ' ').trim();
+        if (normSubd === normStreet || normStreet.includes(normSubd)) {
+            cleanSubd = '';
+        } else if (normSubd.includes(normStreet)) {
+            cleanStreet = '';
+        }
+    }
+
     const postalAdmin = [postalCode, region].filter(Boolean).join(' ');
 
-    const parts = [
-        subdivision,
+    const rawParts = [
+        cleanSubd,
         plusCode,
-        streetAddress,
+        cleanStreet,
         barangay,
         city,
         postalAdmin
     ].filter(Boolean);
+
+    // Deduplicate any repeated segments
+    const parts = [];
+    for (const p of rawParts) {
+        if (!parts.some(existing => existing.toLowerCase() === p.toLowerCase())) {
+            parts.push(p);
+        }
+    }
 
     if (parts.length > 0) {
         return parts.join(', ');

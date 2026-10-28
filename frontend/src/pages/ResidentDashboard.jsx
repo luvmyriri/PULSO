@@ -10804,6 +10804,10 @@ export default function ResidentDashboard() {
     const acceptDevicePosition = (position) => {
         const { latitude, longitude, accuracy } = position.coords || {};
         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+        // Don't degrade an already locked accurate fix with a jittery reading
+        if (reportLocation?.accuracy && Number.isFinite(accuracy) && accuracy > reportLocation.accuracy * 1.8) {
+            return;
+        }
         const loc = {
             lat: latitude,
             lng: longitude,
