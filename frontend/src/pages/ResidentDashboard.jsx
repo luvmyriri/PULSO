@@ -10881,10 +10881,7 @@ export default function ResidentDashboard() {
     };
 
     useEffect(() => {
-        if (activeModal === 'file-report') {
-            requestDeviceLocation();
-            startDeviceLocationTracking();
-        } else {
+        if (activeModal !== 'file-report') {
             stopDeviceLocationTracking();
         }
         return () => {
