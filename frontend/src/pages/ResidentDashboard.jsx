@@ -414,7 +414,6 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
         { id: 'overview', icon: <Home size={19} strokeWidth={2.2} aria-hidden="true" />, label: 'Home' },
         { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: 'My Reports' },
         { id: 'updates', icon: <Radio size={19} strokeWidth={2} aria-hidden="true" />, label: 'Updates' },
-        { id: 'notifications', icon: <Bell size={19} strokeWidth={2} aria-hidden="true" />, label: 'Notifications' },
         { id: 'map', icon: <MapIcon size={19} strokeWidth={2} aria-hidden="true" />, label: 'Map' },
     ];
 
@@ -469,9 +468,7 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
                         {navDestinations.map(item => {
                             const isActive = item.id === 'map'
                                 ? activeModal === 'map'
-                                : item.id === 'notifications'
-                                ? activeModal === 'all-notifications'
-                                : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map' && activeModal !== 'all-notifications';
+                                : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map';
                             return (
                                 <button
                                     key={item.id}
@@ -479,8 +476,6 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
                                     onClick={() => {
                                         if (item.id === 'map') {
                                             handleSetModal('map');
-                                        } else if (item.id === 'notifications') {
-                                            handleSetModal('all-notifications');
                                         } else {
                                             handleSetTab(item.id);
                                         }
@@ -496,14 +491,6 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
                                         {item.icon}
                                     </span>
                                     <span className="truncate">{item.label}</span>
-                                    {item.id === 'notifications' && unreadCount > 0 && (
-                                        <span
-                                            className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#f05a00] text-white tabular-nums shadow-xs"
-                                            aria-label={`${unreadCount} unread`}
-                                        >
-                                            {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
-                                        </span>
-                                    )}
                                 </button>
                             );
                         })}
