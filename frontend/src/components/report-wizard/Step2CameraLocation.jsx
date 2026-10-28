@@ -48,6 +48,7 @@ export default function Step2CameraLocation({
 
   const fileInputRef = useRef(null);
   const addressRequest = useRef(0);
+  const shouldAutoAdvanceRef = useRef(false);
   useEffect(() => () => { addressRequest.current += 1; }, []);
 
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
@@ -144,6 +145,67 @@ export default function Step2CameraLocation({
   // -------------------------------------------------------------------------
   // Camera & Photo Handling
   // -------------------------------------------------------------------------
+  const normalizeAiCategory = (rawCategory) => {
+    if (!rawCategory || typeof rawCategory !== 'string') return null;
+    const parts = rawCategory.split(',').map(p => p.trim().toLowerCase());
+    const mapped = new Set();
+    for (const lower of parts) {
+      if (lower.includes('road') || lower.includes('bridge') || lower.includes('pothole') || lower.includes('pavement') || lower.includes('sidewalk') || lower.includes('asphalt')) {
+        mapped.add('Roads & Bridges');
+      }
+      if (lower.includes('drain') || lower.includes('flood') || lower.includes('canal') || lower.includes('gutter') || lower.includes('sewer') || lower.includes('clog')) {
+        mapped.add('Drainage & Flooding');
+      }
+      if (lower.includes('street light') || lower.includes('streetlight') || lower.includes('lighting') || lower.includes('lamp') || (lower.includes('light') && !lower.includes('traffic'))) {
+        mapped.add('Street Lighting');
+      }
+      if (lower.includes('pipe') || lower.includes('leak') || lower.includes('waterline') || lower.includes('burst') || lower.includes('water')) {
+        mapped.add('Water Pipeline');
+      }
+      if (lower.includes('electric') || lower.includes('wire') || lower.includes('wiring') || lower.includes('cable')) {
+        mapped.add('Electrical Wiring');
+      }
+      if (lower.includes('sign') || lower.includes('traffic')) {
+        mapped.add('Traffic & Road Signs');
+      }
+      if (lower.includes('facility') || lower.includes('facilities') || lower.includes('park') || lower.includes('school') || lower.includes('court')) {
+        mapped.add('Public Facilities');
+      }
+      if (lower.includes('waste') || lower.includes('garbage') || lower.includes('trash') || lower.includes('dump') || lower.includes('litter')) {
+        mapped.add('Waste Management');
+      }
+      if (lower.includes('safety') || lower.includes('hazard') || lower.includes('tree') || lower.includes('manhole') || lower.includes('debris')) {
+        mapped.add('Public Safety Hazards');
+      }
+    }
+    const result = Array.from(mapped).slice(0, 3);
+    return result.length > 0 ? result.join(', ') : rawCategory.split(',')[0].trim();
+  };
+
+  const normalizeAiUrgency = (rawUrgency) => {
+    if (!rawUrgency) return 'high';
+    const lower = String(rawUrgency).toLowerCase();
+    if (lower.includes('crit') || lower.includes('high') || lower.includes('severe')) return 'high';
+    if (lower.includes('low') || lower.includes('minor')) return 'low';
+    return 'medium';
+  };
+
+  const applySampleInfrastructureFallback = () => {
+    setPhotoError(null);
+    onEvidenceChange(prev => ({
+      ...prev,
+      isAiScanning: false,
+      analysisStatus: 'complete',
+      aiCategorySuggestion: 'Roads & Bridges',
+      aiConfidence: 96,
+      autoDescription: 'A large and deep pothole is present on the asphalt road, exposing the aggregate base. The surrounding pavement shows extensive cracking and deterioration. This poses a significant hazard to vehicles and pedestrians.',
+      imageAnalysis: 'Detected severe asphalt surface deterioration and open pothole with exposed gravel aggregate on a local street.',
+      urgency: 'high',
+      isInappropriate: false,
+      rejectionReason: '',
+    }));
+  };
+
   const triggerAIAnalysis = async (file) => {
     onEvidenceChange(prev => ({
       ...prev,
@@ -174,7 +236,7 @@ export default function Step2CameraLocation({
 
       if (res.ok) {
         const data = await res.json();
-        if (data.is_inappropriate) {
+        if (data.is_inappropriate && !file.isSampleInfrastructure) {
           const reason = data.rejection_reason || "We couldn't clearly see an infrastructure issue. Please retake photo.";
           setPhotoError(reason);
           onEvidenceChange(prev => ({
@@ -183,24 +245,34 @@ export default function Step2CameraLocation({
             isInappropriate: true,
             rejectionReason: reason,
           }));
+        } else if (data.is_inappropriate && file.isSampleInfrastructure) {
+          applySampleInfrastructureFallback();
         } else {
           setPhotoError(null);
+          const normalizedCat = normalizeAiCategory(data.category) || (file.isSampleInfrastructure ? 'Roads & Bridges' : null);
           onEvidenceChange(prev => ({
             ...prev,
             isAiScanning: false,
             analysisStatus: 'complete',
-            aiCategorySuggestion: data.category || null,
-            aiConfidence: typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : null,
-            autoDescription: data.auto_description || '',
+            aiCategorySuggestion: normalizedCat,
+            aiConfidence: typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (file.isSampleInfrastructure ? 96 : null),
+            autoDescription: data.auto_description || (file.isSampleInfrastructure ? 'A large and deep pothole is present on the asphalt road, exposing the aggregate base. The surrounding pavement shows extensive cracking and deterioration. This poses a significant hazard to vehicles and pedestrians.' : ''),
             imageAnalysis: data.image_analysis || '',
+            urgency: normalizeAiUrgency(data.urgency),
             isInappropriate: false,
           }));
         }
+      } else if (file.isSampleInfrastructure) {
+        applySampleInfrastructureFallback();
       } else {
         onEvidenceChange(prev => ({ ...prev, isAiScanning: false, analysisStatus: 'failed' }));
       }
     } catch (err) {
-      onEvidenceChange(prev => ({ ...prev, isAiScanning: false, analysisStatus: 'failed' }));
+      if (file.isSampleInfrastructure) {
+        applySampleInfrastructureFallback();
+      } else {
+        onEvidenceChange(prev => ({ ...prev, isAiScanning: false, analysisStatus: 'failed' }));
+      }
     }
   };
 
@@ -214,21 +286,34 @@ export default function Step2CameraLocation({
 
     const previewUrl = URL.createObjectURL(capturedFile);
     setPhotoError(null);
+    shouldAutoAdvanceRef.current = !aiData?.is_inappropriate;
 
     onEvidenceChange({
       file: capturedFile,
       previewUrl,
+      previewDataUrl: capturedFile.isSampleInfrastructure ? '/sample-infrastructure-pothole.jpg' : null,
       fileName: capturedFile.name || `photo_${Date.now()}.jpg`,
       fileSize: capturedFile.size || 0,
       mimeType: capturedFile.type || 'image/jpeg',
       isAiScanning: false,
-      aiCategorySuggestion: aiData?.category || null,
+      aiCategorySuggestion: normalizeAiCategory(aiData?.category),
       aiConfidence: aiData?.confidence ? Math.round(aiData.confidence * 100) : null,
       autoDescription: aiData?.auto_description || '',
       imageAnalysis: aiData?.image_analysis || '',
+      urgency: normalizeAiUrgency(aiData?.urgency),
       isInappropriate: Boolean(aiData?.is_inappropriate),
       rejectionReason: aiData?.rejection_reason || '',
     });
+
+    if (!capturedFile.isSampleInfrastructure) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          onEvidenceChange(prev => ({ ...prev, previewDataUrl: reader.result }));
+        }
+      };
+      reader.readAsDataURL(capturedFile);
+    }
 
     if (!aiData) triggerAIAnalysis(capturedFile);
     if (!hasCoordinates) handleGeolocate(true);
@@ -253,9 +338,11 @@ export default function Step2CameraLocation({
     }
 
     const previewUrl = URL.createObjectURL(file);
+    shouldAutoAdvanceRef.current = true;
     onEvidenceChange({
       file,
       previewUrl,
+      previewDataUrl: file.isSampleInfrastructure ? '/sample-infrastructure-pothole.jpg' : null,
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type,
@@ -268,11 +355,22 @@ export default function Step2CameraLocation({
       rejectionReason: '',
     });
 
+    if (!file.isSampleInfrastructure) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          onEvidenceChange(prev => ({ ...prev, previewDataUrl: reader.result }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
     triggerAIAnalysis(file);
     if (!hasCoordinates) handleGeolocate(true);
   };
 
   const handleRemovePhoto = () => {
+    shouldAutoAdvanceRef.current = false;
     if (evidenceData?.previewUrl) {
       URL.revokeObjectURL(evidenceData.previewUrl);
     }
@@ -293,26 +391,36 @@ export default function Step2CameraLocation({
     setPhotoError(null);
   };
 
-  const handleSimulateCapture = () => {
+  const handleSimulateCapture = async () => {
+    try {
+      const response = await fetch('/sample-infrastructure-pothole.jpg');
+      if (response.ok) {
+        const blob = await response.blob();
+        const file = new File([blob], `sample_road_pothole_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        file.isSampleInfrastructure = true;
+        handleFileProcess(file);
+        return;
+      }
+    } catch (e) {
+      console.warn('Could not load /sample-infrastructure-pothole.jpg, using fallback canvas:', e);
+    }
+
     const canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = 600;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.fillStyle = '#1e293b';
+      ctx.fillStyle = '#334155';
       ctx.fillRect(0, 0, 800, 600);
-      ctx.fillStyle = '#ff6b00';
-      ctx.fillRect(120, 120, 560, 360);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 26px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('PULSO Field Photo Sample', 400, 290);
-      ctx.font = '16px monospace';
-      ctx.fillText(`GPS: ${currentLat.toFixed(5)}, ${currentLng.toFixed(5)}`, 400, 330);
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.ellipse(400, 340, 220, 110, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
     canvas.toBlob((blob) => {
       if (blob) {
-        const file = new File([blob], `sample_camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        const file = new File([blob], `sample_road_pothole_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        file.isSampleInfrastructure = true;
         handleFileProcess(file);
       }
     }, 'image/jpeg');
@@ -326,8 +434,15 @@ export default function Step2CameraLocation({
 
   const canProceed = hasPhoto && !evidenceData?.isAiScanning && !evidenceData?.isInappropriate && hasCoordinates && isInsideJurisdiction;
 
+  useEffect(() => {
+    if (shouldAutoAdvanceRef.current && canProceed) {
+      shouldAutoAdvanceRef.current = false;
+      onContinue();
+    }
+  }, [canProceed, onContinue]);
+
   return (
-    <div className="flex flex-col justify-between h-full space-y-3">
+    <div className="flex flex-col justify-between flex-1 h-full space-y-4">
       {/* ── Compact Header ── */}
       <div className="space-y-0.5">
         <div className="flex items-center gap-2">
@@ -500,13 +615,6 @@ export default function Step2CameraLocation({
               </div>
             )}
 
-            {evidenceData.aiCategorySuggestion && evidenceData.aiCategorySuggestion !== category && (
-              <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-xs text-blue-900 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-2">
-                <Sparkles size={14} className="text-blue-600 shrink-0" />
-                <span>AI suggests category: <strong>{evidenceData.aiCategorySuggestion}</strong></span>
-              </div>
-            )}
-
             <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
@@ -529,20 +637,11 @@ export default function Step2CameraLocation({
         )}
       </div>
 
-      {/* ── Compact Card Footer ── */}
+      {/* ── Pinned Card Footer ── */}
       <WizardCardFooter
         onBack={onBack}
         onContinue={onContinue}
         isContinueDisabled={!canProceed}
-        compact={true}
-        continueLabel={t('reportWizard.step2CameraLocation.continueToCategory', 'Continue to category')}
-        noteText={
-          !hasPhoto
-            ? t('reportWizard.step2CameraLocation.takePhotoNote', 'Take a photo to continue.')
-            : !isInsideJurisdiction
-            ? 'Must be within Caloocan City.'
-            : t('reportWizard.shell.notSubmittedYet', 'Your report is not submitted until confirmed in Review.')
-        }
       />
 
       {/* ── Live In-App Camera Viewfinder Modal ── */}

@@ -186,6 +186,33 @@ export const CATEGORIES = [
   },
 ];
 
+export const MAX_SELECTED_CATEGORIES = 3;
+
+export function parseSelectedCategoryIds(rawCategory) {
+  if (!rawCategory) return [];
+  const items = Array.isArray(rawCategory)
+    ? rawCategory
+    : String(rawCategory)
+        .split(/[,+]/)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+  const matchedIds = [];
+  for (const item of items) {
+    const lower = item.toLowerCase();
+    const found = CATEGORIES.find(
+      c =>
+        c.id.toLowerCase() === lower ||
+        c.defaultLabel.toLowerCase() === lower ||
+        c.key === lower
+    );
+    if (found && !matchedIds.includes(found.id)) {
+      matchedIds.push(found.id);
+    }
+  }
+  return matchedIds.slice(0, MAX_SELECTED_CATEGORIES);
+}
+
 export default function Step1CategoryEmergency({
   selectedCategory,
   onSelectCategory,
@@ -219,11 +246,23 @@ export default function Step1CategoryEmergency({
     }
   }, [hasError]);
 
-  const selectedCatObj = CATEGORIES.find(c =>
-    c.id.toLowerCase() === selectedCategory?.toLowerCase() ||
-    c.defaultLabel.toLowerCase() === selectedCategory?.toLowerCase() ||
-    c.key === selectedCategory
-  );
+  const selectedIds = parseSelectedCategoryIds(selectedCategory);
+  const selectedCatObjs = selectedIds
+    .map(id => CATEGORIES.find(c => c.id === id))
+    .filter(Boolean);
+
+  const handleToggleCategory = (catId) => {
+    if (selectedIds.includes(catId)) {
+      const next = selectedIds.filter(id => id !== catId);
+      onSelectCategory(next.join(', '));
+      return;
+    }
+    if (selectedIds.length >= MAX_SELECTED_CATEGORIES) {
+      return;
+    }
+    const next = [...selectedIds, catId];
+    onSelectCategory(next.join(', '));
+  };
 
   // Keyboard accessibility: Close modal on Escape
   useEffect(() => {
@@ -241,20 +280,32 @@ export default function Step1CategoryEmergency({
   }, [isModalVisible]);
 
   return (
-    <div className="flex flex-col justify-between h-full space-y-6">
+    <div className="flex flex-col justify-between flex-1 h-full space-y-6">
       <div className="space-y-6">
         {/* Header Eyebrow, Title & Subtitle */}
         <div className="space-y-1.5">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            {t('reportWizard.step1Category.stepBadge', 'STEP 2 OF 5')}
-          </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {t('reportWizard.step1Category.stepBadge', 'STEP 2 OF 5')}
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+              {selectedCatObjs.length} / {MAX_SELECTED_CATEGORIES} max
+            </span>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             {t('reportWizard.step1Category.title', 'What would you like to report?')}
           </h1>
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-            {t('reportWizard.step1Category.subtitle', 'Choose one category that best matches your concern.')}
+            {t('reportWizard.step1Category.subtitleMulti', 'Choose up to 3 categories that best match your concern.')}
           </p>
         </div>
+
+        {/* Max 3 Categories Reached Notice */}
+        {selectedCatObjs.length >= MAX_SELECTED_CATEGORIES && (
+          <div className="text-xs font-semibold text-orange-600 dark:text-orange-400 px-1 animate-fadeIn">
+            Maximum of {MAX_SELECTED_CATEGORIES} issues reached. Uncheck one to select a different category.
+          </div>
+        )}
 
         {/* Inline Category Error Message */}
         {hasError && (
@@ -264,17 +315,18 @@ export default function Step1CategoryEmergency({
           </div>
         )}
 
-        {/* 3x3 Grid of Categories */}
+        {/* 3x3 Grid of Categories (Checkboxes, Max 3) */}
         <fieldset
-          role="radiogroup"
-          aria-label="Issue category selector"
+          role="group"
+          aria-label="Issue category selector (choose up to 3)"
           aria-invalid={hasError ? 'true' : undefined}
           aria-describedby={hasError ? 'category-error-message' : undefined}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4"
         >
-          <legend className="sr-only">Choose an infrastructure category</legend>
+          <legend className="sr-only">Choose up to 3 infrastructure categories</legend>
           {CATEGORIES.map((cat) => {
-            const isSelected = selectedCatObj?.id === cat.id;
+            const isSelected = selectedIds.includes(cat.id);
+            const isLimitReached = !isSelected && selectedIds.length >= MAX_SELECTED_CATEGORIES;
             const IconComponent = cat.Icon;
             const label = t(`reportWizard.categories.${cat.key}`, cat.defaultLabel);
             const subtitle = t(`reportWizard.categorySubs.${cat.key}`, cat.subtitle);
@@ -283,17 +335,23 @@ export default function Step1CategoryEmergency({
               <button
                 key={cat.id}
                 type="button"
-                role="radio"
+                role="checkbox"
                 aria-checked={isSelected}
+                aria-disabled={isLimitReached}
+                disabled={isLimitReached}
                 aria-label={`${label}. ${subtitle}`}
                 ref={cat.id === CATEGORIES[0].id ? firstCardRef : null}
-                onClick={() => onSelectCategory(cat.id)}
-                className={`group relative text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 flex items-start justify-between gap-3 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
+                onClick={() => {
+                  if (!isLimitReached) handleToggleCategory(cat.id);
+                }}
+                className={`group relative text-left p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 flex items-start justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
                   isSelected
-                    ? 'border-[#ff6b00] dark:border-[#ff6b00] bg-[#fff8f5] dark:bg-orange-950/25 ring-1 ring-[#ff6b00] shadow-xs'
+                    ? 'border-[#ff6b00] dark:border-[#ff6b00] bg-[#fff8f5] dark:bg-orange-950/25 ring-1 ring-[#ff6b00] shadow-xs cursor-pointer'
+                    : isLimitReached
+                    ? 'border-slate-200/70 dark:border-slate-800/70 bg-slate-50/70 dark:bg-slate-900/40 opacity-50 cursor-not-allowed'
                     : hasError
-                    ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20 dark:bg-red-950/20 hover:border-red-600'
-                    : 'border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-2xs'
+                    ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20 dark:bg-red-950/20 hover:border-red-600 cursor-pointer'
+                    : 'border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-2xs cursor-pointer'
                 }`}
               >
                 {/* Left: Icon Box + Label + Subtitle */}
@@ -311,15 +369,17 @@ export default function Step1CategoryEmergency({
                   </div>
                 </div>
 
-                {/* Right: Circular Radio Indicator */}
+                {/* Right: Square Rounded Checkbox Indicator */}
                 <div className="shrink-0 mt-0.5" aria-hidden="true">
-                  {isSelected ? (
-                    <span className="w-5 h-5 rounded-full border-2 border-[#ff6b00] flex items-center justify-center">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#ff6b00]" />
-                    </span>
-                  ) : (
-                    <span className="w-5 h-5 rounded-full border-2 border-slate-300 dark:border-slate-600 block group-hover:border-slate-400 dark:group-hover:border-slate-500 transition-colors" />
-                  )}
+                  <span
+                    className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
+                      isSelected
+                        ? 'bg-[#ff6b00] border-2 border-[#ff6b00] text-white'
+                        : 'border-2 border-slate-300 dark:border-slate-600 group-hover:border-slate-400 dark:group-hover:border-slate-500'
+                    }`}
+                  >
+                    {isSelected && <Check size={13} strokeWidth={3} className="text-white" />}
+                  </span>
                 </div>
               </button>
             );
@@ -338,20 +398,29 @@ export default function Step1CategoryEmergency({
         </div>
 
         {/* Dynamic Contextual Selection Callout Banner */}
-        {selectedCatObj && (
+        {selectedCatObjs.length > 0 && (
           <div className="bg-[#fff6ee] dark:bg-orange-950/30 border border-[#fed7aa] dark:border-orange-900/60 rounded-2xl p-4 flex items-center gap-4 transition-all duration-300 animate-fadeIn">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${selectedCatObj.bgClass}`}>
-              <selectedCatObj.Icon className="w-6 h-6" color={selectedCatObj.color} />
+            <div className="flex flex-col items-center gap-1.5 shrink-0">
+              {selectedCatObjs.map((catObj) => (
+                <div
+                  key={catObj.id}
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-2xs ${catObj.bgClass}`}
+                >
+                  <catObj.Icon className="w-5 h-5" color={catObj.color} />
+                </div>
+              ))}
             </div>
-            <div className="space-y-0.5 leading-snug">
+            <div className="space-y-0.5 leading-snug min-w-0">
               <p className="text-sm text-slate-800 dark:text-slate-200">
-                <span className="text-slate-500 dark:text-slate-400">Selected: </span>
+                <span className="text-slate-500 dark:text-slate-400">Selected ({selectedCatObjs.length}/{MAX_SELECTED_CATEGORIES}): </span>
                 <strong className="font-extrabold text-slate-900 dark:text-white">
-                  {selectedCatObj.defaultLabel}
+                  {selectedCatObjs.map(c => c.defaultLabel).join(' + ')}
                 </strong>
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-400">
-                {t('reportWizard.step1Category.nextDetails', 'Next, provide specific details about the issue.')}
+                {selectedCatObjs.length > 1
+                  ? 'We will send one report per issue so each reaches the right crew. All of them share your photo and location.'
+                  : t('reportWizard.step1Category.nextDetails', 'Next, provide specific details about the issue.')}
               </p>
             </div>
           </div>
@@ -362,9 +431,9 @@ export default function Step1CategoryEmergency({
       <WizardCardFooter
         onBack={onBack}
         onContinue={onContinue}
-        isContinueDisabled={!selectedCategory}
-        continueLabel={t('reportWizard.step1Category.continueToDetails', 'Continue to details')}
-        noteText={t('reportWizard.shell.notSubmittedYet', 'Your report is not submitted until you confirm it in Review.')}
+        isContinueDisabled={selectedCatObjs.length === 0}
+        continueLabel={t('reportWizard.shell.continue', 'Continue')}
+        noteText={t('reportWizard.shell.notSubmittedYet', 'Your report has not been submitted yet.')}
       />
 
       {/* ── ISSUE CATEGORIES INFORMATION & EXAMPLES MODAL ───────────── */}
@@ -394,7 +463,7 @@ export default function Step1CategoryEmergency({
                     Reporting Guide & Examples
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Find the appropriate civic category for your concern
+                    Find the appropriate civic category for your concern (up to 3)
                   </p>
                 </div>
               </div>
@@ -413,7 +482,8 @@ export default function Step1CategoryEmergency({
             <div className="p-5 sm:p-6 overflow-y-auto space-y-3.5 divide-y divide-slate-100 dark:divide-slate-800/80">
               {CATEGORIES.map((cat) => {
                 const IconComponent = cat.Icon;
-                const isSelected = selectedCatObj?.id === cat.id;
+                const isSelected = selectedIds.includes(cat.id);
+                const isLimitReached = !isSelected && selectedIds.length >= MAX_SELECTED_CATEGORIES;
 
                 return (
                   <div
@@ -434,20 +504,23 @@ export default function Step1CategoryEmergency({
                             {cat.defaultLabel}
                           </h3>
                           {isSelected ? (
-                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#ff6b00] bg-orange-100 dark:bg-orange-950/60 px-2 py-0.5 rounded-md shrink-0">
-                              Selected
-                            </span>
-                          ) : (
                             <button
                               type="button"
-                              onClick={() => {
-                                onSelectCategory(cat.id);
-                                closeModal();
-                              }}
+                              onClick={() => handleToggleCategory(cat.id)}
+                              className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#ff6b00] bg-orange-100 dark:bg-orange-950/60 px-2 py-0.5 rounded-md shrink-0 cursor-pointer"
+                            >
+                              Selected ✓
+                            </button>
+                          ) : !isLimitReached ? (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCategory(cat.id)}
                               className="text-xs font-semibold text-[#ff6b00] hover:underline cursor-pointer"
                             >
                               Select this
                             </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">Max 3 reached</span>
                           )}
                         </div>
                         <p className="text-xs font-medium text-slate-600 dark:text-slate-300">

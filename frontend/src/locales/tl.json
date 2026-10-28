@@ -547,7 +547,7 @@
       },
       "step5Contact": {
         "title": "Paano ka namin makokontak?",
-        "subtitle": "Maglagay ng numero ng telepono o email para makatanggap ng updates.",
+        "subtitle": "Ilagay ang iyong buong pangalan at Gmail address upang makatanggap ng opisyal na abiso at status updates.",
         "guestOption": {
           "title": "Hindi Kilalang Bisita / Anonymous (Walang kailangang account)",
           "desc": "Walang kailangang email o telepono. Makakatanggap ka ng pribadong tracking token sa susunod na screen."
@@ -561,8 +561,8 @@
           "desc": "Iugnay ang ulat na ito sa iyong resident dashboard para sa madaling pagsubaybay."
         },
         "authenticatedBadge": "Isinusumite bilang Rehistradong Residente: {{name}}",
-        "emailLabel": "Email address",
-        "emailPlaceholder": "ikaw@halimbawa.com",
+        "emailLabel": "Gmail / Email address",
+        "emailPlaceholder": "ikaw@gmail.com",
         "phoneLabel": "Numero ng mobile",
         "phonePlaceholder": "09XX XXX XXXX",
         "privacyNotice": "Ang iyong impormasyon sa pakikipag-ugnayan ay protektado sa ilalim ng Data Privacy Act of 2012 (RA 10173) at hindi kailanman ilalabas sa publiko.",
@@ -699,7 +699,7 @@
           "emailInvalid": "Hindi wasto ang format ng email. Pakisuri muli.",
           "contactRequired": "Maglagay ng mobile number o email address upang makipag-ugnayan kami sa iyo.",
           "consentRequired": "Pakikumpirma upang magpatuloy.",
-          "consentLabel": "Sumasang-ayon ako na gamitin ng City Engineering ang mga detalyeng ito para sa follow-up ng aking ulat",
+          "consentLabel": "Sumasang-ayon ako na gamitin ang aking mga detalye para sa beripikasyon, update, at follow-up ng aking ulat",
           "orDivider": "o kaya",
           "typoHint": "Ang ibig mo bang sabihin ay {{suggestion}}?"
         },

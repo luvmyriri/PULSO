@@ -10,12 +10,12 @@ export const REPORT_STEPS = [
   { id: 5, key: 'review', defaultLabel: 'Review', subtitle: 'Check before submitting' },
 ];
 
-export default function WizardSidebar({ currentStep, maxStepReached, onStepClick, onOpenHelpGuide }) {
+export default function WizardSidebar({ currentStep, onOpenHelpGuide }) {
   const { t } = useTranslation();
 
   return (
     <aside
-      aria-label="Report Steps Navigation"
+      aria-label="Report Steps Progress"
       className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col justify-between self-stretch bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xs"
     >
       <div className="space-y-5">
@@ -29,19 +29,18 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
           </p>
         </div>
 
-        {/* Vertical Stepper with natural top-anchored flow */}
-        <nav aria-label="Steps progress" className="pt-1">
+        {/* Vertical Stepper with natural top-anchored flow (Non-clickable) */}
+        <div aria-label="Steps progress" className="pt-1">
           <ol className="relative space-y-4 xl:space-y-5">
             {REPORT_STEPS.map((step, idx) => {
               const isCurrent = step.id === currentStep;
               const isFinished = step.id < currentStep;
-              const isClickable = step.id <= maxStepReached;
               const isLast = idx === REPORT_STEPS.length - 1;
               const label = t(`reportWizard.steps.${step.key}`, step.defaultLabel);
               const subtitle = t(`reportWizard.subtitles.${step.key}`, step.subtitle);
 
               return (
-                <li key={step.id} className="relative flex items-start group">
+                <li key={step.id} className="relative flex items-start">
                   {/* Vertical Connecting Line spanning to next node */}
                   {!isLast && (
                     <div
@@ -54,15 +53,10 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
                     />
                   )}
 
-                  {/* Step Button / Item */}
-                  <button
-                    type="button"
-                    onClick={() => isClickable && onStepClick(step.id)}
-                    disabled={!isClickable}
+                  {/* Step Item (Informational only, not clickable) */}
+                  <div
                     aria-current={isCurrent ? 'step' : undefined}
-                    className={`w-full flex items-start gap-3.5 py-1 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl ${
-                      isClickable ? 'cursor-pointer' : 'cursor-default'
-                    }`}
+                    className="w-full flex items-start gap-3.5 py-1 text-left select-none cursor-default"
                   >
                     {/* Circle Indicator */}
                     <div
@@ -98,12 +92,12 @@ export default function WizardSidebar({ currentStep, maxStepReached, onStepClick
                         {subtitle}
                       </span>
                     </div>
-                  </button>
+                  </div>
                 </li>
               );
             })}
           </ol>
-        </nav>
+        </div>
       </div>
 
       {/* "Need help choosing?" bottom card */}

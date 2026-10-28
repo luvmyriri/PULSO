@@ -3075,13 +3075,14 @@ const MyReports = ({
         return baseReports.filter(r => {
             // Status Tab Filter
             const s = (r.status || '').toLowerCase();
-            if (reportStatusFilter === 'pending' || reportStatusFilter === 'awaiting_review') {
+            const isTicketSearch = searchQuery.trim().toUpperCase().startsWith('PUL-');
+            if (!isTicketSearch && (reportStatusFilter === 'pending' || reportStatusFilter === 'awaiting_review')) {
                 if (!['pending', 'unverified', 'received', 'under_review'].includes(s)) return false;
-            } else if (reportStatusFilter === 'in_progress') {
+            } else if (!isTicketSearch && reportStatusFilter === 'in_progress') {
                 if (!['dispatched', 'approved_internal', 'in_progress', 'assigned'].includes(s)) return false;
-            } else if (reportStatusFilter === 'resolved') {
+            } else if (!isTicketSearch && reportStatusFilter === 'resolved') {
                 if (!['resolved', 'completed', 'fixed'].includes(s)) return false;
-            } else if (reportStatusFilter === 'rejected') {
+            } else if (!isTicketSearch && reportStatusFilter === 'rejected') {
                 if (!['rejected', 'declined', 'invalid', 'spam'].includes(s)) return false;
             }
 
@@ -11115,7 +11116,7 @@ export default function ResidentDashboard() {
             }
         }
 
-        const catsToSubmit = Array.isArray(categories) && categories.length > 0 ? categories : ['Roads & Bridges'];
+        const catsToSubmit = Array.isArray(categories) && categories.length > 0 ? categories.slice(0, 3) : ['Roads & Bridges'];
         const repLoc = location || reportLocation;
         const repBarangay = barangay || structuredAddress?.barangay || (repLoc?.lat && repLoc?.lng ? findBarangayByCoordinates(repLoc.lat, repLoc.lng)?.name : 'Barangay 171');
         const repAddress = address || locationAddress || `${repBarangay}, Caloocan City`;

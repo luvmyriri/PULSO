@@ -1,16 +1,16 @@
 /**
  * PULSO Report Wizard Validation Module
- * Pure validation functions, normalizers, and edge-case guards for the 6-step flow.
+ * Pure validation functions, normalizers, and edge-case guards for the 5-step flow.
  *
  * Rules:
- * - Step 1: Exactly 1 valid category selected.
+ * - Step 1: 1 to 3 valid categories selected.
  * - Step 2: Location inside Caloocan, valid source (GPS/pin/search), readable address.
  *           Warning if GPS accuracy > 20m without confirmation checkbox. Optional fields <= 100 chars.
  * - Step 3: 1 to 5 photos, max 10MB each, JPG/PNG/WebP, min 640px, no duplicates, no rejected/inappropriate.
  * - Step 4: Description 20-1000 chars after trimming, collapse whitespace, no gibberish/repeated chars.
  * - Step 5: Full Name 2-80 chars (letters/accents/hyphen/period/apostrophe only, no digits).
- *           Mobile OR Email (at least one valid, mobile normalized to +639XXXXXXXXX, email typo suggestions).
- *           Consent checkbox confirmed. Honeypot empty, minimum time-on-form check.
+ *           Gmail / Email address required (valid format, email typo suggestions, guest existing account check).
+ *           Consent checkbox confirmed. Honeypot empty.
  * - Step 6: Full revalidation of all steps with aggregated error mapping.
  */
 
@@ -32,6 +32,10 @@ const COMMON_EMAIL_DOMAINS = {
   'gmial.com': 'gmail.com',
   'gamil.com': 'gmail.com',
   'gmail.co': 'gmail.com',
+  'gmail.con': 'gmail.com',
+  'gmail.comm': 'gmail.com',
+  'gmail.cm': 'gmail.com',
+  'gmail.om': 'gmail.com',
   'yaho.com': 'yahoo.com',
   'yahooo.com': 'yahoo.com',
   'yaho.co': 'yahoo.com',
@@ -355,14 +359,16 @@ export function validateDetails(detailsData) {
 
 /**
  * Step 5: Contact Validation
- * AMENDMENT: Mobile OR Email - at least one is required!
+ * Gmail / Email address is required.
  * Name is required (2-80 chars, no digits).
+ * Guest Gmail accounts that already belong to a registered PULSO account are flagged.
  * Consent is required.
  */
-export function validateContact(contactData, consentAccepted = true) {
+export function validateContact(contactData, consentAccepted) {
   const errors = [];
   const warnings = [];
   const contact = contactData || {};
+  const isConsentChecked = Boolean(consentAccepted ?? contact.consentAccepted);
 
   // 1. Full Name
   const nameRes = validateFullName(contact.name || contact.fullName);
@@ -374,54 +380,42 @@ export function validateContact(contactData, consentAccepted = true) {
     });
   }
 
-  // 2. Mobile OR Email check
-  const phoneRaw = (contact.phone || '').trim();
+  // 2. Gmail / Email check (Required)
   const emailRaw = (contact.email || '').trim();
-
-  const hasPhone = phoneRaw.length > 0;
   const hasEmail = emailRaw.length > 0;
 
-  if (!hasPhone && !hasEmail) {
+  if (!hasEmail) {
     errors.push({
-      field: 'contact',
-      code: 'CONTACT_REQUIRED',
-      message: 'Please provide either a mobile number or an email address so we can reach you.',
+      field: 'email',
+      code: 'EMAIL_REQUIRED',
+      message: 'Please enter your Gmail address so we can send your report receipt and status updates.',
     });
   } else {
-    // Validate phone if provided
-    if (hasPhone) {
-      const phoneRes = normalizeMobileNumber(phoneRaw);
-      if (!phoneRes.valid) {
-        errors.push({
-          field: 'phone',
-          code: 'PHONE_INVALID',
-          message: 'Please enter a valid mobile number, like 0917 123 4567.',
-        });
-      }
-    }
-
-    // Validate email if provided
-    if (hasEmail) {
-      const emailRes = validateEmail(emailRaw);
-      if (!emailRes.valid) {
-        errors.push({
-          field: 'email',
-          code: 'EMAIL_INVALID',
-          message: "That email doesn't look right. Please check it.",
-        });
-      } else if (emailRes.typoSuggestion) {
-        warnings.push({
-          field: 'email',
-          code: 'EMAIL_TYPO_HINT',
-          message: `Did you mean ${emailRes.typoSuggestion}?`,
-          suggestion: emailRes.typoSuggestion,
-        });
-      }
+    const emailRes = validateEmail(emailRaw);
+    if (!emailRes.valid) {
+      errors.push({
+        field: 'email',
+        code: 'EMAIL_INVALID',
+        message: "That Gmail address doesn't look right. Please check it.",
+      });
+    } else if (contact.emailInUse) {
+      errors.push({
+        field: 'email',
+        code: 'EMAIL_ALREADY_REGISTERED',
+        message: 'This Gmail address already has an account. Please sign in or use a different Gmail address.',
+      });
+    } else if (emailRes.typoSuggestion) {
+      warnings.push({
+        field: 'email',
+        code: 'EMAIL_TYPO_HINT',
+        message: `Did you mean ${emailRes.typoSuggestion}?`,
+        suggestion: emailRes.typoSuggestion,
+      });
     }
   }
 
   // 3. Consent check
-  if (!consentAccepted && !contact.consentAccepted) {
+  if (!isConsentChecked) {
     errors.push({
       field: 'consent',
       code: 'CONSENT_REQUIRED',
@@ -439,7 +433,7 @@ export function validateContact(contactData, consentAccepted = true) {
   }
 
   return {
-    valid: errors.length === 0,
+    valid: errors.length === 0 && warnings.length === 0,
     errors,
     warnings,
   };

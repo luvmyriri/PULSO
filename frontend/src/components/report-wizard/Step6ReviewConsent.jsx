@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  MapPin, Edit2, ShieldCheck, AlertCircle, ChevronDown, ChevronUp, AlertTriangle, PhoneCall
+  MapPin, Edit2, ShieldCheck, AlertCircle, ChevronDown, ChevronUp, AlertTriangle, Check
 } from 'lucide-react';
-import PulsoPulseLine from '../common/PulsoPulseLine';
 import WizardCardFooter from './WizardCardFooter';
 
 export default function Step6ReviewConsent({
@@ -31,26 +30,14 @@ export default function Step6ReviewConsent({
     ? `${descriptionText.slice(0, 200)}...`
     : descriptionText;
 
-  const severityLabel = details?.urgency === 'low'
-    ? t('reportWizard.step4Details.severityMinor', 'Minor')
-    : details?.urgency === 'high' || details?.urgency === 'critical'
-    ? t('reportWizard.step4Details.severityHigh', 'High')
-    : t('reportWizard.step4Details.severityModerate', 'Moderate');
-
   const photosList = Array.isArray(evidence?.photos)
     ? evidence.photos
     : (evidence?.previewUrl ? [evidence] : []);
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return '0 KB';
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   const hasReviewErrors = reviewErrors.length > 0;
 
   return (
-    <div className="flex flex-col justify-between h-full space-y-6">
+    <div className="flex flex-col justify-between flex-1 h-full space-y-6">
       <div className="space-y-6">
         {/* Title */}
         <div className="space-y-1">
@@ -119,7 +106,14 @@ export default function Step6ReviewConsent({
                     {t('reportWizard.step6Review.rowCategory', 'CATEGORY')}
                   </span>
                   <p className="font-bold text-slate-900 dark:text-white">
-                    {category || 'Not selected'}
+                    {category
+                      ? String(category)
+                          .split(/[,+]/)
+                          .map(c => c.trim())
+                          .filter(Boolean)
+                          .slice(0, 3)
+                          .join(' + ')
+                      : 'Not selected'}
                   </p>
                 </div>
                 <button
@@ -161,19 +155,10 @@ export default function Step6ReviewConsent({
                 </button>
               </div>
 
-              {/* Severity & Description Row */}
+              {/* Description Row */}
               <div className="py-3.5 flex items-start justify-between gap-4">
                 <div className="space-y-1 flex-1 pr-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      {t('reportWizard.step6Review.rowSeverity', 'SEVERITY')}:
-                    </span>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 font-bold text-xs">
-                      {severityLabel}
-                    </span>
-                  </div>
-
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block pt-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
                     {t('reportWizard.step6Review.rowDescription', 'DESCRIPTION')}
                   </span>
                   <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
@@ -315,35 +300,19 @@ export default function Step6ReviewConsent({
                 </div>
               </div>
             )}
-
-            {/* Emergency 911 Link Note */}
-            <aside className="rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/40 p-4 flex items-start gap-3">
-              <PhoneCall size={18} className="text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-rose-800 dark:text-rose-300 leading-relaxed">
-                If this is an immediate life-threatening emergency, please call <a href="tel:911" className="font-extrabold underline hover:text-rose-900">911</a> immediately.
-              </p>
-            </aside>
           </div>
         </div>
       </div>
 
-      {/* Pinned Footer: Single Click Submit with Pulse Line */}
-      <div>
-        {isSubmitting && (
-          <div className="mb-3 space-y-1">
-            <PulsoPulseLine height={16} color="#ff6b00" />
-            <p className="text-xs text-orange-600 font-bold text-center">Sending...</p>
-          </div>
-        )}
-        <WizardCardFooter
-          onBack={onBack}
-          canBack={true}
-          onContinue={onSubmit}
-          isContinueDisabled={!consentAccepted || hasReviewErrors || isSubmitting}
-          isSubmit={true}
-          isSubmitting={isSubmitting}
-        />
-      </div>
+      {/* Pinned Footer */}
+      <WizardCardFooter
+        onBack={onBack}
+        canBack={true}
+        onContinue={onSubmit}
+        isContinueDisabled={!consentAccepted || hasReviewErrors || isSubmitting}
+        isSubmit={true}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 }
