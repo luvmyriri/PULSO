@@ -12038,104 +12038,211 @@ export default function ResidentDashboard() {
             />
 
             {activeModal === 'all-notifications' && (
-                <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setActiveModal(null)}>
+                <div
+                    className="fixed inset-0 z-[1000] bg-slate-900/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+                    onClick={() => setActiveModal(null)}
+                >
                     <motion.div
                         role="dialog"
                         aria-modal="true"
-                        aria-label={t('notificationCenter.title', 'All notifications')}
-                        initial={{ y: '100%', opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: '100%', opacity: 0 }}
-                        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                        aria-label={t('notificationCenter.title', 'Notifications')}
+                        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+                        transition={{ duration: 0.18, ease: 'easeOut' }}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full sm:max-w-2xl bg-white dark:bg-slate-900 border-t sm:border border-slate-200 dark:border-slate-800 rounded-t-[28px] sm:rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[88dvh] sm:max-h-[90dvh] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-0"
+                        className="w-full sm:max-w-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]"
                     >
-                        {/* Mobile Pull Bar / Drag Pill */}
-                        <div className="w-full pt-3 pb-1 flex justify-center sm:hidden shrink-0">
-                            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
-                        </div>
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-                                <Bell className="text-orange-500" /> {t('notificationCenter.title', 'All notifications')}
-                            </h2>
-                            <button autoFocus type="button" aria-label="Close all notifications" onClick={() => setActiveModal(null)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition focus-visible:outline-3 focus-visible:outline-blue-600">
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-3">
-                            <div className="flex justify-end mb-2">
+                        {/* Header */}
+                        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-[#ea580c] dark:text-[#ff6b00] flex items-center justify-center shrink-0">
+                                    <Bell size={17} strokeWidth={2.2} />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                                        {t('notificationCenter.title', 'Notifications')}
+                                    </h2>
+                                    {unreadCount > 0 && (
+                                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#ff6b00]/10 text-[#b83a00] dark:text-[#ff6b00] tabular-nums">
+                                            {unreadCount} {t('common.unread', 'unread')}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {unreadCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={handleMarkAllRead}
+                                        className="text-xs font-semibold text-[#b83a00] dark:text-[#ff6b00] hover:underline px-2 py-1 rounded-md transition focus-visible:outline-2 focus-visible:outline-[#ff6b00]"
+                                    >
+                                        {t('notificationCenter.markAllRead', 'Mark all read')}
+                                    </button>
+                                )}
                                 <button
-                                    onClick={handleMarkAllRead}
-                                    className="text-orange-500 text-sm font-bold hover:underline shrink-0 focus:outline-none"
+                                    type="button"
+                                    aria-label="Close"
+                                    onClick={() => setActiveModal(null)}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition focus-visible:outline-2 focus-visible:outline-[#ff6b00]"
                                 >
-                                    Mark all as read
+                                    <X size={18} />
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Notifications List */}
+                        <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-2.5 flex-1 min-h-0">
                             {loadingNotifications ? (
-                                <p className="text-center text-slate-500 py-8" role="status">Loading notifications…</p>
+                                <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center">
+                                    <Loader2 size={24} className="animate-spin text-orange-500 mb-2" />
+                                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Loading notifications…</p>
+                                </div>
                             ) : notificationsError ? (
-                                <div className="text-center py-8" role="alert">
-                                    <p className="text-slate-600 dark:text-slate-300">{t('notificationCenter.loadError', 'Unable to load notifications.')}</p>
-                                    <button type="button" onClick={() => currentUser?.id && fetchNotifications(currentUser.id)} className="mt-3 min-h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 focus-visible:outline-3 focus-visible:outline-blue-600">{t('notificationCenter.tryAgain', 'Try again')}</button>
+                                <div className="py-10 text-center" role="alert">
+                                    <p className="text-sm text-slate-600 dark:text-slate-300">{t('notificationCenter.loadError', 'Unable to load notifications.')}</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => currentUser?.id && fetchNotifications(currentUser.id)}
+                                        className="mt-3 px-4 py-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                    >
+                                        {t('notificationCenter.tryAgain', 'Try again')}
+                                    </button>
                                 </div>
                             ) : notifications.length === 0 ? (
-                                <p className="text-center text-slate-500 py-8">{t('notificationCenter.empty', 'No notifications available.')}</p>
+                                <div className="py-12 text-center flex flex-col items-center justify-center">
+                                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 dark:text-slate-500 mb-3">
+                                        <Bell size={22} strokeWidth={1.8} />
+                                    </div>
+                                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                                        {t('notificationCenter.empty', 'No notifications yet.')}
+                                    </p>
+                                </div>
                             ) : (
-                                notifications.map(notif => (
-                                    <div key={notif.id} className={`p-4 rounded-xl border ${notif.is_read ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800/80' : 'bg-white dark:bg-slate-800/80 border-blue-100 dark:border-blue-900/60 shadow-sm'} ${notif.is_hidden ? 'opacity-50' : ''}`}>
-                                        <div className="flex justify-between items-start gap-4">
-                                            <div className="flex gap-4">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${notif.is_read ? 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400'}`}>
-                                                    <FileText size={18} />
+                                notifications.map(notif => {
+                                    const textLower = `${notif.title || ''} ${notif.message || ''}`.toLowerCase();
+                                    const isResolved = textLower.includes('resolved') || textLower.includes('completed') || textLower.includes('repaired');
+                                    const isRejected = textLower.includes('rejected') || textLower.includes('cancelled') || textLower.includes('could not be');
+                                    const isWarning = textLower.includes('warning') || textLower.includes('alert') || textLower.includes('hazard');
+
+                                    const tileColor = isRejected
+                                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                        : isResolved
+                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                        : isWarning
+                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                        : 'bg-orange-500/10 text-[#ea580c] dark:text-[#ff6b00] border border-orange-500/20';
+
+                                    const icon = isRejected
+                                        ? <XCircle size={18} strokeWidth={2} />
+                                        : isResolved
+                                        ? <CheckCircle2 size={18} strokeWidth={2} />
+                                        : isWarning
+                                        ? <AlertTriangle size={18} strokeWidth={2} />
+                                        : <FileText size={18} strokeWidth={2} />;
+
+                                    return (
+                                        <div
+                                            key={notif.id}
+                                            onClick={() => {
+                                                handleNotificationClick(notif);
+                                                setActiveModal(null);
+                                            }}
+                                            className={`group relative p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer ${
+                                                notif.is_read
+                                                    ? 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40'
+                                                    : 'bg-orange-50/40 dark:bg-slate-800/80 border-orange-200/70 dark:border-orange-500/30 hover:border-orange-300 shadow-2xs'
+                                            } ${notif.is_hidden ? 'opacity-40' : ''}`}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                {/* Status Icon Tile */}
+                                                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${tileColor}`}>
+                                                    {icon}
                                                 </div>
-                                                <div>
-                                                    <h4 className={`font-bold text-[15px] ${notif.is_read ? 'text-slate-700 dark:text-slate-300' : 'text-slate-900 dark:text-white'}`}>
-                                                        {notif.title}
-                                                        {notif.is_hidden && <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-500 px-2.5 py-0.5 rounded-md ml-3 uppercase tracking-wider font-bold">Dismissed</span>}
-                                                    </h4>
-                                                    <p className={`text-[13px] mt-1 ${notif.is_read ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>{notif.message}</p>
-                                                    <p className="text-[11px] text-blue-500 mt-2 font-bold">{new Date(notif.created_at).toLocaleString()}</p>
+
+                                                {/* Content */}
+                                                <div className="flex-1 min-w-0 pr-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className={`text-[13.5px] sm:text-sm leading-snug truncate ${
+                                                            notif.is_read
+                                                                ? 'font-medium text-slate-700 dark:text-slate-300'
+                                                                : 'font-semibold text-slate-950 dark:text-white'
+                                                        }`}>
+                                                            {notif.title}
+                                                        </h3>
+                                                        {!notif.is_read && (
+                                                            <span className="w-2 h-2 rounded-full bg-[#ff6b00] shrink-0" aria-label="Unread" />
+                                                        )}
+                                                        {notif.is_hidden && (
+                                                            <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-medium">
+                                                                Dismissed
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 mt-1 leading-relaxed line-clamp-3">
+                                                        {notif.message}
+                                                    </p>
+
+                                                    <div className="flex items-center justify-between gap-2 mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/60">
+                                                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                                            <Clock size={12} className="text-slate-400 dark:text-slate-500" />
+                                                            {formatRelativeTime(notif.created_at) || new Date(notif.created_at).toLocaleDateString()}
+                                                        </span>
+
+                                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                                            {!notif.is_read && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleNotificationClick(notif);
+                                                                    }}
+                                                                    className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
+                                                                >
+                                                                    Mark read
+                                                                </button>
+                                                            )}
+                                                            {!notif.is_hidden && (
+                                                                <button
+                                                                    type="button"
+                                                                    aria-label="Dismiss notification"
+                                                                    onClick={async (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_hidden: true } : n));
+                                                                        try {
+                                                                            const authToken = token || getAuthToken();
+                                                                            await fetch(`${API_BASE_URL}/api/notifications/${notif.id}`, {
+                                                                                method: 'DELETE',
+                                                                                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                                                                            });
+                                                                        } catch (err) {
+                                                                            console.error("Delete error:", err);
+                                                                        }
+                                                                    }}
+                                                                    className="text-[11px] font-medium text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                                                                >
+                                                                    Dismiss
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex flex-col gap-2 items-end shrink-0">
-                                                {!notif.is_read && (
-                                                    <button
-                                                        onClick={() => handleNotificationClick(notif)}
-                                                        className="text-[11px] uppercase tracking-wider font-bold text-blue-500 hover:text-blue-600 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 rounded-lg transition focus:outline-none"
-                                                    >
-                                                        Mark Read
-                                                    </button>
-                                                )}
-                                                {!notif.is_hidden && (
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_hidden: true } : n));
-                                                            try {
-                                                                const authToken = token || getAuthToken();
-                                                                await fetch(`${API_BASE_URL}/api/notifications/${notif.id}`, {
-                                                                    method: 'DELETE',
-                                                                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                                                                });
-                                                            } catch (err) {
-                                                                console.error("Delete error:", err);
-                                                            }
-                                                        }}
-                                                        className="text-[11px] uppercase tracking-wider font-bold text-slate-400 hover:text-red-500 px-3 py-1.5 bg-slate-50 hover:bg-red-50 dark:bg-slate-800 dark:hover:bg-red-900/20 rounded-lg transition focus:outline-none"
-                                                    >
-                                                        Remove
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                             {!loadingNotifications && !notificationsError && notificationsHasMore && (
-                                <div className="pt-3 text-center">
-                                    {olderNotificationsError && <p role="alert" className="mb-2 text-sm text-red-600 dark:text-red-400">{t('notificationCenter.olderError', 'Unable to load older notifications.')}</p>}
-                                    <button type="button" onClick={fetchOlderNotifications} disabled={loadingOlderNotifications} className="min-h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 text-sm font-semibold focus-visible:outline-3 focus-visible:outline-blue-600 disabled:opacity-60">
+                                <div className="pt-2 text-center">
+                                    {olderNotificationsError && <p role="alert" className="mb-2 text-xs text-red-600 dark:text-red-400">{t('notificationCenter.olderError', 'Unable to load older notifications.')}</p>}
+                                    <button
+                                        type="button"
+                                        onClick={fetchOlderNotifications}
+                                        disabled={loadingOlderNotifications}
+                                        className="px-4 py-2 rounded-xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition disabled:opacity-60"
+                                    >
                                         {loadingOlderNotifications ? t('notificationCenter.loadingOlder', 'Loading older notifications…') : t('notificationCenter.loadOlder', 'Load older notifications')}
                                     </button>
                                 </div>
