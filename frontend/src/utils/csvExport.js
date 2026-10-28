@@ -7,11 +7,15 @@
 export function escapeCsvCell(val) {
     if (val === null || val === undefined) return '""';
     let str = String(val);
-    // Formula injection protection (CWE-1236): prefix leading =, +, -, @, \t, \r with single quote
-    if (/^[=+\-@\t\r]/.test(str)) {
+    // Keep actual numeric counts numeric; neutralize text even after leading whitespace.
+    if (typeof val !== 'number' && (/^[\s\uFEFF]*[=+\-@]/.test(str) || /^[\t\r\n]/.test(str))) {
         str = "'" + str;
     }
     return `"${str.replace(/"/g, '""')}"`;
+}
+
+export function serializeCsv(headers, rows = []) {
+    return '\uFEFF' + [headers, ...rows].map(row => (Array.isArray(row) ? row : []).map(escapeCsvCell).join(',')).join('\r\n');
 }
 
 /**
@@ -26,11 +30,8 @@ export function escapeCsvCell(val) {
 export function downloadCsv(headers, rows, filename = 'export') {
     if (!headers || !headers.length) return false;
 
-    const formattedHeaders = headers.map(escapeCsvCell).join(',');
-    const formattedRows = (rows || []).map(row => (Array.isArray(row) ? row : []).map(escapeCsvCell).join(','));
-
     // UTF-8 BOM (\uFEFF) ensures Excel and spreadsheet apps render international characters correctly
-    const csvContent = '\uFEFF' + [formattedHeaders, ...formattedRows].join('\r\n');
+    const csvContent = serializeCsv(headers, rows || []);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

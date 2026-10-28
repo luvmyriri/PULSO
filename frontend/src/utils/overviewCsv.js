@@ -1,4 +1,5 @@
 import { exportToStyledXLSX } from './xlsxExport.js';
+import { downloadCsv } from './csvExport.js';
 
 const ZONE = 'Asia/Manila';
 
@@ -114,6 +115,11 @@ export function buildOverviewCsv(data, kind, { days = 14 } = {}) {
             throw new Error('Unknown overview export.');
     }
     return { headers, rows, filename };
+}
+
+export function exportOverviewCSV(data, kind, options = {}) {
+    const { headers, rows, filename } = buildOverviewCsv(data, kind, options);
+    return downloadCsv(headers, rows, filename);
 }
 
 /**

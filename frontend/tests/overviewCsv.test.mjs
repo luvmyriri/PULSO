@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOverviewCsv } from '../src/utils/overviewCsv.js';
-import { escapeCsvCell } from '../src/utils/csvExport.js';
+import { escapeCsvCell, serializeCsv } from '../src/utils/csvExport.js';
 
 const overview = {
     as_of: '2026-10-28T07:00:00Z', scope: 'North Caloocan district',
@@ -43,4 +43,18 @@ test('summary uses one measure per row and does not mix unrelated count columns'
 test('CSV cells preserve quoted place names and neutralize spreadsheet formulas', () => {
     assert.equal(escapeCsvCell('Barangay "A", 171'), '"Barangay ""A"", 171"');
     assert.equal(escapeCsvCell('=SUM(1,2)'), '"\'=SUM(1,2)"');
+    assert.equal(escapeCsvCell('  =SUM(1,2)'), '"\'  =SUM(1,2)"');
+    assert.equal(escapeCsvCell(-5), '"-5"');
+});
+
+test('each exported KPI serializes as an Excel-friendly rectangular CSV', () => {
+    for (const kind of ['open_reports', 'current_work_orders', 'needs_triage', 'attention', 'areas', 'priorities', 'intake', 'work_stages', 'summary']) {
+        const { headers, rows } = buildOverviewCsv(overview, kind);
+        const csv = serializeCsv(headers, rows);
+        const lines = csv.slice(1).split('\r\n');
+        assert.equal(csv.charCodeAt(0), 0xFEFF);
+        assert.equal(lines.length, rows.length + 1);
+        assert.ok(lines[0].includes('"Scope"'));
+        assert.ok(lines.every(line => line.length > 0));
+    }
 });

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, AlertTriangle, Download } from 'lucide-react';
+import { ArrowUpRight, AlertTriangle } from 'lucide-react';
 import './gov-bi-dashboard.css';
 import { GovAssistantSlot } from './government/GovAssistantHost';
 
@@ -21,26 +21,30 @@ function DataTable({ label, columns, rows, note }) {
     </details>;
 }
 
-function ExportButton({ label, onClick, disabled = false }) {
+function ExportButton({ label, format, onClick, disabled = false }) {
     return (
         <button
             type="button"
             className="gov-bi-export-button"
             onClick={onClick}
             disabled={disabled}
-            aria-label={`Export ${label} to Excel (.xlsx)`}
-            title={disabled ? 'Complete, current records are required for export' : `Export ${label} to Excel (.xlsx)`}
+            aria-label={`Export ${label} as ${format === 'csv' ? 'CSV' : 'Excel workbook'}`}
+            title={disabled ? 'Complete, current records are required for export' : `Export ${label} as ${format === 'csv' ? 'CSV' : 'Excel workbook'}`}
         >
-            <Download size={12} aria-hidden="true" />
-            <span>Export</span>
+            {format === 'csv' ? 'CSV' : 'Excel'}
         </button>
     );
 }
-const CsvButton = ExportButton;
+function ExportActions({ label, onExport }) {
+    return <span className="gov-bi-export-actions" role="group" aria-label={`Export ${label}`}>
+        <ExportButton label={label} format="csv" onClick={onExport && (() => onExport('csv'))} disabled={!onExport}/>
+        <ExportButton label={label} format="xlsx" onClick={onExport && (() => onExport('xlsx'))} disabled={!onExport}/>
+    </span>;
+}
 
 function KpiCard({ title, value, detail, url, action, segments, total, onExport, children }) {
     return <section className="gov-bi-surface gov-bi-kpi" aria-label={title}>
-        <header className="gov-bi-kpi__head"><h2>{title}</h2><div className="gov-bi-head-actions"><CsvButton label={title} onClick={onExport} disabled={!onExport}/><Link to={url} aria-label={action} title={action}><ArrowUpRight size={16} aria-hidden="true"/></Link></div></header>
+        <header className="gov-bi-kpi__head"><h2>{title}</h2><div className="gov-bi-head-actions"><ExportActions label={title} onExport={onExport}/><Link to={url} aria-label={action} title={action}><ArrowUpRight size={16} aria-hidden="true"/></Link></div></header>
         <div className="gov-bi-kpi__value"><strong>{count(value)}</strong><span>{detail}</span></div>
         <div className="gov-bi-kpi__meter" role="img" aria-label={segments.map(segment => `${segment.label}: ${count(segment.value)}`).join('; ')}>
             {segments.map(segment => <span key={segment.label} className={`gov-bi-kpi__segment gov-bi-kpi__segment--${segment.kind}`} style={{ width: `${total ? segment.value / total * 100 : 0}%` }}/>) }
@@ -56,14 +60,14 @@ function KpiSummary({ data, onExport }) {
     const needsReview = data.totals.unreviewed_reports;
     const otherWork = Math.max(0, work - relation.blocked_orders - relation.awaiting_verification);
     return <div className="gov-bi-kpis" aria-label="Operational key indicators">
-        <KpiCard title="Open reports" value={open} detail="Current report workload" url="/gov/reports?overview=open" action="Open all open reports" onExport={onExport && (() => onExport('open_reports'))} total={open} segments={[
+        <KpiCard title="Open reports" value={open} detail="Current report workload" url="/gov/reports?overview=open" action="Open all open reports" onExport={onExport && (format => onExport('open_reports', format))} total={open} segments={[
             { label: 'With current work', value: relation.reports_with_current_work, kind: 'active' },
             { label: 'Without current work', value: relation.reports_without_current_work, kind: 'neutral' },
         ]}>
             <Link to="/gov/reports?overview=with_work"><i className="gov-bi-kpi__key gov-bi-kpi__key--active" aria-hidden="true"/>{count(relation.reports_with_current_work)} with work</Link>
             <Link to="/gov/reports?overview=without_work"><i className="gov-bi-kpi__key gov-bi-kpi__key--neutral" aria-hidden="true"/>{count(relation.reports_without_current_work)} without</Link>
         </KpiCard>
-        <KpiCard title="Current work orders" value={work} detail="Across permitted records" url="/gov/work-orders?tab=current" action="Open current work orders" onExport={onExport && (() => onExport('current_work_orders'))} total={work} segments={[
+        <KpiCard title="Current work orders" value={work} detail="Across permitted records" url="/gov/work-orders?tab=current" action="Open current work orders" onExport={onExport && (format => onExport('current_work_orders', format))} total={work} segments={[
             { label: 'Blocked', value: relation.blocked_orders, kind: 'warning' },
             { label: 'For verification', value: relation.awaiting_verification, kind: 'active' },
             { label: 'Other current work', value: otherWork, kind: 'neutral' },
@@ -72,7 +76,7 @@ function KpiSummary({ data, onExport }) {
             <Link to="/gov/work-orders?tab=completed_pending_review"><i className="gov-bi-kpi__key gov-bi-kpi__key--active" aria-hidden="true"/>{count(relation.awaiting_verification)} for verification</Link>
             <span><i className="gov-bi-kpi__key gov-bi-kpi__key--neutral" aria-hidden="true"/>{count(otherWork)} other</span>
         </KpiCard>
-        <KpiCard title="Needs triage or owner" value={needsReview} detail="Of currently open reports" url="/gov/reports?overview=triage" action="Open reports needing triage or an owner" onExport={onExport && (() => onExport('needs_triage'))} total={open} segments={[
+        <KpiCard title="Needs triage or owner" value={needsReview} detail="Of currently open reports" url="/gov/reports?overview=triage" action="Open reports needing triage or an owner" onExport={onExport && (format => onExport('needs_triage', format))} total={open} segments={[
             { label: 'Needs triage or owner', value: needsReview, kind: 'active' },
             { label: 'Other open reports', value: Math.max(0, open - needsReview), kind: 'neutral' },
         ]}>
@@ -90,7 +94,7 @@ function AttentionPanel({ data, onExport }) {
         { label: 'Awaiting verification', count: data.totals.awaiting_verification, url: '/gov/work-orders?tab=completed_pending_review', detail: 'Current orders' },
     ];
     return <aside className="gov-bi-surface gov-bi-attention" aria-labelledby="gov-bi-attention-title">
-        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-attention-title">Needs attention</h2><p>Recorded queues to inspect next</p></div><div className="gov-bi-head-actions"><CsvButton label="needs attention queues" onClick={onExport && (() => onExport('attention'))} disabled={!onExport}/><AlertTriangle size={19} aria-hidden="true"/></div></header>
+        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-attention-title">Needs attention</h2><p>Recorded queues to inspect next</p></div><div className="gov-bi-head-actions"><ExportActions label="needs attention queues" onExport={onExport && (format => onExport('attention', format))}/><AlertTriangle size={19} aria-hidden="true"/></div></header>
         <div className="gov-bi-attention__list">{items.map(item => <Link key={item.label} to={item.url} className="gov-bi-attention__row"><span><strong>{item.label}</strong><small>{item.detail}</small></span><span className="gov-bi-attention__count">{count(item.count)}<ArrowUpRight size={13} aria-hidden="true"/></span></Link>)}</div>
         {(Array.isArray(data.asset_exceptions) || Array.isArray(data.update_exceptions)) && <div className="gov-bi-attention__related">
             {Array.isArray(data.asset_exceptions) && <Link to="/gov/assets">{count(data.asset_exceptions.length)} infrastructure exceptions shown <ArrowUpRight size={13}/></Link>}
@@ -122,7 +126,7 @@ function IntakeChart({ intake, onExport }) {
     const fill = points.length ? `${line} L ${x(points.length - 1)} ${bottom} L ${left} ${bottom} Z` : '';
     const labels = new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]);
     return <section className="gov-bi-surface gov-bi-intake" aria-labelledby="gov-bi-intake-title">
-        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-intake-title">Incoming reports</h2><p>Daily submissions · Asia/Manila · includes reports now closed</p></div><div className="gov-bi-head-actions"><CsvButton label={`${days}-day incoming reports`} onClick={onExport && (() => onExport('intake', { days }))} disabled={!onExport}/><div className="gov-bi-period" role="group" aria-label="Report intake period">{[7, 14].map(value => <button key={value} type="button" aria-pressed={days === value} onClick={() => setDays(value)}>{value} days</button>)}</div></div></header>
+        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-intake-title">Incoming reports</h2><p>Daily submissions · Asia/Manila · includes reports now closed</p></div><div className="gov-bi-head-actions"><ExportActions label={`${days}-day incoming reports`} onExport={onExport && (format => onExport('intake', format, { days }))}/><div className="gov-bi-period" role="group" aria-label="Report intake period">{[7, 14].map(value => <button key={value} type="button" aria-pressed={days === value} onClick={() => setDays(value)}>{value} days</button>)}</div></div></header>
         <div className="gov-bi-intake__summary"><strong>{count(total)}</strong><span>received in {days} days</span><small>Last 7: {count(lastSeven)} · previous 7: {count(previousSeven)}</small></div>
         {total ? <figure ref={plot} className="gov-bi-intake__chart" aria-label={`${count(total)} reports received across the selected ${days} days. The line shows daily counts; exact values are in the table below.`}><svg viewBox={`0 0 ${plotWidth} 136`} preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
             {[0, .5, 1].map(fraction => { const ordinate = y(max * fraction); return <g key={fraction}><line x1={left} x2={right} y1={ordinate} y2={ordinate} className="gov-bi-gridline"/><text x={left - 9} y={ordinate + 4} textAnchor="end" className="gov-bi-axis-label">{max * fraction}</text></g>; })}
@@ -145,7 +149,7 @@ function DemandChart({ data, onExport }) {
         {withoutWork > 0 && <Link className="gov-bi-demand__without" to={`/gov/reports?overview=without_work&${filter}`} style={{ width: `${withoutWork / max * 100}%` }} aria-label={`${label}: open ${count(withoutWork)} reports without current work`} title={`${count(withoutWork)} without current work`}/>}
     </span>;
     return <section className="gov-bi-surface gov-bi-demand" aria-labelledby="gov-bi-demand-title">
-        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-demand-title">{view === 'areas' ? 'Open reports by area' : 'Open reports by priority'}</h2><p>{view === 'areas' ? 'Up to six recorded areas' : 'Recorded staff priority'} · select a bar to inspect reports</p></div><div className="gov-bi-head-actions"><CsvButton label={`open reports by ${view === 'areas' ? 'area' : 'priority'}`} onClick={onExport && (() => onExport(view === 'areas' ? 'areas' : 'priorities'))} disabled={!onExport}/><div className="gov-bi-period" role="group" aria-label="Report breakdown">{[['areas', 'Areas'], ['priority', 'Priority']].map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>)}</div></div></header>
+        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-demand-title">{view === 'areas' ? 'Open reports by area' : 'Open reports by priority'}</h2><p>{view === 'areas' ? 'Up to six recorded areas' : 'Recorded staff priority'} · select a bar to inspect reports</p></div><div className="gov-bi-head-actions"><ExportActions label={`open reports by ${view === 'areas' ? 'area' : 'priority'}`} onExport={onExport && (format => onExport(view === 'areas' ? 'areas' : 'priorities', format))}/><div className="gov-bi-period" role="group" aria-label="Report breakdown">{[['areas', 'Areas'], ['priority', 'Priority']].map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>)}</div></div></header>
         <div className="gov-bi-demand__legend"><span><i className="gov-bi-demand__key gov-bi-demand__key--with" aria-hidden="true"/>With current work</span><span><i className="gov-bi-demand__key gov-bi-demand__key--without" aria-hidden="true"/>Without current work</span></div>
         {view === 'areas' ? <>
             {shown.length ? <div className="gov-bi-demand__bars">{shown.map(area => <div key={area.barangay} className="gov-bi-demand__row"><Link to={area.url} title={`Open ${count(area.count)} reports in ${area.barangay}`}>{area.barangay}</Link>{splitBar(area.with_work_count, area.without_work_count, areaMax, area.barangay, `area=${encodeURIComponent(area.barangay)}`)}<strong>{count(area.count)}</strong></div>)}</div> : <p className="gov-bi-empty">No open reports have a recorded area in this scope.</p>}
@@ -166,7 +170,7 @@ function WorkStageChart({ data, onExport }) {
     const total = data.relationships.current_work_orders;
     const max = Math.max(1, ...stages.map(stage => stage.count));
     return <section className="gov-bi-surface gov-bi-stage" aria-labelledby="gov-bi-stage-title">
-        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-stage-title">Current work by stage</h2><p>Recorded work orders, grouped by their current state</p></div><div className="gov-bi-head-actions"><CsvButton label="current work by stage" onClick={onExport && (() => onExport('work_stages'))} disabled={!onExport}/><Link to="/gov/work-orders?tab=current" className="gov-bi-text-link">All work <ArrowUpRight size={15} aria-hidden="true"/></Link></div></header>
+        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-stage-title">Current work by stage</h2><p>Recorded work orders, grouped by their current state</p></div><div className="gov-bi-head-actions"><ExportActions label="current work by stage" onExport={onExport && (format => onExport('work_stages', format))}/><Link to="/gov/work-orders?tab=current" className="gov-bi-text-link">All work <ArrowUpRight size={15} aria-hidden="true"/></Link></div></header>
         {total ? <div className="gov-bi-stage__plot" role="group" aria-label="Select a work stage to open its work orders">
             {stages.map(stage => {
                 const content = <><strong>{count(stage.count)}</strong><span className="gov-bi-stage__slot"><span className="gov-bi-stage__bar" data-empty={stage.count === 0} style={{ height: `${stage.count ? Math.max(7, stage.count / max * 100) : 0}%` }}/></span><span className="gov-bi-stage__label">{stage.label}</span></>;

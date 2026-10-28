@@ -15,7 +15,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
     ClipboardList, Wrench, Building2, BarChart2,
     Megaphone, Inbox, FileArchive, Menu, X, ShieldCheck,
-    LayoutDashboard
+    LayoutDashboard, Settings
 } from 'lucide-react';
 import { readGovernmentUser } from './governmentWorkspaceConfig';
 import { useGovernmentData } from '../utils/governmentApi';
@@ -152,6 +152,19 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser, respon
                     icon: Megaphone,
                     to: '/gov/announcements',
                     matches: ['/gov/notification-deliveries', '/gov/announcements', '/gov/advisories'],
+                },
+            ],
+        },
+        {
+            name: 'Administration',
+            items: [
+                {
+                    id: 'settings',
+                    legacyIds: ['administration', 'staff', 'users', 'residents'],
+                    label: 'Administration',
+                    icon: Settings,
+                    to: '/gov/administration?view=staff',
+                    matches: ['/gov/administration', '/gov/settings', '/gov/users', '/gov/residents'],
                 },
             ],
         },

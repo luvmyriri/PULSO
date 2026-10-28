@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RefreshCw, Shield, Download } from 'lucide-react';
-import { exportOverviewXLSX } from '../utils/overviewCsv';
+import { exportOverviewCSV, exportOverviewXLSX } from '../utils/overviewCsv';
 import { GovWorkspace, GovButton, GovState } from '../components/government/GovWorkspace';
 import GovBiDashboard from '../components/GovBiDashboard';
 import { GovAssistantSlot } from '../components/government/GovAssistantHost';
@@ -21,14 +21,18 @@ export default function GovOverviewPage() {
     const complete = data?.relationships && data?.totals && data?.report_intake && data?.priorities && data?.priority_work && Array.isArray(data?.areas) && Array.isArray(data?.work_stages);
     const exportReady = Boolean(complete && !error && sourceErrors.length === 0 && data?.as_of);
     const [isExporting, setIsExporting] = useState(false);
+    const [exportError, setExportError] = useState('');
 
-    async function handleExport(kind, options) {
+    async function handleExport(kind, format = 'xlsx', options) {
         if (!exportReady || isExporting) return;
         setIsExporting(true);
+        setExportError('');
         try {
-            await exportOverviewXLSX(data, kind, options);
+            if (format === 'csv') exportOverviewCSV(data, kind, options);
+            else await exportOverviewXLSX(data, kind, options);
         } catch (err) {
-            console.error('Failed to export overview XLSX:', err);
+            console.error(`Failed to export overview ${format}:`, err);
+            setExportError(`The ${format === 'csv' ? 'CSV' : 'Excel'} download could not be prepared. Try again.`);
         } finally {
             setIsExporting(false);
         }
@@ -47,16 +51,18 @@ export default function GovOverviewPage() {
                 </div>
             </div>
             <span className="gov-overview-welcome__city" aria-hidden="true"/>
-            <GovButton onClick={() => handleExport('summary')} disabled={!exportReady || loading || isExporting} title={exportReady ? 'Export executive overview to Excel (.xlsx)' : 'Complete, current records are required for export'}><Download size={14} aria-hidden="true"/> <span>{isExporting ? 'Exporting…' : 'Export'}</span></GovButton>
+            <GovButton onClick={() => handleExport('summary', 'csv')} disabled={!exportReady || loading || isExporting} title="Export executive overview as CSV"><Download size={14} aria-hidden="true"/> CSV</GovButton>
+            <GovButton onClick={() => handleExport('summary', 'xlsx')} disabled={!exportReady || loading || isExporting} title="Export executive overview as Excel workbook"><Download size={14} aria-hidden="true"/> Excel</GovButton>
             <GovButton onClick={reload} disabled={loading}><RefreshCw size={14} aria-hidden="true"/> Refresh</GovButton>
         </>}
     >
         <GovState loading={loading && !data} error={error} onRetry={reload}/>
+        {exportError && <p className="gov-bi-source-error" role="alert">{exportError}</p>}
         {(!complete || error) && <GovAssistantSlot />}
         {!error && data && <>
             {sourceErrors.length > 0 && <div className="gov-bi-source-error" role="alert"><strong>Some supporting records could not be loaded.</strong><span>{sourceErrors.join(' ')}</span><button type="button" onClick={reload}>Retry overview</button></div>}
             {complete
-                ? <GovBiDashboard data={data} onExport={exportReady ? handleExport : null}/>
+                ? <GovBiDashboard data={data} onExport={exportReady && !isExporting ? handleExport : null}/>
                 : <div className="gov-bi-source-error" role="alert"><strong>Dashboard data is incomplete.</strong><span>Refresh to load the report and work-order relationships.</span><button type="button" onClick={reload}>Retry overview</button></div>}
         </>}
     </GovWorkspace>;
