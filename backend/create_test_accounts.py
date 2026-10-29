@@ -17,9 +17,17 @@ test_accounts = {
     ],
     "officials": [
         {
+            "email": "dispatcher@pulso.gov",
+            "full_name": "Caloocan Central Dispatcher",
+            "role": "dispatcher",
+            "password": "password123",
+            "barangay": "174",
+            "address": "City Engineering Office, Caloocan City Hall"
+        },
+        {
             "email": "dispatcher@pulso.com",
             "full_name": "Test Dispatcher",
-            "role": "admin_officer",
+            "role": "dispatcher",
             "password": "password123",
             "barangay": "174",
             "address": "City Hall"
