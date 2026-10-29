@@ -1,11 +1,13 @@
-const CACHE_NAME = 'pulso-pwa-v20';
+const CACHE_NAME = 'pulso-pwa-v21';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
+  '/field',
+  '/manifest.webmanifest',
+  '/manifest-field.webmanifest',
   '/favicon-32x32.png',
   '/favicon.ico',
   '/pulso-loading-mark.png',
-  '/manifest.webmanifest',
   '/fonts/inter-latin-variable.woff2',
   '/fonts/inter-latin-ext-variable.woff2',
   '/pulso-app-icon-192.png',

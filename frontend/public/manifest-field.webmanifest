@@ -1,0 +1,40 @@
+{
+  "name": "PULSO Field - City Engineering Crew",
+  "short_name": "PULSO Field",
+  "description": "Phone-first operations surface for Caloocan City Engineering field workers, crew leads, and inspectors. Track duty location, receive assignments, log progress, and submit proof.",
+  "start_url": "/field?source=pwa_field",
+  "scope": "/",
+  "id": "/field",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#081120",
+  "theme_color": "#081120",
+  "orientation": "portrait",
+  "categories": ["government", "utilities", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/pulso-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pulso-app-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pulso-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pulso-app-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

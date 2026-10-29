@@ -21,7 +21,10 @@ import {
     PhoneCall,
     Send,
     Play,
-    Check
+    Check,
+    Download,
+    Smartphone,
+    Share2
 } from 'lucide-react';
 import { getAuthUser, clearAuthSession, getAuthToken } from '../utils/authSession';
 import { API_BASE_URL } from '../utils/apiBase';
@@ -44,6 +47,60 @@ export default function FieldWorkspacePage() {
     const [error, setError] = useState('');
     const [lastSync, setLastSync] = useState(null);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+    // PWA Installation & Standalone Mode Detection
+    const [deferredPrompt, setDeferredPrompt] = useState(null);
+    const [isInstalled, setIsInstalled] = useState(() => {
+        return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    });
+    const [installDismissed, setInstallDismissed] = useState(false);
+
+    // Dynamic Manifest: switch to field-worker manifest on /field
+    useEffect(() => {
+        const link = document.querySelector('link[rel="manifest"]');
+        const originalHref = link ? link.getAttribute('href') : '/manifest.webmanifest';
+        if (link) {
+            link.setAttribute('href', '/manifest-field.webmanifest');
+        }
+        return () => {
+            if (link) {
+                link.setAttribute('href', originalHref);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleBeforeInstall = (e) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+        };
+        const handleAppInstalled = () => {
+            setIsInstalled(true);
+            setDeferredPrompt(null);
+        };
+        window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+        window.addEventListener('appinstalled', handleAppInstalled);
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+            window.removeEventListener('appinstalled', handleAppInstalled);
+        };
+    }, []);
+
+    const handleInstallApp = async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                setIsInstalled(true);
+                setDeferredPrompt(null);
+            }
+        } else {
+            alert("To install PULSO Field on your phone:\n\n1. Tap your browser's Share/Menu icon (bottom or top bar)\n2. Tap 'Add to Home Screen'\n3. Confirm 'Add'\n\nThe PULSO Field icon will appear directly on your home screen with offline capabilities.");
+        }
+    };
+
+    // Duty shift status ('on_site' | 'en_route' | 'available')
+    const [dutyStatus, setDutyStatus] = useState('on_site');
 
     // Selected Work Order for Docket Sheet
     const [selectedWO, setSelectedWO] = useState(null);
@@ -186,7 +243,7 @@ export default function FieldWorkspacePage() {
         localStorage.setItem(OUTBOX_KEY, JSON.stringify(remaining));
     };
 
-    // ── Duty-Window Location Broadcasting ──────────────────────────────────────
+    // ── Duty-Window Location Broadcasting (Government Field Protocol) ───────
     const toggleLocationSharing = () => {
         if (sharingLocation) {
             if (locationWatchId.current !== null) {
@@ -194,6 +251,18 @@ export default function FieldWorkspacePage() {
                 locationWatchId.current = null;
             }
             setSharingLocation(false);
+            // Notify server duty window ended
+            const token = getAuthToken();
+            if (token) {
+                fetch(`${API_BASE_URL}/api/gov/agents/location`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ status: 'offline' })
+                }).catch(() => {});
+            }
         } else {
             if (!('geolocation' in navigator)) {
                 alert('GPS location is not supported on this device.');
@@ -205,7 +274,15 @@ export default function FieldWorkspacePage() {
                     const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     setCurrentCoords(coords);
 
-                    // Send to backend
+                    let batteryLevel = null;
+                    if (navigator.getBattery) {
+                        try {
+                            const b = await navigator.getBattery();
+                            batteryLevel = Math.round(b.level * 100);
+                        } catch { /* ignore */ }
+                    }
+
+                    // Send compliant AgentLocationUpdate to backend
                     const token = getAuthToken();
                     if (token) {
                         try {
@@ -215,7 +292,14 @@ export default function FieldWorkspacePage() {
                                     'Content-Type': 'application/json',
                                     'Authorization': `Bearer ${token}`
                                 },
-                                body: JSON.stringify(coords)
+                                body: JSON.stringify({
+                                    latitude: Number(pos.coords.latitude.toFixed(7)),
+                                    longitude: Number(pos.coords.longitude.toFixed(7)),
+                                    status: dutyStatus,
+                                    accuracy: pos.coords.accuracy ? Number(pos.coords.accuracy.toFixed(1)) : 5.0,
+                                    battery_level: batteryLevel,
+                                    location_name: `Caloocan Field Crew - ${dutyStatus.replace('_', ' ').toUpperCase()}`
+                                })
                             });
                         } catch {
                             // Non-fatal
@@ -304,6 +388,30 @@ export default function FieldWorkspacePage() {
         }
     };
 
+    const handleLogProgress = async (woId, note) => {
+        if (!note || !note.trim()) return false;
+        const token = getAuthToken();
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/gov/work-orders/${woId}/updates`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    note: note.trim()
+                })
+            });
+            if (res.ok) {
+                fetchWorkOrders(true);
+                return true;
+            }
+        } catch (e) {
+            console.error('Failed to log progress note:', e);
+        }
+        return false;
+    };
+
     const handleSignOut = () => {
         clearAuthSession();
         navigate('/gov');
@@ -388,6 +496,38 @@ export default function FieldWorkspacePage() {
 
             {/* ── DESKTOP TABS (Tablet+) ────────────────────────────────────────── */}
             <div className="field-container">
+                {/* ── PWA DOWNLOAD / INSTALL BANNER ────────────────────────────── */}
+                {!isInstalled && !installDismissed && (
+                    <div className="field-install-banner">
+                        <div className="field-install-banner__content">
+                            <div className="field-install-banner__icon">
+                                <Download size={18} />
+                            </div>
+                            <div className="field-install-banner__text">
+                                <h4>Install PULSO Field App</h4>
+                                <p>Add to your phone home screen for 1-tap launch, offline caching & duty GPS.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                                type="button"
+                                onClick={handleInstallApp}
+                                className="field-install-banner__btn"
+                            >
+                                <Download size={13} />
+                                <span>Install App</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setInstallDismissed(true)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                aria-label="Dismiss banner"
+                            >
+                                <X size={15} />
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <div className="field-desktop-tabs">
                     <button
                         type="button"
@@ -565,6 +705,13 @@ export default function FieldWorkspacePage() {
                         cachedCount={workOrders.length}
                         onReplayOutbox={replayOutbox}
                         onForceSync={() => fetchWorkOrders(true)}
+                        isInstalled={isInstalled}
+                        onInstallApp={handleInstallApp}
+                        sharingLocation={sharingLocation}
+                        onToggleLocation={toggleLocationSharing}
+                        dutyStatus={dutyStatus}
+                        onChangeDutyStatus={setDutyStatus}
+                        currentCoords={currentCoords}
                     />
                 )}
             </div>
@@ -612,6 +759,7 @@ export default function FieldWorkspacePage() {
                     onClose={() => setSelectedWO(null)}
                     onAcknowledge={() => handleAcknowledge(selectedWO.id || selectedWO.wo_id)}
                     onStartWork={() => handleStartWork(selectedWO.id || selectedWO.wo_id)}
+                    onLogProgress={(note) => handleLogProgress(selectedWO.id || selectedWO.wo_id, note)}
                     onSubmitProof={() => {
                         setCompletionModalWO(selectedWO);
                         setSelectedWO(null);
@@ -747,7 +895,25 @@ function WorkOrderCard({ workOrder, onSelect, onAcknowledge, onStartWork, onSubm
 }
 
 // ── DOCKET DETAIL SHEET COMPONENT ─────────────────────────────────────────────
-function WorkOrderDocketSheet({ workOrder, onClose, onAcknowledge, onStartWork, onSubmitProof, onBlock, onUnblock }) {
+function WorkOrderDocketSheet({ workOrder, onClose, onAcknowledge, onStartWork, onLogProgress, onSubmitProof, onBlock, onUnblock }) {
+    const [progressNote, setProgressNote] = useState('');
+    const [loggingProgress, setLoggingProgress] = useState(false);
+    const [progressFeedback, setProgressFeedback] = useState('');
+
+    const handleSendProgress = async (e) => {
+        e.preventDefault();
+        if (!progressNote.trim() || loggingProgress) return;
+        setLoggingProgress(true);
+        const success = await onLogProgress(progressNote);
+        setLoggingProgress(false);
+        if (success) {
+            setProgressFeedback('Progress update saved to timeline!');
+            setProgressNote('');
+            setTimeout(() => setProgressFeedback(''), 3500);
+        } else {
+            setProgressFeedback('Failed to log update. Check connection.');
+        }
+    };
     const mapsUrl = (workOrder.location_lat && workOrder.location_lng)
         ? `https://www.google.com/maps/dir/?api=1&destination=${workOrder.location_lat},${workOrder.location_lng}`
         : null;
@@ -820,6 +986,38 @@ function WorkOrderDocketSheet({ workOrder, onClose, onAcknowledge, onStartWork, 
                 {/* Safety Protocol Note */}
                 <div className="mb-5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200">
                     <strong>Safety First:</strong> Wear official PPE and inspect utilities before mechanical excavation. Report unmapped gas or electric hazards immediately.
+                </div>
+
+                {/* Quick Field Progress Note */}
+                <div className="field-progress-box">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                            Post Field Activity Note
+                        </span>
+                        {progressFeedback && (
+                            <span className="text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                {progressFeedback}
+                            </span>
+                        )}
+                    </div>
+                    <form onSubmit={handleSendProgress}>
+                        <textarea
+                            placeholder="e.g. Unloaded aggregate, clearing drainage culvert on site..."
+                            value={progressNote}
+                            onChange={(e) => setProgressNote(e.target.value)}
+                            disabled={loggingProgress}
+                        />
+                        <div className="flex justify-end mt-1.5">
+                            <button
+                                type="submit"
+                                disabled={!progressNote.trim() || loggingProgress}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:opacity-50 transition-all flex items-center gap-1.5"
+                            >
+                                <Send size={12} />
+                                <span>{loggingProgress ? 'Posting...' : 'Log Note'}</span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
                 {/* Operations Actions */}
@@ -1295,9 +1493,114 @@ function FieldIncidentForm({ currentCoords, onSubmitted }) {
 }
 
 // ── DEVICE & SYNC PANEL COMPONENT ─────────────────────────────────────────────
-function DeviceSyncPanel({ isOnline, lastSync, outbox, cachedCount, onReplayOutbox, onForceSync }) {
+function DeviceSyncPanel({
+    isOnline,
+    lastSync,
+    outbox,
+    cachedCount,
+    onReplayOutbox,
+    onForceSync,
+    isInstalled,
+    onInstallApp,
+    sharingLocation,
+    onToggleLocation,
+    dutyStatus,
+    onChangeDutyStatus,
+    currentCoords
+}) {
     return (
         <div className="flex flex-col gap-3">
+            {/* ── PWA DOWNLOAD & STANDALONE INSTALL CARD ───────────────────── */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <Smartphone size={16} className="text-[#ea580c]" />
+                    <h3 className="text-sm font-extrabold text-slate-800 dark:text-white">PULSO Field PWA Application</h3>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 leading-relaxed">
+                    Designed specifically for field crew members on mobile devices. Install the app to your home screen for rapid camera intake, background GPS duty tracking, and offline outbox sync.
+                </p>
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200/80 dark:border-slate-700/60 mb-3 flex items-center justify-between">
+                    <div>
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">App Status</span>
+                        <strong className="text-xs text-slate-800 dark:text-white">
+                            {isInstalled ? '✅ Installed (Standalone Phone Mode)' : '📱 Running in Browser (Installable)'}
+                        </strong>
+                    </div>
+                    {!isInstalled && (
+                        <button
+                            type="button"
+                            onClick={onInstallApp}
+                            className="field-action-button field-action-button--primary text-xs py-1.5 px-3"
+                        >
+                            <Download size={13} />
+                            <span>Download App</span>
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* ── DUTY SHIFT & GPS LOCATION BROADCASTING ───────────────────── */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <Navigation size={16} className={sharingLocation ? 'text-emerald-500 animate-pulse' : 'text-slate-400'} />
+                        <h3 className="text-sm font-extrabold text-slate-800 dark:text-white">Duty Location Tracking</h3>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onToggleLocation}
+                        className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+                            sharingLocation
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                        }`}
+                    >
+                        {sharingLocation ? '● GPS Broadcasting' : 'GPS Off'}
+                    </button>
+                </div>
+
+                <p className="text-xs text-slate-500 mb-3">
+                    Broadcasts your location to the dispatch command center during your shift window only.
+                </p>
+
+                {/* Duty Status Selector */}
+                <div>
+                    <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider block mb-1">
+                        Active Field Status:
+                    </label>
+                    <div className="field-duty-selector">
+                        <button
+                            type="button"
+                            onClick={() => onChangeDutyStatus('on_site')}
+                            className={`field-duty-pill ${dutyStatus === 'on_site' ? 'is-active-onsite' : ''}`}
+                        >
+                            <span>🟢 On Site</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onChangeDutyStatus('en_route')}
+                            className={`field-duty-pill ${dutyStatus === 'en_route' ? 'is-active-enroute' : ''}`}
+                        >
+                            <span>🟡 En Route</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onChangeDutyStatus('available')}
+                            className={`field-duty-pill ${dutyStatus === 'available' ? 'is-active-duty' : ''}`}
+                        >
+                            <span>🔵 Available</span>
+                        </button>
+                    </div>
+                </div>
+
+                {currentCoords && (
+                    <div className="mt-3 p-2 bg-slate-50 dark:bg-slate-800/60 rounded-lg text-[11px] font-mono-data text-slate-600 dark:text-slate-400 flex justify-between">
+                        <span>Lat: {currentCoords.lat?.toFixed(5)}</span>
+                        <span>Lng: {currentCoords.lng?.toFixed(5)}</span>
+                    </div>
+                )}
+            </div>
+
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4">
                 <h3 className="text-sm font-extrabold text-slate-800 dark:text-white mb-2">Network & Storage Status</h3>
                 <dl className="text-xs flex flex-col gap-2">

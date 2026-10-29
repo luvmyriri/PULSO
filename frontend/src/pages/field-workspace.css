@@ -555,3 +555,137 @@
   padding: 0.2rem 0.5rem;
   border-radius: 6px;
 }
+
+
+/* ── PWA Install Banner ─────────────────────────────────────────────────── */
+.field-install-banner {
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.12), rgba(37, 99, 235, 0.12));
+  border: 1px solid rgba(234, 88, 12, 0.3);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.field-install-banner__content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.field-install-banner__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #ea580c;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.field-install-banner__text h4 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--field-fg);
+}
+
+.field-install-banner__text p {
+  font-size: 0.72rem;
+  color: var(--field-muted);
+  margin: 0.15rem 0 0 0;
+}
+
+.field-install-banner__btn {
+  background: #ea580c;
+  color: white;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.field-install-banner__btn:hover {
+  background: #c2410c;
+  transform: translateY(-1px);
+}
+
+/* ── Duty Shift Selector ─────────────────────────────────────────────────── */
+.field-duty-selector {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.field-duty-pill {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--field-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.field-duty-pill.is-active-duty {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: #2563eb;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.field-duty-pill.is-active-onsite {
+  background: rgba(22, 163, 74, 0.15);
+  border-color: #16a34a;
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.field-duty-pill.is-active-enroute {
+  background: rgba(234, 88, 12, 0.15);
+  border-color: #ea580c;
+  color: #ea580c;
+  font-weight: 700;
+}
+
+/* ── Progress Update Box in Docket ───────────────────────────────────────── */
+.field-progress-box {
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.field-progress-box textarea {
+  width: 100%;
+  font-size: 0.8rem;
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  padding: 0.5rem;
+  background: var(--field-card);
+  color: var(--field-fg);
+  resize: vertical;
+  min-height: 55px;
+}
