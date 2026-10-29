@@ -208,6 +208,8 @@ class ReportBase(BaseModel):
 
 class ReportCreate(ReportBase):
     reporter_type: Optional[str] = "registered"
+    guest_reporter_name: Optional[str] = Field(None, max_length=160)
+    submitted_urgency: Optional[str] = None
 
 
 class ReportResolutionConfirm(BaseModel):
@@ -229,6 +231,7 @@ class ReportResponse(ReportBase):
     severity_score: Optional[float] = 0.0
     cluster_id: Optional[int] = None
     reporter_name: Optional[str] = None  # Convenience field for dispatcher/management views
+    submitted_urgency: Optional[str] = None
     contact_verified: bool = False
     claimed_at: Optional[datetime] = None
     claimed_by_user_id: Optional[int] = None

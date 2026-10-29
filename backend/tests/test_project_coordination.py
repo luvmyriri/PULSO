@@ -40,7 +40,7 @@ def command(client,tokens,project,action,actor='chief',**values):
 
 
 def upload(client,tokens,project,kind):
-    result=client.post('/api/gov/documents/upload',data=dict(target_model='ProjectRequest',target_id=str(project['id']),document_type=kind),files={'file':(f'FAKE-{kind}.txt',f'FAKE evidence {kind}'.encode(),'text/plain')},headers=tokens['platform'])
+    result=client.post('/api/gov/documents/upload',data=dict(target_model='ProjectRequest',target_id=str(project['id']),document_type=kind),files={'file':(f'FAKE-{kind}.txt',f'FAKE evidence {kind}'.encode(),'text/plain')},headers=tokens['chief'])
     assert result.status_code==200,result.text
     return result.json()['document']['id']
 
@@ -283,7 +283,7 @@ def test_assignment_rejects_inactive_unqualified_and_wrong_district_owners(conte
     assert command(client,tokens,project,'assign',owner_id=4,next_review_at=future()).status_code==422
     with sessions() as db:
         person=db.get(models.Official,1);person.primary_jurisdiction=[2];db.commit()
-    assert command(client,tokens,project,'assign',actor='platform',owner_id=1,next_review_at=future()).status_code==422
+    assert command(client,tokens,project,'assign',actor='platform',owner_id=1,next_review_at=future()).status_code==403
 
 
 def test_historical_projects_keep_stage_until_explicit_adoption(context):

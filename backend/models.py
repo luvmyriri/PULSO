@@ -311,6 +311,8 @@ class Report(Base):
     tracking_token_hash = Column(String(128), nullable=True, index=True)                 # HMAC-SHA256 hex digest
     contact_email = Column(String(255), nullable=True, index=True)                       # Optional guest contact email
     contact_phone = Column(String(50), nullable=True)                                    # Optional guest contact phone
+    guest_reporter_name = Column(String(160), nullable=True)
+    submitted_urgency = Column(String(20), nullable=True)
     contact_verified = Column(Boolean, default=False, nullable=False)                   # OTP verification status
     claimed_at = Column(DateTime(timezone=True), nullable=True)                         # Timestamp when claimed by resident
     claimed_by_user_id = Column(Integer, ForeignKey("residents.id"), nullable=True, index=True) # Resident who claimed ticket
@@ -375,7 +377,7 @@ class Report(Base):
         if self.reporter:
             return self.reporter.full_name
         if self.reporter_type == "guest":
-            return "Guest Reporter"
+            return self.guest_reporter_name or "Guest Reporter"
         return "Anonymous Resident"
 
     @reporter_name.setter

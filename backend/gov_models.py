@@ -684,13 +684,18 @@ class InfrastructureAsset(Base):
     geom                 = Column(Geometry(geometry_type="GEOMETRY", srid=4326), nullable=True) # Point, LineString, or Polygon
     material_type        = Column(String) # Asphalt, Concrete, Steel, etc.
     date_completed       = Column(Date, nullable=True)
-    design_life          = Column(Integer, default=20) # Expected life in years
+    design_life          = Column(Integer, nullable=True) # Unknown until supported by a source
     original_contractor  = Column(String, nullable=True)
     # Legacy free-text barangay; barangay_id is the normalised FK (3NF)
     barangay             = Column(String, nullable=True) # Legacy string
     # 3NF: FK to canonical barangays lookup
     barangay_id          = Column(Integer, ForeignKey("barangays.id"), nullable=True, index=True)
-    condition_score      = Column(Float, default=100.0, nullable=True)
+    condition_score      = Column(Float, nullable=True)
+    registry_status      = Column(String(16), nullable=False, default="candidate")
+    maintenance_authority = Column(String(160), nullable=True)
+    source_reference     = Column(String(500), nullable=True)
+    verified_by_id      = Column(Integer, ForeignKey("officials.id"), nullable=True)
+    verified_at         = Column(DateTime(timezone=True), nullable=True)
     status               = Column(String, default="operational", index=True) # operational, maintenance_needed, under_repair, critical, decommissioned
     created_at           = Column(DateTime(timezone=True), server_default=func.now())
     updated_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -715,6 +720,145 @@ class MaintenanceHistory(Base):
     completion_date      = Column(Date)
     
     asset                = relationship("InfrastructureAsset", back_populates="maintenance_logs")
+
+
+class AssetInspectionEvidence(Base):
+    """Private evidence blob metadata; bytes are served only through staff access checks."""
+    __tablename__ = "asset_inspection_evidence"
+
+    id = Column(String(36), primary_key=True)
+    asset_id = Column(String, ForeignKey("infrastructure_assets.asset_id", ondelete="RESTRICT"), nullable=False, index=True)
+    uploaded_by_id = Column(Integer, ForeignKey("officials.id", ondelete="RESTRICT"), nullable=False)
+    stored_path = Column(String(500), nullable=False)
+    content_type = Column(String(40), nullable=False)
+    byte_size = Column(Integer, nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AssetInspectionOutcome(Base):
+    """Field finding and independent review; only verified findings can label a model."""
+    __tablename__ = "asset_inspection_outcomes"
+    __table_args__ = (UniqueConstraint("evidence_reference", name="uq_asset_inspection_evidence_reference"),)
+
+    id = Column(Integer, primary_key=True)
+    command_id = Column(String(64), nullable=False, unique=True)
+    payload_hash = Column(String(64), nullable=False)
+    asset_id = Column(String, ForeignKey("infrastructure_assets.asset_id", ondelete="RESTRICT"), nullable=False, index=True)
+    observed_at = Column(DateTime(timezone=True), nullable=False)
+    defect_found = Column(Boolean, nullable=False)
+    defect_type = Column(String(120), nullable=True)
+    severity = Column(String(32), nullable=True)
+    condition_score = Column(Float, nullable=True)
+    finding = Column(Text, nullable=False)
+    evidence_reference = Column(String(36), ForeignKey("asset_inspection_evidence.id", ondelete="RESTRICT"), nullable=True)
+    recorded_by_id = Column(Integer, ForeignKey("officials.id", ondelete="RESTRICT"), nullable=False)
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    review_status = Column(String(16), nullable=False, default="pending", index=True)
+    reviewed_by_id = Column(Integer, ForeignKey("officials.id", ondelete="RESTRICT"), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    review_reason = Column(Text, nullable=True)
+
+
+class AssetModelAssessment(Base):
+    """Latest scheduled score for an asset and immutable approved model version."""
+    __tablename__ = "asset_model_assessments"
+    __table_args__ = (UniqueConstraint("asset_id", "model_sha256", name="uq_asset_model_version"),)
+
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(String, ForeignKey("infrastructure_assets.asset_id", ondelete="RESTRICT"), nullable=False, index=True)
+    model_sha256 = Column(String(64), nullable=False, index=True)
+    inspection_id = Column(Integer, ForeignKey("asset_inspection_outcomes.id", ondelete="RESTRICT"), nullable=True)
+    weather_snapshot_id = Column(Integer, ForeignKey("hazard_source_snapshots.id", ondelete="RESTRICT"), nullable=True)
+    flood_snapshot_id = Column(Integer, ForeignKey("hazard_source_snapshots.id", ondelete="RESTRICT"), nullable=True)
+    status = Column(String(32), nullable=False)
+    reason = Column(Text, nullable=True)
+    probability = Column(Float, nullable=True)
+    generated_at = Column(DateTime(timezone=True), nullable=False)
+    valid_until = Column(DateTime(timezone=True), nullable=True)
+
+
+class AssetModelRun(Base):
+    """Scheduled scoring run outcome for operations and incident review."""
+    __tablename__ = "asset_model_runs"
+
+    id = Column(Integer, primary_key=True)
+    model_sha256 = Column(String(64), nullable=False, index=True)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(16), nullable=False)
+    assets_seen = Column(Integer, nullable=False, default=0)
+    assets_scored = Column(Integer, nullable=False, default=0)
+    error_summary = Column(Text, nullable=True)
+
+
+class HazardSourceSnapshot(Base):
+    """Immutable, sourced barangay weather context; never an observed asset defect."""
+    __tablename__ = "hazard_source_snapshots"
+
+    id = Column(Integer, primary_key=True)
+    barangay_id = Column(Integer, ForeignKey("barangays.id", ondelete="RESTRICT"), nullable=False, index=True)
+    provider = Column(String(80), nullable=False)
+    product = Column(String(100), nullable=False)
+    signal = Column(String(64), nullable=False, index=True)
+    fetched_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    valid_from = Column(DateTime(timezone=True), nullable=False)
+    valid_to = Column(DateTime(timezone=True), nullable=False)
+    value = Column(Float, nullable=False)
+    unit = Column(String(24), nullable=False)
+    requested_latitude = Column(Float, nullable=False)
+    requested_longitude = Column(Float, nullable=False)
+    grid_latitude = Column(Float, nullable=True)
+    grid_longitude = Column(Float, nullable=True)
+    source_resolution_km = Column(Float, nullable=True)
+    license_reference = Column(String(200), nullable=False)
+    documentation_url = Column(String(500), nullable=False)
+    payload_sha256 = Column(String(64), nullable=False)
+    series = Column(JSON, nullable=False)
+    limitation = Column(Text, nullable=False)
+
+
+class NoahFloodRelease(Base):
+    """Operator-approved, immutable source revision for static flood maps."""
+    __tablename__ = "noah_flood_releases"
+
+    id = Column(Integer, primary_key=True)
+    source_revision = Column(String(64), nullable=False, unique=True)
+    source_url = Column(String(500), nullable=False)
+    license_reference = Column(String(500), nullable=False)
+    archive_manifest = Column(JSON, nullable=False)
+    approved_by = Column(String(200), nullable=False)
+    approval_reference = Column(String(300), nullable=False)
+    approved_at = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String(16), nullable=False)
+    asset_count = Column(Integer, nullable=False)
+
+
+class NoahFloodAssetExposure(Base):
+    """Asset geometry intersection with a versioned NOAH return-period map."""
+    __tablename__ = "noah_flood_asset_exposures"
+    __table_args__ = (UniqueConstraint("release_id", "asset_id", "return_period_years", name="uq_noah_exposure_asset_scenario"),)
+
+    id = Column(Integer, primary_key=True)
+    release_id = Column(Integer, ForeignKey("noah_flood_releases.id", ondelete="RESTRICT"), nullable=False)
+    asset_id = Column(String, ForeignKey("infrastructure_assets.asset_id", ondelete="RESTRICT"), nullable=False, index=True)
+    return_period_years = Column(Integer, nullable=False)
+    hazard_class = Column(Integer, nullable=True)
+    asset_geometry_sha256 = Column(String(64), nullable=False)
+
+
+class HazardIngestionRun(Base):
+    """Provider health evidence without logging credentials or payloads."""
+    __tablename__ = "hazard_ingestion_runs"
+
+    id = Column(Integer, primary_key=True)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(16), nullable=False)
+    barangays_seen = Column(Integer, nullable=False, default=0)
+    snapshots_written = Column(Integer, nullable=False, default=0)
+    error_summary = Column(Text, nullable=True)
 
 
 class EnvironmentalContext(Base):

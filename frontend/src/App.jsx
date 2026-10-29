@@ -40,6 +40,7 @@ import GovAnnouncementsPage from './pages/GovAnnouncementsPage';
 import GovAnnouncementEditor from './pages/GovAnnouncementEditor';
 import PublicUpdatesPage from './pages/PublicUpdatesPage';
 import GovernmentWorkspaceRoute from './pages/GovernmentWorkspaceRoute';
+import FieldWorkspacePage from './pages/FieldWorkspacePage';
 import ProtectedRoute, {
     GOV_ROLES,
     EXECUTIVE_ROLES,
@@ -138,7 +139,7 @@ function App() {
                     <Routes>
                         {/* ── PUBLIC RESIDENT ROUTES ─────────────────────────── */}
                         <Route path="/"               element={<ResidentSurface><ResidentEntry /></ResidentSurface>} />
-                        <Route path="/resident-home"  element={<ResidentSurface><Landing /></ResidentSurface>} />
+                        <Route path="/resident-home"  element={<ResidentSurface><Landing directLanding /></ResidentSurface>} />
                         <Route path="/tutorial"       element={<ResidentSurface><MobileAppTutorial replayMode={true} /></ResidentSurface>} />
                         <Route path="/report"         element={<ResidentSurface><ReportWizardPage /></ResidentSurface>} />
                         <Route path="/report/success" element={<ResidentSurface><ReportSuccessPage /></ResidentSurface>} />
@@ -167,6 +168,12 @@ function App() {
                         } />
                         <Route path="/gov/my-dashboard" element={
                             <GovOnly><GovTodayPage /></GovOnly>
+                        } />
+                        <Route path="/field" element={
+                            <FieldOnly><FieldWorkspacePage /></FieldOnly>
+                        } />
+                        <Route path="/gov/field" element={
+                            <Navigate to="/field" replace />
                         } />
                         <Route path="/gov/my-work" element={
                             <GovOnly><GovTodayPage /></GovOnly>

@@ -12,6 +12,18 @@
 
 **Browser feedback correction:** [19 — Browser feedback corrections](19-browser-feedback-corrections-2026-10-24.md) records the nine annotated comments: clearer Report analysis and Predictive maintenance navigation, asset map investigation, plain-language maintenance, draft creation, real Records data/actions, and restored Caloocan/photo-pin interactions. Verification now covers 70 passing regression checks.
 
+**Current role/process implementation baseline:** [37 — Government role and process baseline](37-role-and-process-operational-baseline-2026-10-28.md) records the user-directed pilot boundaries for report intake, engineering verification, work execution, projects, records and platform administration, along with the LGU authority decisions that remain open.
+
+**Predictive maintenance plan:** [38 — Infrastructure intelligence and predictive maintenance](38-infrastructure-intelligence-and-predictive-maintenance-plan-2026-10-29.md) proposes the asset/inspection pilot, source-gated hazard integration, explainable maintenance queue, model validation gates, and a map–queue–docket dashboard direction. Documentation only; provider access and operational policy require owner review.
+
+**Production predictive release:** [39 — Production predictive maintenance release plan](39-production-predictive-maintenance-release-plan-2026-10-29.md) supersedes 38's exploratory release sequence. It defines the existing LightGBM path to a real-outcome, offline-trained, calibrated where justified, versioned and monitored production service with explicit go/no-go and rollback gates.
+
+**Implementation status and operations:** [40 — Predictive maintenance implementation runbook](40-predictive-maintenance-implementation-runbook-2026-10-29.md) records the additive inspection/model code, private evidence and CSV flow, verification commands, and the authentic-data, approval, Figma and service-acceptance gates still open before model activation.
+
+**Weather and flood source path:** [41 — Hazard source integration runbook](41-hazard-source-integration-runbook-2026-10-29.md) records the licensed rainfall and regional river API adapter, source/freshness contract, model feature gate, and official PAGASA/GeoRiskPH access still needed.
+
+**Static flood-map exposure:** [42 — UP NOAH flood exposure integration](42-noah-flood-exposure-integration-2026-10-29.md) specifies the pinned Metro Manila archives, approval and license controls, verified-asset intersection, attribution, and API/CSV provenance.
+
 ## Recommendation
 
 Build a connected government workspace that helps staff receive concerns, assign work, inspect outcomes, maintain infrastructure, communicate service updates, and explain performance. Make everyday actions clear before adding advanced prediction. Add **Updates & announcements** as a dedicated publishing module, with private report updates and staff notifications kept distinct.

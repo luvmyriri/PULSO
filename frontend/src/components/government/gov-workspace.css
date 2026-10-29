@@ -59,6 +59,9 @@
 .gov-view-tabs span { font-variant-numeric:tabular-nums; color:var(--gov-text-secondary); font-size:12px; }
 .gov-record-layout { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; align-items:start; }
 .gov-record-layout.has-detail { grid-template-columns:minmax(0,1fr) minmax(360px,.82fr); }
+.gov-work-report-docket { min-width:0; min-height:0; }
+@media(min-width:1280px) and (min-height:600px) { .gov-work-report-docket { height:100%; overflow:hidden; } }
+@media(max-width:1279px) { .gov-work-report-docket .report-docket { height:auto; } .gov-work-report-docket .report-docket-body { overflow:visible; } }
 .gov-record-table { min-width:0; background:var(--gov-surface); border:1px solid var(--gov-rule); border-radius:12px; overflow:hidden; box-shadow:var(--workspace-raised); }
 .gov-table-scroll { overflow-x:auto; }
 .gov-record-table table { width:100%; border-collapse:collapse; font-size:13px; }

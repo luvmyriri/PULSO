@@ -237,6 +237,9 @@ def get_predictive_health(db: Session = Depends(get_db), current_user=Depends(ge
     if not _allow_access(current_user):
         raise HTTPException(status_code=403, detail="Access denied to maintenance review")
     assets = scoped_assets(db.query(InfrastructureAsset), current_user).all()
+    import json
+    geometries = {asset_id: json.loads(raw) if raw else None for asset_id, raw in scoped_assets(
+        db.query(InfrastructureAsset.asset_id, func.ST_AsGeoJSON(InfrastructureAsset.geom)), current_user).all()}
     rows = []
     today = datetime.date.today()
     for asset in assets:
@@ -253,6 +256,7 @@ def get_predictive_health(db: Session = Depends(get_db), current_user=Depends(ge
         reasons.append(f"{count} reports explicitly linked through work orders in the past 90 days.")
         reasons.append(f"Last recorded maintenance completed {days} days ago." if last else "No maintenance completion is recorded; inspect the history before planning work.")
         rows.append(dict(asset_id=asset.asset_id, asset_name=asset.asset_name,
+            geometry=geometries.get(asset.asset_id), registry_status=asset.registry_status,
             barangay=str(asset.barangay or 'Not recorded'), category=asset.category or 'Unclassified',
             health_score=score, condition_source='asset_registry' if score is not None else 'not_recorded',
             priority=priority, report_count=count, why_review=' '.join(reasons),

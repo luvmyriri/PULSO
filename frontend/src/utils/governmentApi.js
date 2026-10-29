@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from './apiBase';
 import { getAuthToken } from './authSession';
+import { fetchReportMapPages } from './reportPages';
 
-export async function governmentRequest(path, { method = 'GET', body, signal, headers = {} } = {}) {
+async function requestPage(path, { method = 'GET', body, signal, headers = {} } = {}) {
     const token = getAuthToken();
     const multipart = body instanceof FormData;
     const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -15,6 +16,14 @@ export async function governmentRequest(path, { method = 'GET', body, signal, he
         const error = new Error(response.status === 401 ? 'Your session has expired. Sign in again to continue.' : response.status === 403 ? 'Your account does not have access to this action.' : typeof detail === 'string' ? detail : detail?.next_action || (Array.isArray(detail) ? detail.map(e => `${e.loc?.slice(1).join('.') || 'Field'}: ${e.msg}`).join('; ') : `The request could not be completed (HTTP ${response.status}). Try again.`));
         error.status = response.status;
         throw error;
+    }
+    return data;
+}
+
+export async function governmentRequest(path, options = {}) {
+    const data = await requestPage(path, options);
+    if ((options.method || 'GET') === 'GET' && path.split('?')[0] === '/api/gov/report-map' && data && Object.hasOwn(data, 'next_skip')) {
+        return fetchReportMapPages({ path, first: data, request: nextPath => requestPage(nextPath, options) });
     }
     return data;
 }

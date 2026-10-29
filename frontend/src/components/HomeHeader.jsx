@@ -369,9 +369,14 @@ export default function HomeHeader({
                     <a
                         href="/dashboard"
                         onClick={(e) => {
-                            e.preventDefault();
-                            if (onGoHome) onGoHome();
-                            else if (handleSetTab) handleSetTab('overview');
+                            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                            if (onGoHome) {
+                                e.preventDefault();
+                                onGoHome();
+                            } else if (handleSetTab) {
+                                e.preventDefault();
+                                handleSetTab('overview');
+                            }
                         }}
                         className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl cursor-pointer min-w-0 transition-opacity hover:opacity-90 active:scale-[0.99]"
                         aria-label="PULSO home, Caloocan City Engineering Department"

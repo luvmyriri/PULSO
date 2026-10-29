@@ -232,7 +232,7 @@ export default function ReportSuccessPage() {
         {/* ── BOTTOM RETURN ACTIONS ───────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
           <Link
-            to="/"
+            to="/resident-home"
             className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 rounded-lg"
           >
             <Home size={16} />

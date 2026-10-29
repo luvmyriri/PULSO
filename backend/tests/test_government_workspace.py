@@ -33,7 +33,7 @@ def context(clean_postgis):
         db.flush()
         # The test inspector has an explicit intake-review delegation; this is
         # separate from an inspector's default completion-verification duties.
-        delegated = models.SystemRole(name='FAKE delegated review', capabilities={'report_review':['review']})
+        delegated = models.SystemRole(name='FAKE delegated review', capabilities={'report_review':['review','verify']})
         db.add(delegated)
         db.flush()
         db.get(models.Official,3).role_id = delegated.id
@@ -245,8 +245,102 @@ def test_manual_review_assignment_is_authorized_scoped_versioned_and_tracked(con
     assert client.post('/api/gov/report-review/1/assignment',json={**body,'expected_version':assigned.json()['version']},headers=tokens['chief']).status_code==403
 
 
+def test_authorized_coordinator_can_take_unassigned_report_into_my_work(context):
+    client,sessions,tokens=context
+    path='/api/gov/report-review/1/take'
+    body={'expected_version':1}
+    docket=client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()
+    assert 'take' in docket['allowed_actions']
+    assert 'take' not in client.get('/api/gov/reports/1/docket',headers=tokens['clerk']).json()['allowed_actions']
+    assert client.post(path,json=body,headers=tokens['clerk']).status_code==403
+    assert client.post(path,json=body,headers=tokens['platform']).status_code==403
+    taken=client.post(path,json=body,headers=tokens['chief'])
+    assert taken.status_code==200,taken.text
+    assert taken.json()['review_owner_id']==1 and taken.json()['assignment_mode']=='self_take'
+    assert client.post(path,json=body,headers=tokens['chief']).status_code==409
+    assert client.post(path,json={'expected_version':taken.json()['version']},headers=tokens['chief']).status_code==409
+    inbox=client.get('/api/gov/operations/today',headers=tokens['chief']).json()['needs_attention']
+    assert any(item['entity_type']=='report' and item['id']==1 and item['assigned_to_id']==1 for item in inbox)
+    assert 'take' not in client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()['allowed_actions']
+    with sessions() as db:
+        audit=db.query(gm.AuditLog).filter_by(report_id=1,trigger_type='report_assignment').one()
+        assert audit.actor_id==1
+        assert '"mode": "self_take"' in audit.details
+        assert '"previous_owner_id": null' in audit.details
+
+
+def test_take_from_colleague_requires_reason_and_transfers_my_work(context):
+    client,sessions,tokens=context
+    assigned=client.post('/api/gov/report-review/1/assignment',json={'expected_version':1,'assigned_to_id':3,'reason':'FAKE assign delegated reviewer'},headers=tokens['chief'])
+    assert assigned.status_code==200,assigned.text
+    version=assigned.json()['version']
+    path='/api/gov/report-review/1/take'
+    assert 'take' in client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()['allowed_actions']
+    missing=client.post(path,json={'expected_version':version},headers=tokens['chief'])
+    assert missing.status_code==422
+    assert any(item['entity_type']=='report' and item['id']==1 for item in client.get('/api/gov/operations/today',headers=tokens['inspector']).json()['needs_attention'])
+    taken=client.post(path,json={'expected_version':version,'reason':'FAKE chief taking urgent technical assessment'},headers=tokens['chief'])
+    assert taken.status_code==200,taken.text
+    assert taken.json()['review_owner_id']==1
+    assert not any(item['entity_type']=='report' and item['id']==1 for item in client.get('/api/gov/operations/today',headers=tokens['inspector']).json()['needs_attention'])
+    assert any(item['entity_type']=='report' and item['id']==1 for item in client.get('/api/gov/operations/today',headers=tokens['chief']).json()['needs_attention'])
+    assert client.post(path,json={'expected_version':version,'reason':'FAKE duplicate takeover'},headers=tokens['chief']).status_code==409
+    history=client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()['review_history']
+    assert history[0]['label']=='Review taken by FAKE chief'
+    assert history[0]['previous_owner']=='FAKE inspector'
+    assert history[0]['reason']=='FAKE chief taking urgent technical assessment'
+    with sessions() as db:
+        assert db.query(models.Notification).filter_by(official_id=3,title='Report review reassigned').count()==1
+
+
+def test_take_respects_routing_area_scope_and_review_lifecycle(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.get(models.Report,1).barangay_id=None
+        db.get(models.Report,1).location_barangay='FAKE unknown location'
+        db.commit()
+        version=db.get(models.Report,1).version
+    assert client.post('/api/gov/report-review/1/take',json={'expected_version':version},headers=tokens['chief']).status_code==422
+    with sessions() as db:
+        report=db.get(models.Report,1)
+        assert report.review_assigned_to_id is None and report.barangay_id is None
+        report.barangay_id=1
+        db.get(models.Official,1).primary_jurisdiction=[2]
+        db.commit()
+        version=db.get(models.Report,1).version
+    assert client.post('/api/gov/report-review/1/take',json={'expected_version':version},headers=tokens['chief']).status_code==403
+    with sessions() as db:
+        db.get(models.Official,1).primary_jurisdiction=[1]
+        db.get(models.Report,1).status='resolved'
+        db.commit()
+        version=db.get(models.Report,1).version
+    assert 'take' not in client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()['allowed_actions']
+    assert client.post('/api/gov/report-review/1/take',json={'expected_version':version},headers=tokens['chief']).status_code==409
+
+
+def test_assign_only_administrative_officer_can_take_then_route_without_engineering_decisions(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.add(models.Official(id=7,full_name='FAKE administrative officer',email='officer@test.invalid',password_hash='test-only',role='admin_officer',is_active=True))
+        db.commit()
+    officer={'Authorization':f'Bearer {auth.create_access_token({"sub":"officer@test.invalid"})}'}
+    docket=client.get('/api/gov/reports/2/docket',headers=officer).json()
+    assert 'take' in docket['allowed_actions'] and 'verify' not in docket['allowed_actions']
+    taken=client.post('/api/gov/report-review/2/take',json={'expected_version':docket['report']['version']},headers=officer)
+    assert taken.status_code==200,taken.text
+    inbox=client.get('/api/gov/operations/today',headers=officer).json()['needs_attention']
+    task=next(item for item in inbox if item['entity_type']=='report' and item['id']==2)
+    assert task['recommended_action']=='Assign an intake reviewer'
+    after=client.get('/api/gov/reports/2/docket',headers=officer).json()
+    assert 'verify' not in after['allowed_actions'] and after['review_operations']['review_owner_id']==7
+    assert client.post('/api/gov/report-review/2/assignment',json={'expected_version':after['report']['version'],'assigned_to_id':2,'reason':'FAKE route intake to an eligible clerk'},headers=officer).status_code==200
+
+
 def test_review_queue_and_priority_are_visible_in_my_work_and_bulk_operations(context):
     client,sessions,tokens=context
+    unassigned=client.get('/api/gov/operations/today',headers=tokens['chief']).json()['needs_attention']
+    assert not any(t['entity_type']=='report' for t in unassigned)
+    assert client.get('/api/gov/reports/1/docket',headers=tokens['chief']).status_code==200
     assigned=client.post('/api/gov/report-review/1/assignment',json={'expected_version':1,'assigned_to_id':3,'reason':'FAKE allocate intake assessment'},headers=tokens['chief']).json()
     graded=client.post('/api/gov/report-review/1/priority',json={'expected_version':assigned['version'],'priority_grade':'P2','reason':'FAKE observed significant local risk'},headers=tokens['inspector'])
     assert graded.status_code==200,graded.text
@@ -258,6 +352,170 @@ def test_review_queue_and_priority_are_visible_in_my_work_and_bulk_operations(co
     assert bulk['1']['priority_grade']=='P2' and bulk['1']['review_owner_id']==3
     assert client.get('/api/gov/report-review?ids=1',headers=tokens['owner']).status_code==403
     assert client.get('/api/gov/report-review?ids=1',headers=tokens['field']).json()=={}
+
+
+def test_unlocated_report_requires_audited_routing_area_before_assignment(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        report=db.get(models.Report,1)
+        report.barangay_id=None
+        report.location_barangay=None
+        report.location_string='FAKE address requiring location review'
+        db.get(models.Official,1).primary_jurisdiction=[1]
+        db.commit()
+    assert client.get('/api/gov/reports/1/docket',headers=tokens['chief']).status_code==403
+    with sessions() as db:
+        db.get(models.Official,1).primary_jurisdiction=None
+        db.commit()
+    docket=client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()
+    version=docket['report']['version']
+    assert 'routing_area' in docket['allowed_actions']
+    assert docket['review_operations']['routing_area_id'] is None
+    assert client.get('/api/gov/report-review/1/reviewers',headers=tokens['chief']).json()==[]
+    assert {area['id'] for area in client.get('/api/gov/report-review/1/routing-areas',headers=tokens['chief']).json()}=={1,2}
+    assert client.get('/api/gov/report-review/1/routing-areas',headers=tokens['clerk']).status_code==403
+    body={'expected_version':version,'barangay_id':1,'reason':'FAKE evidence supports this routing barangay'}
+    assert client.post('/api/gov/report-review/1/routing-area',json={**body,'barangay_id':999},headers=tokens['chief']).status_code==422
+    assert client.post('/api/gov/report-review/1/routing-area',json={**body,'expected_version':version-1},headers=tokens['chief']).status_code==409
+    confirmed=client.post('/api/gov/report-review/1/routing-area',json=body,headers=tokens['chief'])
+    assert confirmed.status_code==200,confirmed.text
+    assert confirmed.json()['version']>version
+    with sessions() as db:
+        report=db.get(models.Report,1)
+        assert report.barangay_id==1 and report.review_assigned_to_id is None
+        event=db.query(gm.AuditLog).filter_by(report_id=1,trigger_type='report_routing_location').one()
+        assert event.actor_id==1 and 'FAKE' in event.details
+    assert client.post('/api/gov/report-review/1/routing-area',json={**body,'expected_version':confirmed.json()['version']},headers=tokens['chief']).status_code==409
+    assert any(person['id']==2 for person in client.get('/api/gov/report-review/1/reviewers',headers=tokens['chief']).json())
+    assigned=client.post('/api/gov/report-review/1/assignment',json={'expected_version':confirmed.json()['version'],'assigned_to_id':2,'reason':'FAKE assign clerk for intake after location review'},headers=tokens['chief'])
+    assert assigned.status_code==200,assigned.text
+    work=client.get('/api/gov/operations/today',headers=tokens['clerk']).json()['needs_attention']
+    assert any(item['entity_type']=='report' and item['id']==1 for item in work)
+
+
+def test_clerk_intake_peer_transfer_and_engineering_handoff(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.add(models.Official(id=7,full_name='FAKE peer clerk',email='peerclerk@test.invalid',password_hash='test-only',role='admin_clerk',primary_jurisdiction=[1],is_active=True))
+        db.add(models.Official(id=8,full_name='FAKE outside clerk',email='outsideclerk@test.invalid',password_hash='test-only',role='admin_clerk',primary_jurisdiction=[2],is_active=True))
+        db.commit()
+    peer_token={'Authorization':f'Bearer {auth.create_access_token({"sub":"peerclerk@test.invalid"})}'}
+    assigned=client.post('/api/gov/report-review/1/assignment',json={'expected_version':1,'assigned_to_id':2,'reason':'FAKE assign clerk intake ownership'},headers=tokens['chief'])
+    assert assigned.status_code==200,assigned.text
+    with sessions() as db:
+        notice=db.query(models.Notification).filter_by(official_id=2).order_by(models.Notification.id.desc()).first()
+        assert notice.target_url=='/gov/my-work?selected=report:1'
+        assert 'complete intake' in notice.message
+    version=assigned.json()['version']
+    clerk_work=client.get('/api/gov/operations/today',headers=tokens['clerk']).json()['needs_attention']
+    assert any(t['id']==1 and t['entity_type']=='report' and t['task_bucket']=='assigned_to_me' for t in clerk_work)
+    docket=client.get('/api/gov/reports/1/docket',headers=tokens['clerk']).json()
+    assert {'peer_transfer','submit_engineering','request_info'} <= set(docket['allowed_actions'])
+    assert 'verify' not in docket['allowed_actions'] and not docket['can_grade_priority']
+    assert client.post('/api/gov/report-review/1/priority',json={'expected_version':version,'priority_grade':'P2','reason':'FAKE clerk cannot grade'},headers=tokens['clerk']).status_code==403
+    assert client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers={**tokens['clerk'],'If-Match':str(version)}).status_code==403
+    assert {p['id'] for p in client.get('/api/gov/report-review/1/peer-clerks',headers=tokens['clerk']).json()}=={7}
+    body={'expected_version':version,'assigned_to_id':8,'reason':'FAKE district mismatch transfer'}
+    assert client.post('/api/gov/report-review/1/peer-transfer',json=body,headers=tokens['clerk']).status_code==422
+    body['assigned_to_id']=7
+    moved=client.post('/api/gov/report-review/1/peer-transfer',json=body,headers=tokens['clerk'])
+    assert moved.status_code==200,moved.text
+    assert client.post('/api/gov/report-review/1/peer-transfer',json=body,headers=tokens['clerk']).status_code in {403,409}
+    assert not any(t['id']==1 and t['entity_type']=='report' for t in client.get('/api/gov/operations/today',headers=tokens['clerk']).json()['needs_attention'])
+    assert any(t['id']==1 and t['entity_type']=='report' for t in client.get('/api/gov/operations/today',headers=peer_token).json()['needs_attention'])
+    handoff=client.post('/api/gov/report-review/1/submit-engineering',json={'expected_version':moved.json()['version'],'reason':'FAKE intake reviewed; road defect needs engineering assessment'},headers=peer_token)
+    assert handoff.status_code==200,handoff.text
+    assert handoff.json()['review_owner_id']==1 and handoff.json()['assignment_mode']=='engineering_handoff'
+    with sessions() as db:
+        notice=db.query(models.Notification).filter_by(official_id=1).order_by(models.Notification.id.desc()).first()
+        assert notice.target_url=='/gov/my-work?selected=report:1'
+        assert 'verify public details' in notice.message
+    engineer_work=client.get('/api/gov/operations/today',headers=tokens['chief']).json()['needs_attention']
+    assert any(t['id']==1 and t['entity_type']=='report' and t['assigned_to_id']==1 for t in engineer_work)
+    assert not any(t['id']==1 and t['entity_type']=='report' for t in client.get('/api/gov/operations/today',headers=peer_token).json()['needs_attention'])
+    history=client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()['review_history']
+    assert history[0]['label']=='Intake submitted to FAKE chief' and history[0]['previous_owner']=='FAKE peer clerk'
+
+
+def test_assigned_rejected_report_remains_in_recent_my_work_without_new_permissions(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        report=db.get(models.Report,1)
+        report.status='rejected'
+        report.review_assigned_to_id=2
+        db.commit()
+    inbox=client.get('/api/gov/operations/today',headers=tokens['clerk'])
+    assert inbox.status_code==200,inbox.text
+    record=next(row for row in inbox.json()['needs_attention'] if row['entity_type']=='report' and row['id']==1)
+    assert record['task_bucket']=='recently_completed' and record['recommended_action']=='Open report history'
+    docket=client.get('/api/gov/reports/1/docket',headers=tokens['clerk']).json()
+    assert not {'verify','peer_transfer','submit_engineering'} & set(docket['allowed_actions'])
+
+
+def test_role_families_and_process_boundaries_match_server_actions(context):
+    import project_workspace
+    import report_review
+    import roles_service
+    from government_access import can
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.add_all([
+            models.Official(id=7,full_name='FAKE structural chief',email='structural@test.invalid',password_hash='test-only',role='division_chief_structural',is_active=True),
+            models.Official(id=8,full_name='FAKE admin officer',email='adminofficer@test.invalid',password_hash='test-only',role='admin_officer',is_active=True),
+        ])
+        db.commit()
+        chief=db.get(models.Official,7)
+        admin_officer=db.get(models.Official,8)
+        assert project_workspace.allowed(chief,'manage')
+        assert report_review.permitted(chief,'assign')
+        assert report_review.permitted(admin_officer,'assign')
+        assert not report_review.permitted(admin_officer,'review')
+        assert project_workspace.allowed(db.get(models.Official,2),'view')
+        assert not project_workspace.allowed(db.get(models.Official,2),'manage')
+        assert project_workspace.allowed(db.get(models.Official,6),'view')
+        assert not project_workspace.allowed(db.get(models.Official,6),'manage')
+        assert not report_review.permitted(db.get(models.Official,6),'assign')
+        assert not report_review.permitted(db.get(models.Official,6),'review')
+        assert not report_review.permitted(db.get(models.Official,6),'verify')
+        platform=db.get(models.Official,6)
+        assert can(platform,'announcements','view')
+        assert can(platform,'announcements','create')
+        assert not can(platform,'announcements','approve')
+        assert roles_service.has_permission(db,platform,'records','view')
+        assert not roles_service.has_permission(db,platform,'reports','detail')
+        assert not roles_service.has_permission(db,platform,'analytics','export')
+        assert not roles_service.has_permission(db,platform,'procurement','manage')
+        platform_role=models.SystemRole(name='FAKE platform domain boundary',capabilities={'admin':['manage'],'analytics':['view']})
+        db.add(platform_role);db.flush();platform.role_id=platform_role.id;db.flush();db.expire(platform,['role_ref'])
+        assert roles_service.has_permission(db,platform,'analytics','view')
+        assert not roles_service.has_permission(db,platform,'analytics','export')
+        assert not roles_service.has_permission(db,platform,'reports','detail')
+    chief_token={'Authorization':f'Bearer {auth.create_access_token({"sub":"structural@test.invalid"})}'}
+    officer_token={'Authorization':f'Bearer {auth.create_access_token({"sub":"adminofficer@test.invalid"})}'}
+    assert client.get('/api/reports',headers=chief_token).status_code==200
+    assert client.get('/api/gov/navigation',headers=chief_token).json()['modules'].count('projects')==1
+    assert client.get('/api/gov/report-review/1/reviewers',headers=tokens['platform']).status_code==403
+    assigned=client.post('/api/gov/report-review/1/assignment',json={'expected_version':1,'assigned_to_id':2,'reason':'FAKE administrative intake ownership'},headers=officer_token)
+    assert assigned.status_code==200,assigned.text
+    assert client.post('/api/gov/report-review/1/priority',json={'expected_version':assigned.json()['version'],'priority_grade':'P2','reason':'FAKE unauthorized technical grade'},headers=officer_token).status_code==403
+    assert client.post('/api/gov/project-workspace',json={'title':'FAKE clerk project','description':'FAKE clerk must not coordinate project','requesting_party':'FAKE office','barangay_id':1,'reason':'FAKE unauthorized project creation'},headers=tokens['clerk']).status_code==403
+
+
+def test_project_engineer_reviews_then_hands_off_for_city_verification(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.add(models.Official(id=7,full_name='FAKE project engineer',email='projectengineer@test.invalid',password_hash='test-only',role='project_engineer',is_active=True))
+        db.commit()
+    engineer_token={'Authorization':f'Bearer {auth.create_access_token({"sub":"projectengineer@test.invalid"})}'}
+    assigned=client.post('/api/gov/report-review/1/assignment',json={'expected_version':1,'assigned_to_id':7,'reason':'FAKE assign preliminary engineering review'},headers=tokens['chief'])
+    assert assigned.status_code==200,assigned.text
+    docket=client.get('/api/gov/reports/1/docket',headers=engineer_token).json()
+    assert 'submit_engineering' in docket['allowed_actions'] and 'verify' not in docket['allowed_actions']
+    assert client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers={**engineer_token,'If-Match':str(assigned.json()['version'])}).status_code==403
+    handoff=client.post('/api/gov/report-review/1/submit-engineering',json={'expected_version':assigned.json()['version'],'reason':'FAKE evidence reviewed; City Engineer should verify public details'},headers=engineer_token)
+    assert handoff.status_code==200,handoff.text
+    assert handoff.json()['review_owner_id']==1
+    assert 'verify' in client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()['allowed_actions']
 
 
 def test_priority_grade_is_human_reviewed_and_p0_needs_owner_and_review_date(context):
@@ -721,15 +979,18 @@ def test_unreviewed_candidates_never_receive_related_report_change_notices(conte
 
 def test_map_docket_actions_use_authoritative_status_versions_and_scope(context):
     client, sessions, tokens = context
-    response = client.get('/api/gov/reports/1/docket',headers=tokens['platform'])
+    platform = client.get('/api/gov/reports/1/docket',headers=tokens['platform'])
+    assert platform.status_code == 200 and platform.json()['allowed_actions'] == []
+    response = client.get('/api/gov/reports/1/docket',headers=tokens['chief'])
     assert response.status_code == 200, response.text
     data = response.json()
-    assert set(data['allowed_actions']) == {'verify','reject','request_info'}
-    command = {**tokens['platform'],'If-Match':str(data['report']['version']),'Idempotency-Key':'fake-map-verify-123'}
+    assert set(data['allowed_actions']) == {'verify','request_info','take'}
+    assert client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers={**tokens['platform'],'If-Match':str(data['report']['version'])}).status_code == 403
+    command = {**tokens['chief'],'If-Match':str(data['report']['version']),'Idempotency-Key':'fake-map-verify-123'}
     verified = client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers=command)
     assert verified.status_code == 200, verified.text
     assert client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers=command).status_code == 200
-    next_data = client.get('/api/gov/reports/1/docket',headers=tokens['platform']).json()
+    next_data = client.get('/api/gov/reports/1/docket',headers=tokens['chief']).json()
     assert 'approve' in next_data['allowed_actions'] and 'verify' not in next_data['allowed_actions']
     with sessions() as db:
         # Status transition and public-detail review are separate recorded actions;
@@ -738,10 +999,10 @@ def test_map_docket_actions_use_authoritative_status_versions_and_scope(context)
         assert len([entry for entry in timeline if entry.status == 'pending_approval']) == 1
         assert len([entry for entry in timeline if entry.status == 'public_details_approved']) == 1
         assert db.query(gm.OutboxEvent).filter_by(event_type='resident_in_app_notification').count() == 1
-        db.get(models.Official,6).primary_jurisdiction=[2]
+        db.get(models.Official,1).primary_jurisdiction=[2]
         db.commit()
-    assert client.get('/api/gov/reports/1/docket',headers=tokens['platform']).status_code == 403
-    assert client.post('/api/gov/reports/1/approve-for-work',json={'reason':'FAKE reviewed evidence'},headers=tokens['platform']).status_code == 403
+    assert client.get('/api/gov/reports/1/docket',headers=tokens['chief']).status_code == 403
+    assert client.post('/api/gov/reports/1/approve-for-work',json={'reason':'FAKE reviewed evidence'},headers=tokens['chief']).status_code == 403
     assert client.get('/api/gov/reports/1/docket',headers=tokens['owner']).status_code == 403
 
 

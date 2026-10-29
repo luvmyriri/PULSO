@@ -15,7 +15,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
     ClipboardList, Wrench, Building2, BarChart2,
     Megaphone, Inbox, FileArchive, Menu, X, ShieldCheck,
-    LayoutDashboard, Settings
+    LayoutDashboard, Settings, Smartphone
 } from 'lucide-react';
 import { readGovernmentUser } from './governmentWorkspaceConfig';
 import { useGovernmentData } from '../utils/governmentApi';
@@ -103,6 +103,14 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser, respon
                     matches: ['/gov/work-orders', '/gov/projects', '/gov/delivery', '/gov/obo'],
                 },
                 {
+                    id: 'field',
+                    legacyIds: ['field-pwa', 'dispatch-field'],
+                    label: 'Field PWA',
+                    icon: Smartphone,
+                    to: '/field',
+                    matches: ['/field', '/gov/field'],
+                },
+                {
                     id: 'assets',
                     legacyIds: ['assets'],
                     label: 'Infrastructure',
@@ -183,7 +191,7 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser, respon
                 <div className={`gov-sidebar-brand ${isCollapsed ? 'is-collapsed' : ''}`}>
                     <button type="button" className="gov-sidebar-collapse" onClick={toggleCollapse} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!isCollapsed}><Menu size={18} strokeWidth={1.75}/></button>
                     <Link
-                        to="/gov/dashboard"
+                        to={navigation.data?.modules?.includes('overview') ? '/gov/overview' : '/gov/my-dashboard'}
                         className="flex items-center gap-2.5 group overflow-hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#166534] dark:focus-visible:ring-[#4ade80] rounded-lg"
                         title="City Government of Caloocan - City Engineering Department - PULSO"
                     >

@@ -332,7 +332,7 @@ def send_report_gmail_notification(
         msg.attach(MIMEText(plain_text, 'plain'))
         msg.attach(MIMEText(email_html, 'html'))
 
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
             server.login(smtp_user, clean_pass)
             server.send_message(msg)
             print(f'[MAIL] SMTP accepted report notification email for {ticket_id} -> {clean_to}.')

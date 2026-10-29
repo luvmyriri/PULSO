@@ -471,7 +471,7 @@ class TestReportClaiming:
 
         # 3. Verify Audit Log and In-App Notification in DB
         db = TestingSessionLocal()
-        audit = db.query(gov_models.AuditLog).filter(gov_models.AuditLog.report_id == report_id).first()
+        audit = db.query(gov_models.AuditLog).filter(gov_models.AuditLog.report_id == report_id,gov_models.AuditLog.trigger_type == "report_claimed").first()
         assert audit is not None
         assert audit.trigger_type == "report_claimed"
         assert audit.actor_role == "resident"
@@ -571,11 +571,12 @@ class TestReportClaiming:
             headers=resident_maria["headers"],
             data={
                 "category": "Roads & Bridges",
-                "description": "Authored by registered Maria Santos.",
+                "description": "A deep road pothole beside the corner has damaged the concrete lane.",
                 "lat": 14.7565,
                 "lng": 121.0450
             }
         )
+        assert r_create.status_code in {200,201}, r_create.text
         report_id = r_create.json()["id"]
         token = r_create.json()["tracking_token"]
 

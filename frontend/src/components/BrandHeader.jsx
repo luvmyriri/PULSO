@@ -74,12 +74,17 @@ export default function BrandHeader({
             {/* ── MOBILE BRAND HEADER (< 768px: Seal + Brand Line + Title only, right side empty) ── */}
             {!hideMobileHeader && (
                 <div className="flex md:hidden w-full px-[clamp(1rem,5vw,1.25rem)] pt-[max(env(safe-area-inset-top,0px),12px)] pb-3">
-                    <button
-                        type="button"
+                    <a
+                        href="/dashboard"
                         onClick={(e) => {
-                            e.preventDefault();
-                            if (onGoHome) onGoHome();
-                            else if (handleSetTab) handleSetTab('overview');
+                            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                            if (onGoHome) {
+                                e.preventDefault();
+                                onGoHome();
+                            } else if (handleSetTab) {
+                                e.preventDefault();
+                                handleSetTab('overview');
+                            }
                         }}
                         className="flex items-center gap-3 w-full min-h-[48px] text-left cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl transition-opacity active:scale-[0.99]"
                         aria-label="PULSO home, Caloocan City Engineering Department"
@@ -102,7 +107,7 @@ export default function BrandHeader({
                                 {screenTitle}
                             </h1>
                         </div>
-                    </button>
+                    </a>
                 </div>
             )}
 
@@ -113,9 +118,14 @@ export default function BrandHeader({
                     <a
                         href="/dashboard"
                         onClick={(e) => {
-                            e.preventDefault();
-                            if (onGoHome) onGoHome();
-                            else if (handleSetTab) handleSetTab('overview');
+                            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                            if (onGoHome) {
+                                e.preventDefault();
+                                onGoHome();
+                            } else if (handleSetTab) {
+                                e.preventDefault();
+                                handleSetTab('overview');
+                            }
                         }}
                         className="flex items-center group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl cursor-pointer min-w-0 transition-opacity hover:opacity-90 active:scale-[0.99]"
                         title="Go to Home"

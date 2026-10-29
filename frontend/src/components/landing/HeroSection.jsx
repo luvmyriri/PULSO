@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
-import { SquarePen, Search, ArrowRight, Smartphone, QrCode } from 'lucide-react';
+import { SquarePen, Search, ArrowRight, Smartphone } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import PwaModal from './PwaModal';
-import { isInstalledApp } from '../../utils/appContext';
 import { API_BASE_URL } from '../../utils/apiBase';
 
 /**
@@ -98,25 +97,7 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
               </button>
             </div>
 
-            {isInstalledApp() && (
-              <nav aria-label="Resident account" className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
-                <Link
-                  to="/login"
-                  className="inline-flex min-h-11 items-center text-sm font-semibold text-[#0f2347] underline underline-offset-4 hover:text-[#ff6b00] dark:text-slate-100 dark:hover:text-[#ff8a3d] focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/register"
-                  className="inline-flex min-h-11 items-center text-sm font-semibold text-[#0f2347] underline underline-offset-4 hover:text-[#ff6b00] dark:text-slate-100 dark:hover:text-[#ff8a3d] focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[#2563eb]"
-                >
-                  Create Account
-                </Link>
-              </nav>
-            )}
-
             {/* Mobile App Installation Card with Scannable QR Code */}
-            {!isInstalledApp() && (
               <div className="mt-4 sm:mt-5 pt-3.5 sm:pt-4 border-t border-slate-200/90 dark:border-slate-800 w-full max-w-[620px]">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 p-3 sm:p-3.5 rounded-2xl bg-slate-50/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-2xs hover:border-orange-300 dark:hover:border-slate-700 transition-colors">
                   
@@ -167,12 +148,10 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
 
                 </div>
               </div>
-            )}
 
           </div>
 
-          {/* Right Column: Prominent Official Caloocan City Engineering Department Seal (Desktop only, hidden on mobile / mobile app) */}
-          {!isInstalledApp() && (
+          {/* Keep the desktop seal visible regardless of installed-app mode. */}
             <div className="hidden lg:flex lg:col-span-5 xl:col-span-6 2xl:col-span-6 flex-col items-center justify-center text-center w-full">
               <div className="flex flex-col items-center justify-center text-center">
 
@@ -192,7 +171,6 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
 
               </div>
             </div>
-          )}
 
         </div>
       </div>

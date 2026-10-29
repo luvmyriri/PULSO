@@ -103,7 +103,13 @@ def has_permission(db: Session, user: Union[models.Official, models.Resident], m
     Fine-grained permission check.
     Example: has_permission(db, user, "records", "view")
     """
-    # System Admin and Managers bypass checks for LGU modules
+    # The fallback Official.capabilities property gives platform admins '*'.
+    # Domain grants come only from the stored role, never that fallback.
+    if module in {'analytics','reports','procurement'}:
+        if not isinstance(user,models.Official): return False
+        ref = user.role_ref
+        grants = (ref.capabilities or {}).get(module,[]) if ref else []
+        return isinstance(grants,list) and (action in grants or '*' in grants)
     if hasattr(user, 'role') and user.role in ["system_admin", "admin", "manager"]:
         return True
         

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { API_BASE_URL } from '../utils/apiBase';
-import { getStoredToken } from '../utils/auth';
+import { getStoredToken, getStoredUser } from '../utils/auth';
 
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -20,6 +20,7 @@ const DRAFT_STORAGE_KEY = 'pulso_report_wizard_draft_v1';
 export default function ReportWizardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Centralized Google Maps API loader state
   const { isLoaded: isMapLoaded } = useGoogleMaps();
@@ -32,12 +33,20 @@ export default function ReportWizardPage() {
   });
 
   // Stepper State (1 - 5)
-  const [currentStep, setCurrentStep] = useState(() => Math.min(5, Math.max(1, Number(restoredDraft?.currentStep) || 1)));
+  const [currentStep, setCurrentStep] = useState(() => location.state?.startAtStepOne ? 1 : Math.min(5, Math.max(1, Number(restoredDraft?.currentStep) || 1)));
   const [maxStepReached, setMaxStepReached] = useState(() => Math.min(5, Math.max(1, Number(restoredDraft?.maxStepReached) || 1)));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [submissionError, setSubmissionError] = useState(null);
   const [isHelpGuideOpen, setIsHelpGuideOpen] = useState(false);
+
+  // Consume explicit guest entry once so reload still resumes the saved step.
+  useEffect(() => {
+    if (!location.state?.startAtStepOne) return;
+    const state = { ...location.state };
+    delete state.startAtStepOne;
+    navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state });
+  }, [location, navigate]);
 
   // Consolidated Form State
   const [formData, setFormData] = useState(() => {
@@ -101,11 +110,11 @@ export default function ReportWizardPage() {
       // A File cannot survive JSON storage. Require reattachment and fresh consent.
       evidence: {
         ...initial.evidence,
-        fileName: saved.evidence?.fileName || (Number(restoredDraft?.currentStep) > 1 ? 'sample_road_pothole.jpg' : ''),
+        fileName: saved.evidence?.fileName || '',
         fileSize: saved.evidence?.fileSize || 0,
         mimeType: saved.evidence?.mimeType || 'image/jpeg',
-        previewUrl: saved.evidence?.previewDataUrl || ((saved.evidence?.fileName || Number(restoredDraft?.currentStep) > 1) ? '/sample-infrastructure-pothole.jpg' : null),
-        previewDataUrl: saved.evidence?.previewDataUrl || ((saved.evidence?.fileName || Number(restoredDraft?.currentStep) > 1) ? '/sample-infrastructure-pothole.jpg' : null),
+        previewUrl: saved.evidence?.previewDataUrl?.startsWith('data:image/') ? saved.evidence.previewDataUrl : null,
+        previewDataUrl: saved.evidence?.previewDataUrl?.startsWith('data:image/') ? saved.evidence.previewDataUrl : null,
         aiCategorySuggestion: saved.evidence?.aiCategorySuggestion || null,
         aiConfidence: saved.evidence?.aiConfidence || null,
       },
@@ -116,7 +125,7 @@ export default function ReportWizardPage() {
   // Rehydrate File object when draft is restored from storage
   useEffect(() => {
     if (formData.evidence.file) return;
-    const sourceUrl = formData.evidence.previewUrl || (currentStep > 1 ? '/sample-infrastructure-pothole.jpg' : null);
+    const sourceUrl = formData.evidence.previewUrl || formData.evidence.previewDataUrl;
     if (!sourceUrl) return;
     let cancelled = false;
     fetch(sourceUrl)
@@ -145,7 +154,7 @@ export default function ReportWizardPage() {
     return () => {
       cancelled = true;
     };
-  }, [currentStep, formData.evidence.file, formData.evidence.previewUrl, formData.evidence.fileName, formData.evidence.mimeType]);
+  }, [currentStep, formData.evidence.file, formData.evidence.previewUrl, formData.evidence.previewDataUrl, formData.evidence.fileName, formData.evidence.mimeType]);
 
   // Auto-Save Draft to LocalStorage (debounced 400ms)
   useEffect(() => {
@@ -199,7 +208,9 @@ export default function ReportWizardPage() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setAnnouncement(`Step ${prev} of 5`);
     } else {
-      navigate('/');
+      const enteredAsGuest = new URLSearchParams(location.search).get('source') === 'guest';
+      const isResident = Boolean(getStoredToken()) && getStoredUser()?.role === 'resident';
+      navigate(enteredAsGuest ? '/login' : isResident ? '/dashboard' : '/resident-home');
     }
   };
 
@@ -222,9 +233,9 @@ export default function ReportWizardPage() {
     let evidenceFile = formData.evidence.file;
     if (!evidenceFile) {
       try {
-        const fallbackUrl = formData.evidence.previewUrl || formData.evidence.previewDataUrl || '/sample-infrastructure-pothole.jpg';
-        const res = await fetch(fallbackUrl);
-        if (res.ok) {
+        const fallbackUrl = formData.evidence.previewUrl || formData.evidence.previewDataUrl;
+        const res = fallbackUrl ? await fetch(fallbackUrl) : null;
+        if (res?.ok) {
           const blob = await res.blob();
           evidenceFile = new File([blob], formData.evidence.fileName || 'evidence.jpg', { type: blob.type || 'image/jpeg' });
         }
@@ -232,7 +243,7 @@ export default function ReportWizardPage() {
         console.warn('Could not rehydrate evidence file:', e);
       }
     }
-    if (!evidenceFile && !formData.evidence.previewUrl) {
+    if (!evidenceFile) {
       setCurrentStep(1);
       setSubmissionError('Please attach or take a photo of the concern before submitting.');
       return;
@@ -350,7 +361,7 @@ export default function ReportWizardPage() {
       <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 w-full flex justify-between items-center">
         {/* Logo on top-left linking to home */}
         <Link
-          to="/"
+          to="/resident-home"
           className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
           title="Caloocan City PULSO Home"
         >
@@ -361,9 +372,10 @@ export default function ReportWizardPage() {
         <div className="flex items-center gap-2 sm:gap-2.5">
           <ThemeToggle />
           <Link
-            to="/"
+            to="/resident-home"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
             title="Return to Home Section"
+            aria-label="Home"
           >
             <Home size={14} className="text-[#ff6b00]" />
             <span className="hidden sm:inline">Home</span>

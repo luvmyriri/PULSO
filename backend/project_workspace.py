@@ -15,14 +15,16 @@ from sqlalchemy.orm import Session
 import models
 import gov_models as gm
 import staff_accounts
+from operational_roles import canonical_role
 from auth import get_current_user
 from database import get_db
 from government_access import jurisdiction_ids, require_scope, require_report_scope, scoped, scoped_reports
 
 router = APIRouter(prefix='/api/gov/project-workspace',tags=['Project coordination'])
-MANAGERS={'city_engineer','asst_city_engineer','division_chief','project_engineer','dispatcher','manager','admin_officer','admin_clerk','system_admin'}
+MANAGERS={'city_engineer','asst_city_engineer','division_chief','project_engineer','dispatcher','manager','admin_officer'}
 INSPECTORS={'city_engineer','asst_city_engineer','division_chief','building_inspector','electrical_inspector','mechanical_inspector','manager'}
 OWNERS={'city_engineer','asst_city_engineer','division_chief','project_engineer','design_engineer','engineer_ii','manager'}
+VIEWERS={'admin_clerk','system_admin','admin','records_officer','cad_operator','estimator'}
 CLOSED={'completed','cancelled','closed_completion_certified','resolved'}
 NEXT={'intake':'assessment','assessment':'planning','planning':'ready_for_work','ready_for_work':'in_progress','in_progress':'awaiting_verification'}
 STATES=set(NEXT)|{'awaiting_verification','completed','cancelled'}
@@ -37,11 +39,12 @@ def allowed(user,action='view'):
     if 'projects' in caps:
         grants=caps['projects']
         return isinstance(grants,list) and (action in grants or '*' in grants)
-    if action=='view': return user.role in MANAGERS|INSPECTORS|OWNERS|{'records_officer','cad_operator','estimator'}
-    if action=='manage': return user.role in MANAGERS
-    if action in {'evidence_view','evidence_upload'}: return user.role in MANAGERS|INSPECTORS|OWNERS|{'records_officer','cad_operator','estimator'}
-    if action=='inspect': return user.role in INSPECTORS
-    if action=='record_certificate': return user.role in {'city_engineer','asst_city_engineer','records_officer','manager'}
+    role=canonical_role(user.role)
+    if action=='view': return role in MANAGERS|INSPECTORS|OWNERS|VIEWERS
+    if action=='manage': return role in MANAGERS
+    if action in {'evidence_view','evidence_upload'}: return role in MANAGERS|INSPECTORS|OWNERS|{'records_officer','cad_operator','estimator'}
+    if action=='inspect': return role in INSPECTORS
+    if action=='record_certificate': return role in {'city_engineer','asst_city_engineer','records_officer','manager'}
     return False
 
 
@@ -175,7 +178,7 @@ def event(db,user,project,action,reason,details=None,related_report_id=None):
 
 def eligible_owner(db,user,project,owner_id):
     person=db.get(models.Official,owner_id)
-    if not person or not person.is_active or person.is_suspended or person.role not in OWNERS:
+    if not person or not person.is_active or person.is_suspended or canonical_role(person.role) not in OWNERS:
         raise HTTPException(422,'Choose an active engineering owner.')
     ids=jurisdiction_ids(person)
     if ids and project.district_id not in ids: raise HTTPException(422,'The engineering owner does not cover this district.')

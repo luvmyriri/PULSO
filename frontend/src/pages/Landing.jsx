@@ -42,7 +42,7 @@ function SectionSkeleton({ height = 'h-72', title = 'Loading...' }) {
  *     public landing so guests can report, track, sign in, or register.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export default function Landing() {
+export default function Landing({ directLanding = false }) {
   const inApp = isInstalledApp();
   const tutorialCompleted = isTutorialCompleted();
   const isAuthenticated = Boolean(getAuthToken());
@@ -50,7 +50,7 @@ export default function Landing() {
   // Cold start splash state
   const [splashFinished, setSplashFinished] = useState(() => {
     if (typeof window === 'undefined') return true;
-    if (!inApp) return true;
+    if (!inApp || directLanding) return true;
     return Boolean(sessionStorage.getItem('pulso_session_started'));
   });
 
@@ -72,7 +72,7 @@ export default function Landing() {
 
 
   // 1. Installed Mobile App Context:
-  if (inApp) {
+  if (inApp && !directLanding) {
     // Show splash screen on cold start
     if (!splashFinished) {
       return (

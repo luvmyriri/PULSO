@@ -227,9 +227,10 @@ export default function CivicNavbar({ onOpenTrackModal, onOpenPwaModal, mode, ac
           
           {/* Brand Logo & Municipal Identity: City Engineering Department Logo + Stacked LGU Hierarchy */}
           <a
-            href="/"
+            href="/resident-home"
             onClick={(e) => {
-              if (typeof window !== 'undefined' && window.location.pathname === '/') {
+              if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              if (typeof window !== 'undefined' && ['/', '/resident-home'].includes(window.location.pathname)) {
                 e.preventDefault();
                 setActiveSection('home');
                 if (onSelectTab) onSelectTab('home');

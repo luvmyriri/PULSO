@@ -82,7 +82,7 @@ export default function MobileAppTutorial({
 
   const [currentStep, setCurrentStep] = useState(stepOverride || 1);
   const totalSteps = 5;
-  const homeRoute = getAuthToken() ? '/dashboard' : '/';
+  const homeRoute = getAuthToken() ? '/dashboard' : '/resident-home';
   const reportRoute = getAuthToken() ? '/dashboard?openReport=true' : '/report';
 
   const containerRef = useRef(null);

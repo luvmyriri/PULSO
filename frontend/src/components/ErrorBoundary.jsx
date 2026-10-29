@@ -38,7 +38,7 @@ class ErrorBoundary extends React.Component {
                                 Restart Session
                             </button>
                             <button
-                                onClick={() => { window.location.href = '/'; }}
+                                onClick={() => { window.location.href = '/resident-home'; }}
                                 className="w-full py-3 bg-slate-700/60 hover:bg-slate-700 rounded-2xl font-bold text-xs uppercase tracking-widest text-slate-300 transition-all cursor-pointer"
                             >
                                 Return to Home

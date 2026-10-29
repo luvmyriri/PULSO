@@ -2003,7 +2003,7 @@ export default function Register() {
                 {/* Main Header Row */}
                 <div className="w-full flex justify-between items-center gap-2">
                     <Link
-                        to="/"
+                        to="/resident-home"
                         className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer shrink-0"
                         title="Caloocan City PULSO Home"
                         aria-label="Caloocan City PULSO Home"
@@ -2051,7 +2051,7 @@ export default function Register() {
                     <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                         <ThemeToggle />
                         <Link
-                            to="/"
+                            to="/resident-home"
                             className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
                             title="Return to Home Section"
                             aria-label="Return to Home Section"

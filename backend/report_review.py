@@ -8,11 +8,17 @@ from sqlalchemy import text, func, or_
 import models
 import gov_models as gm
 from government_access import jurisdiction_ids, require_report_scope
+from operational_roles import canonical_role
 
 INTAKE = {'pending','received','unverified','unvalidated','under_review','validated','needs_information'}
 CLOSED = {'resolved','completed','rejected','cancelled','duplicate','spam'}
 REVIEWERS = {'dispatcher','project_engineer'}
-COORDINATORS = {'dispatcher','manager','city_engineer','asst_city_engineer','division_chief','system_admin','admin'}
+CLERK_ROLES = {'admin_clerk'}
+ENGINEER_ROLES = {'city_engineer','asst_city_engineer'}
+COORDINATORS = {'dispatcher','manager','city_engineer','asst_city_engineer','division_chief'}
+ASSIGNERS = COORDINATORS | {'admin_officer'}
+REJECTERS = {'dispatcher','manager'}
+APPROVERS = {'dispatcher','manager','city_engineer','asst_city_engineer'}
 GRADES = {'P0':'Monitoring','P1':'Preventive work','P2':'Standard repair','P3':'High priority','P4':'Severe hazard','P5':'Immediate response'}
 PRIORITY_POLICY = 'p0-p5-ascending-v2'
 POLICY = 'report-review-pilot-v1'
@@ -22,10 +28,23 @@ _routing_cursor = 0
 def permitted(user, action):
     if not isinstance(user, models.Official) or not user.is_active or user.is_suspended: return False
     caps = user.role_ref.capabilities or {} if user.role_ref else {}
+    role = canonical_role(user.role)
+    # Intake ownership is narrower than an engineering decision. A clerk may
+    # prepare and transfer a report, but cannot grade or publish its verification.
+    if role in CLERK_ROLES:
+        if action not in {'intake','peer_transfer'}: return False
+        if 'report_review' in caps:
+            grant = caps['report_review']
+            return isinstance(grant,list) and (action in grant or '*' in grant)
+        return True
     if 'report_review' in caps:
         grant = caps['report_review']
         return isinstance(grant,list) and (action in grant or '*' in grant)
-    return user.role in (COORDINATORS if action == 'assign' else REVIEWERS | COORDINATORS)
+    if action == 'assign': return role in ASSIGNERS
+    if action == 'reject': return role in REJECTERS
+    if action == 'approve': return role in APPROVERS
+    if action == 'verify': return role in ENGINEER_ROLES
+    return action == 'review' and role in REVIEWERS | COORDINATORS
 
 
 def routing_area(db, report, persist=False):
@@ -46,7 +65,7 @@ def routing_area(db, report, persist=False):
     return area
 
 
-def eligible(db, report):
+def eligible(db, report, manual=False):
     from gov_router import GOV_ROLES
     area = routing_area(db,report)
     if not area or not area.district_id: return []
@@ -55,7 +74,13 @@ def eligible(db, report):
     for user in users:
         # Leaders/admins coordinate by default; they are not an automatic employee pool.
         caps = user.role_ref.capabilities or {} if user.role_ref else {}
-        if user.role not in GOV_ROLES or not permitted(user,'review') or (user.role not in REVIEWERS and 'report_review' not in caps): continue
+        role = canonical_role(user.role)
+        if user.role not in GOV_ROLES: continue
+        if manual:
+            if role in CLERK_ROLES:
+                if not permitted(user,'intake'): continue
+            elif not permitted(user,'review'): continue
+        elif not permitted(user,'review') or (role not in REVIEWERS and 'report_review' not in caps): continue
         try:
             ids = jurisdiction_ids(user)
         except HTTPException:
@@ -68,17 +93,18 @@ def _history(db, report, kind, detail, actor=None):
     db.add(gm.AuditLog(trigger_type=kind,report_id=report.id,actor_id=actor.id if actor else None,actor_role=actor.role if actor else 'system',action=f'{kind.replace("_"," ")}: {report.ticket_id}',details=json.dumps(detail)))
 
 
-def assign(db, report, person, reason, actor=None, automatic=False):
+def assign(db, report, person, reason, actor=None, automatic=False, mode=None):
     previous = report.review_assigned_to_id
     report.review_assigned_to_id = person.id
     report.review_assigned_at = datetime.now(timezone.utc)
-    report.review_assignment_mode = 'automatic' if automatic else 'manual'
+    report.review_assignment_mode = mode or ('automatic' if automatic else 'manual')
     report.review_routing_reason = reason
     db.flush()
     previous_owner = db.get(models.Official,previous) if previous else None
-    _history(db,report,'report_assignment',dict(policy=POLICY,previous_owner_id=previous,previous_owner_name=previous_owner.full_name if previous_owner else None,owner_id=person.id,owner_name=person.full_name,reason=reason,automatic=automatic),actor)
+    _history(db,report,'report_assignment',dict(policy=POLICY,previous_owner_id=previous,previous_owner_name=previous_owner.full_name if previous_owner else None,owner_id=person.id,owner_name=person.full_name,reason=reason,automatic=automatic,mode=report.review_assignment_mode),actor)
     if previous != person.id:
-        db.add(models.Notification(official_id=person.id,title='Report assigned for review',message=f'{report.ticket_id}: review the concern, confirm its priority and record the next step.',target_url=f'/gov/reports?reportId={report.id}'))
+        next_step = 'complete intake and submit to engineering' if person.role in CLERK_ROLES else 'assess the evidence and verify public details' if person.role in ENGINEER_ROLES else 'assign an eligible intake reviewer' if permitted(person,'assign') and not permitted(person,'review') else 'review the concern and route it for engineering verification'
+        db.add(models.Notification(official_id=person.id,title='Report assigned for review',message=f'{report.ticket_id}: {next_step}.',target_url=f'/gov/my-work?selected=report:{report.id}'))
 
 
 def auto_route(db, report):
@@ -137,7 +163,7 @@ def projection(db, report):
 def require_decision(db,user,report,action):
     require_report_scope(db,user,report)
     if not permitted(user,action): raise HTTPException(403,'Your account cannot make this report-review decision.')
-    if action == 'review' and not permitted(user,'assign') and report.review_assigned_to_id != user.id:
+    if action in {'review','verify','intake','peer_transfer'} and not permitted(user,'assign') and report.review_assigned_to_id != user.id:
         raise HTTPException(403,'This report is assigned to another reviewer. A coordinator can reassign it.')
 
 
@@ -151,8 +177,11 @@ def history(db,report):
             facts = {}
         if not isinstance(facts,dict): facts = {}
         actor = db.get(models.Official,event.actor_id) if event.actor_id else None
-        label = 'Routing location matched to the area catalog' if facts.get('location_resolution') else f'Priority set to {facts["grade"]}' if facts.get('grade') else f'Review assigned to {facts["owner_name"]}' if facts.get('owner_name') else 'Review needs routing'
+        label = f'Routing barangay confirmed: {facts["barangay_name"]}' if facts.get('location_confirmation') else 'Routing location matched to the area catalog' if facts.get('location_resolution') else f'Priority set to {facts["grade"]}' if facts.get('grade') else f'Review assigned to {facts["owner_name"]}' if facts.get('owner_name') else 'Review needs routing'
         if event.trigger_type == 'report_priority_scale_change': label = f'Scale updated: {facts.get("previous_grade")} to {facts.get("grade")}'
+        elif facts.get('mode') == 'self_take': label = f'Review taken by {facts.get("owner_name")}'
+        elif facts.get('mode') == 'engineering_handoff': label = f'Intake submitted to {facts.get("owner_name")}'
+        elif facts.get('mode') == 'peer_transfer': label = f'Intake transferred to {facts.get("owner_name")}'
         elif event.trigger_type == 'report_priority' and facts.get('policy') != PRIORITY_POLICY: label += ' (previous scale)'
         result.append(dict(id=event.id,label=label,reason=facts.get('reason'),previous_owner=facts.get('previous_owner_name'),actor=actor.full_name if actor else 'System migration' if event.trigger_type == 'report_priority_scale_change' else 'Automatic routing',created_at=event.created_at))
     return result

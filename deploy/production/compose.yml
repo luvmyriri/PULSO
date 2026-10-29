@@ -24,6 +24,8 @@ services:
       dockerfile: deploy/production/backend.Dockerfile
     restart: unless-stopped
     env_file: /opt/pulso/shared/backend.env
+    environment:
+      PULSO_PREDICTIVE_ARTIFACT: /app/backend/predictive_artifact/current
     depends_on:
       db: {condition: service_healthy}
     volumes:
@@ -31,8 +33,25 @@ services:
       - /opt/pulso/shared/private_publications:/app/backend/private_publications
       - /opt/pulso/shared/secrets:/run/secrets:ro
       - /opt/pulso/shared/ai_usage.json:/app/backend/.ai_usage.json
+      - /opt/pulso/shared/predictive:/app/backend/predictive_artifact:ro
     networks: [data, egress]
     security_opt: [no-new-privileges:true]
+    logging: *logs
+  predictive-worker:
+    image: pulso-api:${PULSO_RELEASE:?Select the release image}
+    restart: unless-stopped
+    command: [python, -u, scripts/score_production_predictive.py, --loop, --interval-minutes, "360"]
+    env_file: /opt/pulso/shared/backend.env
+    environment:
+      PULSO_PREDICTIVE_ARTIFACT: /app/backend/predictive_artifact/current
+    depends_on:
+      db: {condition: service_healthy}
+    volumes:
+      - /opt/pulso/shared/predictive:/app/backend/predictive_artifact:ro
+      - /opt/pulso/shared/private_publications:/app/backend/private_publications
+    networks: [data, egress]
+    security_opt: [no-new-privileges:true]
+    healthcheck: {disable: true}
     logging: *logs
   web:
     image: pulso-web:${PULSO_RELEASE:?Select the release image}

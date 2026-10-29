@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pulso-pwa-v19';
+const CACHE_NAME = 'pulso-pwa-v20';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

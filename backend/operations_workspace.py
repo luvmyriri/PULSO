@@ -112,21 +112,15 @@ def my_work(db, user):
     if can(user, 'verification'):
         for wo in wos.filter(gm.WorkOrder.status.in_(['completed_pending_review', 'awaiting_verification']), or_(gm.WorkOrder.assigned_to_id != user.id, gm.WorkOrder.assigned_to_id.is_(None))).all():
             append_wo(wo, 'needs_my_review', 'Independent completion review is available within your operational scope.', 'Review completion evidence')
-    review_reports = scoped_reports(db.query(models.Report),user).filter(models.Report.review_assigned_to_id == user.id,models.Report.status.in_(['pending','received','unverified','unvalidated','under_review','validated','needs_information','pending_approval','approved_internal'])).all()
+    review_reports = scoped_reports(db.query(models.Report),user).filter(models.Report.review_assigned_to_id == user.id,models.Report.status.in_(['pending','received','unverified','unvalidated','under_review','validated','needs_information','pending_approval','approved_internal',*report_review.CLOSED])).all()
     for report in review_reports:
+        closed = report.status in report_review.CLOSED
+        if closed and (not utc(report.updated_at or report.created_at) or utc(report.updated_at or report.created_at) < now - timedelta(days=7)):
+            continue
         waiting = report.status in {'needs_information','pending_approval'}
         owner = db.get(models.Official,report.review_assigned_to_id)
-        items.append(dict(id=report.id,entity_type='report',ticket_id=report.ticket_id,title=(report.description or 'Citizen report')[:160],category=report.category or 'Unclassified',priority=report.priority_grade or 'Unreviewed',status=report.status,barangay=report.location_barangay,time_in_state=f'Updated {age(report.updated_at or report.created_at,now)}d ago',action_url=f'/gov/reports?reportId={report.id}',recommended_action='Review report',task_bucket='waiting_on_others' if waiting else 'assigned_to_me',assigned_to_id=user.id,assigned_to_name=owner.full_name,why_in_inbox='You are the recorded report review owner.',work_bundle='intake_review',updated_at=report.updated_at or report.created_at))
-    if can(user, 'coordination') or report_review.permitted(user,'assign'):
-        active_report_ids = db.query(gm.WorkOrder.report_id).filter(gm.WorkOrder.status.notin_(list(CLOSED)), gm.WorkOrder.report_id.isnot(None))
-        for report in scoped_reports(db.query(models.Report), user).filter(models.Report.status.in_(['received', 'pending', 'unverified', 'unvalidated', 'under_review', 'validated']), or_(models.Report.review_assigned_to_id.is_(None),models.Report.review_assigned_to_id.notin_(db.query(models.Official.id).filter(models.Official.is_active.is_(True),models.Official.is_suspended.is_not(True)))), models.Report.id.notin_(active_report_ids)).all():
-            days = age(report.updated_at or report.created_at, now)
-            items.append(dict(id=report.id, entity_type='report', ticket_id=report.ticket_id or f'Report {report.id}',
-                title=(report.description or 'Citizen report')[:160], category=report.category or 'Unclassified',
-                priority=report.priority_grade or 'Unreviewed', status=report.status, barangay=report.location_barangay,
-                time_in_state=f'Updated {days}d ago' if days is not None else 'Update date not recorded',
-                action_url=f'/gov/reports?reportId={report.id}', recommended_action='Review and route report', task_bucket='needs_my_review',
-                why_in_inbox='Review owner unavailable; reassignment needed.' if report.review_assigned_to_id else report.review_routing_reason or 'Needs a review owner; a coordinator can route this report.', work_bundle='intake_routing', updated_at=report.updated_at or report.created_at))
+        next_action = 'Open report history' if closed else 'Complete intake and submit to engineering' if user.role == 'admin_clerk' and not waiting else 'Assess and verify report' if user.role in report_review.ENGINEER_ROLES and not waiting else 'Assign an intake reviewer' if report_review.permitted(user,'assign') and not report_review.permitted(user,'review') and not waiting else 'Review and route to engineering' if user.role in report_review.REVIEWERS and not waiting else 'Review report'
+        items.append(dict(id=report.id,entity_type='report',ticket_id=report.ticket_id,title=(report.description or 'Citizen report')[:160],category=report.category or 'Unclassified',priority=report.priority_grade or 'Unreviewed',status=report.status,barangay=report.location_barangay,time_in_state=f'Updated {age(report.updated_at or report.created_at,now)}d ago',action_url=f'/gov/reports?reportId={report.id}',recommended_action=next_action,task_bucket='recently_completed' if closed else 'waiting_on_others' if waiting else 'assigned_to_me',assigned_to_id=user.id,assigned_to_name=owner.full_name,why_in_inbox='You were the recorded review owner when this report closed.' if closed else 'You are the recorded report review owner.',work_bundle='intake_review',updated_at=report.updated_at or report.created_at))
     if can(user, 'announcements', 'approve'):
         for item in scoped(db.query(gm.Announcement), gm.Announcement.district_id, user).filter(gm.Announcement.status.in_(['in_review', 'approved'])).all():
             items.append(dict(id=item.id, entity_type='announcement', ticket_id=item.announcement_id,

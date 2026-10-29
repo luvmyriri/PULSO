@@ -1,16 +1,42 @@
 {
-  "name": "PULSO - Caloocan City Citizen Portal",
+  "name": "PULSO - Caloocan City Citizen & Field Portal",
   "short_name": "PULSO",
-  "description": "Report utility hazards and road damage directly to Caloocan City Engineering.",
+  "description": "Report utility hazards and road damage directly to Caloocan City Engineering, and manage field crew dispatch operations.",
   "start_url": "/?mode=standalone",
   "scope": "/",
   "id": "/?mode=standalone",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#F7F9FC",
-  "theme_color": "#F7F9FC",
+  "theme_color": "#081120",
   "orientation": "portrait-primary",
   "categories": ["government", "utilities", "productivity"],
+  "shortcuts": [
+    {
+      "name": "PULSO Field Operations",
+      "short_name": "Field PWA",
+      "description": "City Engineering field crew dispatch, work orders, and mobile intake",
+      "url": "/field",
+      "icons": [
+        {
+          "src": "/pulso-app-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Report an Issue",
+      "short_name": "Report",
+      "description": "Submit a road hazard or infrastructure report",
+      "url": "/report",
+      "icons": [
+        {
+          "src": "/pulso-app-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "/pulso-app-icon-192.png",

@@ -121,7 +121,7 @@ export default function GovLanding() {
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
                 {/* Branding: Official City Engineering Department Lockup + Gov Portal Tag */}
                 <Link
-                    to="/"
+                    to="/resident-home"
                     className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
                     title="Caloocan City PULSO Home"
                 >
@@ -464,7 +464,7 @@ export default function GovLanding() {
                             Terms of Service
                         </button>
                         <span>•</span>
-                        <Link to="/" className="hover:text-[#ff6b00] transition-colors cursor-pointer">
+                        <Link to="/resident-home" className="hover:text-[#ff6b00] transition-colors cursor-pointer">
                             Portal Home
                         </Link>
                     </div>

@@ -867,7 +867,7 @@ export default function Login() {
             <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
                 {/* Logo on top-left linking to home */}
                 <Link
-                    to="/"
+                    to="/resident-home"
                     className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
                     title="Caloocan City PULSO Home"
                 >
@@ -878,7 +878,7 @@ export default function Login() {
                 <div className="flex items-center gap-2 sm:gap-3">
                     <ThemeToggle />
                     <Link
-                        to="/"
+                        to="/resident-home"
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/85 dark:bg-slate-800/85 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
                         title="Return to Home Section"
                     >
@@ -1084,6 +1084,7 @@ export default function Login() {
                                                 <div className="mt-2.5">
                                                     <Link
                                                         to="/report?source=guest"
+                                                        state={{ startAtStepOne: true }}
                                                         className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-750 hover:border-slate-300 dark:hover:border-slate-650 bg-slate-50/70 hover:bg-slate-100/80 dark:bg-slate-800/60 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold transition-all shadow-2xs hover:shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                                                         title="File a report immediately without creating an account"
                                                     >

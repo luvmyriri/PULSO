@@ -54,9 +54,9 @@ SENIOR_ROLES = (
 
 ANALYTICS_VIEW_ROLES = set(GOV_ROLES) - {"field_worker"}
 ANALYTICS_REVIEW_ROLES = set(SENIOR_ROLES) | {"project_engineer", "design_engineer"}
-ANALYTICS_EXPORT_ROLES = set(SENIOR_ROLES) | {"records_officer"}
-PROCUREMENT_DRAFT_ROLES = {"city_engineer", "manager", "system_admin", "admin_officer", "estimator", "project_engineer"}
-REPORT_DETAIL_ROLES = {"city_engineer", "asst_city_engineer", "manager", "system_admin", "dispatcher", "project_engineer"}
+ANALYTICS_EXPORT_ROLES = (set(SENIOR_ROLES) - {"system_admin"}) | {"records_officer"}
+PROCUREMENT_DRAFT_ROLES = {"city_engineer", "manager", "admin_officer", "estimator", "project_engineer"}
+REPORT_DETAIL_ROLES = {"city_engineer", "asst_city_engineer", "manager", "dispatcher", "project_engineer"}
 
 
 def _assert_permission(user, db, module, action):

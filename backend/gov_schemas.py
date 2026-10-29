@@ -711,6 +711,10 @@ class AssetMaintenanceLogResponse(BaseModel):
 
 class AssetResponse(AssetBase):
     asset_id: str
+    registry_status: str = "candidate"
+    maintenance_authority: Optional[str] = None
+    source_reference: Optional[str] = None
+    verified_at: Optional[datetime] = None
     barangay_name: Optional[str] = None
     district_code: Optional[str] = None
     condition_tier: str  # "good", "fair", "poor", "critical"

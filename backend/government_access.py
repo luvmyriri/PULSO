@@ -7,6 +7,7 @@ not a claim about the City's actual signing authority.
 from fastapi import HTTPException
 from sqlalchemy import select
 import models
+from operational_roles import canonical_role
 
 LEADERS = {'city_engineer', 'asst_city_engineer', 'manager', 'division_chief'}
 COORDINATORS = LEADERS | {'dispatcher', 'admin_officer'}
@@ -17,7 +18,7 @@ VERIFIERS = LEADERS | {'building_inspector', 'electrical_inspector', 'mechanical
 def can(user, module, action='view'):
     if not isinstance(user, models.Official):
         return False
-    role = str(user.role or '')
+    role = canonical_role(str(user.role or ''))
     ref = getattr(user, 'role_ref', None)
     caps = (ref.capabilities or {}) if ref else {}
     if module in caps:

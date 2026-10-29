@@ -737,10 +737,8 @@ const ResidentHomeView = ({
     setActiveModal,
     setSelectedPost,
     setReportCategory,
-    showToast,
     t
 }) => {
-    const isLocalhost = isLocalDevHost();
     const barangayName = user?.barangay || 'Barangay 171';
     const userReportCount = userReports ? userReports.length : 0;
 
@@ -887,24 +885,6 @@ const ResidentHomeView = ({
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3 shrink-0">
-                            {isLocalhost && userReportCount > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={async () => {
-                                        const residentName = user?.first_name || user?.name || 'Citizen';
-                                        const ok = await exportReportsToXLSX(userReports, residentName);
-                                        if (ok && showToast) {
-                                            showToast(`Exported ${userReports.length} report(s) to Excel.`);
-                                        }
-                                    }}
-                                    className="px-2.5 py-1.5 rounded-xl border border-slate-200/90 dark:border-slate-700/80 bg-slate-100/80 dark:bg-slate-800/60 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-[#2563EB]"
-                                    title="Export your reports to Excel (.xlsx)"
-                                    aria-label="Export your reports to Excel"
-                                >
-                                    <Download size={13} className="text-slate-500 dark:text-slate-400" />
-                                    <span>Export</span>
-                                </button>
-                            )}
                             <button
                                 type="button"
                                 onClick={() => setActiveModal('file-report')}
@@ -2959,6 +2939,7 @@ const SAMPLE_REPORTS_LIST = [
 ];
 
 const MyReports = ({
+    user,
     userReports = [],
     loadingReports,
     handleSetModal,
@@ -12279,6 +12260,7 @@ export default function ResidentDashboard() {
                                     />
                                 ) : (
                                     <MyReports
+                                        user={user}
                                         userReports={userReports}
                                         loadingReports={loadingReports}
                                         handleSetModal={handleSetModal}

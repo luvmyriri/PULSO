@@ -134,11 +134,12 @@ def test_verification_command_integrity(client, test_context):
 
     url = f"/api/reports/{report_id}/status"
     headers = {
-        "Authorization": f"Bearer {test_context['dispatcher']}",
+        "Authorization": f"Bearer {test_context['engineer']}",
         "If-Match": str(version),
         "Idempotency-Key": "verify-key-001",
     }
     body = {"status": "pending_approval", "public_content_reviewed": True}
+    assert client.patch(url, json=body, headers={**headers,"Authorization":f"Bearer {test_context['dispatcher']}"}).status_code == 403
     assert client.patch(url, json={"status": "pending_approval"}, headers=headers).status_code == 422
 
     # 1. Stale version returns 409

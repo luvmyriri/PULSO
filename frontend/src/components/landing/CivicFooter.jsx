@@ -28,7 +28,13 @@ export default function CivicFooter({ onOpenLegalModal, onOpenPwaModal }) {
           
           {/* Col 1: Branding & Municipal Trust Anchor (5 cols) */}
           <div className="lg:col-span-5 space-y-3">
-            <div className="flex items-center gap-3">
+            <Link to="/resident-home" aria-label="PULSO home, Caloocan City Engineering Department" onClick={(event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              if (['/', '/resident-home'].includes(window.location.pathname)) {
+                event.preventDefault();
+                window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+              }
+            }} className="flex items-center gap-3 rounded-sm focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-[#2563eb]">
               <Branding size="h-8 w-8" className="shrink-0" showText={false} />
               <div className="flex flex-col">
                 <span className="font-heading font-black text-lg sm:text-xl text-white tracking-tight leading-tight">
@@ -44,7 +50,7 @@ export default function CivicFooter({ onOpenLegalModal, onOpenPwaModal }) {
                   </span>
                 </div>
               </div>
-            </div>
+            </Link>
 
             <p className="text-xs text-slate-400 leading-normal max-w-sm font-normal">
               Official Public Utility &amp; Infrastructure Locator System operated by the City Engineering Department. Empowering citizens with direct reporting, rapid work order dispatch, and 24/7 public safety tracking across all 188 barangays.

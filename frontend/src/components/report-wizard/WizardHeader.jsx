@@ -18,7 +18,7 @@ export default function WizardHeader({ currentStep, totalSteps = 6 }) {
         {/* Left: Exit Link & Branding */}
         <div className="flex items-center gap-3 sm:gap-4">
           <Link
-            to="/"
+            to="/resident-home"
             className="p-2 -ml-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500"
             title={t('landing.nav.home', 'Home')}
             aria-label={t('landing.nav.home', 'Home')}
@@ -26,7 +26,7 @@ export default function WizardHeader({ currentStep, totalSteps = 6 }) {
             <ArrowLeft size={20} />
           </Link>
           <Link
-            to="/"
+            to="/resident-home"
             className="flex items-center gap-2.5 sm:gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-xl group p-0.5"
             aria-label="Caloocan City - City Engineering Department - Powered by PULSO Home"
           >

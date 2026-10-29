@@ -21,4 +21,5 @@ scipy
 numpy
 haversine
 shapely>=2.0.0
+pyshp==2.3.1
 lightgbm>=4.5.0

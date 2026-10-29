@@ -28,15 +28,15 @@ import { getAuthToken, getAuthUser, clearAuthSession } from '../utils/authSessio
 export const GOV_ROLES = [
     'city_engineer', 'asst_city_engineer', 'admin_officer', 'admin_clerk',
     'records_officer', 'division_chief', 'design_engineer', 'estimator',
-    'cad_operator', 'project_engineer', 'construction_foreman', 'field_worker',
+    'cad_operator', 'project_engineer', 'foreman', 'construction_foreman', 'field_worker',
     'building_inspector', 'electrical_inspector', 'mechanical_inspector',
-    'dispatcher', 'manager', 'system_admin',
+    'dispatcher', 'manager', 'system_admin', 'admin',
 ];
 
-export const EXECUTIVE_ROLES = ['city_engineer', 'asst_city_engineer', 'manager', 'system_admin'];
-export const SENIOR_ROLES    = ['city_engineer', 'asst_city_engineer', 'admin_officer', 'division_chief', 'manager', 'system_admin'];
+export const EXECUTIVE_ROLES = ['city_engineer', 'asst_city_engineer', 'manager', 'system_admin', 'admin'];
+export const SENIOR_ROLES    = ['city_engineer', 'asst_city_engineer', 'admin_officer', 'division_chief', 'manager', 'system_admin', 'admin'];
 export const INSPECTOR_ROLES = ['building_inspector', 'electrical_inspector', 'mechanical_inspector', ...EXECUTIVE_ROLES];
-export const FIELD_ROLES     = ['project_engineer', 'construction_foreman', 'field_worker', 'dispatcher', ...SENIOR_ROLES];
+export const FIELD_ROLES     = ['project_engineer', 'foreman', 'construction_foreman', 'field_worker', 'dispatcher', ...SENIOR_ROLES];
 export const PROCUREMENT_ROLES = ['project_engineer', 'admin_officer', 'estimator', ...EXECUTIVE_ROLES];
 export const ADMIN_ONLY      = ['system_admin', 'manager'];
 

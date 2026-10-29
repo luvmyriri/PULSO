@@ -27,6 +27,7 @@ import './gov-reports-header.css';
 import { getAuthToken, getAuthUser } from '../utils/authSession';
 import { getCaloocanDistrict } from '../data/caloocanBoundaries';
 import { API_BASE_URL } from '../utils/apiBase';
+import { fetchReportPages } from '../utils/reportPages';
 import { 
     getStatusDescriptor, 
     getReportPlainTitle, 
@@ -216,12 +217,8 @@ export default function GovReportsDashboard() {
             if (overviewSelection !== null) scope.set('overview', overviewSelection);
             if (overviewArea !== null) scope.set('area', overviewArea);
             if (overviewPriority !== null) scope.set('priority', overviewPriority);
-            const res = await fetch(`${API_BASE_URL}/api/reports?${scope}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!res.ok) throw new Error(`Reports could not be loaded (HTTP ${res.status}). Retry to check the current queue.`);
+            const data = await fetchReportPages({ baseUrl: API_BASE_URL, token, scope });
             {
-                const data = await res.json();
                 if (!Array.isArray(data)) throw new Error('Report response was invalid. Retry to check the current queue.');
                 {
                     const mapped = data.filter(r => Number.isInteger(r.id)).map((r) => {
@@ -720,6 +717,10 @@ export default function GovReportsDashboard() {
                         <div role="status" className="w-full rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Loading reports…</div>
                     )}
                 </div>
+                <div className="px-3 sm:px-4 lg:px-6 py-2 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300">
+                    <strong>Assign a report:</strong> Select a row and confirm its routing barangay if missing. In <strong>Review owner</strong>, choose <strong>Assign intake owner</strong> or <strong>Take it</strong>.
+                    <details className="mt-1"><summary className="cursor-pointer underline underline-offset-2">Assignment steps and permissions</summary><ol className="list-decimal pl-5 py-2 space-y-1"><li>An authorized coordinator reviews the report’s address, map pin and evidence. A missing routing barangay must be confirmed with a reason.</li><li>The coordinator selects an active employee eligible for that district and records why they are assigning or reassigning the report, or uses Take it to become the review owner. Taking a report from a colleague requires a reason.</li><li>The report appears in the new owner’s My Work. A clerk completes intake; preliminary reviewers hand off to an engineer; an authorized engineer verifies the report before field work is approved.</li><li>Assignment changes retain the previous owner, new owner, actor, time and reason. Field work receives its own work-order assignment after approval.</li></ol></details>
+                </div>
                 <ReportSelectionActions key={selectedInView.map(report=>`${report.id}:${report.updated_at}:${report.raw_status}`).join('|')} reports={filteredReports} selectedIds={selectedRowIds} activeId={selectedReportId} onReview={reviewSelected} onClear={()=>setSelectedRowIds([])}/>
                 <div className={`gov-reports-queue-layout flex-1 min-h-0 flex flex-col xl:flex-row overflow-y-auto xl:overflow-hidden p-3 sm:p-4 lg:p-6 gap-0 ${selectedReport ? 'has-selection' : ''}`}>
 
@@ -755,8 +756,9 @@ export default function GovReportsDashboard() {
                     <div className="gov-surface gov-reports-table-surface hidden lg:flex flex-1 flex-col bg-white dark:bg-[#090e1a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden min-w-0">
 
                         {/* Table Header & Rows Container */}
-                        <div className="flex-1 overflow-auto custom-scrollbar" role="region" aria-label="Reports table" tabIndex={0}>
-                            <table className={`reports-review-table w-full text-left border-collapse ${selectedReport?'has-detail':''}`}>
+                        {selectedReport && <p className="reports-table-scroll-hint">Scroll horizontally if needed to view all report columns.</p>}
+                        <div className="reports-table-scroll flex-1 custom-scrollbar" role="region" aria-label="Reports table; scroll horizontally to view all columns" tabIndex={0}>
+                            <table className="reports-review-table w-full text-left border-collapse">
                                 <caption className="sr-only">Reported concerns in the current scope and filters</caption>
                                 <thead>
                                     <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 text-[11px] font-heading font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 sticky top-0 z-10 backdrop-blur-xs">

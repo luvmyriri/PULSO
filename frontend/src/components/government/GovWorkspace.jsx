@@ -86,7 +86,7 @@ export function GovDetail({ title, onClose, children, actions }) {
     </section>;
 }
 
-export function GovTable({ columns, rows, rowKey, selected, onSelect, label, emptyMessage = 'No matching records', pageSize = 15, pagination }) {
+export function GovTable({ columns, rows, rowKey, selected, onSelect, label, emptyMessage = 'No matching records', emptyDescription = 'Change the filters or search to see other records.', pageSize = 15, pagination }) {
     const [page, setPage] = useState(1);
     const total = pagination?.total ?? rows.length;
     const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -96,7 +96,7 @@ export function GovTable({ columns, rows, rowKey, selected, onSelect, label, emp
     return <div className="gov-record-table">
         <div className="gov-table-scroll" role="region" aria-label={label} tabIndex={0}>
             <table><caption className="sr-only">{label}</caption><thead><tr>{columns.map(c => <th key={c.key} scope="col">{c.label}</th>)}</tr></thead>
-                <tbody>{visible.map(row => <GovRecordRow key={rowKey(row)} row={row} columns={columns} selected={selected===rowKey(row)} onSelect={onSelect}/>)}{!rows.length && <tr><td colSpan={columns.length}><GovState empty title={emptyMessage}>Change the filters or search to see other records.</GovState></td></tr>}</tbody>
+                <tbody>{visible.map(row => <GovRecordRow key={rowKey(row)} row={row} columns={columns} selected={selected===rowKey(row)} onSelect={onSelect}/>)}{!rows.length && <tr><td colSpan={columns.length}><GovState empty title={emptyMessage}>{emptyDescription}</GovState></td></tr>}</tbody>
             </table>
         </div>
         <div className="gov-table-footer"><span>{total ? `${(current - 1) * pageSize + 1}–${Math.min(current * pageSize, total)} of ${total}` : '0 records'}</span><div><GovButton aria-label="Previous page" disabled={current === 1} onClick={() => setCurrent(current - 1)}><ChevronLeft size={16} /></GovButton><span>Page {current} of {pages}</span><GovButton aria-label="Next page" disabled={current >= pages} onClick={() => setCurrent(current + 1)}><ChevronRight size={16} /></GovButton></div></div>

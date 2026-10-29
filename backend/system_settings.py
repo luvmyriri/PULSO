@@ -49,7 +49,7 @@ def read_config(db,key):
     try: return SCHEMAS[key].model_validate({name:raw[name] for name in fields if name in raw}).model_dump()
     except ValidationError:
         if key=='ai_report_category_suggestion':
-            return {'enabled':True,'suggest_urgency':True}
+            return {'enabled':False,'suggest_urgency':False}
         return {'enabled':False} if key=='report_review_routing' else None
 
 

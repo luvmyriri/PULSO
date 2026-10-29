@@ -61,6 +61,8 @@ def government_navigation(db: Session=Depends(get_db), current_user=Depends(get_
     modules = ['my-work']
     if can(current_user, 'overview'): modules.append('overview')
     modules += ['reports', 'work-orders']
+    if current_user.role in FIELD_ROLES or current_user.role in {'system_admin', 'admin'}:
+        modules.append('field')
     import project_workspace
     if project_workspace.allowed(current_user): modules.append('projects')
     if can(current_user, 'maintenance'): modules += ['assets', 'analytics', 'predictive']
@@ -72,9 +74,9 @@ def government_navigation(db: Session=Depends(get_db), current_user=Depends(get_
 
 
 @router.get('/report-map')
-def government_report_map(ids: Optional[str] = None, asset_id: Optional[str] = None, context_asset_id: Optional[str] = None, overview: Optional[str] = None, area: Optional[str] = None, priority: Optional[str] = None, radius_m: int = Query(500, ge=50, le=2000), db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    _assert_role(current_user, *GOV_ROLES)
-    from government_access import scoped_reports
+def government_report_map(ids: Optional[str] = None, asset_id: Optional[str] = None, context_asset_id: Optional[str] = None, overview: Optional[str] = None, area: Optional[str] = None, priority: Optional[str] = None, radius_m: int = Query(500, ge=50, le=2000), skip: int = Query(0, ge=0), limit: int = Query(1000, ge=1, le=1000), as_of: Optional[datetime] = None, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    from government_access import require, scoped_reports
+    require(current_user, 'reports')
     from math import isfinite
     if overview is not None:
         from operations_workspace import overview_report_query
@@ -94,13 +96,16 @@ def government_report_map(ids: Optional[str] = None, asset_id: Optional[str] = N
         from asset_map_context import asset_report_context
         context = asset_report_context(db, current_user, context_asset_id, radius_m)
         query = query.filter(models.Report.id.in_([r.id for r in context['reports']]))
+    snapshot = as_of or datetime.now().astimezone()
+    if snapshot.tzinfo is None: raise HTTPException(422, 'Report snapshot time must include a timezone.')
+    query = query.filter(models.Report.created_at <= snapshot)
     total = query.count()
-    rows = query.order_by(models.Report.created_at.desc()).limit(1000).all()
+    rows = query.order_by(models.Report.created_at.desc(), models.Report.id.desc()).offset(skip).limit(limit).all()
     def point(report):
         lat, lng = report.location_lat, report.location_lng
         if lat is None or lng is None or not isfinite(lat) or not isfinite(lng) or not (-90 <= lat <= 90 and -180 <= lng <= 180) or (lat == 0 and lng == 0): return None
         return dict(lat=lat, lng=lng)
-    return dict(as_of=datetime.now().astimezone(), total=total, truncated=total > len(rows),
+    return dict(as_of=snapshot, total=total, truncated=total > len(rows), next_skip=skip + len(rows) if skip + len(rows) < total else None,
         asset=context['asset'] if context else None, radius_m=radius_m if context else None,
         items=[dict(id=r.id, ticket_id=r.ticket_id, title=(r.description or 'Resident report')[:180], category=r.category or r.ai_category or 'Unclassified', status=r.status, barangay=r.location_barangay, address=r.location_string, position=point(r), image_url=r.image_url, created_at=r.created_at, updated_at=r.updated_at, review_operations=report_review.projection(db,r),
             relationship='linked' if context and r.id in context['linked_ids'] else 'nearby' if context else None,
@@ -124,15 +129,16 @@ GOV_ROLES = [
     "project_engineer", "dispatcher", "estimator", "architect",
     "division_chief", "building_inspector", "finance_officer", "admin_officer",
     "records_officer", "design_engineer", "cad_operator", "foreman",
-    "field_worker", "construction_foreman", "electrical_inspector", "mechanical_inspector", "system_admin"
+    "field_worker", "construction_foreman", "electrical_inspector", "mechanical_inspector", "system_admin", "admin",
+    "division_chief_arch", "division_chief_structural", "division_chief_electrical"
 ]
 
 FIELD_ROLES = [
     "project_engineer", "dispatcher", "building_inspector", 
-    "asst_city_engineer", "city_engineer", "manager", "system_admin", "foreman", "construction_foreman", "field_worker"
+    "asst_city_engineer", "city_engineer", "manager", "foreman", "construction_foreman", "field_worker"
 ]
 
-DISPATCH_ROLES = ["dispatcher", "project_engineer", "asst_city_engineer", "city_engineer", "manager", "system_admin"]
+DISPATCH_ROLES = ["dispatcher", "project_engineer", "asst_city_engineer", "city_engineer", "manager"]
 FIELD_SELF_ROLES = {"field_worker", "foreman", "construction_foreman"}
 
 
@@ -154,17 +160,17 @@ def _require_assigned_or_dispatcher(db: Session, wo_id: int, user):
 
 PROCUREMENT_ROLES = [
     "admin_officer", "manager", "admin_clerk", "finance_officer", "bac_secretariat",
-    "city_engineer", "system_admin", "estimator"
+    "city_engineer", "estimator"
 ]
 
 SENIOR_ROLES = [
-    "city_engineer", "asst_city_engineer", "manager", "division_chief", "system_admin",
+    "city_engineer", "asst_city_engineer", "manager", "division_chief",
     "admin_officer", "dispatcher", "records_officer", "project_engineer", "design_engineer",
     "building_inspector", "finance_officer"
 ]
 
 EXECUTIVE_ROLES = [
-    "city_engineer", "asst_city_engineer", "manager", "system_admin"
+    "city_engineer", "asst_city_engineer", "manager"
 ]
 
 ADMIN_ONLY = ["system_admin"]
@@ -173,16 +179,15 @@ ADMIN_ONLY = ["system_admin"]
 
 INSPECTOR_ROLES = [
     "building_inspector", "architect", "project_engineer", 
-    "asst_city_engineer", "city_engineer", "manager", "system_admin",
+    "asst_city_engineer", "city_engineer", "manager",
     "electrical_inspector", "mechanical_inspector"
 ]
 
 
 def _assert_role(user, *allowed_roles):
     """Reject non-officials and officials outside the explicitly allowed roles."""
-    if not isinstance(user, models.Official) or (
-        user.role not in allowed_roles and user.role not in ("system_admin", "admin")
-    ):
+    from operational_roles import canonical_role
+    if not isinstance(user, models.Official) or canonical_role(user.role) not in allowed_roles:
         raise HTTPException(
             status_code=403,
             detail="Government capability required for this action."
@@ -757,7 +762,7 @@ def get_system_documents(
     current_user=Depends(get_current_user),
 ):
     """Centralized Electronic Records registry (RA 9470)."""
-    _assert_role(current_user, *SENIOR_ROLES)
+    _assert_role(current_user, *SENIOR_ROLES, 'system_admin')
     from records_workspace import documents_query,document_projection
     return [document_projection(doc) for doc in documents_query(db,current_user).order_by(gov_models.SystemDocument.uploaded_at.desc()).offset(skip).limit(limit).all()]
 
@@ -923,13 +928,10 @@ def create_project(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """
-    Create a new LGU-initiated infrastructure project (Phase 1 — Request).
-    Raised by: City Engineer, Admin Clerk, or Manager.
-    """
-    _assert_role(current_user, "city_engineer", "admin_clerk", "manager", "system_admin")
+    """Create an LGU-initiated project through an authorized coordinator."""
     import project_workspace
     project_workspace.require(current_user,'manage')
+    _assert_role(current_user, *project_workspace.MANAGERS)
     from government_access import resolve_record_area
     resolve_record_area(db,current_user,data)
     if {'estimated_cost','procurement_modality','is_emergency'} & data.model_fields_set:
@@ -2009,28 +2011,37 @@ def get_agents_with_work_orders(
 
 @router.get("/agents/my-work-orders")
 def get_my_work_orders(
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     """
     Get the current logged-in agent's own assigned work orders.
-    Available to any authenticated user (agents will only see their own).
+    Available to any authenticated field official (agents only see their own assignments).
+    Supports optional status filtering ('all', 'assigned', 'in_progress', 'blocked', 'completed_pending_review').
     """
     _assert_role(current_user, *FIELD_ROLES)
     from sqlalchemy.orm import joinedload as jl
-    work_orders = legacy_operations.work_query(db, current_user).options(
+    query = legacy_operations.work_query(db, current_user).options(
         jl(gov_models.WorkOrder.assigned_by)
     ).filter(
         gov_models.WorkOrder.assigned_to_id == current_user.id,
-        gov_models.WorkOrder.status.in_(["assigned", "in_progress", "blocked", "rework_required"])
-    ).order_by(gov_models.WorkOrder.created_at.desc()).all()
+    )
+    if status == "all":
+        pass
+    elif status:
+        query = query.filter(gov_models.WorkOrder.status == status)
+    else:
+        query = query.filter(gov_models.WorkOrder.status.in_(["assigned", "in_progress", "blocked", "rework_required"]))
+
+    work_orders = query.order_by(gov_models.WorkOrder.created_at.desc()).all()
 
     result = []
     for wo in work_orders:
-        # Try to get location from the linked report
         loc_string = None
         loc_lat = None
         loc_lng = None
+        report_image = None
         if wo.report_id:
             from government_access import can, scoped_reports
             report = scoped_reports(db.query(models.Report), current_user).filter(models.Report.id == wo.report_id).first() if can(current_user, 'reports') else None
@@ -2038,21 +2049,66 @@ def get_my_work_orders(
                 loc_string = report.location_string
                 loc_lat = report.location_lat
                 loc_lng = report.location_lng
+                report_image = report.image_url
+
+        latest_update = db.query(gov_models.WorkOrderUpdate).filter(
+            gov_models.WorkOrderUpdate.work_order_id == wo.id
+        ).order_by(gov_models.WorkOrderUpdate.created_at.desc()).first()
 
         result.append({
             "wo_id": wo.id,
+            "id": wo.id,
             "wo_number": wo.wo_number,
             "title": wo.title,
             "status": wo.status,
             "priority": wo.priority,
             "wo_type": wo.wo_type,
             "description": wo.description,
-            "location_string": loc_string,
-            "location_lat": loc_lat,
-            "location_lng": loc_lng,
+            "location_string": loc_string or wo.location_string,
+            "location_lat": loc_lat if loc_lat is not None else wo.location_lat,
+            "location_lng": loc_lng if loc_lng is not None else wo.location_lng,
+            "report_id": wo.report_id,
+            "report_image": report_image,
+            "proof_image": latest_update.image_url if latest_update and latest_update.image_url else None,
+            "notes": wo.notes,
+            "assigned_by_name": wo.assigned_by.full_name if wo.assigned_by else None,
             "created_at": str(wo.created_at) if wo.created_at else None,
+            "updated_at": str(wo.updated_at) if wo.updated_at else None,
         })
     return result
+
+
+@router.post("/agents/work-orders/{wo_id}/acknowledge")
+def acknowledge_work_order(
+    wo_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Field employee acknowledges receiving an assigned work order.
+    Creates an immutable acknowledgement event on the timeline.
+    """
+    _assert_role(current_user, *FIELD_ROLES)
+    wo = db.query(gov_models.WorkOrder).filter(
+        gov_models.WorkOrder.id == wo_id,
+        gov_models.WorkOrder.assigned_to_id == current_user.id,
+    ).first()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found or not assigned to you")
+    gov_crud._append_timeline(
+        db, status="acknowledged", previous_status=wo.status,
+        actor_id=current_user.id, actor_role=current_user.role,
+        note=f"Assignment acknowledged by {current_user.full_name}",
+        work_order_id=wo_id,
+    )
+    gov_crud._append_audit(
+        db, trigger_type="acknowledgement",
+        action=f"Work order {wo.wo_number} acknowledged by official #{current_user.id}",
+        actor_id=current_user.id, actor_role=current_user.role,
+        work_order_id=wo_id,
+    )
+    db.commit()
+    return {"success": True, "message": "Assignment acknowledged"}
 
 
 class AgentFieldReport(BaseModel):
@@ -2196,7 +2252,9 @@ def approve_report_for_work(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    _assert_role(current_user, "dispatcher", "asst_city_engineer", "city_engineer", "manager", "system_admin")
+    import report_review
+    if not report_review.permitted(current_user,'approve'):
+        raise HTTPException(403,'Your account cannot approve a report for field work.')
     reason = payload.reason.strip()
     if len(reason) < 10:
         raise HTTPException(status_code=422, detail="A decision reason of at least 10 characters is required")
@@ -2472,11 +2530,16 @@ def get_asset_detail(
 @router.get('/asset-permissions')
 def asset_workspace_permissions(db: Session=Depends(get_db),current_user=Depends(get_current_user)):
     _assert_role(current_user, *GOV_ROLES)
-    from government_access import can, jurisdiction_ids
+    from government_access import LEADERS, can, jurisdiction_ids
+    from operational_roles import canonical_role
     ids=jurisdiction_ids(current_user)
     areas=db.query(models.Barangay)
     if ids: areas=areas.filter(models.Barangay.district_id.in_(ids))
-    return dict(register=current_user.role in SENIOR_ROLES, assess=current_user.role in INSPECTOR_ROLES,plan=can(current_user,'maintenance'),barangays=[dict(id=area.id,name=area.name) for area in areas.order_by(models.Barangay.name).all()])
+    return dict(register=current_user.role in SENIOR_ROLES, verify_registry=canonical_role(current_user.role) in LEADERS,
+                assess=current_user.role in INSPECTOR_ROLES,
+                review_outcome=can(current_user,'maintenance','create_work_order') and can(current_user,'verification','view'),
+                current_user_id=current_user.id, plan=can(current_user,'maintenance'),
+                barangays=[dict(id=area.id,name=area.name) for area in areas.order_by(models.Barangay.name).all()])
 
 
 @router.post('/assets/{asset_id}/inspections', response_model=gov_schemas.AssetResponse)
@@ -2647,7 +2710,7 @@ def request_citizen_info(
     if not report: raise HTTPException(404, 'Report not found')
     require_report_scope(db, current_user, report)
     import report_review
-    report_review.require_decision(db,current_user,report,'review')
+    report_review.require_decision(db,current_user,report,'intake' if current_user.role == 'admin_clerk' else 'review')
     return gov_crud.request_citizen_information(
         db, report_id, payload,
         actor_id=current_user.id,
@@ -2678,7 +2741,7 @@ def publish_verified_report_details(
         raise HTTPException(404, "Citizen report not found")
     from report_review_router import require_report_access
     require_report_access(db, current_user, report)
-    report_review.require_decision(db, current_user, report, 'review')
+    report_review.require_decision(db, current_user, report, 'verify')
     if report.version != decision.expected_version:
         raise HTTPException(409, "Report changed. Reload it before publishing.")
     if report.status not in {'pending_approval', 'validated', 'approved_internal', 'dispatched', 'in_progress', 'resolved'}:
@@ -2734,14 +2797,20 @@ def get_report_docket(
     require_report_access(db, current_user, report)
     actions = []
     can_review = report_review.permitted(current_user,'review') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id)
-    if can_review and report.status in intake: actions.append('verify')
+    can_clerk_intake = current_user.role == 'admin_clerk' and report_review.permitted(current_user,'intake') and report.review_assigned_to_id == current_user.id and report.status in report_review.INTAKE
+    can_handoff = report.review_assigned_to_id == current_user.id and report.status in report_review.INTAKE and not report_review.permitted(current_user,'verify') and report_review.permitted(current_user,'intake' if current_user.role in report_review.CLERK_ROLES else 'review')
+    can_verify = report_review.permitted(current_user,'verify') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id)
+    if can_verify and report.status in intake: actions.append('verify')
     public_details_approved = report.status in {'pending_approval', 'validated', 'approved_internal', 'dispatched', 'in_progress', 'resolved'}
-    if current_user.role in {'dispatcher', 'manager', 'system_admin', 'admin'}:
+    if report_review.permitted(current_user,'reject'):
         if report.status in intake | {'pending_approval'}: actions.append('reject')
-    if can_review and report.status in (intake - {'needs_information'}) | {'validated', 'pending_approval'}: actions.append('request_info')
+    if (can_review or can_clerk_intake) and report.status in (intake - {'needs_information'}) | {'validated', 'pending_approval'}: actions.append('request_info')
+    if can_clerk_intake:
+        actions.append('peer_transfer')
+    if can_handoff and report.status != 'needs_information': actions.append('submit_engineering')
     if current_user.role in DISPATCH_ROLES:
         if report.status == 'approved_internal': actions.append('assign')
-    if current_user.role in {'dispatcher', 'asst_city_engineer', 'city_engineer', 'manager', 'system_admin'} and report.status == 'pending_approval': actions.append('approve')
+    if report_review.permitted(current_user,'approve') and report.status == 'pending_approval': actions.append('approve')
 
     timeline = db.query(gov_models.ProcessTimeline).filter(
         gov_models.ProcessTimeline.report_id == report_id
@@ -2750,6 +2819,11 @@ def get_report_docket(
     work_orders = db.query(gov_models.WorkOrder).filter(
         gov_models.WorkOrder.report_id == report_id
     ).order_by(gov_models.WorkOrder.created_at.desc()).all()
+    routing_area = report_review.routing_area(db, report)
+    if report_review.permitted(current_user,'assign') and report.status in report_review.INTAKE and not report.review_assigned_to_id and not work_orders and not routing_area:
+        actions.append('routing_area')
+    if report_review.permitted(current_user,'assign') and report.status in report_review.INTAKE | {'pending_approval','approved_internal'} and report.review_assigned_to_id != current_user.id and routing_area:
+        actions.append('take')
 
     audit_logs = db.query(gov_models.AuditLog).filter(
         gov_models.AuditLog.report_id == report_id
@@ -2770,7 +2844,7 @@ def get_report_docket(
         "can_create_project": project_workspace.allowed(current_user,'manage') and bool(report.barangay_id) and report.status not in {'resolved','completed','rejected','cancelled','spam','duplicate'} and not any(project['open'] for project in projects),
         "allowed_actions": actions,
         "public_details_approved": public_details_approved,
-        "review_operations": report_review.projection(db, report),
+        "review_operations": dict(report_review.projection(db, report),routing_area_id=routing_area.id if routing_area else None,routing_area_name=routing_area.name if routing_area else None),
         "review_history": report_review.history(db, report),
         "referral_permissions": external_referrals.permissions(current_user, report),
         "can_assign_review": report_review.permitted(current_user,'assign'),
@@ -2785,6 +2859,8 @@ def get_report_docket(
             "status": report.status,
             "priority": getattr(report, "priority", getattr(report, "ai_urgency", "medium")),
             "ai_urgency": report.ai_urgency,
+            "submitted_urgency": report.submitted_urgency,
+            "reporter_name": report.reporter_name,
             "location_barangay": report.location_barangay,
             "location_string": report.location_string,
             "location_lat": report.location_lat,

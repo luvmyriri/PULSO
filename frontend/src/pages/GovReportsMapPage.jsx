@@ -49,11 +49,16 @@ export default function GovReportsMapPage() {
     const listParams = new URLSearchParams(params);
     listParams.delete('layer');
     listParams.delete('asset'); listParams.delete('radius');
+    listParams.delete('from');
     if(params.has('asset')){listParams.set('ids',rows.map(r=>r.id).join(','));listParams.set('source','Asset investigation');}
     if (status !== 'all' || category !== 'all' || area !== 'all' || search) {
         listParams.set('ids', rows.map(r => r.id).join(','));
         listParams.set('source', 'Reports map selection');
     }
+    const requestedFrom = params.get('from') || '';
+    const safeFrom = /^\/gov\/(?:reports(?:\/\d+)?|my-work|my-dashboard|dashboard|today)(?:\?|$)/.test(requestedFrom) && !requestedFrom.includes('\\') && !requestedFrom.includes('//');
+    const backTo = safeFrom ? requestedFrom : `/gov/reports?${listParams}`;
+    const backLabel = safeFrom && /^\/gov\/(?:my-work|my-dashboard|dashboard|today)(?:\?|$)/.test(requestedFrom) ? 'My work' : 'Reports';
     const change = useCallback((name, value) => { setParams(p => { const n = new URLSearchParams(p); value && value !== 'all' ? n.set(name, value) : n.delete(name); return n; }, { replace: name === 'search' }); },[setParams]);
     const selectArea=useCallback(value=>change('barangay',value),[change]);
     const fit = useCallback(() => {
@@ -79,7 +84,7 @@ export default function GovReportsMapPage() {
         window.gm_authFailure = () => { setMapAuthError(true); previous?.(); };
         return () => { window.gm_authFailure = previous; };
     }, []);
-    return <GovWorkspace title="Reports map" parent={{ label: 'Reports', to: `/gov/reports?${listParams}` }} actions={<>
+    return <GovWorkspace title="Reports map" parent={{ label: backLabel, to: backTo }} actions={<>
         <GovSearch value={search} onChange={v => change('search', v)} placeholder="Search report, issue or address" />
         <div className="gov-page-actions__group"><ReportViewToggle mode="map" tableTo={`/gov/reports?${listParams}`} mapTo={`/gov/map?${params}`} /><GovButton disabled={records.loading} onClick={records.reload}><RefreshCw size={15} /> Refresh reports</GovButton></div>
     </>}>

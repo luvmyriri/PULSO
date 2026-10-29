@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, Query, Request, Header
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, Query, Request, Header, Response, BackgroundTasks
 from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,6 +53,8 @@ import command_integrity
 import analytics_router                 # AI Analytics & Intelligence Engine
 import philsys_router                   # PhilSys Check Authentication (PSA)
 import predictive_router                # Predictive Maintenance Engine
+import asset_inspection_router           # Reviewed asset observations
+import georisk_router                    # Public planning hazard map layers
 import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
 import report_review_router
@@ -361,9 +363,8 @@ get_current_user = auth.get_current_user
 def require_role(*roles):
     """Dependency factory for explicitly listed active government roles."""
     def _check(current_user: Union[models.Official, models.Resident] = Depends(get_current_user)):
-        if not isinstance(current_user, models.Official) or (
-            current_user.role not in roles and current_user.role not in ("system_admin", "admin")
-        ):
+        from operational_roles import canonical_role
+        if not isinstance(current_user, models.Official) or canonical_role(current_user.role) not in roles:
             raise HTTPException(status_code=403, detail="Government role required for this action.")
         return current_user
     return _check
@@ -396,6 +397,8 @@ app.include_router(analytics_router.router)
 app.include_router(philsys_router.router)
 # Predictive Maintenance Engine
 app.include_router(predictive_router.router)
+app.include_router(asset_inspection_router.router)
+app.include_router(georisk_router.router)
 # System Document tracking & validation (FQA)
 app.include_router(document_router.router, prefix="/api/gov/documents", tags=["System Documents"])
 # Governed Announcements & Notices Module (R6)
@@ -1893,7 +1896,8 @@ def get_report_stats(
 
 @app.get("/api/reports", response_model=List[schemas.ReportResponse])
 def read_reports(
-    skip: int = 0,
+    response: Response,
+    skip: int = Query(0, ge=0),
     limit: int = Query(200, ge=1, le=1000),
     status: Optional[str] = None,
     ids: Optional[str] = None,
@@ -1901,6 +1905,7 @@ def read_reports(
     overview: Optional[str] = None,
     area: Optional[str] = None,
     priority: Optional[str] = None,
+    as_of: Optional[datetime] = None,
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(require_role(*gov_router.GOV_ROLES))
 ):
@@ -1909,6 +1914,9 @@ def read_reports(
     Restricted to city officials for operational dispatching.
     """
     from government_access import scoped_reports
+    snapshot = as_of or datetime.now(timezone.utc)
+    if snapshot.tzinfo is None:
+        raise HTTPException(422, 'Report snapshot time must include a timezone.')
     if overview is not None:
         from operations_workspace import overview_report_query
         query = overview_report_query(db, current_user, overview, area, priority)
@@ -1936,7 +1944,10 @@ def read_reports(
             else:
                 query = query.filter(func.lower(models.Report.status) == st)
     
-    reports = query.order_by(models.Report.created_at.desc()).offset(skip).limit(limit).all()
+    query = query.filter(models.Report.created_at <= snapshot)
+    response.headers['X-Reports-As-Of'] = snapshot.isoformat()
+    response.headers['X-Total-Count'] = str(query.count())
+    reports = query.order_by(models.Report.created_at.desc(), models.Report.id.desc()).offset(skip).limit(limit).all()
     return reports
 
 @app.get("/api/me/reports", response_model=schemas.UserReportsResponse)
@@ -2263,6 +2274,7 @@ async def analyze_report_only(
 @app.post("/api/reports", response_model=schemas.ReportResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_report(
     request: Request,
+    background_tasks: BackgroundTasks,
     category: str = Form(...),
     description: str = Form(...),
     lat: Optional[float] = Form(None),
@@ -2270,7 +2282,8 @@ async def create_new_report(
     location_string: Optional[str] = Form(None),
     location_barangay: Optional[str] = Form(None),
     contact_email: Optional[str] = Form(None),
-    reporter_name: Optional[str] = Form(None),
+    reporter_name: Optional[str] = Form(None, max_length=160),
+    urgency: Optional[str] = Form(None, pattern='^(low|medium|high|critical|normal|moderate)$'),
     contact_phone: Optional[str] = Form(None),
     submission_source: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
@@ -2289,7 +2302,7 @@ async def create_new_report(
     # 1. Payload validation
     text_fields = (
         category, description, location_string, location_barangay,
-        contact_email, contact_phone, submission_source,
+        contact_email, contact_phone, submission_source, reporter_name,
     )
     if any("\x00" in value for value in text_fields if value is not None):
         raise HTTPException(
@@ -2318,8 +2331,7 @@ async def create_new_report(
 
     # 3. Duplicate Detection within 15 meters
     if lat is not None and lng is not None:
-        is_test_env = bool(os.getenv("PYTEST_CURRENT_TEST") or os.getenv("PULSO_ENV", "").lower() == "test" or (getattr(getattr(db, "bind", None), "dialect", None) and db.bind.dialect.name == "sqlite"))
-        existing = nearby_active_report(db, category, lat, lng) if is_test_env else None
+        existing = nearby_active_report(db, category, lat, lng)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -2406,7 +2418,9 @@ async def create_new_report(
         contact_phone=contact_phone,
         submission_source=submission_src,
         image_url=image_url,
-        reporter_type=reporter_type
+        reporter_type=reporter_type,
+        guest_reporter_name=reporter_name.strip() if reporter_name and not is_registered_resident else None,
+        submitted_urgency=urgency,
     )
 
     db_report = crud.create_report(
@@ -2445,12 +2459,13 @@ async def create_new_report(
 
     # 10. Attach Ephemeral Plaintext Credentials to Response
     db_report.tracking_token = plaintext_token
-    db_report.tracking_url = f"https://pulso.caloocan.gov.ph/track?id={db_report.ticket_id}&code={plaintext_token}"
+    public_origin = os.getenv('PULSO_PUBLIC_BASE_URL', 'https://srv1857115.hstgr.cloud').rstrip('/')
+    db_report.tracking_url = f"{public_origin}/track?id={db_report.ticket_id}&code={plaintext_token}"
     recipient_email = (contact_email or (current_user.email if is_registered_resident else None) or "").strip().lower()
     if recipient_email:
         from report_receipts import send_report_gmail_notification
         recipient_display_name = (reporter_name or (current_user.full_name if is_registered_resident else None) or "Resident").strip()
-        await asyncio.to_thread(send_report_gmail_notification, recipient_email, db_report.ticket_id, category, plaintext_token, final_location_string or location_barangay or "Caloocan City", recipient_display_name, db_report.tracking_url)
+        background_tasks.add_task(send_report_gmail_notification, recipient_email, db_report.ticket_id, category, plaintext_token, final_location_string or location_barangay or "Caloocan City", recipient_display_name, db_report.tracking_url)
     
     return db_report
 
@@ -3011,7 +3026,7 @@ def update_report_status(
     from government_access import require_report_scope
     require_report_scope(db, current_user, report)
     import report_review
-    report_review.require_decision(db,current_user,report,'review')
+    report_review.require_decision(db,current_user,report,'verify')
     if hasattr(current_user, "id") and getattr(current_user, "role", None) != "resident":
         receipt = command_integrity.find_receipt(
             db, actor_id=current_user.id, operation="report_verify",
@@ -3053,9 +3068,12 @@ def reject_report(
     if_match: Optional[str] = Header(None, alias="If-Match"),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role("dispatcher", "manager", "system_admin", "admin"))
+    current_user: Union[models.Official, models.Resident] = Depends(get_current_user)
 ):
     """Record a reasoned intake rejection before a report enters field work."""
+    import report_review
+    if not report_review.permitted(current_user,'reject'):
+        raise HTTPException(403,'Your account cannot reject a report.')
     reason = decision.reason.strip()
     if len(reason) < 10:
         raise HTTPException(status_code=422, detail="A rejection reason of at least 10 characters is required")

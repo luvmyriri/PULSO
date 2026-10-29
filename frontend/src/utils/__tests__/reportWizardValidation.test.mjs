@@ -139,13 +139,13 @@ const rejectedPhoto = { file: { name: 'selfie.jpg' }, isInappropriate: true, rej
 assert.strictEqual(validateEvidence({ photos: [rejectedPhoto] }).valid, false);
 assert.strictEqual(validateEvidence({ photos: [rejectedPhoto] }).errors[0].code, 'PHOTOS_REJECTED');
 
-// 9. Contact Step 5 (AMENDMENT: mobile OR email required)
+// 9. Updated resident contact contract: email is required; phone is optional.
 console.log('9. Testing Contact Step 5...');
 // Neither phone nor email
 assert.strictEqual(validateContact({ name: 'Juan Cruz', phone: '', email: '' }, true).valid, false);
 
-// Only valid phone
-assert.strictEqual(validateContact({ name: 'Juan Cruz', phone: '09171234567', email: '' }, true).valid, true);
+// A phone alone does not provide the required receipt email.
+assert.strictEqual(validateContact({ name: 'Juan Cruz', phone: '09171234567', email: '' }, true).valid, false);
 
 // Only valid email
 assert.strictEqual(validateContact({ name: 'Juan Cruz', phone: '', email: 'juan@example.com' }, true).valid, true);

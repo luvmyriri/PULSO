@@ -147,7 +147,7 @@ def test_legacy_work_order_and_dispatch_paths_cannot_skip_governed_assignment():
 
 
 def test_rejection_requires_reason_and_eligible_intake_state(monkeypatch):
-    actor = models.Official(id=7, role="dispatcher")
+    actor = models.Official(id=7, role="dispatcher", is_active=True, is_suspended=False)
     monkeypatch.setattr(main.crud, "get_report", lambda *_args, **_kwargs: SimpleNamespace(status="approved_internal"))
     with pytest.raises(HTTPException) as approved_error:
         main.reject_report(
@@ -241,7 +241,7 @@ def test_generic_work_order_patch_cannot_reassign_active_work():
             db, 12, gov_schemas.WorkOrderUpdate(assigned_to_id=9),
             actor_id=7, actor_role="dispatcher",
         )
-    assert error.value.status_code == 409
+    assert error.value.status_code == 422
     assert wo.assigned_to_id == 8
     assert db.commits == 0
 
