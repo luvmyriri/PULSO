@@ -436,7 +436,7 @@
     border-bottom: 1px solid var(--field-border);
     padding-bottom: 0.5rem;
   }
-  
+
   .field-tab-button {
     display: flex;
     align-items: center;
@@ -450,7 +450,7 @@
     border: 1px solid transparent;
     cursor: pointer;
   }
-  
+
   .field-tab-button.is-active {
     color: var(--field-primary);
     background: rgba(234, 88, 12, 0.08);
