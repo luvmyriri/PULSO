@@ -1,13 +1,13 @@
 # Resident deployment branch integration — 29 October 2026
 
-Status: observed local implementation and verification. This is not a VPS release or a production-readiness certification.
+Status: observed local implementation and verification. Subsequent production deployment is recorded in [the production release record](./production-release-2026-10-29.md); this integration audit does not certify trained-model readiness.
 
 ## Source and preservation
 
 - Integrated `origin/FinalIntegratedMarcPulso-deployment` at `ca3a25e5` into local `FinalIntegratedPulso` with merge commit `b63fbee2`.
 - Restored the existing government operations and predictive maintenance changes after the merge. Retained the resident dashboard's working XLSX exports while resolving its two conflicts.
 - Recovery stash `b29aac5421c3bbc92530dc9bb45fe9eece85c3fd` is retained. It has already been reapplied; do not apply it again automatically.
-- Integration fixes and previously existing government work remain in the working tree. Nothing was pushed or deployed in this operation.
+- Follow-up: the integrated work was committed and pushed in `77618c57`, followed by cleanup commit `21479fa97d4c`, and deployed in the release linked above. The runtime AI usage counter remains local and was excluded from the commits.
 
 ## Integration changes
 
