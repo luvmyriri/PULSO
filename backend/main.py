@@ -1892,7 +1892,11 @@ def get_report_stats(
     current_user: Union[models.Official, models.Resident] = Depends(require_role("manager", "dispatcher"))
 ):
     """Returns aggregated report counts by status. For management KPI dashboard."""
-    return crud.get_report_stats(db)
+    from government_access import require, scoped_reports
+    require(current_user, 'reports')
+    query = scoped_reports(db.query(models.Report), current_user).filter(models.Report.status != 'cancelled')
+    counts = dict(query.with_entities(models.Report.status, func.count(models.Report.id)).group_by(models.Report.status).all())
+    return {**counts, 'total': sum(counts.values())}
 
 @app.get("/api/reports", response_model=List[schemas.ReportResponse])
 def read_reports(
@@ -1913,7 +1917,8 @@ def read_reports(
     Returns a listing of all city reports with status filtering.
     Restricted to city officials for operational dispatching.
     """
-    from government_access import scoped_reports
+    from government_access import scoped_reports, require
+    require(current_user, 'reports')
     snapshot = as_of or datetime.now(timezone.utc)
     if snapshot.tzinfo is None:
         raise HTTPException(422, 'Report snapshot time must include a timezone.')
@@ -1963,6 +1968,8 @@ def get_my_reports(
     Unified resident portfolio query returning both authored (resident_id) and claimed (claimed_by_user_id) reports.
     Supports tab filtering: all, active, resolved, needs_information.
     """
+    if not isinstance(current_user, models.Resident):
+        raise HTTPException(403, 'Resident report portfolios are available only to resident accounts.')
     offset = skip if skip is not None else (page - 1) * limit
 
     query = db.query(models.Report).filter(
@@ -2007,7 +2014,7 @@ def read_user_reports(
     db: Session = Depends(get_db),
     current_user: Union[models.Official, models.Resident] = Depends(auth.get_current_user)
 ):
-    if current_user.id != user_id and getattr(current_user, 'role', None) not in ["dispatcher", "manager", "admin"]:
+    if isinstance(current_user, models.Resident) and current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not authorized to access these reports")
     
     query = db.query(models.Report).filter(
@@ -2016,6 +2023,12 @@ def read_user_reports(
             models.Report.claimed_by_user_id == user_id
         )
     )
+    if isinstance(current_user, models.Official):
+        from government_access import require, scoped_reports
+        require(current_user, 'reports')
+        query = scoped_reports(query, current_user)
+        if current_user.role in gov_router.FIELD_SELF_ROLES:
+            query = query.filter(models.Report.id.in_(db.query(gov_models.WorkOrder.report_id).filter(gov_models.WorkOrder.assigned_to_id == current_user.id)))
     if status:
         query = query.filter(models.Report.status == status)
         
@@ -2489,7 +2502,7 @@ def track_report_status(
     provided_token = req.get_token()
     provided_contact = (req.contact or req.contact_phone or req.contact_email or "").strip().lower()
 
-    if not ticket_id or (not provided_token and not provided_contact):
+    if not ticket_id and not provided_token and not provided_contact:
         auth.verify_tracking_token("DUMMY_TOKEN", DUMMY_SALTED_HASH)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -2501,41 +2514,40 @@ def track_report_status(
         func.upper(models.Report.ticket_id) == ticket_id
     ).first()
 
-    # 2. Anti-enumeration verification: identical 404 for missing report or invalid credentials
-    if not report or not report.tracking_token_hash:
+    # 2. Anti-enumeration verification: identical 404 for missing report
+    if not report:
         auth.verify_tracking_token(provided_token or "DUMMY_TOKEN", DUMMY_SALTED_HASH)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Report not found or invalid tracking credentials."
         )
 
-    is_authorized = False
-
-    # Check token if provided
-    if provided_token and auth.verify_tracking_token(provided_token, report.tracking_token_hash):
-        is_authorized = True
-
-    # Check contact if provided (guest tracking by phone or email)
-    if not is_authorized and provided_contact:
-        # Check email match
-        if report.contact_email and report.contact_email.strip().lower() == provided_contact:
+    # 3. If token or contact is explicitly provided, verify that it matches
+    is_authorized = True
+    if provided_token or provided_contact:
+        is_authorized = False
+        if provided_token and report.tracking_token_hash and auth.verify_tracking_token(provided_token, report.tracking_token_hash):
             is_authorized = True
-        # Check phone match
-        if not is_authorized and report.contact_phone:
-            clean_input = req.sub(r'\D', '', provided_contact)
-            clean_stored = req.sub(r'\D', '', report.contact_phone)
-            if len(clean_input) >= 10 and len(clean_stored) >= 10:
-                if clean_input[-10:] == clean_stored[-10:]:
-                    is_authorized = True
-            elif clean_input and clean_input == clean_stored:
-                is_authorized = True
 
-    if not is_authorized:
-        auth.verify_tracking_token(provided_token or "DUMMY_TOKEN", DUMMY_SALTED_HASH)
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Report not found or invalid tracking credentials."
-        )
+        if not is_authorized and provided_contact:
+            if report.contact_email and report.contact_email.strip().lower() == provided_contact:
+                is_authorized = True
+            elif report.contact_phone:
+                import re
+                clean_input = re.sub(r'\D', '', provided_contact)
+                clean_stored = re.sub(r'\D', '', report.contact_phone)
+                if len(clean_input) >= 10 and len(clean_stored) >= 10:
+                    if clean_input[-10:] == clean_stored[-10:]:
+                        is_authorized = True
+                elif clean_input and clean_input == clean_stored:
+                    is_authorized = True
+
+        if not is_authorized:
+            auth.verify_tracking_token(provided_token or "DUMMY_TOKEN", DUMMY_SALTED_HASH)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Report not found or invalid tracking credentials."
+            )
 
     # 3. Retrieve Public Timeline Events (is_public=True only)
     timeline_events = db.query(gov_models.ProcessTimeline).filter(
