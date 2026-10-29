@@ -1896,7 +1896,8 @@ def get_report_stats(
     require(current_user, 'reports')
     query = scoped_reports(db.query(models.Report), current_user).filter(models.Report.status != 'cancelled')
     counts = dict(query.with_entities(models.Report.status, func.count(models.Report.id)).group_by(models.Report.status).all())
-    return {**counts, 'total': sum(counts.values())}
+    defaults = dict.fromkeys(('pending','pending_approval','approved_internal','dispatched','resolved','rejected'), 0)
+    return {**defaults, **counts, 'total': sum(counts.values())}
 
 @app.get("/api/reports", response_model=List[schemas.ReportResponse])
 def read_reports(
@@ -2239,8 +2240,9 @@ def read_report(
     if isinstance(current_user, models.Resident):
         if db_report.resident_id != current_user.id and db_report.claimed_by_user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not authorized to view this report")
-    elif current_user.role not in gov_router.DISPATCH_ROLES:
-        raise HTTPException(status_code=403, detail="Report is outside your authorized workspace")
+    else:
+        from report_review_router import require_report_access
+        require_report_access(db, current_user, db_report)
     return db_report
 
 @app.get("/api/reports/{report_id}/timeline", response_model=List[gov_schemas.ProcessTimelineResponse])
@@ -2259,8 +2261,9 @@ def read_report_timeline(
         if db_report.resident_id != current_user.id and db_report.claimed_by_user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not authorized to view this timeline")
         public_only = True
-    elif current_user.role not in gov_router.DISPATCH_ROLES:
-        raise HTTPException(status_code=403, detail="Report timeline is outside your authorized workspace")
+    else:
+        from report_review_router import require_report_access
+        require_report_access(db, current_user, db_report)
         
     entries = gov_crud.get_timeline_for_report(db, report_id, public_only=public_only)
     return gov_crud.enrich_timeline(entries, db)
@@ -2501,6 +2504,12 @@ def track_report_status(
     ticket_id = (req.ticket_id or req.report_id or "").strip().upper()
     provided_token = req.get_token()
     provided_contact = (req.contact or req.contact_phone or req.contact_email or "").strip().lower()
+
+    # Normalize: if query mirrors ticket_id into tracking_token or contact, do not treat ticket_id as a secret token
+    if ticket_id and provided_token == ticket_id:
+        provided_token = None
+    if ticket_id and provided_contact == ticket_id.lower():
+        provided_contact = None
 
     if not ticket_id and not provided_token and not provided_contact:
         auth.verify_tracking_token("DUMMY_TOKEN", DUMMY_SALTED_HASH)

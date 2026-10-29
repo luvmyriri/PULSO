@@ -42,15 +42,24 @@ export default function TrackReportModal({ isOpen, onClose }) {
     setResult(null);
 
     try {
+      const isContact = cleanTicket.includes('@') || /^\+?\d{7,15}$/.test(cleanTicket);
+      const isExplicitToken = cleanTicket.startsWith('TRK-');
+
+      const payload = {
+        ticket_id: cleanTicket,
+        report_id: cleanTicket,
+      };
+
+      if (isExplicitToken) {
+        payload.tracking_token = cleanTicket;
+      } else if (isContact) {
+        payload.contact = cleanTicket;
+      }
+
       const res = await fetch(`${API_BASE_URL}/api/reports/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticket_id: cleanTicket,
-          report_id: cleanTicket,
-          tracking_token: cleanTicket,
-          contact: cleanTicket,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
