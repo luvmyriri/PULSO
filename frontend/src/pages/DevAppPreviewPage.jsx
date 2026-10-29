@@ -2229,9 +2229,10 @@ function DevAppPreviewContent() {
                       }
 
                       const isActive = headerActiveTab === item.id;
-                      const unreadCount = headerNotifMode === 'empty' ? 0 : headerNotifMode === 'capped9plus' ? 12 : previewNotifications.filter(n => !n.is_read).length;
-                      const showBadge = item.id === 'updates' && unreadCount > 0;
-                      const badgeText = unreadCount > 9 ? '9+' : unreadCount;
+                      // Updates badge is independent from personal notifications count
+                      const unreadUpdatesCount = headerActiveTab === 'updates' ? 0 : 2;
+                      const showBadge = item.id === 'updates' && unreadUpdatesCount > 0;
+                      const badgeText = unreadUpdatesCount > 9 ? '9+' : unreadUpdatesCount;
                       const IconComp = item.icon;
 
                       return (
@@ -2259,7 +2260,7 @@ function DevAppPreviewContent() {
                             {showBadge && (
                               <span
                                 className="absolute -top-1.5 -right-2.5 min-w-[15px] h-3.5 px-0.5 rounded-full bg-[#f05a00] text-white text-[8px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none tabular-nums shadow-xs"
-                                aria-label={`${unreadCount} unread`}
+                                aria-label={`${unreadUpdatesCount} unread updates`}
                               >
                                 {badgeText}
                               </span>

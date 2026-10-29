@@ -406,7 +406,7 @@ export const UserAvatar = ({
     );
 };
 
-const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModal, handleLogout, t, unreadCount, unreadBadgeText }) => {
+const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModal, handleLogout, t, unreadCount, unreadBadgeText, unreadUpdatesCount = 0, unreadUpdatesBadgeText = '0' }) => {
     const navDestinations = [
         { id: 'overview', icon: <Home size={19} strokeWidth={2.2} aria-hidden="true" />, label: 'Home' },
         { id: 'reports', icon: <FileText size={19} strokeWidth={2} aria-hidden="true" />, label: 'My Reports' },
@@ -487,7 +487,15 @@ const LeftSidebar = ({ user, activeTab, activeModal, handleSetTab, handleSetModa
                                     <span className={`shrink-0 transition-colors ${isActive ? 'text-[#EA580C]' : 'text-slate-800 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white'}`}>
                                         {item.icon}
                                     </span>
-                                    <span className="truncate">{item.label}</span>
+                                    <span className="truncate flex-1">{item.label}</span>
+                                    {item.id === 'updates' && unreadUpdatesCount > 0 && (
+                                        <span
+                                            className="ml-auto min-w-[18px] h-4 px-1 rounded-full bg-[#f05a00] text-white text-[10px] font-bold flex items-center justify-center leading-none tabular-nums shadow-2xs"
+                                            aria-label={`${unreadUpdatesCount} unread updates`}
+                                        >
+                                            {unreadUpdatesBadgeText}
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })}
@@ -737,6 +745,8 @@ const ResidentHomeView = ({
     setActiveModal,
     setSelectedPost,
     setReportCategory,
+    unreadUpdatesCount = 0,
+    showToast,
     t
 }) => {
     const barangayName = user?.barangay || 'Barangay 171';
@@ -1187,6 +1197,11 @@ const ResidentHomeView = ({
                                 <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                                     City updates &amp; advisories
                                 </h3>
+                                {unreadUpdatesCount > 0 && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 tabular-nums">
+                                        {unreadUpdatesCount} new
+                                    </span>
+                                )}
                             </div>
                             <button
                                 type="button"
@@ -9935,6 +9950,98 @@ export default function ResidentDashboard() {
         ? notifications.filter(n => !n.is_read && !n.is_hidden).length
         : 0;
     const unreadBadgeText = unreadCount > 9 ? '9+' : String(unreadCount);
+    const unreadNotificationsCount = unreadCount;
+    const unreadNotificationsBadgeText = unreadBadgeText;
+
+    // ── Separate Unread Counting for City Updates vs Personal Notifications ──
+    const PULSO_VIEWED_UPDATES_STORAGE_KEY = 'pulso_viewed_announcements';
+
+    const [viewedUpdateIds, setViewedUpdateIds] = useState(() => {
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                const stored = window.localStorage.getItem(PULSO_VIEWED_UPDATES_STORAGE_KEY);
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed)) {
+                        return new Set(parsed.map(String));
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('PULSO: Unable to read viewed announcements from storage', e);
+        }
+        return new Set();
+    });
+
+    // Mark an individual advisory/announcement as viewed
+    const markUpdateAsViewed = useCallback((updateId) => {
+        if (!updateId) return;
+        const idStr = String(updateId);
+        setViewedUpdateIds(prev => {
+            if (prev.has(idStr)) return prev;
+            const next = new Set(prev);
+            next.add(idStr);
+            try {
+                if (typeof window !== 'undefined' && window.localStorage) {
+                    window.localStorage.setItem(PULSO_VIEWED_UPDATES_STORAGE_KEY, JSON.stringify(Array.from(next)));
+                }
+            } catch (err) {
+                console.warn('PULSO: Unable to save viewed announcements', err);
+            }
+            return next;
+        });
+    }, []);
+
+    // Unread City Updates count (Calculated independently from personal notifications)
+    const unreadUpdatesCount = useMemo(() => {
+        if (!Array.isArray(lguUpdates) || lguUpdates.length === 0) return 0;
+        const now = Date.now();
+        const unviewed = lguUpdates.filter(u => {
+            const uid = u?.id || u?.announcement_id || u?.advisory_id;
+            if (!uid) return false;
+            if (viewedUpdateIds.has(String(uid))) return false;
+            // Only count advisories published within the last 14 days
+            const dateStr = u.published_at || u.created_at;
+            if (dateStr) {
+                const pubTime = new Date(dateStr).getTime();
+                if (!isNaN(pubTime) && (now - pubTime) > 14 * 24 * 60 * 60 * 1000) {
+                    return false;
+                }
+            }
+            return true;
+        });
+        return unviewed.length;
+    }, [lguUpdates, viewedUpdateIds]);
+
+    const unreadUpdatesBadgeText = unreadUpdatesCount > 9 ? '9+' : String(unreadUpdatesCount);
+
+    // Automatically mark all loaded updates as viewed when visiting the 'updates' tab
+    useEffect(() => {
+        if (activeTab === 'updates' && Array.isArray(lguUpdates) && lguUpdates.length > 0) {
+            setViewedUpdateIds(prev => {
+                let changed = false;
+                const next = new Set(prev);
+                lguUpdates.forEach(u => {
+                    const uid = u?.id || u?.announcement_id || u?.advisory_id;
+                    if (uid && !next.has(String(uid))) {
+                        next.add(String(uid));
+                        changed = true;
+                    }
+                });
+                if (changed) {
+                    try {
+                        if (typeof window !== 'undefined' && window.localStorage) {
+                            window.localStorage.setItem(PULSO_VIEWED_UPDATES_STORAGE_KEY, JSON.stringify(Array.from(next)));
+                        }
+                    } catch (err) {
+                        console.warn('PULSO: Unable to persist viewed announcements', err);
+                    }
+                    return next;
+                }
+                return prev;
+            });
+        }
+    }, [activeTab, lguUpdates]);
 
     const fetchNotifications = useCallback(async (userId) => {
         if (!userId) return;
@@ -12199,6 +12306,8 @@ export default function ResidentDashboard() {
                                 t={t}
                                 unreadCount={unreadCount}
                                 unreadBadgeText={unreadBadgeText}
+                                unreadUpdatesCount={unreadUpdatesCount}
+                                unreadUpdatesBadgeText={unreadUpdatesBadgeText}
                             />
                         </aside>
                     )}
@@ -12218,8 +12327,15 @@ export default function ResidentDashboard() {
                                 nearbyReports={publicHazards}
                                 handleSetTab={handleSetTab}
                                 setActiveModal={handleSetModal}
-                                setSelectedPost={setSelectedPost}
+                                setSelectedPost={(post) => {
+                                    if (post) {
+                                        const uid = post.id || post.announcement_id || post.advisory_id;
+                                        if (uid) markUpdateAsViewed(uid);
+                                    }
+                                    setSelectedPost(post);
+                                }}
                                 setReportCategory={setReportCategory}
+                                unreadUpdatesCount={unreadUpdatesCount}
                                 showToast={showToast}
                                 t={t}
                             />
@@ -12521,7 +12637,7 @@ export default function ResidentDashboard() {
                             const isActive = isMoreItem
                                 ? (isMoreMenuOpen || activeModal === 'map' || activeTab === 'profile')
                                 : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map' && activeTab !== 'profile';
-                            const showBadge = item.id === 'updates' && unreadCount > 0;
+                            const showBadge = item.id === 'updates' && unreadUpdatesCount > 0;
                             return (
                                 <button
                                     key={item.id}
@@ -12551,9 +12667,9 @@ export default function ResidentDashboard() {
                                         {showBadge && (
                                             <span
                                                 className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#f05a00] text-white text-[9px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none tabular-nums shadow-xs"
-                                                aria-label={`${unreadCount} unread`}
+                                                aria-label={`${unreadUpdatesCount} unread updates`}
                                             >
-                                                {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
+                                                {unreadUpdatesBadgeText || (unreadUpdatesCount > 9 ? '9+' : unreadUpdatesCount)}
                                             </span>
                                         )}
                                     </div>
