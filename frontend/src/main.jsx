@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.jsx'
 import './styles/government-surfaces.css'
 import './i18n'
+import { isNativeAndroid } from './utils/appContext'
 
 // Filter out known external third-party deprecation warnings (e.g. @react-google-maps/api Marker deprecation)
 const _originalWarn = console.warn;
@@ -20,7 +21,7 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Register PWA service worker
-if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+if (!isNativeAndroid() && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });

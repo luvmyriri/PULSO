@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import RatioSelector from './RatioSelector';
+import { useAndroidBack } from '../../utils/nativeAndroid';
 
 /**
  * CameraTopBar
@@ -25,6 +26,7 @@ export default function CameraTopBar({
 }) {
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const popupWrapperRef = useRef(null);
+    useAndroidBack(showRatioControl && isPopupOpen, 60, () => setIsPopupOpen(false));
 
     // Close pop-up if ratio control is hidden (e.g. when leaving live state)
     useEffect(() => {

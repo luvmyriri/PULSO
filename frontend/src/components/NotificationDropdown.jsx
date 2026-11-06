@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Bell, FileText, CheckCircle2, Clock, AlertTriangle, Megaphone, Info, X } from 'lucide-react';
+import { useAndroidBack } from '../utils/nativeAndroid';
 
 /**
  * formatRelativeTime
@@ -100,6 +101,10 @@ export default function NotificationDropdown({
     const { t } = useTranslation();
     const panelRef = useRef(null);
     const [liveAnnouncement, setLiveAnnouncement] = useState('');
+    useAndroidBack(isOpen, 35, () => {
+        onClose?.();
+        activeTriggerRef?.current?.focus();
+    });
 
     // Filter to non-hidden notifications and slice to 5 most recent
     const visibleNotifications = (notifications || []).filter(n => !n.is_hidden).slice(0, 5);

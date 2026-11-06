@@ -56,6 +56,11 @@
         "resolved": "Nalutas"
       }
     },
+    "nativeAndroid": {
+        "backToExit": "Pindutin muli ang Bumalik para lumabas",
+        "about": "Tungkol sa PULSO",
+        "version": "Bersyon ng app {{version}}"
+    },
     "loadingScreen": {
       "ariaLabel": "Nilo-load ang PULSO",
       "city": "Lungsod ng Caloocan",

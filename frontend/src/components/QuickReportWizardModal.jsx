@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAndroidBack } from '../utils/nativeAndroid';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -812,6 +813,16 @@ function QuickReportWizardModal({
         setStep(1);
         onClose();
     };
+
+    useAndroidBack(isOpen, 40, () => {
+        if (isSubmitting) return;
+        if (isDiscardPromptOpen) setIsDiscardPromptOpen(false);
+        else if (isFullscreenPhotoOpen) setIsFullscreenPhotoOpen(false);
+        else if (isLocationPickerOpen) setIsLocationPickerOpen(false);
+        else if (isPhotoTipsOpen) setIsPhotoTipsOpen(false);
+        else if (step > 1 && step < 4) setStep(step - 1);
+        else handleCloseAttempt();
+    });
 
     // -------------------------------------------------------------------------
     // Step 3 Submission

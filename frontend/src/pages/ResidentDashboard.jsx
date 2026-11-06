@@ -4,6 +4,9 @@ import ResidentNotificationSettings from '../components/ResidentNotificationSett
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { App as NativeApp } from '@capacitor/app';
+import { isNativeAndroid } from '../utils/appContext';
+import { useAndroidBack } from '../utils/nativeAndroid';
 import { useGovernmentData } from '../utils/governmentApi';
 import { residentDashboardRoute, residentDashboardUrl, residentNotificationTarget } from '../utils/residentDashboardRoute';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6041,6 +6044,15 @@ const ProfileView = ({
 };
 
 const SettingsView = ({ user, handleLogout, containerVariants, token, showToast, t, onClearAIChatHistory }) => {
+    const [androidVersion, setAndroidVersion] = useState(null);
+    useEffect(() => {
+        if (!isNativeAndroid()) return;
+        let mounted = true;
+        void NativeApp.getInfo().then(info => {
+            if (mounted) setAndroidVersion(info.version);
+        }).catch(console.warn);
+        return () => { mounted = false; };
+    }, []);
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
     const [changing, setChanging] = useState(false);
     const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
@@ -6611,6 +6623,17 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                     </button>
                 </div>
             </div>
+
+            {androidVersion && (
+                <details className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                    <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">
+                        {t('nativeAndroid.about', 'About PULSO')}
+                    </summary>
+                    <p className="px-4 pb-4 text-sm text-slate-600 dark:text-slate-300">
+                        {t('nativeAndroid.version', 'App version {{version}}', { version: androidVersion })}
+                    </p>
+                </details>
+            )}
 
             {/* ── Gmail 2FA Activation & OTP Verification Modal ── */}
             <AnimatePresence>
@@ -9404,6 +9427,7 @@ export default function ResidentDashboard() {
     const [zoomedImage, setZoomedImage] = useState(null);
     const [reportToCancel, setReportToCancel] = useState(null);
     const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
+    useAndroidBack(isMoreMenuOpen, 20, () => setIsMoreMenuOpen(false));
 
     // Close mobile "More" menu on Escape key
     useEffect(() => {
@@ -9626,6 +9650,7 @@ export default function ResidentDashboard() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [toast, setToast] = useState({ message: '', type: 'success' });
     const [isIDCameraOpen, setIsIDCameraOpen] = useState(false);
+    useAndroidBack(showSearchDropdown, 20, () => setShowSearchDropdown(false));
 
     const showToast = useCallback((message, type = 'success') => {
         // Robust check to prevent rendering objects as React children which crashes the UI
@@ -12497,6 +12522,7 @@ export default function ResidentDashboard() {
                     </AnimatePresence>
 
                     <nav
+                        data-resident-bottom-nav
                         className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
                         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
                     >

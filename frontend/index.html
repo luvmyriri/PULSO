@@ -22,6 +22,10 @@
         var savedMode = localStorage.getItem('pulso_theme_mode');
         var saved = localStorage.getItem('pulso_theme') || localStorage.getItem('theme');
         var isDark;
+        if (!savedMode && !saved && window.Capacitor?.isNativePlatform?.()) {
+          savedMode = 'system';
+          localStorage.setItem('pulso_theme_mode', savedMode);
+        }
         if (savedMode === 'dark' || savedMode === 'light') {
           isDark = (savedMode === 'dark');
         } else if (savedMode === 'system') {

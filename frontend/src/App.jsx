@@ -53,7 +53,8 @@ import ProtectedRoute, {
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import { initAuthSession, getAuthToken, getAuthUser } from './utils/authSession';
-import { isInstalledApp } from './utils/appContext';
+import { isInstalledApp, isNativeAndroid } from './utils/appContext';
+import NativeAndroidShell from './components/mobile/NativeAndroidShell';
 import './index.css';
 import './resident/evangelista.css';
 
@@ -134,12 +135,13 @@ function App() {
         <ThemeProvider>
             <GoogleMapsProvider>
                 <BrowserRouter>
+                {isNativeAndroid() && <NativeAndroidShell />}
                 <ErrorBoundary>
                     <GovAssistantProvider>
                     <Routes>
                         {/* ── PUBLIC RESIDENT ROUTES ─────────────────────────── */}
                         <Route path="/"               element={<ResidentSurface><ResidentEntry /></ResidentSurface>} />
-                        <Route path="/resident-home"  element={<ResidentSurface><Landing directLanding /></ResidentSurface>} />
+                        <Route path="/resident-home"  element={isNativeAndroid() ? <Navigate to="/report?source=guest" replace /> : <ResidentSurface><Landing directLanding /></ResidentSurface>} />
                         <Route path="/tutorial"       element={<ResidentSurface><MobileAppTutorial replayMode={true} /></ResidentSurface>} />
                         <Route path="/report"         element={<ResidentSurface><ReportWizardPage /></ResidentSurface>} />
                         <Route path="/report/success" element={<ResidentSurface><ReportSuccessPage /></ResidentSurface>} />

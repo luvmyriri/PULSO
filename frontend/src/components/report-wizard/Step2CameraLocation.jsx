@@ -29,6 +29,7 @@ import { reverseGeocodeLocation } from '../../utils/reverseGeocode';
 import { normalizeDisplayAddress, parseLegacyDisplayAddress, formatFullAddress, parseGeocodedAddress } from '../../utils/locationPrivacy';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { getStoredToken } from '../../utils/auth';
+import { isNativeAndroid } from '../../utils/appContext';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
@@ -566,15 +567,17 @@ export default function Step2CameraLocation({
             </div>
 
             {/* Links row: Sample photo for testing */}
-            <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
-              <button
-                type="button"
-                onClick={handleSimulateCapture}
-                className="hover:text-slate-700 dark:hover:text-slate-300 underline cursor-pointer"
-              >
-                Use sample field photo (testing)
-              </button>
-            </div>
+            {!isNativeAndroid() && (
+              <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
+                <button
+                  type="button"
+                  onClick={handleSimulateCapture}
+                  className="hover:text-slate-700 dark:hover:text-slate-300 underline cursor-pointer"
+                >
+                  Use sample field photo (testing)
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           /* Attached Photo Card */
@@ -659,7 +662,7 @@ export default function Step2CameraLocation({
           locationAddress: locationData?.address,
           user: null,
         }}
-        onPickFromGallery={() => fileInputRef.current?.click()}
+        onPickFromGallery={isNativeAndroid() ? undefined : () => fileInputRef.current?.click()}
       />
     </div>
   );

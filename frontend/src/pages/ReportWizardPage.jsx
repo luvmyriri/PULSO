@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getStoredToken, getStoredUser } from '../utils/auth';
+import { useAndroidBack } from '../utils/nativeAndroid';
 
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -213,6 +214,10 @@ export default function ReportWizardPage() {
       navigate(enteredAsGuest ? '/login' : isResident ? '/dashboard' : '/resident-home');
     }
   };
+
+  useAndroidBack(isHelpGuideOpen, 30, () => setIsHelpGuideOpen(false));
+  useAndroidBack(isSubmitting, 10, () => {});
+  useAndroidBack(currentStep > 1, 0, goToPreviousStep);
 
   const jumpToStep = (stepNumber) => {
     if (stepNumber >= 1 && stepNumber <= 5 && stepNumber <= maxStepReached) {

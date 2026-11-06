@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAndroidBack } from '../utils/nativeAndroid';
 import {
     GoogleMap,
     MarkerF,
@@ -1192,6 +1193,17 @@ export default function NearbyIssuesMapModal({
             handleSelectHazard(validReport);
         }
     }, [initialSelectedReport, map, reports, handleSelectHazard]);
+
+    useAndroidBack(isOpen, 30, () => {
+        if (isBarangayPickerOpen) setIsBarangayPickerOpen(false);
+        else if (isBarangayDropdownOpen) setIsBarangayDropdownOpen(false);
+        else if (isFilterSheetOpen) setIsFilterSheetOpen(false);
+        else if (isLayersSheetOpen) setIsLayersSheetOpen(false);
+        else if (isLegendOpen) setIsLegendOpen(false);
+        else if (isMobileDrawerOpen) setIsMobileDrawerOpen(false);
+        else if (selectedHazard) handleCloseDetail();
+        else onClose?.();
+    });
 
     // Keyboard support: Escape closes detail panel or modal
     useEffect(() => {

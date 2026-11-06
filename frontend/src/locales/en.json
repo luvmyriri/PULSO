@@ -56,6 +56,11 @@
         "resolved": "Resolved"
       }
     },
+    "nativeAndroid": {
+        "backToExit": "Press back again to exit",
+        "about": "About PULSO",
+        "version": "App version {{version}}"
+    },
     "loadingScreen": {
       "ariaLabel": "Loading PULSO",
       "city": "Caloocan City",

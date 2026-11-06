@@ -15,8 +15,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { Capacitor } from '@capacitor/core';
+
 const APP_MODE_KEY = 'pulso_app_mode';
 const TUTORIAL_COMPLETED_KEY = 'pulso_tutorial_completed';
+
+export function isNativeAndroid() {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+}
 
 /**
  * Detects whether the current session is running inside the installed mobile app / PWA.
@@ -24,6 +30,7 @@ const TUTORIAL_COMPLETED_KEY = 'pulso_tutorial_completed';
  */
 export function isInstalledApp() {
   if (typeof window === 'undefined') return false;
+  if (Capacitor.isNativePlatform()) return true;
 
   try {
     // 1. Check URL parameters for explicit standalone mode or PWA launch

@@ -148,8 +148,6 @@ class PublicUploadFiles(StaticFiles):
         if path.replace("\\", "/").lstrip("/").split("/", 1)[0].lower() == "docs":
             raise HTTPException(status_code=404, detail="File not found")
         response = await super().get_response(path, scope)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         return response
 
@@ -243,10 +241,13 @@ if env_allowed:
         if cleaned and cleaned not in ALLOWED_ORIGINS:
             ALLOWED_ORIGINS.append(cleaned)
 
+if os.getenv("PULSO_ENV", "").lower() == "development":
+    ALLOWED_ORIGINS.extend(("https://localhost", "http://localhost", "capacitor://localhost"))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?$",
+    allow_origin_regex=r"^(?!https?://localhost$)https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -329,8 +330,6 @@ async def get_thumbnail(src: str = Query(..., description="Relative path to uplo
             media_type="image/jpeg",
             headers={
                 "Cache-Control": "public, max-age=31536000, immutable",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
                 "Cross-Origin-Resource-Policy": "cross-origin",
             }
         )

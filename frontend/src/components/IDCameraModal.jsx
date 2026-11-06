@@ -11,6 +11,7 @@ import {
 import { drawEvidenceWatermark, burnEvidenceWatermark, formatWatermarkTimestamp, formatWatermarkCoordinates } from '../utils/watermark';
 import { formatWatermarkAddress } from '../utils/locationPrivacy';
 import { API_BASE_URL } from '../utils/apiBase';
+import { useAndroidBack } from '../utils/nativeAndroid';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import CameraTopBar from './camera/CameraTopBar';
 import CameraMessage from './camera/CameraMessage';
@@ -94,6 +95,8 @@ const IDCameraModal = ({
     ratioOverride = null,
     onRatioChange = null
 }) => {
+    useAndroidBack(isOpen, 50, onClose);
+
     // Dynamic theme awareness: uses prop if supplied, otherwise observes html.dark class
     const [isSystemDark, setIsSystemDark] = useState(() => {
         if (typeof document !== 'undefined') {

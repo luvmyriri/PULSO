@@ -21,7 +21,8 @@ import {
   User,
   ArrowRight
 } from 'lucide-react';
-import { markTutorialCompleted } from '../../utils/appContext';
+import { isNativeAndroid, markTutorialCompleted } from '../../utils/appContext';
+import { useAndroidBack } from '../../utils/nativeAndroid';
 import { getAuthToken } from '../../utils/authSession';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ONBOARDING_CONTENT } from '../../data/onboardingContent';
@@ -83,7 +84,7 @@ export default function MobileAppTutorial({
   const [currentStep, setCurrentStep] = useState(stepOverride || 1);
   const totalSteps = 5;
   const homeRoute = getAuthToken() ? '/dashboard' : '/resident-home';
-  const reportRoute = getAuthToken() ? '/dashboard?openReport=true' : '/report';
+  const reportRoute = getAuthToken() ? '/dashboard?openReport=true' : isNativeAndroid() ? '/report?source=guest' : '/report';
 
   const containerRef = useRef(null);
 
@@ -124,6 +125,8 @@ export default function MobileAppTutorial({
   const handleSkip = () => {
     finishTutorial(homeRoute, 'Skip tapped');
   };
+
+  useAndroidBack(currentStep > 1, 0, handleBack);
 
   // Keyboard navigation
   useEffect(() => {
