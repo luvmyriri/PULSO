@@ -288,10 +288,12 @@ def command_bootstrap() -> None:
     print("Schema-only snapshot restored; normalized inventory matches.")
 
 
-def command_check_existing() -> None:
+def command_check_existing(*, require_head: bool = False) -> None:
     with connect() as connection:
-        actual = inventory(connection)
         revision = current_revision(connection)
+        if require_head and revision != HEAD_REVISION:
+            raise ValueError("Alembic current does not match the expected final revision")
+        actual = inventory(connection)
     if revision == HEAD_REVISION:
         expected = load_inventory(HEAD_INVENTORY)
         state = "head"
@@ -349,7 +351,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("bootstrap")
-    sub.add_parser("check-existing")
+    existing_parser = sub.add_parser("check-existing")
+    existing_parser.add_argument("--require-head", action="store_true")
     inventory_parser = sub.add_parser("inventory")
     inventory_parser.add_argument("--output", type=Path, required=True)
     revision_parser = sub.add_parser("assert-revision")
@@ -362,7 +365,7 @@ def main() -> int:
         if args.command == "bootstrap":
             command_bootstrap()
         elif args.command == "check-existing":
-            command_check_existing()
+            command_check_existing(require_head=args.require_head)
         elif args.command == "inventory":
             with connect() as connection:
                 write_inventory(args.output, inventory(connection))

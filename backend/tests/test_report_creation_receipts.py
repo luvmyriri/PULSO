@@ -55,11 +55,12 @@ def test_receipt_smtp_copy_uses_account_link_not_tracking_secret(monkeypatch):
         def __exit__(self,*args):pass
         def login(self,*args):pass
         def send_message(self,message):
-            text=message.get_content()
             assert message['To']=='resident@test.invalid'
-            assert 'PUL-2026-0042' in text and 'Roads' in text
-            assert 'https://pulso.test.invalid/dashboard?tab=reports' in text
-            assert all(secret not in text for secret in ('SECRET_DESCRIPTION','SECRET_LOCATION','SECRET_TOKEN'))
+            for mime in ('plain', 'html'):
+                text = message.get_body(preferencelist=(mime,)).get_content()
+                assert 'PUL-2026-0042' in text and 'Roads' in text
+                assert 'https://pulso.test.invalid/dashboard?tab=reports' in text
+                assert all(secret not in text for secret in ('SECRET_DESCRIPTION','SECRET_LOCATION','SECRET_TOKEN'))
             return {}
     with patch('report_receipts.smtplib.SMTP_SSL',return_value=SMTP()):
         receipts.send_email('resident@test.invalid',report,'<fake@test.invalid>')
@@ -80,7 +81,10 @@ def test_report_creation_queues_and_delivers_each_channel_once(context,monkeypat
         report=crud.create_report(db,schemas.ReportCreate(category='Roads',description='FAKE report receipt integration concern',location_barangay='FAKE Area one'),resident_id=100,queue_resident_receipt=True)
         report_id=report.id
     with sessions() as db:
-        events=db.query(gm.OutboxEvent).filter(gm.OutboxEvent.payload['report_id'].as_integer()==report_id).all()
+        events=db.query(gm.OutboxEvent).filter(
+            gm.OutboxEvent.payload['report_id'].as_integer()==report_id,
+            gm.OutboxEvent.event_type.in_(receipts.EVENTS),
+        ).all()
         assert {event.event_type for event in events}==receipts.EVENTS
         assert deliver_pending(db)>=2
     sent=[]

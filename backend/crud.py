@@ -149,10 +149,8 @@ def get_users_by_identifier(db: Session, identifier: str):
     # 1. If it contains '@', query by email directly
     if "@" in clean_id:
         res = db.query(models.Resident).filter(func.lower(models.Resident.email) == clean_id.lower()).all()
-        if res: return res
         off = db.query(models.Official).filter(func.lower(models.Official.email) == clean_id.lower()).all()
-        if off: return off
-        return []
+        return res + off
         
     # 2. Treat as potential phone number
     norm_phone = normalize_ph_phone(clean_id)
