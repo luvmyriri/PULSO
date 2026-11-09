@@ -2,10 +2,8 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
 import os
-from dotenv import load_dotenv, dotenv_values
-from sqlalchemy.engine import make_url
+from dotenv import load_dotenv
 import logging
-import socket
 
 env_path = os.path.join(os.path.dirname(__file__), ".env")
 local_env_path = os.path.join(os.path.dirname(__file__), ".env.local")
@@ -17,24 +15,8 @@ else:
     load_dotenv()
 
 
-def _resolve_database_url() -> str:
-    primary = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/pulso_db")
-    try:
-        parsed = make_url(primary)
-        host = parsed.host or "127.0.0.1"
-        port = int(parsed.port or 5432)
-        with socket.create_connection((host, port), timeout=1.0):
-            return primary
-    except Exception:
-        if os.path.exists(env_path):
-            fallback = dotenv_values(env_path).get("DATABASE_URL")
-            if fallback and fallback != primary:
-                logging.warning("Primary DATABASE_URL unreachable; falling back to backend/.env DATABASE_URL.")
-                return fallback
-        return primary
-
-
-DATABASE_URL = _resolve_database_url()
+# Keep migrations and requests on the configured database even during an outage.
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/pulso_db")
 
 engine = create_engine(
     DATABASE_URL,

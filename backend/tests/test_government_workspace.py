@@ -40,7 +40,7 @@ def context(clean_postgis):
         db.add_all([models.Resident(id=100, full_name='FAKE Owner', email='owner@test.invalid', password_hash='test-not-login', is_active=True, is_verified=True), models.Resident(id=101, full_name='FAKE Other resident', email='resident2@test.invalid', password_hash='test-not-login', is_active=True, is_verified=True)])
         db.flush()
         for id, owner in ((1,100),(2,100),(3,101)):
-            db.add(models.Report(id=id, ticket_id=f'FAKE-REPORT-{id}', resident_id=owner, category='Roads', description='FAKE road concern for integration test', status='pending', barangay_id=1, location_barangay='FAKE Area one'))
+            db.add(models.Report(ticket_id=f'FAKE-REPORT-{id}', resident_id=owner, category='Roads', description='FAKE road concern for integration test', status='pending', barangay_id=1, location_barangay='FAKE Area one'))
         db.commit()
     def override_db():
         with clean_postgis() as db:

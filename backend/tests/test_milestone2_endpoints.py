@@ -450,9 +450,10 @@ class TestReportClaiming:
                 "description": "Severe road depression along Susano Road.",
                 "lat": 14.7565,
                 "lng": 121.0450,
-                "contact_email": "maria.santos@example.com"
+                "contact_email": "guest-report@example.com"
             }
         )
+        assert r_create.status_code == 201, r_create.text
         report_id = r_create.json()["id"]
         token = r_create.json()["tracking_token"]
 

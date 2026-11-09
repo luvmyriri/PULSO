@@ -43,26 +43,8 @@ jobs:
           python-version: '3.12'
       - name: Install backend requirements
         run: python -m pip install -r backend/requirements.txt
-      - name: Bootstrap blank database
+      - name: Bootstrap and verify the blank database
         run: bash scripts/bootstrap_db.sh
-      - name: Confirm Alembic head
-        working-directory: backend
-        run: |
-          python -m alembic -c alembic.ini current
-          python ../scripts/db_schema.py assert-revision f3a6d8c1b250
-      - name: Compare normalized schema inventory
-        run: |
-          python scripts/db_schema.py inventory --output "$RUNNER_TEMP/head-inventory.json"
-          python - "$RUNNER_TEMP/head-inventory.json" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-
-          expected = json.loads(Path("backend/schema/head_f3a6d8c1b250.inventory.json").read_text())
-          actual = json.loads(Path(sys.argv[1]).read_text())
-          assert actual == expected, "Normalized schema inventory differs from the checked-in manifest"
-          print("Normalized schema inventory: PASS")
-          PY
       - name: Report Alembic model drift
         continue-on-error: true
         working-directory: backend

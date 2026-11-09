@@ -3,7 +3,7 @@ from sqlalchemy import case, func, or_
 from fastapi import HTTPException
 import models
 import gov_models as gm
-from government_access import jurisdiction_ids
+from government_access import can, jurisdiction_ids, scoped_reports
 
 GROUPS={'open':['open'],'assigned':['assigned'],'active':['in_progress','rework_required'],'blocked':['blocked'],'completed_pending_review':['completed_pending_review','awaiting_verification'],'completed':['completed','resolved'],'cancelled':['cancelled']}
 
@@ -28,7 +28,18 @@ def queue(db,user,page,view,search,assignee=None):
         else: raise HTTPException(422,'Choose an available work queue.')
     if search:
         term=f'%{search}%'
-        query=query.filter(or_(gm.WorkOrder.wo_number.ilike(term),gm.WorkOrder.title.ilike(term),gm.WorkOrder.location_string.ilike(term),gm.WorkOrder.assigned_to.has(models.Official.full_name.ilike(term))))
+        matches = [
+            gm.WorkOrder.wo_number.ilike(term),
+            gm.WorkOrder.title.ilike(term),
+            gm.WorkOrder.barangay_ref.has(models.Barangay.name.ilike(term)),
+            gm.WorkOrder.assigned_to.has(models.Official.full_name.ilike(term)),
+        ]
+        if can(user, 'reports'):
+            locations = scoped_reports(db.query(models.Report.id), user).filter(
+                or_(models.Report.location_string.ilike(term), models.Report.location_barangay.ilike(term))
+            )
+            matches.append(gm.WorkOrder.report_id.in_(locations.statement))
+        query = query.filter(or_(*matches))
     total=query.count()
     query=query.order_by(case((gm.WorkOrder.status.in_(['completed','resolved','cancelled']),1),else_=0),gm.WorkOrder.updated_at.desc().nullslast(),gm.WorkOrder.id.desc())
     owner = db.get(models.Official, int(assignee)) if total and assignee and assignee != 'unassigned' else None
