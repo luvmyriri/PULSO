@@ -12,7 +12,7 @@ Start your configured PULSO backend on port 33159 with `PULSO_ENV=development`. 
 
 Enable USB debugging on the phone, connect it, and accept the debugging prompt. From the repository root:
 
-```powershell
+```bash
 cd frontend
 npm ci
 adb devices -l
@@ -27,29 +27,26 @@ Open **PULSO** on the phone. `adb install -r` keeps settings and drafts when upd
 
 Start an emulator in Android Studio. In the `frontend` directory, set the emulator's host address for this build:
 
-```powershell
-$env:VITE_API_BASE_URL = 'http://10.0.2.2:33159'
-npm run app:apk
+```bash
+VITE_API_BASE_URL=http://10.0.2.2:33159 npm run app:apk
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-Remove-Item Env:VITE_API_BASE_URL
 ```
 
 The default USB APK can also run on the emulator with `adb reverse`. If multiple devices are connected, use `adb -s DEVICE_SERIAL` or `npm run app:run -- --target DEVICE_SERIAL`.
 
 ### Wi-Fi phone
 
-Keep the phone and computer on the same private network. Run `npm run app:lan-ip` in `frontend` to find the computer's IPv4 address. Use the active Wi-Fi or Ethernet adapter's address. For this case, start the backend with `--host 0.0.0.0 --port 33159` and allow port 33159 in the computer's firewall for the private network.
+Connect the phone and computer to the same private Wi-Fi network. Start the configured development backend from `backend` with `PULSO_ENV=development python -m uvicorn main:app --host 0.0.0.0 --port 33159`. In a second terminal, use Bash (Git Bash on Windows) from the repository root.
 
-Use USB on Android 17. Android 17 requires a separate permission for LAN connections from an app targeting API 37, and this build requests only the permissions used by the existing resident workflow. [Android local network permission](https://developer.android.com/privacy-and-security/local-network-permission)
-
-```powershell
-$env:VITE_API_BASE_URL = 'http://192.168.1.20:33159' # Replace with your computer's address
-npm run app:apk
-adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-Remove-Item Env:VITE_API_BASE_URL
+```bash
+bash scripts/android-dev.sh
 ```
 
-On macOS or Linux, use `VITE_API_BASE_URL=http://10.0.2.2:33159 npm run app:apk` to override the address for a single command. To save a machine-local setting, put `VITE_API_BASE_URL` in the ignored `frontend/.env.android.local`. Use public browser configuration there if your local setup uses Google Maps, Google sign-in or reCAPTCHA. Keep backend credentials in the backend configuration.
+If several adapters are listed, pass the Wi-Fi IPv4 address as the first argument. Open the URL printed in the terminal, scan the QR on the Android phone, and tap **Download Android APK**. Open the downloaded APK and follow Android's installation prompt. Ports 4174 (download page) and 33159 (API) must be reachable on the private network. The QR page serves only the APK and its install instructions, and stops when you press Ctrl+C.
+
+The Wi-Fi debug build targets API 36 to use Android's legacy local-network access on Android 17 while compiling with SDK 37. [Android local network permission](https://developer.android.com/privacy-and-security/local-network-permission)
+
+To save a machine-local API address, put `VITE_API_BASE_URL` in the ignored `frontend/.env.android.local`. Use public browser configuration there if your local setup uses Google Maps, Google sign-in or reCAPTCHA. Keep backend credentials in the backend configuration.
 
 ## Other commands
 
@@ -62,4 +59,4 @@ On macOS or Linux, use `VITE_API_BASE_URL=http://10.0.2.2:33159 npm run app:apk`
 
 The build generates the debug network allowlist for loopback, the emulator, and the specific LAN host selected for that build. The APK uses `https://localhost` for its bundled WebView and permits HTTP for those local targets. The API's development CORS settings cover requests and images from the native origin. The native app skips PWA service-worker registration, while browser builds keep it.
 
-The app's version is maintained in `app/build.gradle` and read by Settings → About PULSO. The adaptive launcher artwork was generated with Capacitor Assets from `frontend/public/caloocan-seal-large.png`. Android supplies runtime permission prompts, and residents take photos inside the existing PULSO camera screen.
+The app's version is maintained in `app/build.gradle` and read by Settings → About PULSO. The adaptive launcher artwork was generated with Capacitor Assets from `frontend/public/pulso-loading-mark.png`. Android supplies runtime permission prompts, and residents take photos inside the existing PULSO camera screen.

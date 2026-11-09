@@ -59,7 +59,41 @@
     "nativeAndroid": {
         "backToExit": "Pindutin muli ang Bumalik para lumabas",
         "about": "Tungkol sa PULSO",
-        "version": "Bersyon ng app {{version}}"
+        "navigation": {
+            "home": "Home ng PULSO",
+            "language": "Wika",
+            "search": "Maghanap ng ulat, balita o tulong",
+            "assistant": "Katulong",
+            "changeTheme": "Gamitin ang temang {{theme}}",
+            "themes": { "light": "maliwanag", "dark": "madilim", "system": "ayon sa system" }
+        },
+        "version": "Bersyon ng app {{version}}",
+        "home": {
+            "heading": "Iulat ang problema sa inyong lugar",
+            "description": "Ipaalam sa City Engineering Department ang mga sirang kalsada, baradong kanal, at iba pang problema sa pampublikong imprastraktura sa Caloocan.",
+            "actions": "Mga serbisyo para sa residente",
+            "report": "Mag-ulat ng problema",
+            "track": "Subaybayan ang ulat",
+            "signIn": "Mag-sign in bilang residente",
+            "myReports": "Mga ulat ko",
+            "guide": "Paano gamitin ang PULSO",
+            "headlineStart": "Mag-ulat ng",
+            "headlineMiddle": "problema sa",
+            "welcome": "Mas ligtas at malinis na Caloocan para sa lahat.",
+            "signInShort": "Mag-sign In",
+            "createAccount": "Gumawa ng Account",
+            "howTitle": "Paano Ito",
+            "howAccent": "Gumagana",
+            "steps": {
+                "capture": { "title": "Mag-ulat", "description": "Magdagdag ng larawan at ilarawan ang problema." },
+                "submit": { "title": "Ipadala", "description": "Suriin at ipadala ang iyong ulat." },
+                "follow": { "title": "Sundan", "description": "Gamitin ang resibo para makita ang mga update." }
+            },
+            "communityStart": "Pagandahin natin ang",
+            "communityEnd": ".",
+            "communityTagline": "Bayanihan. Para sa Caloocan.",
+            "citySeal": "Sagisag ng Lungsod ng Caloocan"
+        }
     },
     "loadingScreen": {
       "ariaLabel": "Nilo-load ang PULSO",
@@ -754,21 +788,24 @@
     },
     "track": {
       "header": {
-        "title": "Subaybayan ang Pampublikong Ulat sa Imprastraktura",
-        "subtitle": "Tingnan ang pinakahuling naitalang katayuan at pampublikong timeline ng iyong ticket sa Caloocan City.",
-        "badge": "Civic Aperture · Transparent na Pampublikong Gawain"
+        "title": "Subaybayan ang ulat",
+        "subtitle": "Ilagay ang ticket ID at tracking code mula sa resibo ng iyong ulat."
       },
       "lookup": {
         "title": "Paghahanap ng Ticket",
-        "subtitle": "Ilagay ang iyong Ticket ID at Secret Tracking Token mula sa iyong resibo.",
+        "subtitle": "Ilagay ang ticket ID at tracking code mula sa resibo ng iyong ulat.",
         "ticketLabel": "Ticket ID",
-        "ticketPlaceholder": "hal. RPT-20260902-8F92E1B4 o PULSO-10492",
-        "tokenLabel": "Lihim na Tracking Token",
-        "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
-        "submitBtn": "Subaybayan ang Ulat",
-        "searching": "Hinahanap sa Talaan ng Lungsod...",
-        "errorNotFound": "Hindi nahanap ang ulat o mali ang tracking credentials. Pakisuri ang Ticket ID at Token.",
-        "networkError": "Hindi makontak ang talaan ng lungsod. Suriin ang koneksiyon at subukan muli."
+        "ticketPlaceholder": "Ilagay ang ticket ID",
+        "ticketExample": "hal. PUL-2026-0842",
+        "tokenLabel": "Tracking code",
+        "tokenPlaceholder": "Ilagay ang tracking code",
+        "tokenReceiptPlaceholder": "Code mula sa iyong resibo",
+        "submitBtn": "Subaybayan ang ulat",
+        "closeSheet": "Isara ang pagsubaybay",
+        "searching": "Sinusuri…",
+        "errorNotFound": "Walang nahanap na ulat gamit ang mga detalyeng ito. Suriin ang ticket ID at tracking code.",
+        "networkError": "Hindi makakonekta. Suriin ang koneksiyon at subukang muli.",
+        "serviceError": "Hindi makuha ang iyong ulat. Subukang muli."
       },
       "reply": {
         "title": "May hinihinging karagdagang impormasyon",
@@ -802,11 +839,12 @@
         "lastUpdated": "Huling Na-update",
         "currentStageLabel": "Kasalukuyang Yugto ng Operasyon",
         "publicSummary": "Buod ng Lokasyon",
-        "privacyNotice": "Aktibo ang Public Privacy Mode: Ang mga personal na detalye ng nag-ulat at panloob na tala ng kawani ay protektado at hindi nakikita.",
+        "privacyNotice": "Pribado ang iyong pangalan at mga detalye ng pakikipag-ugnayan.",
         "pulseLineTitle": "6-Yugtong Progreso ng PulseLine",
         "timelineTitle": "Timeline ng mga Pampublikong Yugto",
         "claimPrompt": "Iyo ba ang ulat na ito? Iugnay ito sa iyong account para sa pinag-isang pamamahala",
-        "claimBtn": "I-claim ang Ulat na Ito"
+        "claimBtn": "I-claim ang Ulat na Ito",
+        "claimDescription": "Mag-sign in upang i-save ang ulat sa iyong account."
       },
       "stages": {
         "received": {

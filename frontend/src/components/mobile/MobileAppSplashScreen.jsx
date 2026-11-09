@@ -7,6 +7,8 @@ export default function MobileAppSplashScreen({
   onFinish,
   minDurationMs = 1200,
   isReady = true,
+  minDurationStartsOnReady = false,
+  loadsBundledApp = false,
   isTestMode = false,
   forceSlow = false,
   forceOffline = false,
@@ -58,7 +60,9 @@ export default function MobileAppSplashScreen({
 
   useEffect(() => {
     if (forceSlow || forceOffline || !isReady) return;
-    const remainingTime = Math.max(0, minDurationMs - (Date.now() - mountTimeRef.current));
+    const remainingTime = minDurationStartsOnReady
+      ? minDurationMs
+      : Math.max(0, minDurationMs - (Date.now() - mountTimeRef.current));
     let finishTimeout;
     const dismissTimeout = setTimeout(() => {
       setIsFadingOut(true);
@@ -71,7 +75,7 @@ export default function MobileAppSplashScreen({
       clearTimeout(dismissTimeout);
       clearTimeout(finishTimeout);
     };
-  }, [forceSlow, forceOffline, isReady, minDurationMs, isTestMode, onFinish, reducedMotion]);
+  }, [forceSlow, forceOffline, isReady, minDurationMs, minDurationStartsOnReady, isTestMode, onFinish, reducedMotion]);
 
   const handleRetry = () => {
     if (isTestMode) {
@@ -85,8 +89,8 @@ export default function MobileAppSplashScreen({
 
   const selectedTheme = themeModeOverride || theme || 'light';
   const isDark = selectedTheme === 'dark' || (selectedTheme === 'system' && osPrefersDark);
-  const showError = isOffline || elapsedSeconds >= 12 || forceOffline;
-  const showSlow = !showError && (elapsedSeconds >= 5 || forceSlow);
+  const showError = !loadsBundledApp && (isOffline || elapsedSeconds >= 12 || forceOffline);
+  const showSlow = !showError && !loadsBundledApp && (elapsedSeconds >= 5 || forceSlow);
 
   return (
     <div

@@ -1,3 +1,4 @@
+import NativeAppHeader from '../components/mobile/NativeAppHeader';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -5,6 +6,7 @@ import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getStoredToken, getStoredUser } from '../utils/auth';
 import { useAndroidBack } from '../utils/nativeAndroid';
+import { isNativeAndroid } from '../utils/appContext';
 
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -208,6 +210,8 @@ export default function ReportWizardPage() {
       setCurrentStep(prev);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setAnnouncement(`Step ${prev} of 5`);
+    } else if (isNativeAndroid()) {
+      navigate('/', { replace: true });
     } else {
       const enteredAsGuest = new URLSearchParams(location.search).get('source') === 'guest';
       const isResident = Boolean(getStoredToken()) && getStoredUser()?.role === 'resident';
@@ -363,22 +367,23 @@ export default function ReportWizardPage() {
       </div>
 
       {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
-      <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 w-full flex justify-between items-center">
+      {isNativeAndroid() ? <NativeAppHeader /> : (
+        <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 w-full flex justify-between items-center gap-3">
         {/* Logo on top-left linking to home */}
         <Link
           to="/resident-home"
-          className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
+          className="flex min-w-0 flex-1 items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
           title="Caloocan City PULSO Home"
         >
-          <Branding size="h-8 w-8 sm:h-9 sm:w-9" />
+          <Branding size="h-8 w-8 sm:h-9 sm:w-9" className="min-w-0 max-w-full" />
         </Link>
 
         {/* Right side: Theme Toggle & Home Navigation */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
           <ThemeToggle />
           <Link
             to="/resident-home"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
             title="Return to Home Section"
             aria-label="Home"
           >
@@ -387,6 +392,7 @@ export default function ReportWizardPage() {
           </Link>
         </div>
       </header>
+      )}
 
       {/* Main Responsive Container */}
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-2 sm:pt-3 pb-32 lg:pb-6 flex flex-col">

@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { SquarePen, Search, ArrowRight, Smartphone } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import PwaModal from './PwaModal';
-import { API_BASE_URL } from '../../utils/apiBase';
+import { useMobileInstallLink } from './useMobileInstallLink';
 
 /**
  * HeroSection
@@ -22,34 +22,7 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
   const [internalPwaOpen, setInternalPwaOpen] = useState(false);
   const handleOpenPwa = onOpenPwaModal || (() => setInternalPwaOpen(true));
 
-  const [activeUrl, setActiveUrl] = useState(() => {
-    if (typeof window === 'undefined') return 'https://pulso.caloocan.gov.ph';
-    return window.location.origin;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    if (!isLocalDev) {
-      setActiveUrl(window.location.origin);
-      return;
-    }
-
-    const controller = new AbortController();
-    fetch(`${API_BASE_URL}/api/system/network-ip`, { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.ip) {
-          const port = window.location.port ? `:${window.location.port}` : '';
-          setActiveUrl(`http://${data.ip}${port}`);
-        }
-      })
-      .catch(() => {
-        setActiveUrl(window.location.origin);
-      });
-
-    return () => controller.abort();
-  }, []);
+  const { activeUrl, apkUrl } = useMobileInstallLink();
 
   return (
     <section
@@ -107,31 +80,23 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
                       type="button"
                       onClick={handleOpenPwa}
                       className="p-1.5 bg-white dark:bg-white rounded-xl border border-slate-200 shadow-2xs shrink-0 cursor-pointer hover:border-[#ff6b00] hover:scale-105 transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
-                      title="Click to view full installation guide"
-                      aria-label="Scan or click QR code to install PULSO Mobile App"
+                      title={apkUrl ? "Open the Android APK QR code" : "Open the PULSO mobile QR code"}
+                      aria-label={apkUrl ? "Open the Android APK QR code" : "Open the PULSO mobile QR code"}
                     >
                       <QRCodeSVG
                         value={activeUrl}
                         size={64}
                         level="M"
-                        includeMargin={false}
-                        imageSettings={{
-                          src: '/city-engineering-logo.png',
-                          x: undefined,
-                          y: undefined,
-                          height: 16,
-                          width: 16,
-                          excavate: true,
-                        }}
+                        marginSize={4}
                       />
                     </button>
 
                     <div className="flex flex-col text-left min-w-0">
                       <span className="font-heading font-black text-xs sm:text-sm text-[#0f2347] dark:text-white">
-                        Install Mobile App
+                        {apkUrl ? 'PULSO Android APK' : 'Install Mobile App'}
                       </span>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
-                        Scan with your phone&apos;s camera to install PULSO directly onto your home screen.
+                        {apkUrl ? 'Development build for Android on the same Wi-Fi.' : 'Scan to open PULSO on your phone.'}
                       </p>
                     </div>
                   </div>
@@ -143,7 +108,7 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#0f2347] dark:text-white border border-slate-300 dark:border-slate-700 text-xs font-heading font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                   >
                     <Smartphone size={14} className="text-[#ff6b00]" />
-                    <span>Install App</span>
+                    <span>{apkUrl ? 'View APK download' : 'Install App'}</span>
                   </button>
 
                 </div>

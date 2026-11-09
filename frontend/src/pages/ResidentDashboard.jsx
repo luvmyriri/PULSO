@@ -1,3 +1,5 @@
+import NativeAppHeader from '../components/mobile/NativeAppHeader';
+import NotificationDropdown from '../components/NotificationDropdown';
 import { exportResidentReportsToXLSX } from '../utils/xlsxExport';
 import { residentPublication } from '../utils/publicationAdapter';
 import ResidentNotificationSettings from '../components/ResidentNotificationSettings';
@@ -8653,6 +8655,7 @@ const TopNavigation = ({
     const searchRef = useRef(null);
     const searchInputRef = useRef(null);
     const mobileSearchRef = useRef(null);
+    const nativeBellRef = useRef(null);
     const mobileSearchInputRef = useRef(null);
     const [searchPillWidth, setSearchPillWidth] = useState(240);
     const [recentSearchAnnouncement, setRecentSearchAnnouncement] = useState('');
@@ -9306,6 +9309,48 @@ const TopNavigation = ({
             handleSetTab('overview');
         }
     };
+
+    if (isNativeAndroid()) {
+        return (
+            <div className="sticky top-0 z-50 shrink-0">
+                <NativeAppHeader>
+                    <button type="button" ref={nativeBellRef}
+                        aria-label={t('notificationCenter.title', 'All notifications')}
+                        aria-expanded={showNotifications}
+                        onClick={() => { setShowNotifications(!showNotifications); setIsSearchOpen(false); }}
+                        className="relative flex size-11 items-center justify-center rounded-md text-slate-700 hover:bg-slate-200 focus-visible:outline-3 focus-visible:outline-blue-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:outline-blue-300">
+                        <Bell size={20} aria-hidden="true" />
+                        {unreadCount > 0 && <span className="absolute right-0 top-0 rounded-full bg-primary px-1 text-xs font-bold text-[#0b1630]">{unreadBadgeText}</span>}
+                    </button>
+                </NativeAppHeader>
+                {isHomeTab && (
+                    <div ref={mobileSearchRef} className="relative flex items-center gap-2 border-b border-slate-300 bg-[#f7f9fc] px-4 py-2 dark:border-slate-700 dark:bg-[#0c1421]">
+                        <input ref={mobileSearchInputRef} type="search" value={searchQuery}
+                            aria-label={t('nativeAndroid.navigation.search')}
+                            placeholder={t('nativeAndroid.navigation.search')}
+                            onFocus={() => setIsSearchOpen(true)}
+                            onChange={event => { setSearchQuery(event.target.value); setIsSearchOpen(true); }}
+                            onKeyDown={handleSearchKeyDown}
+                            className="min-h-11 min-w-0 flex-1 rounded-md border border-slate-400 bg-white px-3 text-base text-slate-900 focus-visible:outline-3 focus-visible:outline-blue-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50" />
+                        <button type="button" onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+                            className="min-h-11 rounded-md px-2 text-sm font-semibold text-slate-700 underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-blue-600 dark:text-slate-200">
+                            {t('nativeAndroid.navigation.assistant')}
+                        </button>
+                        {isSearchOpen && (
+                            <div className="absolute inset-x-0 top-full max-h-[60dvh] overflow-y-auto border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900">
+                                {renderSearchDropdown(true)}
+                            </div>
+                        )}
+                    </div>
+                )}
+                <NotificationDropdown isOpen={showNotifications} onClose={() => setShowNotifications(false)}
+                    notifications={notifications} onNotificationClick={handleNotificationClick}
+                    onMarkAllRead={handleMarkAllRead} onOpenAllNotifications={() => { setShowNotifications(false); handleSetModal('all-notifications'); }}
+                    unreadCount={unreadCount} loading={loadingNotifications} error={notificationsError}
+                    onRetry={onRetryNotifications} triggerRefs={[nativeBellRef]} activeTriggerRef={nativeBellRef} />
+            </div>
+        );
+    }
 
     return (
         <header className={`${isHeaderlessTab ? 'hidden md:block' : ''} app-header-landmark shrink-0 sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800`}>

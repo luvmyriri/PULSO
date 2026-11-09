@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import ResidentThemeToggle from '../ResidentThemeToggle';
+import { isNativeAndroid } from '../../utils/appContext';
+import NativeAppHeader from '../mobile/NativeAppHeader';
 
 export default function WizardHeader({ currentStep, totalSteps = 6 }) {
   const { t, i18n } = useTranslation();
@@ -11,6 +13,8 @@ export default function WizardHeader({ currentStep, totalSteps = 6 }) {
     const nextLang = i18n.language === 'tl' ? 'en' : 'tl';
     i18n.changeLanguage(nextLang);
   };
+
+  if (isNativeAndroid()) return <NativeAppHeader />;
 
   return (
     <header className="w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 transition-colors">

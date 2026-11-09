@@ -6,6 +6,14 @@ export const webDir = 'dist';
 export const server = { androidScheme: 'https', cleartext: debug };
 export const android = { allowMixedContent: debug, webContentsDebuggingEnabled: debug, zoomEnabled: true };
 export const plugins = {
-  SplashScreen: { launchAutoHide: false, showSpinner: false },
-  SystemBars: { insetsHandling: 'native' },
+  SplashScreen: {
+    launchAutoHide: false,
+    launchFadeOutDuration: 0,
+    androidSplashResourceName: 'pulso_launch_icon',
+    backgroundColor: '#F7F9FC',
+    showSpinner: false,
+  },
+  // PulsoAppearance owns insets: the landing draws under the system bars while
+  // forms and other routes retain native padding, including keyboard handling.
+  SystemBars: { insetsHandling: 'disable' },
 };

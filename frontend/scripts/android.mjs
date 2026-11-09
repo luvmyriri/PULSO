@@ -48,7 +48,7 @@ if (mode === 'open') {
 }
 
 if (!['sync', 'run', 'apk'].includes(mode)) throw new Error('Use sync, open, run, apk or ip.');
-const configuredUrl = loadEnv('android', root).VITE_API_BASE_URL;
+const configuredUrl = process.env.VITE_API_BASE_URL || loadEnv('android', root).VITE_API_BASE_URL;
 const url = new URL(configuredUrl);
 const allowedHosts = new Set(['localhost', '127.0.0.1', '10.0.2.2']);
 if (url.protocol !== 'http:' || url.port !== '33159' || url.username || url.password ||
@@ -56,6 +56,7 @@ if (url.protocol !== 'http:' || url.port !== '33159' || url.username || url.pass
     (!allowedHosts.has(url.hostname) && !privateIpv4(url.hostname))) {
   throw new Error('Android builds require an HTTP API on port 33159 using localhost, the emulator, or a private LAN IPv4 address.');
 }
+env.PULSO_ANDROID_LAN = allowedHosts.has(url.hostname) ? '0' : '1';
 allowedHosts.add(url.hostname);
 env.VITE_API_BASE_URL = url.origin;
 

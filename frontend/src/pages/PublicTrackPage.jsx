@@ -1,27 +1,44 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
-  Search, ShieldCheck, MapPin, CheckCircle2, 
+  Search, ShieldCheck, MapPin,
   AlertTriangle, UserPlus, 
-  Calendar, Loader2, Activity 
+  Calendar, Loader2, KeyRound
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getAuthToken } from '../utils/authSession';
 import { formatFullAddress, parseAddressString } from '../utils/locationPrivacy';
 import WizardHeader from '../components/report-wizard/WizardHeader';
-import PulsoPulseLine from '../components/common/PulsoPulseLine';
-
-const LIFECYCLE_STAGES = [
-  { id: 'received', key: 'received', defaultLabel: 'Received', defaultDesc: 'Report logged and queued for engineering triage.' },
-  { id: 'under_review', key: 'under_review', defaultLabel: 'Under Review', defaultDesc: 'Dispatch engineers verifying jurisdiction and field requirements.' },
-  { id: 'validated', key: 'validated', defaultLabel: 'Validated', defaultDesc: 'Issue confirmed and work order authorized.' },
-  { id: 'assigned', key: 'assigned', defaultLabel: 'Assigned', defaultDesc: 'Work order dispatched to District Maintenance Crew.' },
-  { id: 'in_progress', key: 'in_progress', defaultLabel: 'In Progress', defaultDesc: 'Field team actively conducting on-site repairs.' },
-  { id: 'resolved', key: 'resolved', defaultLabel: 'Resolved', defaultDesc: 'Repairs completed and verified with on-site proof.' },
-];
 
 export default function PublicTrackPage() {
+  return (
+    <div className="min-h-screen bg-[#f7f9fc] dark:bg-[#0c1421] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
+      <WizardHeader currentStep={1} totalSteps={1} />
+      <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        <TrackReportHeading />
+        <TrackReportContent />
+      </main>
+    </div>
+  );
+}
+
+export function TrackReportHeading({ as = 'h1', titleId, descriptionId, titleRef }) {
+  const { t } = useTranslation();
+  const Heading = as;
+  return (
+    <div className="space-y-2">
+      <Heading id={titleId} ref={titleRef} tabIndex={titleRef ? -1 : undefined} className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        {t('track.header.title', 'Track a report')}
+      </Heading>
+      <p id={descriptionId} className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+        {t('track.lookup.subtitle', 'Enter the ticket ID and tracking code from your report receipt.')}
+      </p>
+    </div>
+  );
+}
+
+export function TrackReportContent({ inSheet = false }) {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
 
@@ -34,6 +51,11 @@ export default function PublicTrackPage() {
   const [replyLoading, setReplyLoading] = useState(false);
   const [replyMessage, setReplyMessage] = useState(null);
   const [replyError, setReplyError] = useState(null);
+  const resultRegion = useRef(null);
+
+  useEffect(() => {
+    if (inSheet && reportData) resultRegion.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }, [inSheet, reportData]);
 
   const fetchTrackStatus = useCallback(async (id, token) => {
     if (!id) return;
@@ -58,15 +80,15 @@ export default function PublicTrackPage() {
       } else {
         setReportData(null);
         if (response.status === 404 || response.status === 403) {
-          setErrorMsg(t('track.lookup.errorNotFound', 'Report not found or invalid tracking credentials. Please check your Ticket ID and Tracking Token or Contact Number.'));
+          setErrorMsg(t('track.lookup.errorNotFound', 'Check the ticket ID and tracking code and try again.'));
         } else {
-          setErrorMsg('Unable to retrieve tracking record. Please try again.');
+          setErrorMsg(t('track.lookup.serviceError', 'Could not load your report. Try again.'));
         }
       }
     } catch (err) {
       console.warn('Track lookup network error:', err);
       setReportData(null);
-      setErrorMsg(t('track.lookup.networkError', 'Could not reach the civic registry. Check your connection and try again.'));
+      setErrorMsg(t('track.lookup.networkError', 'Could not connect. Check your connection and try again.'));
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +97,7 @@ export default function PublicTrackPage() {
   useEffect(() => {
     const idParam = searchParams.get('id');
     const tokenParam = searchParams.get('token') || searchParams.get('code');
-    if (idParam) {
+    if (idParam && tokenParam) {
       setTicketId(idParam);
       if (tokenParam) setTrackingToken(tokenParam);
       fetchTrackStatus(idParam, tokenParam || '');
@@ -84,7 +106,7 @@ export default function PublicTrackPage() {
 
   const handleLookupSubmit = (e) => {
     e.preventDefault();
-    if (!ticketId.trim()) return;
+    if (!ticketId.trim() || !trackingToken.trim()) return;
     fetchTrackStatus(ticketId.trim(), trackingToken.trim());
   };
 
@@ -127,96 +149,67 @@ export default function PublicTrackPage() {
     }
   };
 
-  // Determine current active stage index
-  const currentStageId = ({
-    pending: 'received', unverified: 'received', needs_information: 'under_review',
-    under_review: 'under_review', pending_approval: 'under_review',
-    approved_internal: 'validated', dispatched: 'assigned',
-    completed_pending_review: 'in_progress',
-  })[(reportData?.status || '').toLowerCase()] || (reportData?.status || 'received').toLowerCase().replace(' ', '_');
-  let currentStageIndex = LIFECYCLE_STAGES.findIndex(s => s.id === currentStageId);
-  if (currentStageIndex === -1) currentStageIndex = 0;
-
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
-      <WizardHeader currentStep={1} totalSteps={1} />
-
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
-        
-        {/* ── HEADER ──────────────────────────────────────────────────────────── */}
-        <div className="text-center space-y-2 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 text-xs font-bold uppercase tracking-wider mb-1">
-            <Activity size={14} className="text-orange-600" />
-            <span>{t('track.header.badge', 'Civic Aperture · Transparent Public Works')}</span>
-          </div>
-          <h1 className="font-display font-bold text-2xl sm:text-4xl text-slate-900 dark:text-white">
-            {t('track.header.title', 'Track Public Infrastructure Report')}
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-            {t('track.header.subtitle', 'Read the latest recorded status and public timeline for your Caloocan City ticket.')}
-          </p>
-        </div>
-
+    <div className="space-y-6">
         {/* ── LOOKUP FORM ─────────────────────────────────────────────────────── */}
-        <form onSubmit={handleLookupSubmit} className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-md space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form onSubmit={handleLookupSubmit} className={inSheet ? 'native-track-sheet__form' : 'space-y-5'}>
+          <div className={inSheet ? 'native-track-sheet__fields' : 'grid grid-cols-1 sm:grid-cols-2 gap-4'}>
             <div>
-              <label htmlFor="track-ticket-id" className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="track-ticket-id" className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
                 {t('track.lookup.ticketLabel', 'Ticket ID')}
               </label>
+              <div className={inSheet ? 'native-track-sheet__input' : undefined}>
               <input
                 id="track-ticket-id"
                 type="text"
                 value={ticketId}
                 onChange={(e) => setTicketId(e.target.value)}
-                placeholder={t('track.lookup.ticketPlaceholder', 'e.g. RPT-20260902-8F92E1B4 or PULSO-10492')}
+                placeholder={inSheet ? t('track.lookup.ticketExample', 'e.g. PUL-2026-0842') : t('track.lookup.ticketPlaceholder', 'Enter ticket ID')}
                 required
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm font-mono placeholder:font-sans placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                autoCapitalize="characters" autoCorrect="off" spellCheck={false} disabled={isLoading}
+                className="min-h-12 w-full rounded-md border border-slate-400 bg-white px-3 py-3 text-base text-slate-900 placeholder:text-slate-500 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 dark:focus-visible:outline-blue-300"
               />
+              {inSheet && <Search size={18} aria-hidden="true" />}
+              </div>
             </div>
 
             <div>
-              <label htmlFor="track-token" className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('track.lookup.tokenLabel', 'Tracking Code OR Contact (Phone / Email)')}
+              <label htmlFor="track-token" className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                {t('track.lookup.tokenLabel', 'Tracking code')}
               </label>
+              <div className={inSheet ? 'native-track-sheet__input' : undefined}>
               <input
                 id="track-token"
                 type="text"
+                required
                 value={trackingToken}
                 onChange={(e) => setTrackingToken(e.target.value)}
-                placeholder={t('track.lookup.tokenPlaceholder', 'TRK-XXXX-XXXX or 0917XXXXXXX or name@email.com')}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm font-mono placeholder:font-sans placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                placeholder={inSheet ? t('track.lookup.tokenReceiptPlaceholder', 'Code from your receipt') : t('track.lookup.tokenPlaceholder', 'Enter tracking code')}
+                autoCapitalize="characters" autoCorrect="off" spellCheck={false} disabled={isLoading}
+                className="min-h-12 w-full rounded-md border border-slate-400 bg-white px-3 py-3 text-base text-slate-900 placeholder:text-slate-500 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 dark:focus-visible:outline-blue-300"
               />
+              {inSheet && <KeyRound size={18} aria-hidden="true" />}
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div>
             <button
               type="submit"
-              disabled={isLoading || !ticketId.trim()}
-              className="px-6 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm flex items-center gap-2 shadow-md transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={isLoading || !ticketId.trim() || !trackingToken.trim()}
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-5 py-3 text-base font-bold text-[#0b1630] hover:bg-primary-hover focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:outline-blue-300"
             >
-              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-              <span>{isLoading ? t('track.lookup.searching', 'Searching Civic Registry...') : t('track.lookup.submitBtn', 'Track Report')}</span>
+              {isLoading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : !inSheet && <Search size={16} aria-hidden="true" />}
+              <span>{isLoading ? t('track.lookup.searching', 'Checking…') : t('track.lookup.submitBtn', 'Track report')}</span>
             </button>
           </div>
         </form>
 
-        {/* ── CIVIC PULSE LOADING INDICATOR ─────────────────────────────────── */}
-        {isLoading && (
-          <div className="py-6 flex flex-col items-center justify-center gap-2.5 animate-fadeIn" role="status" aria-live="polite">
-            <div className="w-48">
-              <PulsoPulseLine />
-            </div>
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium font-sans">
-              {t('track.lookup.searching', 'Searching Civic Registry...')}
-            </span>
-          </div>
-        )}
+        {isLoading && <p role="status" className={inSheet ? 'sr-only' : 'text-sm text-slate-600 dark:text-slate-300'}>{t('track.lookup.searching', 'Checking…')}</p>}
 
         {/* ── ERROR ALERT ─────────────────────────────────────────────────────── */}
         {errorMsg && (
-          <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-sm text-red-800 dark:text-red-300 flex items-center gap-3">
+          <div role="alert" className="p-4 rounded-md bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-sm text-red-800 dark:text-red-300 flex items-center gap-3">
             <AlertTriangle size={20} className="shrink-0 text-red-600" />
             <span>{errorMsg}</span>
           </div>
@@ -226,7 +219,7 @@ export default function PublicTrackPage() {
 
         {/* ── TRACKING RESULTS ────────────────────────────────────────────────── */}
         {reportData && (
-          <div className="space-y-6 animate-fade-in">
+          <div ref={resultRegion} className="space-y-6 animate-fade-in">
             {reportData.status === 'needs_information' && (
               <form onSubmit={handleReplySubmit} className="rounded-xl border border-orange-300 bg-white dark:bg-slate-900 p-5 space-y-3">
                 <h2 className="font-bold text-base">{t('track.reply.title', 'Additional information requested')}</h2>
@@ -245,21 +238,21 @@ export default function PublicTrackPage() {
             {/* Privacy Redaction Banner */}
             <aside className="p-3.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300">
               <ShieldCheck size={16} className="text-slate-400 shrink-0" />
-              <span>{t('track.result.privacyNotice', 'Public Privacy Mode Active: Reporter details and private contact info are protected.')}</span>
+              <span>{t('track.result.privacyNotice', 'Your name and contact details are kept private.')}</span>
             </aside>
 
             {/* Main Ticket Summary */}
-            <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-lg space-y-6">
+            <div className="rounded-lg border border-slate-300 bg-white p-4 sm:p-6 dark:border-slate-700 dark:bg-slate-900 space-y-6">
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     {t('track.result.ticketHeader', 'Ticket Details')}
                   </span>
-                  <div className="font-mono font-black text-2xl text-slate-900 dark:text-white mt-0.5">
+                  <div className="break-all font-mono font-semibold text-lg text-slate-900 dark:text-white mt-0.5">
                     {reportData.ticket_id || reportData.id || ticketId}
                   </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{t('track.result.statusLabel', 'Recorded status')}: {t(`track.status.${reportData.status}`, reportData.public_status_label || reportData.status)}</p>
+                  <p role="status" className="text-sm text-slate-600 dark:text-slate-300 mt-1">{t('track.result.statusLabel', 'Recorded status')}: {t(`track.status.${reportData.status}`, reportData.public_status_label || reportData.status)}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -289,46 +282,6 @@ export default function PublicTrackPage() {
                       {reportData.created_at ? new Date(reportData.created_at).toLocaleString() : 'Recent'}
                     </p>
                   </div>
-                </div>
-              </div>
-
-              {/* ── 6-STAGE PULSELINE STEPPER ──────────────────────────────────── */}
-              <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <h2 className="font-bold text-sm uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                  {t('track.result.pulseLineTitle', 'PulseLine 6-Stage Progress')}
-                </h2>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                  {LIFECYCLE_STAGES.map((stg, idx) => {
-                    const isCompleted = idx < currentStageIndex;
-                    const isCurrent = idx === currentStageIndex;
-
-                    return (
-                      <div
-                        key={stg.id}
-                        className={`p-3 rounded-2xl border text-center transition-all ${
-                          isCurrent
-                            ? 'border-orange-500 bg-orange-50/70 dark:bg-orange-950/40 shadow-sm ring-2 ring-orange-500/20'
-                            : isCompleted
-                            ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300'
-                            : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-slate-400 dark:text-slate-600 opacity-70'
-                        }`}
-                      >
-                        <div className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center text-xs font-bold mb-1.5 ${
-                          isCurrent
-                            ? 'bg-orange-600 text-white'
-                            : isCompleted
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
-                        }`}>
-                          {isCompleted ? <CheckCircle2 size={14} /> : idx + 1}
-                        </div>
-                        <h3 className={`font-bold text-xs ${isCurrent ? 'text-orange-600 dark:text-orange-400' : ''}`}>
-                          {t(`track.stages.${stg.key}.label`, stg.defaultLabel)}
-                        </h3>
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
 
@@ -370,7 +323,7 @@ export default function PublicTrackPage() {
                       {t('track.result.claimPrompt', 'Is this your report? Link it to your account for unified management')}
                     </h3>
                     <p className="text-[11px] text-blue-800/80 dark:text-blue-300/80">
-                      Save this ticket to your resident profile to receive instant push alerts.
+                      {t('track.result.claimDescription', 'Sign in to save this report to your account.')}
                     </p>
                   </div>
                   <Link
@@ -387,7 +340,6 @@ export default function PublicTrackPage() {
           </div>
         )}
 
-      </main>
     </div>
   );
 }

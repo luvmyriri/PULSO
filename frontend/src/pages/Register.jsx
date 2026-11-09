@@ -1,3 +1,5 @@
+import NativeAppHeader from '../components/mobile/NativeAppHeader';
+import { isNativeAndroid } from '../utils/appContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -1998,8 +2000,11 @@ export default function Register() {
 
 
 
+            {isNativeAndroid() && <NativeAppHeader />}
             {/* ── Top Header: Logo, Dynamic Progress, Theme Toggle (Mirrored from Login) ───────────── */}
-            <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex flex-col gap-2 shrink-0">
+            <header className={isNativeAndroid() ? "relative z-20 w-full shrink-0 px-4 py-2" : "relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex flex-col gap-2 shrink-0"}>
+                {!isNativeAndroid() && (
+                <>
                 {/* Main Header Row */}
                 <div className="w-full flex justify-between items-center gap-2">
                     <Link
@@ -2061,6 +2066,9 @@ export default function Register() {
                         </Link>
                     </div>
                 </div>
+
+                </>
+                )}
 
                 {/* Mobile: Step-by-Step progress placed at the bottom of the header (Segmented Stepper) */}
                 {step <= 5 ? (

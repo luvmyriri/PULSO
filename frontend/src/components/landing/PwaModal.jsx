@@ -3,51 +3,24 @@ import { QRCodeSVG } from 'qrcode.react';
 import {
   X,
   Smartphone,
-  Share2,
-  PlusSquare,
   Download,
   Copy,
   Check,
-  Apple,
   Wifi,
   Globe,
-  Edit3,
-  RotateCw
+  Edit3
 } from 'lucide-react';
-import { API_BASE_URL } from '../../utils/apiBase';
-
-const getInitialPort = () => {
-  if (typeof window === 'undefined') return '5173';
-  return window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
-};
-
-const getInitialOrigin = () => (
-  typeof window === 'undefined' ? '' : window.location.origin
-);
-
-const getInitialUrlMode = () => {
-  return 'origin';
-};
+import { useMobileInstallLink } from './useMobileInstallLink';
 
 export default function PwaModal({ isOpen, onClose }) {
-  const [activePlatform, setActivePlatform] = useState('android'); // 'ios' | 'android'
   const [copied, setCopied] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstallable, setIsInstallable] = useState(false);
-  const [networkStatus, setNetworkStatus] = useState('idle');
-
-  // Wi-Fi vs Localhost mode
-  const [urlMode, setUrlMode] = useState(getInitialUrlMode); // 'wifi' | 'origin'
-  const [wifiIp, setWifiIp] = useState('');
   const [isEditingIp, setIsEditingIp] = useState(false);
-  const [customIp, setCustomIp] = useState('');
-  const [port] = useState(getInitialPort);
-  const [originUrl] = useState(getInitialOrigin);
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
-  const isLocalDevelopment = import.meta.env.DEV
-    && typeof window !== 'undefined'
-    && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const { activeUrl, apkUrl, needsDiscovery, wifiIp, setWifiIp } = useMobileInstallLink(isOpen);
+  const canCopy = typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
@@ -62,32 +35,6 @@ export default function PwaModal({ isOpen, onClose }) {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
-
-  useEffect(() => {
-    if (!isOpen || !isLocalDevelopment) return undefined;
-
-    const controller = new AbortController();
-    fetch(`${API_BASE_URL}/api/system/network-ip`, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error('Network discovery unavailable');
-        return res.json();
-      })
-      .then((data) => {
-        if (!data?.ip) throw new Error('Network discovery unavailable');
-        setWifiIp(data.ip);
-        setCustomIp(data.ip);
-        setUrlMode('wifi');
-        setNetworkStatus('ready');
-      })
-      .catch((error) => {
-        if (error.name !== 'AbortError') {
-          setUrlMode('origin');
-          setNetworkStatus('unavailable');
-        }
-      });
-
-    return () => controller.abort();
-  }, [isOpen, isLocalDevelopment]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -128,11 +75,6 @@ export default function PwaModal({ isOpen, onClose }) {
       previouslyFocused?.focus?.();
     };
   }, [isOpen, onClose]);
-
-  // Compute final URL for QR Code
-  const activeUrl = urlMode === 'wifi'
-    ? (customIp || wifiIp ? `http://${customIp || wifiIp}${port ? `:${port}` : ''}` : originUrl)
-    : (originUrl || 'https://pulso.caloocan.gov.ph');
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -182,12 +124,12 @@ export default function PwaModal({ isOpen, onClose }) {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                  {networkStatus === 'ready' ? <Wifi size={13} className="text-emerald-500" /> : <Globe size={13} />}
-                  {networkStatus === 'ready' ? 'Same Wi-Fi preview available' : 'Install from a supported browser'}
+                  {apkUrl ? <Wifi size={13} /> : <Globe size={13} />}
+                  {apkUrl ? 'Development only · Same Wi-Fi' : 'PULSO on mobile'}
                 </span>
               </div>
               <h3 id="pwa-modal-title" className="font-heading font-black text-lg sm:text-xl text-slate-900 dark:text-white leading-tight mt-0.5">
-                Install PULSO Mobile App
+                {apkUrl ? 'PULSO Android APK' : 'Install PULSO Mobile App'}
               </h3>
             </div>
           </div>
@@ -214,19 +156,12 @@ export default function PwaModal({ isOpen, onClose }) {
                 value={activeUrl}
                 size={144}
                 level="H"
-                includeMargin={false}
-                imageSettings={{
-                  src: '/city-engineering-logo.png',
-                  x: undefined,
-                  y: undefined,
-                  height: 34,
-                  width: 34,
-                  excavate: true,
-                }}
+                marginSize={4}
+                title={apkUrl ? 'QR code for the development APK download page' : 'QR code for the PULSO website'}
               />
               <span className="text-[10px] font-mono font-bold text-slate-500 mt-1.5 uppercase tracking-wider flex items-center gap-1">
                 <Wifi size={10} className="text-[#ff6b00]" />
-                  {urlMode === 'wifi' ? 'Open mobile preview' : 'Scan via phone'}
+                  Scan via phone
               </span>
             </div>
 
@@ -234,33 +169,35 @@ export default function PwaModal({ isOpen, onClose }) {
             <div className="flex-1 text-center sm:text-left w-full min-w-0">
               <div className="flex items-center gap-2 justify-center sm:justify-start flex-wrap">
                 <h4 className="font-heading font-extrabold text-base text-slate-900 dark:text-white leading-snug">
-                  {urlMode === 'wifi' ? 'Open the development preview' : 'Scan to open on your phone'}
+                  {apkUrl ? 'Scan to download the APK' : 'Scan to open on your phone'}
                 </h4>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
-                {urlMode === 'wifi'
-                  ? <>This HTTP address opens a same-network preview. Browser installation is unavailable until PULSO is served over HTTPS.</>
-                  : <>Open this secure site on your phone, then use your browser&apos;s install or Add to Home Screen action when available.</>}
+                {apkUrl
+                  ? 'Use the same Wi-Fi as this computer and keep the development download server running.'
+                  : needsDiscovery
+                    ? 'Enter your computer’s Wi-Fi address to show the Android APK QR code.'
+                    : 'Open PULSO on your phone.'}
               </p>
 
               {/* Direct App URL pill + Copy */}
               <div className="mt-2.5 flex items-center gap-2 p-1.5 pl-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                {isEditingIp && urlMode === 'wifi' ? (
+                {isEditingIp && needsDiscovery ? (
                   <input
                     type="text"
-                    value={customIp}
-                    onChange={(e) => setCustomIp(e.target.value)}
+                    value={wifiIp}
+                    onChange={(e) => setWifiIp(e.target.value)}
                     placeholder="Enter Wi-Fi IPv4 (e.g. 192.168.0.110)"
                     aria-label="Development Wi-Fi address"
                     className="min-h-11 font-mono text-xs text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-orange-400 flex-1 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
                   />
                 ) : (
-                  <span className="font-mono text-xs text-slate-700 dark:text-slate-300 truncate flex-1 text-left font-bold select-all">
+                  <a href={activeUrl} className="flex min-h-11 flex-1 items-center break-all text-left font-mono text-xs font-bold text-slate-700 underline dark:text-slate-300 focus-visible:outline-3 focus-visible:outline-blue-600">
                     {activeUrl}
-                  </span>
+                  </a>
                 )}
 
-                {urlMode === 'wifi' && (
+                {needsDiscovery && (
                   <button
                     type="button"
                     onClick={() => setIsEditingIp(!isEditingIp)}
@@ -272,18 +209,20 @@ export default function PwaModal({ isOpen, onClose }) {
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="min-h-11 px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/70 dark:hover:bg-orange-900/80 text-[#ff6b00] dark:text-orange-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
-                >
-                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                  <span aria-live="polite">{copied ? 'Copied!' : 'Copy'}</span>
-                </button>
+                {canCopy && (
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="min-h-11 px-3 py-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/70 dark:hover:bg-orange-900/80 text-[#ff6b00] dark:text-orange-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600"
+                  >
+                    {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                    <span aria-live="polite">{copied ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                )}
               </div>
 
               {/* Direct Install button if supported by browser */}
-              {isInstallable && (
+              {isInstallable && !apkUrl && (
                 <button
                   type="button"
                   onClick={handleInstallClick}
@@ -294,118 +233,6 @@ export default function PwaModal({ isOpen, onClose }) {
                 </button>
               )}
             </div>
-          </div>
-
-          {/* Platform Step-by-Step Tabs */}
-          <div>
-            {urlMode === 'wifi' ? (
-              <div className="py-2 text-left">
-                <p className="font-heading font-bold text-xs sm:text-sm text-slate-900 dark:text-white">Preview only</p>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">The same-Wi-Fi HTTP address can preview the mobile layout, but browsers require HTTPS to install PULSO. Use the current secure site for installation.</p>
-              </div>
-            ) : (
-            <>
-            <div className="flex flex-col items-start justify-between gap-2 mb-3 sm:flex-row sm:items-center">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Installation Instructions:
-              </span>
-              <div className="grid w-full grid-cols-2 rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/80 dark:border-slate-700 sm:inline-flex sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setActivePlatform('android')}
-                  aria-pressed={activePlatform === 'android'}
-                  className={`min-h-11 min-w-0 justify-center px-2 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${
-                    activePlatform === 'android'
-                      ? 'bg-white dark:bg-slate-700 text-[#ff6b00] shadow-xs font-black'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Smartphone size={13} />
-                  <span>Android</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePlatform('ios')}
-                  aria-pressed={activePlatform === 'ios'}
-                  className={`min-h-11 min-w-0 justify-center px-2 sm:px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-600 ${
-                    activePlatform === 'ios'
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-black'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Apple size={13} />
-                  <span>iPhone / iPad</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Android Instructions */}
-            {activePlatform === 'android' && (
-              <div className="space-y-2.5">
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 text-xs">
-                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950/70 text-[#ff6b00] flex items-center justify-center font-black shrink-0 mt-0.5">
-                    1
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900 dark:text-white">Open the secure PULSO site</p>
-                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">Open <strong className="font-mono text-[#ff6b00]">{activeUrl}</strong> in Google Chrome.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 text-xs">
-                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950/70 text-[#ff6b00] flex items-center justify-center font-black shrink-0 mt-0.5">
-                    2
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900 dark:text-white">Look for &quot;Install app&quot; in Chrome Menu (⋮)</p>
-                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">Tap the 3 dots in the top-right corner of Chrome and select <strong>&quot;Install app&quot;</strong> (or <strong>&quot;Install PULSO&quot;</strong>). When installed, PULSO launches independently without any Chrome browser URL bar or tabs!</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* iOS Instructions */}
-            {activePlatform === 'ios' && (
-              <div className="space-y-2.5">
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 text-xs">
-                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950/70 text-[#ff6b00] flex items-center justify-center font-black shrink-0 mt-0.5">
-                    1
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900 dark:text-white">Scan the secure site QR code</p>
-                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">Open the Camera app and tap the detected link to open PULSO in Safari.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 text-xs">
-                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950/70 text-[#ff6b00] flex items-center justify-center font-black shrink-0 mt-0.5">
-                    2
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <span>Tap the Share Button</span>
-                      <Share2 size={13} className="text-blue-500 inline shrink-0" />
-                    </p>
-                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">At the bottom bar of Safari, tap the Share icon (square box with an arrow pointing up).</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 text-xs">
-                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-950/70 text-[#ff6b00] flex items-center justify-center font-black shrink-0 mt-0.5">
-                    3
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                      <span>Select &quot;Add to Home Screen&quot;</span>
-                      <PlusSquare size={13} className="text-[#ff6b00] inline shrink-0" />
-                    </p>
-                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">Scroll down in the action sheet, tap <strong>&quot;Add to Home Screen&quot;</strong>, then tap <strong>&quot;Add&quot;</strong>. The official PULSO app icon will appear on your iPhone home screen!</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            </>
-            )}
           </div>
         </div>
 

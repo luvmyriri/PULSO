@@ -1,7 +1,10 @@
+import { isNativeAndroid } from '../utils/appContext';
+import NativeAppHeader from '../components/mobile/NativeAppHeader';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
     User, Shield, Eye, EyeOff, ChevronRight,
     Activity, Mail, ArrowLeft, CheckCircle, Lock,
@@ -233,6 +236,8 @@ function SixDigitOtpInput({
 export default function Login() {
     const captchaConfig = getRecaptchaConfig();
     const navigate = useNavigate();
+    const { t } = useTranslation();
+    const nativeAndroid = isNativeAndroid();
     const [legalModal, setLegalModal]     = useState({ isOpen: false, tab: 'privacy' });
     const [email, setEmail]               = useState('');
     const [password, setPassword]         = useState('');
@@ -864,7 +869,8 @@ export default function Login() {
             {/* Clean background */}
 
             {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
-            <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
+            {nativeAndroid ? <NativeAppHeader /> : (
+              <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
                 {/* Logo on top-left linking to home */}
                 <Link
                     to="/resident-home"
@@ -887,6 +893,7 @@ export default function Login() {
                     </Link>
                 </div>
             </header>
+            )}
 
             {/* ── Main Content Grid (60/40 Ratio in max-w-7xl on Desktop, Hero hidden on Mobile) ───────────── */}
             <main className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-6 lg:py-12 flex-1 flex items-center justify-center">
@@ -1095,9 +1102,9 @@ export default function Login() {
 
                                                 <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 text-center">
                                                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                        Need to file an urgent hazard report right away?{' '}
+                                                        {nativeAndroid ? t('login.noAccount') : 'Need to file an urgent hazard report right away?'}{' '}
                                                         <Link to="/register" className="text-[#ff6b00] font-bold hover:underline cursor-pointer">
-                                                            Register as resident
+                                                            {nativeAndroid ? t('nativeAndroid.home.createAccount') : 'Register as resident'}
                                                         </Link>
                                                     </p>
                                                 </div>

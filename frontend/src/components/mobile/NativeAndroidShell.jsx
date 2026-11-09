@@ -1,42 +1,46 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { App as NativeApp } from '@capacitor/app';
 import { SplashScreen } from '@capacitor/splash-screen';
-import { StatusBar, Style } from '@capacitor/status-bar';
-import { SystemBars, SystemBarsStyle, SystemBarType } from '@capacitor/core';
 import { Toast } from '@capacitor/toast';
 import { useTheme } from '../../contexts/ThemeContext';
-import { getAuthToken } from '../../utils/authSession';
-import { residentDashboardRoute } from '../../utils/residentDashboardRoute';
 import { dismissAndroidLayer } from '../../utils/nativeAndroid';
+import { syncNativeSystemBars } from '../../utils/nativeSystemBars';
+import MobileAppSplashScreen from './MobileAppSplashScreen';
 import './native-android.css';
 
-export default function NativeAndroidShell() {
+export default function NativeAndroidShell({ children }) {
   const navigate = useNavigate();
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   const { t } = useTranslation();
   const { isDark } = useTheme();
   const lastBack = useRef(0);
+  const [isStarting, setIsStarting] = useState(true);
+  const [nativeSplashReleased, setNativeSplashReleased] = useState(false);
+  const finishStartup = useCallback(() => setIsStarting(false), []);
+  const darkBars = isStarting || isDark;
 
   useEffect(() => {
+    let active = true;
     let second;
     const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => { void SplashScreen.hide().catch(console.warn); });
+      second = requestAnimationFrame(() => {
+        void SplashScreen.hide().catch(console.warn).finally(() => {
+          if (active) setNativeSplashReleased(true);
+        });
+      });
     });
     return () => {
+      active = false;
       cancelAnimationFrame(first);
       cancelAnimationFrame(second);
     };
   }, []);
 
   useEffect(() => {
-    void StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light }).catch(console.warn);
-    void SystemBars.setStyle({
-      bar: SystemBarType.NavigationBar,
-      style: isDark ? SystemBarsStyle.Dark : SystemBarsStyle.Light,
-    }).catch(console.warn);
-  }, [isDark]);
+    return syncNativeSystemBars(darkBars ? '#0c1421' : '#f7f9fc');
+  }, [darkBars, pathname]);
 
   useEffect(() => {
     lastBack.current = 0;
@@ -45,12 +49,9 @@ export default function NativeAndroidShell() {
         lastBack.current = 0;
         return;
       }
-      const home = getAuthToken() ? '/dashboard' : '/report';
-      const dashboardHome = pathname === '/dashboard' && residentDashboardRoute(search).tab === 'overview';
-      const atHome = home === '/dashboard' ? dashboardHome : pathname === home;
-      if (!atHome && pathname !== '/') {
+      if (pathname !== '/') {
         if (canGoBack && (window.history.state?.idx ?? 0) > 0) navigate(-1);
-        else navigate(home, { replace: true });
+        else navigate('/', { replace: true });
         return;
       }
       if (performance.now() - lastBack.current < 2000 && lastBack.current > 0) {
@@ -61,7 +62,7 @@ export default function NativeAndroidShell() {
       void Toast.show({ text: t('nativeAndroid.backToExit', 'Press back again to exit'), duration: 'short' });
     });
     return () => { void listener.then((subscription) => subscription.remove()); };
-  }, [navigate, pathname, search, t]);
+  }, [navigate, pathname, t]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -91,5 +92,14 @@ export default function NativeAndroidShell() {
     };
   }, []);
 
-  return null;
+  return isStarting ? (
+    <MobileAppSplashScreen
+      onFinish={finishStartup}
+      isReady={nativeSplashReleased}
+      minDurationStartsOnReady
+      loadsBundledApp
+      themeModeOverride="dark"
+      reducedMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches}
+    />
+  ) : children;
 }

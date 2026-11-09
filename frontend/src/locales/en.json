@@ -59,7 +59,41 @@
     "nativeAndroid": {
         "backToExit": "Press back again to exit",
         "about": "About PULSO",
-        "version": "App version {{version}}"
+        "navigation": {
+            "home": "PULSO home",
+            "language": "Language",
+            "search": "Search reports, updates or help",
+            "assistant": "Assistant",
+            "changeTheme": "Switch to {{theme}} theme",
+            "themes": { "light": "light", "dark": "dark", "system": "system" }
+        },
+        "version": "App version {{version}}",
+        "home": {
+            "heading": "Report a problem in your neighborhood",
+            "description": "Tell the City Engineering Department about damaged roads, blocked drains, and other public infrastructure issues in Caloocan.",
+            "actions": "Resident services",
+            "report": "Report a Problem",
+            "track": "Track a report",
+            "signIn": "Resident sign in",
+            "myReports": "My reports",
+            "guide": "How to use PULSO",
+            "headlineStart": "Report an",
+            "headlineMiddle": "issue in",
+            "welcome": "A safer, cleaner, and better Caloocan for everyone.",
+            "signInShort": "Sign In",
+            "createAccount": "Create Account",
+            "howTitle": "How It",
+            "howAccent": "Works",
+            "steps": {
+                "capture": { "title": "Report", "description": "Add a photo and describe the issue." },
+                "submit": { "title": "Submit", "description": "Review and send your report." },
+                "follow": { "title": "Track", "description": "Follow updates using your receipt." }
+            },
+            "communityStart": "Let’s build a better",
+            "communityEnd": " together.",
+            "communityTagline": "Bayanihan. Para sa Caloocan.",
+            "citySeal": "Caloocan City seal"
+        }
     },
     "loadingScreen": {
       "ariaLabel": "Loading PULSO",
@@ -757,21 +791,24 @@
     },
     "track": {
       "header": {
-        "title": "Track Public Infrastructure Report",
-        "subtitle": "Read the latest recorded status and public timeline for your Caloocan City ticket.",
-        "badge": "Civic Aperture · Transparent Public Works"
+        "title": "Track a report",
+        "subtitle": "Enter the ticket ID and tracking code from your report receipt."
       },
       "lookup": {
         "title": "Ticket Lookup",
-        "subtitle": "Enter your Ticket ID and Secret Tracking Token from your receipt.",
+        "subtitle": "Enter the ticket ID and tracking code from your report receipt.",
         "ticketLabel": "Ticket ID",
-        "ticketPlaceholder": "e.g. RPT-20260902-8F92E1B4 or PULSO-10492",
-        "tokenLabel": "Secret Tracking Token",
-        "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
-        "submitBtn": "Track Report",
-        "searching": "Searching Civic Registry...",
-        "errorNotFound": "Report not found or invalid tracking credentials. Please check your Ticket ID and Token.",
-        "networkError": "Could not reach the civic registry. Check your connection and try again."
+        "ticketPlaceholder": "Enter ticket ID",
+        "ticketExample": "e.g. PUL-2026-0842",
+        "tokenLabel": "Tracking code",
+        "tokenPlaceholder": "Enter tracking code",
+        "tokenReceiptPlaceholder": "Code from your receipt",
+        "submitBtn": "Track report",
+        "closeSheet": "Close tracking panel",
+        "searching": "Checking…",
+        "errorNotFound": "We could not find a report with those details. Check the ticket ID and tracking code.",
+        "networkError": "Could not connect. Check your connection and try again.",
+        "serviceError": "Could not load your report. Try again."
       },
       "reply": {
         "title": "Additional information requested",
@@ -805,11 +842,12 @@
         "lastUpdated": "Last Updated",
         "currentStageLabel": "Current Operational Stage",
         "publicSummary": "Location Summary",
-        "privacyNotice": "Public Privacy Mode Active: Reporter details, private contact info, and internal staff notes are protected and redacted.",
+        "privacyNotice": "Your name and contact details are kept private.",
         "pulseLineTitle": "PulseLine 6-Stage Progress",
         "timelineTitle": "Public Milestone Timeline",
         "claimPrompt": "Is this your report? Link it to your account for unified management",
-        "claimBtn": "Claim This Report"
+        "claimBtn": "Claim This Report",
+        "claimDescription": "Sign in to save this report to your account."
       },
       "stages": {
         "received": {
