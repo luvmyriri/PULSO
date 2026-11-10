@@ -8,8 +8,7 @@ import { getAuthToken } from '../../utils/authSession';
 import { markTutorialCompleted } from '../../utils/appContext';
 import { ONBOARDING_CONTENT } from '../../data/onboardingContent';
 import { NATIVE_GUIDE_CONTENT } from '../../data/nativeGuideContent';
-import NativeAppHeader, { NativeAppBrand, NativeLanguagePicker, NativeThemeToggle } from './NativeAppHeader';
-import NativeGuideDiagram from './NativeGuideDiagram';
+import { NativeAppBrand, NativeLanguagePicker, NativeThemeToggle } from './NativeAppHeader';
 import './native-resident-theme.css';
 import './native-resident-landing.css';
 import './native-app-guide.css';
@@ -50,24 +49,21 @@ export default function NativeAppGuide({ firstLaunch = false, onComplete, onNavi
   }, [step]);
 
   return (
-    <div className={`native-guide${firstLaunch ? ' native-guide--briefing' : ''}`} data-native-guide data-first-launch={firstLaunch || undefined} data-landing-theme={isDark ? 'dark' : 'light'} lang={language}>
-      {firstLaunch ? (
-        <div className="native-guide__photo" aria-hidden="true">
-          <img src="/resident-hero/native-bonifacio-monument.webp" alt="" fetchPriority="high" />
-        </div>
-      ) : <NativeAppHeader appearance="hero">
-        <button type="button" className="native-home__account-link" onClick={() => finish(signedIn ? '/dashboard' : '/login', 'Account tapped')}>
-          {t(signedIn ? 'nativeAndroid.home.myReports' : 'nativeAndroid.home.signInShort')}
-        </button>
-      </NativeAppHeader>}
+    <div className="native-guide" data-native-guide data-first-launch={firstLaunch || undefined} data-landing-theme={isDark ? 'dark' : 'light'} lang={language}>
+      <div className="native-guide__photo" aria-hidden="true">
+        <img src="/resident-hero/native-bonifacio-monument.webp" alt="" fetchPriority="high" />
+      </div>
       <header className="native-guide__utility">
-        {firstLaunch && <NativeAppBrand linked={false} appearance="hero" />}
-        {firstLaunch && (
-          <div className="native-guide__controls">
-            <NativeLanguagePicker />
-            <NativeThemeToggle className="native-guide__theme" />
-          </div>
-        )}
+        <NativeAppBrand linked={!firstLaunch} appearance="hero" />
+        <div className="native-guide__controls">
+          {!firstLaunch && (
+            <button type="button" className="native-home__account-link" onClick={() => finish(signedIn ? '/dashboard' : '/login', 'Account tapped')}>
+              {t(signedIn ? 'nativeAndroid.home.myReports' : 'nativeAndroid.home.signInShort')}
+            </button>
+          )}
+          <NativeLanguagePicker />
+          <NativeThemeToggle className="native-guide__theme" />
+        </div>
         <button type="button" className="native-guide__skip" onClick={() => finish(firstLaunch ? '/' : signedIn ? '/dashboard' : '/', 'Skip tapped')} aria-label={common.header.skipAria}>
           {common.header.skipLabel}<ArrowRight size={16} aria-hidden="true" />
         </button>
@@ -78,14 +74,13 @@ export default function NativeAppGuide({ firstLaunch = false, onComplete, onNavi
             <h1 id="native-guide-heading" ref={heading} tabIndex={-1}>{content.title} <strong>{content.accent}</strong></h1>
             <p className="native-guide__subtitle">{content.subtitle}</p>
           </div>
-          {!firstLaunch && <NativeGuideDiagram step={step} />}
           <div className="native-guide__tips">
             {step === 1 && <h2>{labels.overview}</h2>}
             <ul>
               {content.items.map(([icon, title, description], index) => {
                 const Icon = icons[icon];
                 return <li key={`${step}-${index}`}>
-                  <Icon size={firstLaunch ? 25 : 22} strokeWidth={1.7} aria-hidden="true" />
+                  <Icon size={25} strokeWidth={1.7} aria-hidden="true" />
                   <div><h3>{title}</h3><p>{description}</p></div>
                 </li>;
               })}

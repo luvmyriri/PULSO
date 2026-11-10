@@ -2,7 +2,7 @@ import { registerPlugin } from '@capacitor/core';
 
 const Appearance = registerPlugin('PulsoAppearance');
 
-/** Use true edge-to-edge on the native landing; retain safe native form insets elsewhere. */
+/** Draw the native landing and guide behind the Android system bars. */
 export function syncNativeSystemBars(fallbackColor) {
   const canvas = document.createElement('canvas');
   canvas.width = 1;
@@ -32,7 +32,7 @@ export function syncNativeSystemBars(fallbackColor) {
     if (stopped) return;
     const topColor = edgeColor(1);
     const bottomColor = edgeColor(window.innerHeight - 1);
-    const edgeToEdge = Boolean(document.querySelector('[data-native-resident-landing]'));
+    const edgeToEdge = Boolean(document.querySelector('[data-native-resident-landing], [data-native-guide]'));
     const colors = topColor + bottomColor + edgeToEdge;
     if (colors === previousColors) return;
     previousColors = colors;
