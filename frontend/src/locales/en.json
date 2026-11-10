@@ -59,8 +59,19 @@
       }
     },
     "nativeAndroid": {
+        "search": {
+            "back": "Back to dashboard", "clear": "Clear search", "intro": "Your reports, city updates and help.",
+            "reports": "My reports", "actions": "Quick actions", "updates": "City updates", "guides": "Help guides", "hotlines": "Hotlines",
+            "recent": "Recent searches", "clearAll": "Clear all", "removeRecent": "Remove {{query}} from recent searches",
+            "removed": "{{query}} removed.", "cleared": "Recent searches cleared.",
+            "results_one": "{{count}} match", "results_other": "{{count}} matches",
+            "empty": "No matches found", "emptyHelp": "Try a ticket ID, location, service or another keyword.",
+            "loading": "Reports and city updates are still loading. More matches may appear.",
+            "updatesUnavailable": "City updates are temporarily unavailable. Other search results are still available.",
+            "shortcuts": { "report": "File a report", "map": "Community map", "services": "City services", "help": "Help guides", "reports": "My reports", "profile": "My account", "settings": "Settings and security" }
+        },
         "notificationSettingsBack": "Settings",
-        "dashboard": { "hello": "Hello,", "resident": "Resident", "returnHome": "Return to dashboard Home" },
+        "dashboard": { "hello": "Hello,", "resident": "Resident", "openAccount": "Open Account and Profile" },
         "appUpdate": {
             "shortLabel": "App update",
             "confirmTitle": "Update PULSO?",

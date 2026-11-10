@@ -12,10 +12,10 @@ export function syncNativeSystemBars(fallbackColor) {
   let previousColors = '';
   let stopped = false;
 
-  const edgeColor = (y) => {
+  const elementColor = (element) => {
     const layers = [];
-    for (let element = document.elementFromPoint(window.innerWidth / 2, y); element; element = element.parentElement) {
-      layers.push(getComputedStyle(element).backgroundColor);
+    for (let layer = element; layer; layer = layer.parentElement) {
+      layers.push(getComputedStyle(layer).backgroundColor);
     }
     context.clearRect(0, 0, 1, 1);
     context.fillStyle = fallbackColor;
@@ -30,10 +30,14 @@ export function syncNativeSystemBars(fallbackColor) {
 
   const update = () => {
     if (stopped) return;
-    const topColor = edgeColor(1);
-    const bottomColor = edgeColor(window.innerHeight - 1);
     const immersive = Boolean(document.querySelector('[data-native-camera]'));
     const edgeToEdge = immersive || Boolean(document.querySelector('[data-native-resident-landing], [data-native-guide]'));
+    const pageSurface = [...document.querySelectorAll('[data-native-system-bar-surface]')]
+      .filter(element => element.getClientRects().length).at(-1);
+    // Scrolling report cards and action buttons must not recolor the status bar.
+    const topElement = !edgeToEdge && pageSurface ? pageSurface : document.elementFromPoint(window.innerWidth / 2, 1);
+    const topColor = elementColor(topElement);
+    const bottomColor = elementColor(document.elementFromPoint(window.innerWidth / 2, window.innerHeight - 1));
     const colors = topColor + bottomColor + edgeToEdge + immersive;
     if (colors === previousColors) return;
     previousColors = colors;

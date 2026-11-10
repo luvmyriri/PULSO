@@ -59,8 +59,19 @@
       }
     },
     "nativeAndroid": {
+        "search": {
+            "back": "Bumalik sa dashboard", "clear": "Burahin ang paghahanap", "intro": "Iyong mga ulat, update ng lungsod at tulong.",
+            "reports": "Aking mga ulat", "actions": "Mga mabilisang aksyon", "updates": "Mga update ng lungsod", "guides": "Mga gabay", "hotlines": "Mga hotline",
+            "recent": "Mga kamakailang paghahanap", "clearAll": "Burahin lahat", "removeRecent": "Alisin ang {{query}} sa mga kamakailang paghahanap",
+            "removed": "Naalis ang {{query}}.", "cleared": "Nabura ang mga kamakailang paghahanap.",
+            "results_one": "{{count}} na tugma", "results_other": "{{count}} na tugma",
+            "empty": "Walang nahanap na tugma", "emptyHelp": "Subukan ang ticket ID, lokasyon, serbisyo o ibang salita.",
+            "loading": "Kinukuha pa ang mga ulat at update ng lungsod. Maaaring may lumabas pang tugma.",
+            "updatesUnavailable": "Pansamantalang hindi makuha ang mga update ng lungsod. Available pa rin ang ibang resulta.",
+            "shortcuts": { "report": "Mag-ulat ng problema", "map": "Mapa ng komunidad", "services": "Mga serbisyo ng lungsod", "help": "Mga gabay", "reports": "Aking mga ulat", "profile": "Aking account", "settings": "Mga setting at seguridad" }
+        },
         "notificationSettingsBack": "Mga setting",
-        "dashboard": { "hello": "Kumusta,", "resident": "Residente", "returnHome": "Bumalik sa Home ng dashboard" },
+        "dashboard": { "hello": "Kumusta,", "resident": "Residente", "openAccount": "Buksan ang Account at Profile" },
         "appUpdate": {
             "shortLabel": "Update ng app",
             "confirmTitle": "I-update ang PULSO?",

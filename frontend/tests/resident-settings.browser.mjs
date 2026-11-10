@@ -48,14 +48,21 @@ try {
       localStorage.setItem('pulso_token', 'fixture.' + btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 })) + '.fixture');
       localStorage.setItem('pulso_user', JSON.stringify(fixture));
       window.androidBridge = {};
+      window.__barCalls = [];
       window.Capacitor = {
         PluginHeaders: [
           { name: 'SplashScreen', methods: [{ name: 'hide', rtype: 'promise' }] },
           { name: 'App', methods: [{ name: 'getInfo', rtype: 'promise' }, { name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'callback' }] },
           { name: 'PulsoAppearance', methods: [{ name: 'setSystemBars', rtype: 'promise' }] },
         ],
-        nativePromise: async (plugin, method) => plugin === 'App' && method === 'getInfo' ? { id: 'ph.gov.caloocan.pulso', version: '2.4.4', build: '5' } : {},
-        nativeCallback: async () => 'fixture',
+        nativePromise: async (plugin, method, options) => {
+          if (plugin === 'PulsoAppearance') window.__barCalls.push(options);
+          return plugin === 'App' && method === 'getInfo' ? { id: 'ph.gov.caloocan.pulso', version: '2.4.4', build: '5' } : {};
+        },
+        nativeCallback: async (_plugin, method, options, callback) => {
+          if (method === 'addListener' && options.eventName === 'backButton') window.__nativeBack = callback;
+          return 'fixture';
+        },
       };
     }, { language, theme, fixture });
     await page.goto(base + '/dashboard');
@@ -65,16 +72,96 @@ try {
     assert.equal(await greeting.locator('.native-resident-greeting__avatar').innerText(), 'SR');
     assert.equal(await page.locator('[data-native-app-header] .native-app-brand').count(), 0);
     if (screenshots) await page.screenshot({ path: join(screenshots, `dashboard-home-${language}-${theme}.png`) });
+    await page.waitForFunction(() => window.__barCalls.length > 0);
+    const statusColor = await page.evaluate(() => window.__barCalls.at(-1).topColor);
+    await page.evaluate(() => {
+      const button = document.createElement('button'); button.id = 'synthetic-edge-button';
+      button.textContent = 'Synthetic orange action at viewport edge';
+      button.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:48px;background:#ff6b00;z-index:9999';
+      document.body.appendChild(button);
+    });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(await page.evaluate(() => window.__barCalls.at(-1).topColor), statusColor, 'Orange action cannot recolor the status bar');
+    await page.evaluate(() => document.getElementById('synthetic-edge-button').remove());
+    const searchTrigger = page.locator('.native-dashboard-search__trigger');
+    await searchTrigger.click();
+    const searchPanel = page.locator('.native-search-panel[open]');
+    const searchInput = searchPanel.getByRole('searchbox');
+    await searchInput.waitFor();
+    assert.equal(await searchInput.evaluate(el => el === document.activeElement), true);
+    assert.equal(await searchInput.locator('..').evaluate(el => getComputedStyle(el).outlineColor), 'rgb(255, 107, 0)');
+    assert.equal(await searchInput.evaluate(el => getComputedStyle(el).boxShadow), 'none');
+    assert.equal(await searchPanel.locator('.native-search-panel__recent').count(), 0, 'First-use history is empty');
+    if (screenshots) await page.screenshot({ path: join(screenshots, `search-open-${language}-${theme}.png`) });
+    await searchInput.fill('city');
+    await searchPanel.getByRole('button', { name: language === 'en' ? 'City services' : 'Mga serbisyo ng lungsod', exact: true }).waitFor();
+    if (screenshots) await page.screenshot({ path: join(screenshots, `search-results-${language}-${theme}.png`) });
+    await page.setViewportSize({ width, height: 420 });
+    await page.waitForFunction(() => Math.abs(document.querySelector('.native-search-panel').getBoundingClientRect().height - visualViewport.height) < 2);
+    assert.equal(await searchPanel.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    if (screenshots) await page.screenshot({ path: join(screenshots, `search-keyboard-height-${language}-${theme}.png`) });
+    await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+    assert.equal(await searchPanel.evaluate(el => el.scrollWidth <= el.clientWidth), true, 'Search reflows with enlarged text');
+    await page.evaluate(() => { document.documentElement.style.fontSize = ''; });
+    await searchInput.fill('synthetic-no-match-xyz');
+    await searchPanel.locator('.native-search-panel__empty').waitFor();
+    await searchPanel.locator('.native-search-panel__field button').click();
+    assert.equal(await searchInput.inputValue(), '');
+    await searchPanel.locator('.native-search-panel__back').click();
+    await searchPanel.waitFor({ state: 'detached' });
+    assert.equal(await searchTrigger.evaluate(el => el === document.activeElement), true);
+    await page.setViewportSize({ width, height: 844 });
+    await searchTrigger.click();
+    await searchInput.fill('history');
+    await page.keyboard.press('Escape');
+    await searchPanel.waitFor({ state: 'detached' });
+    await searchTrigger.click();
+    assert.equal(await searchInput.inputValue(), 'history');
+    await page.evaluate(() => window.__nativeBack({ canGoBack: true }));
+    await searchPanel.waitFor({ state: 'detached' });
+    assert(new URL(page.url()).pathname === '/dashboard');
+    await searchTrigger.click();
+    await searchPanel.getByRole('button', { name: language === 'en' ? 'My reports' : 'Aking mga ulat', exact: true }).click();
+    await page.waitForURL('**/dashboard?tab=reports');
+    assert.equal(await page.evaluate(() => document.body.style.overflow), '');
+    await page.goto(base + '/dashboard');
+    await greeting.waitFor();
     await page.evaluate(() => scrollTo({ top: 240, behavior: 'instant' }));
-    await page.evaluate(() => scrollBy({ top: -40, behavior: 'instant' }));
-    await greeting.click();
+    await page.locator('[data-resident-bottom-nav] button').nth(0).click();
     await page.waitForFunction(() => scrollY < 2);
     assert(new URL(page.url()).pathname === '/dashboard');
+    await greeting.locator('.native-resident-greeting__avatar').click();
+    await page.waitForURL('**/dashboard?tab=profile');
+    assert.equal(await page.locator('[data-native-app-header]').count(), 0, 'Avatar opens Account and Profile');
     for (const tab of ['reports', 'updates', 'profile']) {
       await page.goto(base + '/dashboard?tab=' + tab);
       await page.locator('[data-resident-bottom-nav]').waitFor();
       await page.waitForTimeout(150);
       assert.equal(await page.locator('[data-native-app-header]').count(), 0, tab + ' has no top navbar');
+      await page.evaluate(() => {
+        const spacer = document.createElement('div'); spacer.id = 'synthetic-scroll-content'; spacer.style.height = '1500px';
+        document.querySelector('[data-native-system-bar-surface]').appendChild(spacer);
+        scrollTo({ top: 350, behavior: 'instant' });
+      });
+      assert.equal(await page.evaluate(() => scrollY > 100), true, tab + ' fixture is genuinely scrolled');
+      if (tab === 'reports') {
+        const before = await page.evaluate(() => window.__barCalls.at(-1).topColor);
+        for (const color of ['#020617', '#ff6b00']) {
+          await page.evaluate(color => {
+            const surface = document.createElement('div'); surface.id = 'synthetic-scrolling-card';
+            surface.style.cssText = `position:fixed;top:0;left:0;width:100%;height:48px;z-index:9999;background:${color}`;
+            document.body.appendChild(surface);
+          }, color);
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+          assert.equal(await page.evaluate(() => window.__barCalls.at(-1).topColor), before, 'My Reports status bar does not follow dark cards or orange buttons');
+          await page.evaluate(() => document.getElementById('synthetic-scrolling-card').remove());
+        }
+        if (theme === 'light') assert.equal(before.toLowerCase(), '#f1f5f9', 'Light My Reports keeps a light status bar');
+      }
+      await page.locator('[data-resident-bottom-nav] button').nth({ reports: 1, updates: 3, profile: 4 }[tab]).click();
+      await page.waitForFunction(() => scrollY < 2);
+      assert.equal(new URL(page.url()).searchParams.get('tab'), tab, 'Retapping keeps the current page');
+      await page.evaluate(() => document.getElementById('synthetic-scroll-content').remove());
       if (tab === 'reports') {
         assert.equal(await page.getByRole('button', { name: 'Export reports to Excel', exact: true }).count(), 0);
         assert.equal(await page.getByRole('button', { name: /New report|Bagong ulat/i }).count() > 0, true);
@@ -120,5 +207,5 @@ try {
     assert.equal(await master.evaluate(el => getComputedStyle(el).appearance), 'auto');
     await page.close();
   }
-  console.log('PASS: greeting initials/name and Home scroll, hidden non-Home headers, no APK export, orange/white checkboxes, saved/failed preferences, disabled groups, bilingual themes and forced colors.');
+  console.log('PASS: light/dark My Reports status bars stay stable over cards/buttons; orange full-screen search at keyboard height; avatar opens Profile; active bottom tabs scroll to top; search navigation, preferences and bilingual themes.');
 } finally { await browser.close(); }

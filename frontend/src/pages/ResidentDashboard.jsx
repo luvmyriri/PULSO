@@ -1,4 +1,5 @@
 import NativeAppHeader, { NativeResidentGreeting } from '../components/mobile/NativeAppHeader';
+import NativeDashboardSearch from '../components/mobile/NativeDashboardSearch';
 import NativeBottomSheet from '../components/mobile/NativeBottomSheet';
 import NotificationDropdown from '../components/NotificationDropdown';
 import { exportResidentReportsToXLSX } from '../utils/xlsxExport';
@@ -8639,6 +8640,8 @@ const TopNavigation = ({
     t,
     userReports = [],
     lguUpdates = [],
+    searchLoading = false,
+    searchUpdatesUnavailable = false,
     processedHazards = [],
     setSelectedPost,
     setSelectedHazard,
@@ -8656,6 +8659,12 @@ const TopNavigation = ({
         controlledSetIsSearchOpen?.(val);
     };
     const [recentSearches, setRecentSearches] = useState(() => {
+        if (isNativeAndroid()) {
+            try {
+                const stored = JSON.parse(localStorage.getItem('pulso_recent_searches') || '[]');
+                return Array.isArray(stored) ? stored.filter(value => typeof value === 'string').slice(0, 6) : [];
+            } catch { return []; }
+        }
         try {
             const saved = localStorage.getItem('pulso_recent_searches');
             return saved ? JSON.parse(saved) : ['Water Interruption', 'Street Lighting', 'Engineering Contact'];
@@ -8750,7 +8759,7 @@ const TopNavigation = ({
             return updated;
         });
 
-        setRecentSearchAnnouncement(`${item} removed.`);
+        setRecentSearchAnnouncement(nativeAndroid ? t('nativeAndroid.search.removed', { query: item }) : `${item} removed.`);
 
         // Focus management: preserve focus without closing or jumping to top
         setTimeout(() => {
@@ -8776,7 +8785,7 @@ const TopNavigation = ({
         e.preventDefault();
         setRecentSearches([]);
         try { localStorage.removeItem('pulso_recent_searches'); } catch (err) { /* ignore */ }
-        setRecentSearchAnnouncement('All recent searches cleared.');
+        setRecentSearchAnnouncement(nativeAndroid ? t('nativeAndroid.search.cleared') : 'All recent searches cleared.');
 
         setTimeout(() => {
             const searchInput = document.querySelector('[data-pulso-search-input="true"]');
@@ -9336,7 +9345,11 @@ const TopNavigation = ({
         if (!isHomeTab || activeModal) return null;
         return (
             <div className="native-dashboard-topbar sticky top-0 z-50 shrink-0" data-scroll-hidden={isNativeHeaderHidden || undefined}>
-                <NativeAppHeader appearance="hero" brand={<NativeResidentGreeting user={user} onGoHome={handleNavGoHome} />}>
+                <NativeAppHeader appearance="hero" brand={<NativeResidentGreeting user={user} onOpenAccount={() => {
+                    setIsSearchOpen(false);
+                    setShowNotifications(false);
+                    handleSetTab('profile');
+                }} />}>
                     <button type="button" ref={nativeBellRef}
                         aria-label={t('notificationCenter.title', 'All notifications')}
                         aria-expanded={showNotifications}
@@ -9346,25 +9359,17 @@ const TopNavigation = ({
                         {unreadCount > 0 && <span className="absolute right-0 top-0 rounded-full bg-primary px-1 text-xs font-bold text-[#0b1630]">{unreadBadgeText}</span>}
                     </button>
                 </NativeAppHeader>
-                {isHomeTab && (
-                    <div ref={mobileSearchRef} className="relative bg-[var(--color-canvas)] px-4 pb-2 dark:bg-[var(--color-canvas-dark)]">
-                        <label className="mx-auto flex min-h-11 w-full max-w-[29.8rem] cursor-text items-center gap-2 rounded-xl bg-slate-200/60 px-3 text-slate-700 focus-within:outline-3 focus-within:outline-blue-600 dark:bg-slate-800/70 dark:text-slate-300 dark:focus-within:outline-blue-300">
-                            <Search size={18} className="shrink-0" aria-hidden="true" />
-                            <input ref={mobileSearchInputRef} type="search" value={searchQuery}
-                                aria-label={t('nativeAndroid.navigation.search')}
-                                placeholder={t('nativeAndroid.navigation.search')}
-                                onFocus={() => setIsSearchOpen(true)}
-                                onChange={event => { setSearchQuery(event.target.value); setIsSearchOpen(true); }}
-                                onKeyDown={handleSearchKeyDown}
-                                className="min-h-11 min-w-0 flex-1 border-0 bg-transparent text-base outline-none placeholder:text-slate-600 dark:placeholder:text-slate-400" />
-                        </label>
-                        {isSearchOpen && (
-                            <div className="absolute inset-x-0 top-full max-h-[60dvh] overflow-y-auto border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900">
-                                {renderSearchDropdown(true)}
-                            </div>
-                        )}
-                    </div>
-                )}
+                <NativeDashboardSearch isOpen={isSearchOpen} onOpen={() => { setShowNotifications(false); setIsSearchOpen(true); }}
+                    onClose={() => setIsSearchOpen(false)} query={searchQuery} onQueryChange={setSearchQuery}
+                    actions={quickActions.map((action, index) => ({ ...action,
+                        id: ['report', 'map', 'services', 'help', 'reports', 'profile', 'settings'][index],
+                        label: t(`nativeAndroid.search.shortcuts.${['report', 'map', 'services', 'help', 'reports', 'profile', 'settings'][index]}`),
+                        searchText: action.label,
+                    }))}
+                    reports={matchedReports} updates={matchedAdvisories} guides={matchedKB} hotlines={matchedHotlines}
+                    recent={recentSearches} announcement={recentSearchAnnouncement} onClearRecent={clearAllRecent} onRemoveRecent={removeRecentSearch}
+                    onReport={handleSelectReport} onUpdate={handleSelectAdvisory} onGuide={handleSelectKB} onHotline={handleSelectHotline}
+                    loading={searchLoading} updatesUnavailable={searchUpdatesUnavailable} />
                 <NotificationDropdown isOpen={showNotifications} onClose={() => setShowNotifications(false)}
                     notifications={notifications} onNotificationClick={handleNotificationClick}
                     onMarkAllRead={handleMarkAllRead} onOpenAllNotifications={() => { setShowNotifications(false); handleSetModal('all-notifications'); }}
@@ -9651,6 +9656,12 @@ export default function ResidentDashboard() {
             return;
         }
         if (tab === activeTab) {
+            if (isNativeAndroid()) {
+                tabScrollPositionsRef.current[tab] = 0;
+                window.scrollTo({ top: 0, behavior: 'instant' });
+                if (mainScrollRef.current) mainScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
+                return;
+            }
             if (tab === 'reports') {
                 setSelectedReportForDetails(null);
                 setActiveTab('reports');
@@ -11863,7 +11874,7 @@ export default function ResidentDashboard() {
     }));
 
     return (
-        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col">
+        <div data-native-system-bar-surface className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col">
 
             {/* Global Toast Notification */}
             <AnimatePresence>
@@ -12263,6 +12274,8 @@ export default function ResidentDashboard() {
                 t={t}
                 userReports={allAvailableReports}
                 lguUpdates={lguUpdates}
+                searchLoading={loadingReports || loadingAdvisories}
+                searchUpdatesUnavailable={Boolean(advisoriesError)}
                 processedHazards={processedHazards}
                 setSelectedPost={setSelectedPost}
                 setSelectedHazard={setSelectedHazard}
@@ -12620,7 +12633,10 @@ export default function ResidentDashboard() {
                                     key={item.id}
                                     onClick={() => {
                                         if (isMoreItem) {
-                                            setIsMoreMenuOpen(prev => !prev);
+                                            if (isNativeAndroid() && ['profile', 'settings', 'account'].includes(activeTab) &&
+                                                (window.scrollY > 0 || mainScrollRef.current?.scrollTop > 0)) {
+                                                handleSetTab(activeTab);
+                                            } else setIsMoreMenuOpen(prev => !prev);
                                         } else {
                                             setIsMoreMenuOpen(false);
                                             handleSetTab(item.id);

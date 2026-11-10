@@ -112,14 +112,14 @@ export function NativeResidentAccountLink({ signedIn, onClick }) {
   );
 }
 
-export function NativeResidentGreeting({ user, onGoHome }) {
+export function NativeResidentGreeting({ user, onOpenAccount }) {
   const { t } = useTranslation();
   const fullName = user?.fullName?.trim();
   const name = (fullName && fullName !== 'Loading...' ? fullName : user?.name?.trim()) || '';
   const words = name.split(/\s+/).filter(Boolean);
   const initials = words.length ? `${words[0][0]}${words.length > 1 ? words.at(-1)[0] : ''}`.toLocaleUpperCase() : '';
-  return <button type="button" className="native-resident-greeting" onClick={onGoHome}
-    aria-label={t('nativeAndroid.dashboard.returnHome')}>
+  return <button type="button" className="native-resident-greeting" onClick={onOpenAccount}
+    aria-label={t('nativeAndroid.dashboard.openAccount')}>
     <span className="native-resident-greeting__avatar" aria-hidden="true">{initials || <UserRound size={20} />}</span>
     <span className="native-resident-greeting__text"><span>{t('nativeAndroid.dashboard.hello')}</span>
       <strong>{name || t('nativeAndroid.dashboard.resident')}</strong></span>
