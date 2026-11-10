@@ -2000,7 +2000,7 @@ export default function Register() {
 
 
 
-            {isNativeAndroid() && <NativeAppHeader appearance="hero" />}
+            {isNativeAndroid() && <NativeAppHeader appearance="hero" transparent />}
             {/* ── Top Header: Logo, Dynamic Progress, Theme Toggle (Mirrored from Login) ───────────── */}
             <header className={isNativeAndroid() ? "relative z-20 w-full shrink-0 px-4 py-2" : "relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex flex-col gap-2 shrink-0"}>
                 {!isNativeAndroid() && (

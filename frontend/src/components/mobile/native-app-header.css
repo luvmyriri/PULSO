@@ -3,6 +3,7 @@
   background: var(--home-canvas);
   color: var(--home-ink);
 }
+.native-app-header--hero.native-app-header--transparent { background: transparent; }
 .native-app-header--hero > div {
   max-width: 32rem; min-height: 3.5rem; flex-wrap: wrap; row-gap: .25rem;
   padding: .375rem var(--home-gutter);
