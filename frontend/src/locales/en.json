@@ -1,5 +1,6 @@
 {
   "translation": {
+    "reportMedia": { "photoUnavailable": "Photo unavailable" },
     "locationPrivacy": {
       "title": "Current location",
       "mappedAddress": "Address near your GPS point",

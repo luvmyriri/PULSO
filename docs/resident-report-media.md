@@ -1,0 +1,9 @@
+# Resident report media consistency
+
+Implemented correction: report cards, map markers, selected pins and map details resolve the same report photo through the configured API origin. Relative upload and published-thumbnail paths must never resolve against the bundled Android app's localhost origin. Absolute external URLs and in-progress image data/blob URLs remain intact. Legacy image arrays are supported; the authoritative `image_url` takes precedence.
+
+Map pin generation is shared between dashboard and map. Cached promises survive report-list rerenders during slow downloads, and keys include the source image and category color. A failed optimized thumbnail falls back to the same report image, drawing the image that actually loaded. Public metadata-free thumbnail projections remain projections; no private evidence fields or original URLs are invented.
+
+My Reports no longer replaces missing or failed evidence with unrelated stock photography. It presents a localized photo-unavailable state while retaining the report and its actions. Unread notification counts appear on the bell, without a duplicate badge on the bottom Updates tab. The installed guest-report header uses the existing transparent landing-header appearance; web header behavior is preserved.
+
+Validation uses synthetic media and native/API responses: relative/absolute URL handling, public projection preservation, canvas image pixels after thumbnail failure, slow-load rerenders, changed-source invalidation, report image decoding, localized failures, bell-only badges and transparent guest headers in both themes. Existing resident navigation, location privacy, tracking and report-render checks pass. API upload CORS headers were checked from the Android app origin. APK compilation/signing are verified separately; live map tile rendering and a physical phone are not claimed. This reuses existing visual primitives; no Figma changes were made.

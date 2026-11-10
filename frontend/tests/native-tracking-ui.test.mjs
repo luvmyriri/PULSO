@@ -110,7 +110,8 @@ test('Filipino tracking and the dark theme retain the same controls and short co
   const html = render(Track, '/track');
   assert.match(html, /Subaybayan ang ulat/);
   assert.match(html, /ticket ID at tracking code mula sa resibo/);
-  assert.match(html, /Switch to English/);
+  assert.match(html, /aria-label="Wika \(TL\)"/);
+  assert.match(html, /lang="en" aria-pressed="false"/);
   assert.match(html, /Gamitin ang temang ayon sa system/);
   assert.match(html, /id="track-token"[^>]*required/);
   await i18n.changeLanguage('en');

@@ -153,6 +153,9 @@ import {
     REPORT_WORKFLOW_STEPS
 } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
+import { getReportPhotoUrl, resolveReportMediaUrl } from '../utils/reportMedia';
+import useReportPhotoPins from '../utils/useReportPhotoPins';
+import ReportEvidenceImage from '../components/ReportEvidenceImage';
 import { apiFetch, dedupeFetch, checkServerHealth, logApiFailure } from '../utils/apiFetch';
 import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 import { reverseGeocodeLocation } from '../utils/reverseGeocode';
@@ -2479,7 +2482,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                 <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-center shadow-2xs">
                     {report.image_url ? (
                         <img
-                            src={`${API_BASE_URL}${report.image_url}`}
+                            src={resolveReportMediaUrl(report.image_url)}
                             alt=""
                             loading="lazy"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -2608,14 +2611,14 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                                 <div className="lg:col-span-7 flex flex-col gap-3">
                                     <div className="relative rounded-xl overflow-hidden bg-black/10 dark:bg-black/40 border border-slate-200/80 dark:border-slate-800 aspect-[16/9] max-h-64 sm:max-h-72 lg:max-h-none">
                                         <img
-                                            src={`${API_BASE_URL}${report.image_url}`}
+                                            src={resolveReportMediaUrl(report.image_url)}
                                             alt={`${report.category} photo proof`}
                                             className="w-full h-full object-cover"
                                         />
                                         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
                                         <button
                                             type="button"
-                                            onClick={() => setZoomedImage(`${API_BASE_URL}${report.image_url}`)}
+                                            onClick={() => setZoomedImage(resolveReportMediaUrl(report.image_url))}
                                             className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/90 backdrop-blur-xs text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                                         >
                                             <Maximize2 size={12} />
@@ -2745,7 +2748,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                             {isResolved && report.resolution_image_url && (
                                 <button
                                     type="button"
-                                    onClick={() => setZoomedImage(`${API_BASE_URL}${report.resolution_image_url}`)}
+                                    onClick={() => setZoomedImage(resolveReportMediaUrl(report.resolution_image_url))}
                                     className="text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50 bg-emerald-50 dark:bg-emerald-950/40 px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer min-h-[44px]"
                                 >
                                     <ImageIcon size={14} />
@@ -3160,40 +3163,7 @@ const MyReports = ({
         return 'Reported civic concern';
     };
 
-    const getReportThumbnail = (report) => {
-        if (report.media_urls && report.media_urls.length > 0 && report.media_urls[0]) {
-            return report.media_urls[0];
-        }
-        if (report.image_url) return report.image_url;
-        if (report.photos && report.photos.length > 0 && report.photos[0]) {
-            return report.photos[0];
-        }
-        if (report.image) return report.image;
-
-        const cat = (report.category || report.ai_category || '').toLowerCase();
-        if (cat.includes('safety') || cat.includes('hazard')) {
-            return 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('light')) {
-            return 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('road') || cat.includes('pothole') || cat.includes('asphalt') || cat.includes('infrastructure')) {
-            return 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('water') || cat.includes('leak')) {
-            return 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('drain') || cat.includes('flood')) {
-            return 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('electric') || cat.includes('wire')) {
-            return 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('sign') || cat.includes('traffic')) {
-            return 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=400&q=80';
-        }
-        return 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80';
-    };
+    const getReportThumbnail = getReportPhotoUrl;
 
     const getReportDisplayCategory = (report) => {
         const raw = (report.category || report.ai_category || '').toLowerCase();
@@ -4133,13 +4103,10 @@ const MyReports = ({
                                     >
                                         {/* Top Photo Banner */}
                                         <div className="relative w-full h-44 sm:h-48 overflow-hidden bg-slate-900 shrink-0">
-                                            <img
+                                            <ReportEvidenceImage
                                                 src={thumbnailSrc}
                                                 alt={displayTitle}
                                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                                onError={(e) => {
-                                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80';
-                                                }}
                                             />
 
                                             {/* Floating Status Pill (Top-Left overlay on photo) */}
@@ -9560,9 +9527,7 @@ export default function ResidentDashboard() {
         gestureHandling: 'greedy',
     }), [theme]);
 
-    const pinIconCache = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
     const iconCacheRef = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
-    const [photoPinIcons, setPhotoPinIcons] = useState({});
 
     // Memoized Google Maps Icon Object Cache to prevent MarkerF re-render flicker
     const getCachedIcon = (url, w, h, ax, ay) => {
@@ -10509,19 +10474,7 @@ export default function ResidentDashboard() {
             const lat = parseFloat(r.location_lat || r.lat);
             const lng = parseFloat(r.location_lng || r.lng);
 
-            let image = r.image_url || r.photo_url;
-            if (!image && r.image_paths) {
-                if (typeof r.image_paths === 'string') {
-                    try {
-                        const parsed = JSON.parse(r.image_paths);
-                        image = Array.isArray(parsed) ? parsed[0] : parsed;
-                    } catch (e) {
-                        image = r.image_paths;
-                    }
-                } else if (Array.isArray(r.image_paths)) {
-                    image = r.image_paths[0];
-                }
-            }
+            const image = getReportPhotoUrl(r);
 
             const formattedTicket = formatTicketId(r.ticket_id, r.id);
             return {
@@ -10713,151 +10666,7 @@ export default function ResidentDashboard() {
         });
     }, [processedHazards, mapCategoryFilter]);
 
-    // Generate photo-pins for hazards with images (matching government DispatcherDashboard)
-    useEffect(() => {
-        if (!processedHazards || processedHazards.length === 0) return;
-
-        let batchTimer = null;
-        const pendingBatch = {};
-
-        const flushBatch = () => {
-            if (Object.keys(pendingBatch).length > 0) {
-                setPhotoPinIcons(prev => {
-                    let hasNew = false;
-                    for (const k in pendingBatch) {
-                        if (!prev[k]) {
-                            hasNew = true;
-                            break;
-                        }
-                    }
-                    return hasNew ? { ...prev, ...pendingBatch } : prev;
-                });
-            }
-        };
-
-        processedHazards.forEach(hazard => {
-            const rawImg = hazard.image || hazard.photo_url || hazard.photo_thumbnail || hazard.image_url || hazard.media_url;
-            if (!rawImg) return;
-
-            [false, true].forEach(isSelected => {
-                const cacheKey = `${hazard.id}-${isSelected ? 'sel' : 'norm'}`;
-                if (pinIconCache.current.has(cacheKey)) return;
-
-                let thumbUrl = rawImg;
-                if (!rawImg.startsWith('http') && !rawImg.startsWith('data:')) {
-                    const cleanPath = rawImg.startsWith('/') ? rawImg : `/${rawImg}`;
-                    thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
-                }
-
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    try {
-                        const size = isSelected ? 46 : 36;
-                        const pointerH = isSelected ? 8 : 7;
-                        const totalW = size + 6;
-                        const totalH = size + pointerH + 2;
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = totalW;
-                        canvas.height = totalH;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) return;
-
-                        const cx = totalW / 2;
-                        const cy = size / 2 + 1;
-                        const radius = (size - 4) / 2;
-
-                        const borderColor = getReportCategoryMeta(hazard).color;
-
-                        // Pointer Arrow
-                        ctx.beginPath();
-                        ctx.moveTo(cx - 5, cy + radius - 2);
-                        ctx.lineTo(cx + 5, cy + radius - 2);
-                        ctx.lineTo(cx, cy + radius + pointerH);
-                        ctx.closePath();
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Outer Glow if Selected
-                        if (isSelected) {
-                            ctx.beginPath();
-                            ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
-                            ctx.fillStyle = `${borderColor}59`;
-                            ctx.fill();
-                        }
-
-                        // Outer Border Ring
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Inner background
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                        ctx.fillStyle = '#0c1424';
-                        ctx.fill();
-
-                        // Circular photo clip
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.clip();
-
-                        const aspect = img.width / img.height;
-                        let dw, dh, dx, dy;
-                        if (aspect > 1) {
-                            dh = (radius - 0.5) * 2;
-                            dw = dh * aspect;
-                            dx = cx - dw / 2;
-                            dy = cy - radius + 0.5;
-                        } else {
-                            dw = (radius - 0.5) * 2;
-                            dh = dw / aspect;
-                            dx = cx - radius + 0.5;
-                            dy = cy - dh / 2;
-                        }
-                        ctx.drawImage(img, dx, dy, dw, dh);
-                        ctx.restore();
-
-                        // White inner accent ring
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1.0;
-                        ctx.stroke();
-
-                        const dataUrl = canvas.toDataURL('image/png');
-                        pinIconCache.current.set(cacheKey, dataUrl);
-                        pendingBatch[cacheKey] = dataUrl;
-
-                        if (batchTimer) clearTimeout(batchTimer);
-                        batchTimer = setTimeout(flushBatch, 100);
-                    } catch (err) {
-                        // fallback to svg
-                    }
-                };
-                img.onerror = () => {
-                    if (thumbUrl.includes('/api/thumbnails')) {
-                        const fallbackImg = new Image();
-                        fallbackImg.crossOrigin = 'anonymous';
-                        fallbackImg.onload = img.onload;
-                        fallbackImg.onerror = () => {
-                            // Safely handle missing fallback image; marker will use SVG pin
-                        };
-                        fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
-                    }
-                };
-                img.src = thumbUrl;
-            });
-        });
-
-        return () => {
-            if (batchTimer) clearTimeout(batchTimer);
-        };
-    }, [processedHazards]);
-
+    const photoPinIcons = useReportPhotoPins(processedHazards, getReportCategoryMeta);
 
     const stopDeviceLocationTracking = useCallback(() => {
         if (locationWatchRef.current !== null && navigator.geolocation) {
@@ -12629,7 +12438,6 @@ export default function ResidentDashboard() {
                             const isActive = isMoreItem
                                 ? (isMoreMenuOpen || activeModal === 'map' || activeTab === 'profile')
                                 : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map' && activeTab !== 'profile';
-                            const showBadge = item.id === 'updates' && unreadCount > 0;
                             return (
                                 <button
                                     key={item.id}
@@ -12659,14 +12467,7 @@ export default function ResidentDashboard() {
                                             'aria-hidden': 'true',
                                             className: `transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110 text-[#D95700] dark:text-[#FF6B00]' : 'text-[#5B6B88] dark:text-[#9AA8C7]'}`
                                         })}
-                                        {showBadge && (
-                                            <span
-                                                className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#f05a00] text-white text-[9px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none tabular-nums shadow-xs"
-                                                aria-label={`${unreadCount} unread`}
-                                            >
-                                                {unreadBadgeText || (unreadCount > 9 ? '9+' : unreadCount)}
-                                            </span>
-                                        )}
+
                                     </div>
                                     <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-[#D95700] dark:text-[#FF6B00]' : 'font-medium text-[#5B6B88] dark:text-[#9AA8C7]'}`}>
                                         {item.label}

@@ -377,7 +377,7 @@ export default function ReportWizardPage() {
 
       {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
       {isNativeAndroid() ? (
-        <NativeAppHeader appearance="hero" onBrandClick={handleHeaderNavigation}>
+        <NativeAppHeader appearance="hero" transparent onBrandClick={handleHeaderNavigation}>
           <NativeResidentAccountLink signedIn={Boolean(getStoredToken()) && getStoredUser()?.role === 'resident'} onClick={handleHeaderNavigation} />
         </NativeAppHeader>
       ) : (

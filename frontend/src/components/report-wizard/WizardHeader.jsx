@@ -14,7 +14,7 @@ export default function WizardHeader({ currentStep, totalSteps = 6 }) {
     i18n.changeLanguage(nextLang);
   };
 
-  if (isNativeAndroid()) return <NativeAppHeader />;
+  if (isNativeAndroid()) return <NativeAppHeader appearance="hero" transparent />;
 
   return (
     <header className="w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 transition-colors">
