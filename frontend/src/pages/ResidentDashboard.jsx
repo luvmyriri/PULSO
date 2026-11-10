@@ -8701,29 +8701,39 @@ const TopNavigation = ({
         return () => observer.disconnect();
     }, []);
 
-    // Mobile scroll-direction detection: collapse search Row 2 on scroll-down, restore on scroll-up
-    const [isScrolledDown, setIsScrolledDown] = useState(false);
-    const lastScrollYRef = useRef(0);
+    const nativeAndroid = isNativeAndroid();
+    const [isNativeHeaderHidden, setIsNativeHeaderHidden] = useState(false);
 
     useEffect(() => {
+        setIsNativeHeaderHidden(false);
+        if (!nativeAndroid || isSearchOpen || showNotifications) return;
+
+        let previousY = Math.max(0, window.scrollY);
+        let travel = 0;
         const handleScroll = () => {
-            const currentY = window.scrollY || document.documentElement.scrollTop;
-            if (isSearchOpen) {
-                setIsScrolledDown(false);
-                lastScrollYRef.current = currentY;
+            const limit = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+            const currentY = Math.min(limit, Math.max(0, window.scrollY));
+            const delta = currentY - previousY;
+            previousY = currentY;
+            if (currentY <= 24) {
+                travel = 0;
+                setIsNativeHeaderHidden(false);
                 return;
             }
-            if (currentY > 60 && currentY > lastScrollYRef.current + 6) {
-                setIsScrolledDown(true);
-            } else if (currentY < lastScrollYRef.current - 6 || currentY <= 25) {
-                setIsScrolledDown(false);
+            if (!delta) return;
+            travel = Math.sign(travel) === Math.sign(delta) ? travel + delta : delta;
+            if (travel >= 12 && currentY >= 72) {
+                travel = 0;
+                setIsNativeHeaderHidden(true);
+            } else if (travel <= -12) {
+                travel = 0;
+                setIsNativeHeaderHidden(false);
             }
-            lastScrollYRef.current = currentY;
         };
 
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
-    }, [isSearchOpen]);
+    }, [activeTab, nativeAndroid, isSearchOpen, showNotifications]);
 
     const saveRecentSearch = (query) => {
         if (!query || !query.trim()) return;
@@ -9328,10 +9338,10 @@ const TopNavigation = ({
         }
     };
 
-    if (isNativeAndroid()) {
+    if (nativeAndroid) {
         return (
-            <div className="sticky top-0 z-50 shrink-0">
-                <NativeAppHeader borderless>
+            <div className="native-dashboard-topbar sticky top-0 z-50 shrink-0" data-scroll-hidden={isNativeHeaderHidden || undefined}>
+                <NativeAppHeader appearance="hero">
                     <button type="button" ref={nativeBellRef}
                         aria-label={t('notificationCenter.title', 'All notifications')}
                         aria-expanded={showNotifications}
@@ -9342,9 +9352,9 @@ const TopNavigation = ({
                     </button>
                 </NativeAppHeader>
                 {isHomeTab && (
-                    <div ref={mobileSearchRef} className="relative border-b border-slate-200 bg-[#f7f9fc] px-4 py-2 dark:border-slate-700 dark:bg-[#0c1421]">
-                        <label className="flex min-h-12 w-full cursor-text items-center gap-2.5 rounded-[14px] border border-slate-300 bg-white px-3.5 text-slate-900 shadow-2xs focus-within:outline-3 focus-within:outline-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus-within:outline-blue-300">
-                            <Search size={20} className="shrink-0" aria-hidden="true" />
+                    <div ref={mobileSearchRef} className="relative bg-[var(--color-canvas)] px-4 pb-2 dark:bg-[var(--color-canvas-dark)]">
+                        <label className="mx-auto flex min-h-11 w-full max-w-[29.8rem] cursor-text items-center gap-2 rounded-xl bg-slate-200/60 px-3 text-slate-700 focus-within:outline-3 focus-within:outline-blue-600 dark:bg-slate-800/70 dark:text-slate-300 dark:focus-within:outline-blue-300">
+                            <Search size={18} className="shrink-0" aria-hidden="true" />
                             <input ref={mobileSearchInputRef} type="search" value={searchQuery}
                                 aria-label={t('nativeAndroid.navigation.search')}
                                 placeholder={t('nativeAndroid.navigation.search')}

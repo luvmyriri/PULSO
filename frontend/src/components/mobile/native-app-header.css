@@ -70,6 +70,17 @@
 }
 .native-app-header--hero button { color: var(--home-ink); }
 .native-app-header--hero button:active { background: var(--home-surface); }
+.native-dashboard-topbar {
+  transition: transform 180ms ease-out;
+}
+.native-dashboard-topbar[data-scroll-hidden='true']:not(:has(:focus-visible, .native-app-header__language-trigger[aria-expanded='true'])) {
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+.native-dashboard-topbar:has(:focus-visible) { transition-duration: 0s; }
+@media (prefers-reduced-motion: reduce) {
+  .native-dashboard-topbar { transition: none; }
+}
 @media (hover: hover) {
   .native-app-header--hero button:hover { background: var(--home-surface); }
   .native-home__account-link:hover { text-decoration: underline; }
