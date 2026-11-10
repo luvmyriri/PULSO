@@ -23,7 +23,7 @@ try {
         return route.continue();
       }
       if (url.pathname === '/api/reports/user/-1') return route.fulfill({status:200,json:[
-        {id:901,ticket_id:'QA-901',category:'Roads & Bridges',status:'pending',image_url:'/api/uploads/reports/qa-real.svg',created_at:'2026-11-10T08:00:00Z',location_lat:14.74,location_lng:121.01},
+        {id:901,ticket_id:'QA-901',title:'QA road photo',category:'Roads & Bridges',status:'pending',image_url:'/api/uploads/reports/qa-real.svg',created_at:'2026-11-10T08:00:00Z',location_lat:14.74,location_lng:121.01},
         {id:902,ticket_id:'QA-902',category:'Water Supply & Distribution',status:'pending',image_url:'/api/uploads/reports/qa-missing.svg',created_at:'2026-11-10T07:00:00Z'},
       ]});
       if (url.pathname === '/api/uploads/reports/qa-real.svg') return route.fulfill({status:200,contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#1188cc"/></svg>'});
@@ -61,7 +61,12 @@ try {
         nativePromise: async (plugin, method, options) => {
           if (plugin === 'CapacitorHttp') {
             window.__mediaCalls.push(options);
-            if (options.url.includes('qa-real.svg')) return { status: 200, headers: { 'Content-Type': 'image/png' }, data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aC1sAAAAASUVORK5CYII=' };
+            if (options.url.includes('qa-real.svg')) {
+              const canvas=document.createElement('canvas'); canvas.width=80; canvas.height=80;
+              const ctx=canvas.getContext('2d'); ctx.fillStyle='#8ba4b5'; ctx.fillRect(0,0,80,80);
+              ctx.strokeStyle='#304958'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(20,0); ctx.lineTo(45,30); ctx.lineTo(30,50); ctx.lineTo(60,80); ctx.stroke();
+              return { status: 200, headers: { 'Content-Type': 'image/png' }, data: canvas.toDataURL('image/png').split(',')[1] };
+            }
             return { status: 404, headers: { 'Content-Type': 'application/json' }, data: {} };
           }
           if (plugin === 'PulsoAppearance') {
@@ -82,11 +87,30 @@ try {
     await page.waitForFunction(() => [...document.querySelectorAll('[data-native-app-header] button')].some(button => button.querySelector('.lucide-bell') && button.textContent.includes('2')));
     assert.equal(await page.locator('[data-resident-bottom-nav] [aria-label$="unread"]').count(), 0);
     assert.equal(await page.locator('[data-resident-bottom-nav] button').nth(3).innerText(), 'Updates');
+    await page.getByRole('button',{name:'Explore city map',exact:true}).click();
+    const map=page.locator('[data-native-task-screen="community-map"]');
+    await map.getByRole('button',{name:'View list',exact:true}).click();
+    const sheet=map.locator('[data-map-report-sheet]');
+    await sheet.getByRole('button').filter({hasText:'QA road photo'}).click();
+    await page.waitForFunction(()=>document.querySelector('[data-map-report-sheet][data-sheet-snap="half"] img')?.naturalWidth===80);
+    const detailsButton=sheet.getByRole('button',{name:'View full report',exact:true});
+    await detailsButton.waitFor();
+    await page.waitForTimeout(350);
+    const gap=await detailsButton.evaluate(el=>el.closest('[data-map-report-sheet]').getBoundingClientRect().bottom-el.getBoundingClientRect().bottom);
+    assert(gap>=0 && gap<=24,'Selected report panel fits its content: '+gap);
+    assert.equal(await sheet.evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+    if(screenshots) await page.screenshot({path:join(screenshots,'map-report-preview-'+theme+'.png')});
+    await page.evaluate(()=>document.documentElement.style.fontSize='200%');
+    assert.equal(await sheet.evaluate(el=>el.scrollWidth<=el.clientWidth),true,'Map report preview reflows at enlarged text');
+    await detailsButton.scrollIntoViewIfNeeded();
+    await page.evaluate(()=>document.documentElement.style.fontSize='');
+    await map.getByRole('button',{name:'Back to dashboard',exact:true}).click();
+    await map.waitFor({state:'detached'});
     await page.locator('[data-resident-bottom-nav] button').nth(1).click();
     await page.waitForURL('**/dashboard?tab=reports');
     const photo=page.locator('img[src^="data:image/png;base64,"]');
     await photo.waitFor();
-    await page.waitForFunction(() => document.querySelector('img[src^="data:image/png;base64,"]')?.naturalWidth === 1);
+    await page.waitForFunction(() => document.querySelector('img[src^="data:image/png;base64,"]')?.naturalWidth === 80);
     assert.equal(await page.evaluate(() => window.__mediaCalls.some(call => call.url.startsWith('http://192.168.0.199:33159/api/thumbnails?') && call.url.includes('qa-real.svg') && call.responseType === 'arraybuffer')), true);
     await page.getByText(language === 'en' ? 'Photo unavailable' : 'Hindi available ang larawan', {exact:true}).waitFor();
     const beforeRetry = await page.evaluate(() => window.__mediaCalls.length);

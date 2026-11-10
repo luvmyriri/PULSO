@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAndroidBack } from '../utils/nativeAndroid';
 import { isNativeAndroid } from '../utils/appContext';
 import './common/resident-checkbox.css';
+import ReportEvidenceImage from './ReportEvidenceImage';
 import {
     GoogleMap,
     MarkerF,
@@ -689,6 +690,15 @@ export default function NearbyIssuesMapModal({
 
     // Mobile sheet position: 'collapsed' | 'half' | 'full'
     const [mobileSheetSnap, setMobileSheetSnap] = useState('collapsed');
+    const mobileSheetRef = useRef(null);
+    const [mobileSheetHeight, setMobileSheetHeight] = useState(74);
+    useEffect(() => {
+        if (!isOpen || !mobileSheetRef.current) return;
+        const sheet = mobileSheetRef.current;
+        const observer = new ResizeObserver(() => setMobileSheetHeight(Math.ceil(sheet.getBoundingClientRect().height)));
+        observer.observe(sheet);
+        return () => observer.disconnect();
+    }, [isOpen]);
     const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
     const [isBarangayPickerOpen, setIsBarangayPickerOpen] = useState(false);
@@ -1978,7 +1988,7 @@ export default function NearbyIssuesMapModal({
                                 : mobileSheetSnap === 'collapsed'
                                 ? 'calc(env(safe-area-inset-bottom, 0px) + 88px)'
                                 : mobileSheetSnap === 'half'
-                                ? 'calc(env(safe-area-inset-bottom, 0px) + 380px)'
+                                ? `calc(env(safe-area-inset-bottom, 0px) + ${mobileSheetHeight + 15}px)`
                                 : '-999px',
                             opacity: mobileSheetSnap === 'full' && !isMobileFullscreenMap ? 0 : 1,
                             pointerEvents: mobileSheetSnap === 'full' && !isMobileFullscreenMap ? 'none' : 'auto'
@@ -2003,13 +2013,16 @@ export default function NearbyIssuesMapModal({
 
                     {/* ── MOBILE DRAGGABLE BOTTOM SHEET (3 POSITIONS: COLLAPSED, HALF, FULL) ── */}
                     <div
+                        ref={mobileSheetRef}
+                        data-map-report-sheet
+                        data-sheet-snap={mobileSheetSnap}
                         className={`lg:hidden absolute inset-x-0 bottom-0 z-30 bg-white dark:bg-slate-900 rounded-t-[24px] border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.15)] flex flex-col transition-all duration-300 ease-out select-none ${
                             isMobileFullscreenMap || (isSearchFocused && matchingSearchReports.length > 0)
                                 ? 'translate-y-full opacity-0 pointer-events-none'
                                 : mobileSheetSnap === 'collapsed'
                                 ? 'h-[74px] pb-[env(safe-area-inset-bottom,0px)]'
                                 : mobileSheetSnap === 'half'
-                                ? 'h-[365px] max-h-[75vh] pb-[calc(env(safe-area-inset-bottom,0px)+6px)]'
+                                ? 'h-auto max-h-[75dvh] pb-[calc(env(safe-area-inset-bottom,0px)+6px)]'
                                 : 'h-[calc(100%-60px)] max-h-[calc(100%-60px)] pb-[env(safe-area-inset-bottom,0px)]'
                         }`}
                     >
@@ -2090,12 +2103,15 @@ export default function NearbyIssuesMapModal({
                                 {selectedHazard ? (
                                     <div className="flex-1 overflow-y-auto px-4 py-2.5 pb-2 space-y-2.5 custom-scrollbar">
                                         {/* Top Card: Photo + Title + Meta (Responsive) */}
-                                        <div className="flex flex-col sm:flex-row items-start gap-3">
-                                            {selectedHazardPhotoUrl ? <img
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-24 h-24 sm:w-[100px] sm:h-24 rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shrink-0">
+                                            {selectedHazardPhotoUrl ? <ReportEvidenceImage
                                                 src={selectedHazardPhotoUrl}
                                                 alt={selectedHazard.title || 'Report preview'}
-                                                className="w-20 h-20 sm:w-[100px] sm:h-[80px] rounded-xl object-cover border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shrink-0 self-start"
-                                                /> : <div className="w-20 h-20 sm:w-[100px] sm:h-[80px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300 shrink-0 self-start" aria-label={t('mapPublicReports.photoPrivate', { defaultValue: 'No report photo available' })}><FileText size={24} aria-hidden="true" /></div>}
+                                                className="w-full h-full object-cover"
+                                                compact size={80}
+                                                /> : <div className="w-full h-full flex items-center justify-center text-slate-500 dark:text-slate-300" aria-label={t('mapPublicReports.photoPrivate', { defaultValue: 'No report photo available' })}><FileText size={24} aria-hidden="true" /></div>}
+                                            </div>
                                             <div className="flex-1 min-w-0 flex flex-col justify-between w-full">
                                                 <div>
                                                     <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white leading-snug break-words">
@@ -2280,7 +2296,7 @@ export default function NearbyIssuesMapModal({
 
                             {/* Photo Preview */}
                             <div className="w-full h-44 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800">
-                                {selectedHazardPhotoUrl ? <img
+                                {selectedHazardPhotoUrl ? <ReportEvidenceImage
                                     src={selectedHazardPhotoUrl}
                                     alt={selectedHazard.title || 'Report photo'}
                                     className="w-full h-full object-cover"
