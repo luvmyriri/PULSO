@@ -12,6 +12,7 @@ import { drawEvidenceWatermark, burnEvidenceWatermark, formatWatermarkTimestamp,
 import { formatWatermarkAddress } from '../utils/locationPrivacy';
 import { API_BASE_URL } from '../utils/apiBase';
 import { useAndroidBack } from '../utils/nativeAndroid';
+import { isNativeAndroid } from '../utils/appContext';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import CameraTopBar from './camera/CameraTopBar';
 import CameraMessage from './camera/CameraMessage';
@@ -96,6 +97,7 @@ const IDCameraModal = ({
     onRatioChange = null
 }) => {
     useAndroidBack(isOpen, 50, onClose);
+    const nativeCamera = isNativeAndroid() && !standalone;
 
     // Dynamic theme awareness: uses prop if supplied, otherwise observes html.dark class
     const [isSystemDark, setIsSystemDark] = useState(() => {
@@ -840,6 +842,7 @@ const IDCameraModal = ({
         <AnimatePresence>
             {isOpen && (
                 <div
+                    data-native-camera={nativeCamera || undefined}
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="camera-screen-title"
@@ -851,14 +854,14 @@ const IDCameraModal = ({
                     } overflow-hidden select-none touch-none`}
                     style={{
                         touchAction: 'none',
-                        paddingTop: standalone ? '0px' : 'env(safe-area-inset-top, 0px)',
-                        paddingBottom: standalone ? '0px' : 'env(safe-area-inset-bottom, 0px)'
+                        paddingTop: standalone || nativeCamera ? '0px' : 'env(safe-area-inset-top, 0px)',
+                        paddingBottom: standalone || nativeCamera ? '0px' : 'env(safe-area-inset-bottom, 0px)'
                     }}
                 >
                     {/* Smartphone Camera Frame: Fullscreen on mobile/standalone, sleek smartphone viewport on desktop */}
                     <div
                         className={`relative w-full h-full ${
-                            standalone
+                            standalone || nativeCamera
                                 ? ''
                                 : `sm:w-[412px] sm:h-[min(92dvh,860px)] sm:rounded-[2.25rem] sm:border-[3px] ${
                                     isDark
@@ -882,6 +885,7 @@ const IDCameraModal = ({
                             titleId="camera-screen-title"
                             isDark={isDark}
                             translucent={isFullBleed16x9}
+                            nativeCamera={nativeCamera}
                             showRatioControl={isIssue && isLiveState}
                             photoRatio={photoRatio}
                             centerContent={isLiveState ? <CameraZoomControls zoom={zoom} onZoomChange={applyZoom} /> : null}
@@ -1099,6 +1103,7 @@ const IDCameraModal = ({
                         {/* ─────────────────────────────────────────────────────────── */}
                         <footer
                             className="w-full bg-transparent px-4 pt-2.5 pb-4 z-30 shrink-0 transition-colors duration-300"
+                            style={nativeCamera ? { paddingBottom: 'max(1rem, var(--pulso-safe-bottom, 0px))' } : undefined}
                         >
                             {isPreviewAcceptedState ? (
                                 /* Acceptance actions in bottom deck */

@@ -18,6 +18,7 @@ export default function CameraTopBar({
     className = '',
     isDark = true,
     translucent = false,
+    nativeCamera = false,
     showRatioControl = false,
     photoRatio = '4:3',
     onRatioChange,
@@ -58,7 +59,8 @@ export default function CameraTopBar({
             </h1>
 
             {/* Top Icons Row */}
-            <div className="w-full flex items-center justify-between gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2.5">
+            <div className="w-full flex items-center justify-between gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2.5"
+                style={nativeCamera ? { paddingTop: 'max(.75rem, var(--pulso-safe-top, 0px))' } : undefined}>
                 {/* Top Left: Back (<) Button */}
                 <button
                     type="button"
@@ -120,6 +122,7 @@ export default function CameraTopBar({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -6 }}
                         transition={{ duration: 0.15, ease: 'easeOut' }}
+                        style={nativeCamera ? { paddingTop: 'max(.75rem, var(--pulso-safe-top, 0px))' } : undefined}
                         className={`absolute inset-x-0 top-0 w-full px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-4 z-50 space-y-2 ${
                             isDark
                                 ? 'bg-black text-white'

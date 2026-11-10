@@ -32,11 +32,12 @@ export function syncNativeSystemBars(fallbackColor) {
     if (stopped) return;
     const topColor = edgeColor(1);
     const bottomColor = edgeColor(window.innerHeight - 1);
-    const edgeToEdge = Boolean(document.querySelector('[data-native-resident-landing], [data-native-guide]'));
-    const colors = topColor + bottomColor + edgeToEdge;
+    const immersive = Boolean(document.querySelector('[data-native-camera]'));
+    const edgeToEdge = immersive || Boolean(document.querySelector('[data-native-resident-landing], [data-native-guide]'));
+    const colors = topColor + bottomColor + edgeToEdge + immersive;
     if (colors === previousColors) return;
     previousColors = colors;
-    void Appearance.setSystemBars({ topColor, bottomColor, edgeToEdge }).catch((error) => {
+    void Appearance.setSystemBars({ topColor, bottomColor, edgeToEdge, immersive }).catch((error) => {
       previousColors = '';
       console.warn('Unable to update Android system bars', error);
     });
