@@ -45,6 +45,7 @@ try {
       }
       window.androidBridge = {};
       window.__barCalls = [];
+      window.__mediaCalls = [];
       Object.defineProperty(navigator, 'geolocation', { value: {
         getCurrentPosition: (_success, error) => error?.({ code: 1, message: 'Synthetic permission denied' }),
         watchPosition: (_success, error) => { error?.({ code: 1, message: 'Synthetic permission denied' }); return 1; },
@@ -55,8 +56,14 @@ try {
           { name: 'SplashScreen', methods: [{ name: 'hide', rtype: 'promise' }] },
           { name: 'App', methods: [{ name: 'getInfo', rtype: 'promise' }, { name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'callback' }] },
           { name: 'PulsoAppearance', methods: [{ name: 'setSystemBars', rtype: 'promise' }] },
+          { name: 'CapacitorHttp', methods: [{ name: 'get', rtype: 'promise' }] },
         ],
         nativePromise: async (plugin, method, options) => {
+          if (plugin === 'CapacitorHttp') {
+            window.__mediaCalls.push(options);
+            if (options.url.includes('qa-real.svg')) return { status: 200, headers: { 'Content-Type': 'image/png' }, data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aC1sAAAAASUVORK5CYII=' };
+            return { status: 404, headers: { 'Content-Type': 'application/json' }, data: {} };
+          }
           if (plugin === 'PulsoAppearance') {
             window.__barCalls.push(options);
             document.documentElement.style.setProperty('--pulso-safe-top', options.edgeToEdge ? '24px' : '0px');
@@ -77,10 +84,14 @@ try {
     assert.equal(await page.locator('[data-resident-bottom-nav] button').nth(3).innerText(), 'Updates');
     await page.locator('[data-resident-bottom-nav] button').nth(1).click();
     await page.waitForURL('**/dashboard?tab=reports');
-    const photo=page.locator('img[src$="/api/uploads/reports/qa-real.svg"]');
+    const photo=page.locator('img[src^="data:image/png;base64,"]');
     await photo.waitFor();
-    assert.equal(await photo.getAttribute('src'), 'http://192.168.0.199:33159/api/uploads/reports/qa-real.svg');
-    await page.waitForFunction(() => document.querySelector('img[src$="qa-real.svg"]')?.naturalWidth === 40);
+    await page.waitForFunction(() => document.querySelector('img[src^="data:image/png;base64,"]')?.naturalWidth === 1);
+    assert.equal(await page.evaluate(() => window.__mediaCalls.some(call => call.url.startsWith('http://192.168.0.199:33159/api/thumbnails?') && call.url.includes('qa-real.svg') && call.responseType === 'arraybuffer')), true);
+    await page.getByText(language === 'en' ? 'Photo unavailable' : 'Hindi available ang larawan', {exact:true}).waitFor();
+    const beforeRetry = await page.evaluate(() => window.__mediaCalls.length);
+    await page.getByRole('button', {name: language === 'en' ? 'Retry photo' : 'Subukan muli', exact:true}).click();
+    await page.waitForFunction(count => window.__mediaCalls.length > count, beforeRetry);
     await page.getByText(language === 'en' ? 'Photo unavailable' : 'Hindi available ang larawan', {exact:true}).waitFor();
     assert.equal(await page.locator('img[src*="unsplash"]').count(), 0, 'No stock evidence substituted');
     if(screenshots) await page.screenshot({path:join(screenshots,'my-reports-media-'+theme+'.png'),fullPage:true});

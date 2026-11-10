@@ -17,6 +17,7 @@ import {
     MoreHorizontal
 } from 'lucide-react';
 import { getReportPhotoUrl } from '../utils/reportMedia';
+import useReportImageSource from '../utils/useReportImageSource';
 import PulsoPulseLine from './common/PulsoPulseLine';
 
 /**
@@ -141,6 +142,7 @@ export default function ReportPopup({
 }) {
     const closeBtnRef = useRef(null);
     const [imageFailed, setImageFailed] = useState(false);
+    const photo = useReportImageSource(getReportPhotoUrl(report));
     const [hasStreetView, setHasStreetView] = useState(true);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const [ariaAnnouncement, setAriaAnnouncement] = useState('');
@@ -215,7 +217,7 @@ export default function ReportPopup({
 
     if (!isOpen || !report) return null;
 
-    const fullPhotoUrl = imageFailed ? null : getReportPhotoUrl(report);
+    const fullPhotoUrl = imageFailed ? null : photo.src;
 
     const categoryTitle = report.category || report.raw_category || report.report_type || report.title || 'Civic Infrastructure';
     const CategoryIcon = getCategoryIconComponent(categoryTitle, report.raw_category);

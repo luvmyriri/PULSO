@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { getReportPhotoUrl, getReportPinPhotoUrl } from './reportMedia';
+import { loadReportImageSource } from './nativeReportMedia';
 
 export const reportPhotoPinKey = (report, color, selected = false) =>
     JSON.stringify([report.id, color, selected, getReportPhotoUrl(report)]);
 
-function loadImage(url) {
+async function loadImage(url) {
+    const source = await loadReportImageSource(url);
     return new Promise((resolve, reject) => {
         const image = new Image();
         image.crossOrigin = 'anonymous';
         image.onload = () => resolve(image);
         image.onerror = reject;
-        image.src = url;
+        image.src = source;
     });
 }
 

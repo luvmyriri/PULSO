@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getReportPhotoUrl } from '../utils/reportMedia';
+import useReportImageSource from '../utils/useReportImageSource';
 import { getCategoryIconComponent, getFriendlyStatusName } from './ReportPopup';
 
 /**
@@ -21,6 +22,8 @@ export default function MapPin({
     reportLocation
 }) {
     const [failedPhoto, setFailedPhoto] = useState(null);
+    const resolvedPhoto = getReportPhotoUrl(report);
+    const photo = useReportImageSource(resolvedPhoto, 80);
 
     if (!report) return null;
 
@@ -39,8 +42,7 @@ export default function MapPin({
 
     const categoryPinColor = categoryColor || getCategoryColorFallback(report);
 
-    const resolvedPhoto = getReportPhotoUrl(report);
-    const photoUrl = resolvedPhoto !== failedPhoto ? resolvedPhoto : null;
+    const photoUrl = photo.src !== failedPhoto ? photo.src : null;
     const pinColor = categoryPinColor;
 
     const categoryName = report.category || report.raw_category || report.report_type || report.title || 'Civic Infrastructure';
@@ -77,7 +79,7 @@ export default function MapPin({
                     src={photoUrl}
                     alt=""
                     aria-hidden="true"
-                    onError={() => setFailedPhoto(resolvedPhoto)}
+                    onError={() => setFailedPhoto(photo.src)}
                     className="w-full h-full object-cover rounded-full"
                 />
             ) : (

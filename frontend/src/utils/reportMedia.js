@@ -24,7 +24,7 @@ export function getReportPhotoUrl(report, apiBase = API_BASE_URL) {
     return null;
 }
 
-export function getReportPinPhotoUrl(photoUrl, apiBase = API_BASE_URL) {
+export function getReportThumbnailUrl(photoUrl, size = 80, apiBase = API_BASE_URL) {
     if (!photoUrl) return null;
     // Resize only this backend's already-published media; do not replace public
     // projections with originals or proxy arbitrary external image URLs.
@@ -32,11 +32,13 @@ export function getReportPinPhotoUrl(photoUrl, apiBase = API_BASE_URL) {
     const url = new URL(photoUrl, origin);
     if (url.origin !== origin) return photoUrl;
     if (url.pathname === '/api/thumbnails') {
-        url.searchParams.set('size', '80');
+        url.searchParams.set('size', String(size));
         return url.href;
     }
     if (/^\/(?:api\/)?uploads\/reports\//.test(url.pathname)) {
-        return `${apiBase}/api/thumbnails?src=${encodeURIComponent(url.pathname)}&size=80`;
+        return `${apiBase}/api/thumbnails?src=${encodeURIComponent(url.pathname)}&size=${size}`;
     }
     return photoUrl;
 }
+
+export const getReportPinPhotoUrl = (photoUrl, apiBase = API_BASE_URL) => getReportThumbnailUrl(photoUrl, 80, apiBase);

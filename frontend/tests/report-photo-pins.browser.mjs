@@ -28,8 +28,28 @@ const server = createServer((req,res) => {
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const browser = await chromium.launch({channel:'chrome',headless:true});
 try {
+  for (const native of [false, true]) {
     const page = await browser.newPage();
     const requests = [];
+    if (native) await page.addInitScript(() => {
+        window.androidBridge = {};
+        window.__nativeMediaRequests = [];
+        window.Capacitor = {
+            PluginHeaders: [{name:'CapacitorHttp',methods:[{name:'get',rtype:'promise'}]}],
+            nativePromise: async (_plugin,_method,options) => {
+                const url = new URL(options.url);
+                window.__nativeMediaRequests.push(url.pathname+url.search);
+                const source = url.searchParams.get('src') || url.pathname;
+                if(source.includes('slow')) await new Promise(resolve=>setTimeout(resolve,350));
+                if(url.pathname === '/api/thumbnails' && source.includes('fallback')) return {status:404,headers:{'content-type':'application/json'},data:{}};
+                const canvas=document.createElement('canvas');canvas.width=80;canvas.height=80;
+                const ctx=canvas.getContext('2d');
+                ctx.fillStyle=source.includes('replacement') ? '#cc2266' : source.includes('fallback') ? '#1188cc' : '#22aa66';
+                ctx.fillRect(0,0,80,80);
+                return {status:200,headers:{'content-type':'image/png'},data:canvas.toDataURL('image/png').split(',')[1]};
+            },
+        };
+    });
     await page.route('https://media.example.invalid/**',async route=> {
         const url = new URL(route.request().url());
         requests.push(url.pathname+url.search);
@@ -54,9 +74,13 @@ try {
         return result;
     });
     for(const {key,pixel} of colors) assert.deepEqual(pixel, key[0]===1 ? [34,170,102,255] : [17,136,204,255]);
+    if (native) requests.push(...await page.evaluate(()=>window.__nativeMediaRequests));
     assert(requests.some(path=>path==='/api/uploads/reports/fallback.svg'), 'Thumbnail failure loads the same evidence source');
     await page.evaluate(()=>window.__replace());
     await page.waitForFunction(()=>Object.keys(window.__pins||{}).filter(key=>key.includes('replacement')).length===2);
+    if (native) requests.push(...await page.evaluate(()=>window.__nativeMediaRequests));
     assert(requests.some(path=>path.includes('replacement')), 'Changing a report photo invalidates its pin key');
-    console.log('PASS: slow photo pins survive report rerenders; original-image fallback uses the loaded image; photo changes refresh cached pins.');
+    await page.close();
+  }
+    console.log('PASS: web and native-byte photo pins survive slow rerenders, draw the correct fallback image, and refresh after source changes.');
 } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }

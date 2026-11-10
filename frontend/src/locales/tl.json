@@ -1,6 +1,6 @@
 {
   "translation": {
-    "reportMedia": { "photoUnavailable": "Hindi available ang larawan" },
+    "reportMedia": { "photoUnavailable": "Hindi available ang larawan", "loading": "Kinukuha ang larawan", "retry": "Subukan muli" },
     "locationPrivacy": {
       "title": "Kasalukuyang lokasyon",
       "mappedAddress": "Address malapit sa lokasyon ng GPS",
