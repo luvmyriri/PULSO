@@ -1,7 +1,7 @@
 .native-app-update-trigger { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; max-width: 100%; padding: .4rem 0; color: inherit; font: inherit; font-weight: 600; text-align: start; cursor: pointer; }
 .native-app-update-trigger:hover { text-decoration: underline; text-underline-offset: 3px; }
-.native-app-update-trigger--prominent { min-width: 7rem; padding-inline: .75rem; border: 1px solid var(--color-primary); border-radius: 999px; color: var(--home-ink); }
-.native-app-update-trigger--prominent svg { color: var(--color-primary); }
+.native-app-update-trigger--prominent { min-width: 44px; padding-inline: .25rem; border: 0; border-radius: .25rem; background: transparent; color: var(--home-muted); font-weight: 500; }
+.native-app-update-trigger--prominent svg { width: 14px; height: 14px; color: currentColor; }
 .native-app-update__confirmation { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .native-app-update-trigger:focus-visible { outline: 3px solid var(--home-focus, Highlight); outline-offset: 2px; }
 .native-app-update { padding-block-end: .5rem; font-size: .9375rem; line-height: 1.5; }
