@@ -1,4 +1,5 @@
 import NativeAppHeader from '../components/mobile/NativeAppHeader';
+import NativeBottomSheet from '../components/mobile/NativeBottomSheet';
 import NotificationDropdown from '../components/NotificationDropdown';
 import { exportResidentReportsToXLSX } from '../utils/xlsxExport';
 import { residentPublication } from '../utils/publicationAdapter';
@@ -4379,6 +4380,31 @@ const ProfileView = ({
     const [ratingScore, setRatingScore] = useState(5);
     const [ratingSubmitted, setRatingSubmitted] = useState(false);
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+    const nativeContactSheet = isNativeAndroid();
+    const closeContact = () => setIsContactModalOpen(false);
+    const contactTitle = t('nativeAndroid.contact.title');
+    const contactDescription = t('nativeAndroid.contact.description');
+    const contactCloseLabel = t('nativeAndroid.contact.close');
+    const contactDetails = (
+        <div className="space-y-2 pt-1 text-left">
+            <div className="space-y-0.5 rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{t('nativeAndroid.contact.engineeringOffice')}</div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">888-1234 / 8397-6212</div>
+                <div className="break-all text-sm text-slate-600 dark:text-slate-300">engineering@caloocancity.gov.ph</div>
+            </div>
+            <div className="space-y-0.5 rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{t('nativeAndroid.contact.emergencyHotlines')}</div>
+                <div className="text-sm font-semibold text-orange-700 dark:text-orange-400">{t('nativeAndroid.contact.emergencyNumber')}</div>
+                <div className="text-sm text-slate-600 dark:text-slate-300">Caloocan DRRMO: 8397-6212</div>
+            </div>
+        </div>
+    );
+    const contactCloseButton = (
+        <button type="button" onClick={closeContact}
+            className="min-h-11 w-full cursor-pointer rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            {contactCloseLabel}
+        </button>
+    );
 
     // Password & Security States
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
@@ -5079,6 +5105,7 @@ const ProfileView = ({
                                         <button
                                             type="button"
                                             onClick={() => setIsContactModalOpen(true)}
+                                            aria-haspopup="dialog"
                                             className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
                                         >
                                             <div className="flex items-center gap-3.5 min-w-0">
@@ -5917,11 +5944,19 @@ const ProfileView = ({
             </AnimatePresence>
 
             {/* Contact & Support Modal */}
+            {nativeContactSheet && isContactModalOpen && (
+                <NativeBottomSheet title={contactTitle} description={contactDescription} closeLabel={contactCloseLabel} onDismiss={closeContact}>
+                    <div className="space-y-3 pb-2">
+                        {contactDetails}
+                        {contactCloseButton}
+                    </div>
+                </NativeBottomSheet>
+            )}
             <AnimatePresence>
-                {isContactModalOpen && (
+                {!nativeContactSheet && isContactModalOpen && (
                     <div
                         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
-                        onClick={() => setIsContactModalOpen(false)}
+                        onClick={closeContact}
                     >
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
@@ -5934,9 +5969,9 @@ const ProfileView = ({
                         >
                             <button
                                 type="button"
-                                onClick={() => setIsContactModalOpen(false)}
+                                onClick={closeContact}
                                 className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg cursor-pointer"
-                                aria-label="Close"
+                                aria-label={contactCloseLabel}
                             >
                                 <X size={18} />
                             </button>
@@ -5944,30 +5979,13 @@ const ProfileView = ({
                                 <PhoneCall size={22} />
                             </div>
                             <div className="text-center space-y-1">
-                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Contact &amp; Assistance</h3>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">{contactTitle}</h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Caloocan City Engineering Department &amp; Emergency Hotlines
+                                    {contactDescription}
                                 </p>
                             </div>
-                            <div className="space-y-2 pt-1 text-left">
-                                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">City Engineering Office</div>
-                                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">888-1234 / 8397-6212</div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400">engineering@caloocancity.gov.ph</div>
-                                </div>
-                                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Emergency Hotlines (24/7)</div>
-                                    <div className="text-xs font-semibold text-orange-600 dark:text-orange-400">911 (Rescue, Police &amp; Fire)</div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400">Caloocan DRRMO: 8397-6212</div>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsContactModalOpen(false)}
-                                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
-                            >
-                                Close
-                            </button>
+                            {contactDetails}
+                            {contactCloseButton}
                         </motion.div>
                     </div>
                 )}
@@ -9313,7 +9331,7 @@ const TopNavigation = ({
     if (isNativeAndroid()) {
         return (
             <div className="sticky top-0 z-50 shrink-0">
-                <NativeAppHeader>
+                <NativeAppHeader borderless>
                     <button type="button" ref={nativeBellRef}
                         aria-label={t('notificationCenter.title', 'All notifications')}
                         aria-expanded={showNotifications}
@@ -9324,18 +9342,17 @@ const TopNavigation = ({
                     </button>
                 </NativeAppHeader>
                 {isHomeTab && (
-                    <div ref={mobileSearchRef} className="relative flex items-center gap-2 border-b border-slate-300 bg-[#f7f9fc] px-4 py-2 dark:border-slate-700 dark:bg-[#0c1421]">
-                        <input ref={mobileSearchInputRef} type="search" value={searchQuery}
-                            aria-label={t('nativeAndroid.navigation.search')}
-                            placeholder={t('nativeAndroid.navigation.search')}
-                            onFocus={() => setIsSearchOpen(true)}
-                            onChange={event => { setSearchQuery(event.target.value); setIsSearchOpen(true); }}
-                            onKeyDown={handleSearchKeyDown}
-                            className="min-h-11 min-w-0 flex-1 rounded-md border border-slate-400 bg-white px-3 text-base text-slate-900 focus-visible:outline-3 focus-visible:outline-blue-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50" />
-                        <button type="button" onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-                            className="min-h-11 rounded-md px-2 text-sm font-semibold text-slate-700 underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-blue-600 dark:text-slate-200">
-                            {t('nativeAndroid.navigation.assistant')}
-                        </button>
+                    <div ref={mobileSearchRef} className="relative border-b border-slate-200 bg-[#f7f9fc] px-4 py-2 dark:border-slate-700 dark:bg-[#0c1421]">
+                        <label className="flex min-h-12 w-full cursor-text items-center gap-2.5 rounded-[14px] border border-slate-300 bg-white px-3.5 text-slate-900 shadow-2xs focus-within:outline-3 focus-within:outline-blue-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus-within:outline-blue-300">
+                            <Search size={20} className="shrink-0" aria-hidden="true" />
+                            <input ref={mobileSearchInputRef} type="search" value={searchQuery}
+                                aria-label={t('nativeAndroid.navigation.search')}
+                                placeholder={t('nativeAndroid.navigation.search')}
+                                onFocus={() => setIsSearchOpen(true)}
+                                onChange={event => { setSearchQuery(event.target.value); setIsSearchOpen(true); }}
+                                onKeyDown={handleSearchKeyDown}
+                                className="min-h-11 min-w-0 flex-1 border-0 bg-transparent text-base outline-none placeholder:text-slate-600 dark:placeholder:text-slate-400" />
+                        </label>
                         {isSearchOpen && (
                             <div className="absolute inset-x-0 top-full max-h-[60dvh] overflow-y-auto border-b border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900">
                                 {renderSearchDropdown(true)}

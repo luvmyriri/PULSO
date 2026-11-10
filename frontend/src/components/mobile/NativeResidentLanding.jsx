@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
-import NativeAppHeader from './NativeAppHeader';
+import NativeAppHeader, { NativeResidentAccountLink } from './NativeAppHeader';
 import NativeTrackSheet from './NativeTrackSheet';
 import './native-resident-theme.css';
 import './native-resident-landing.css';
@@ -27,9 +27,7 @@ export default function NativeResidentLanding({ residentSignedIn, trackingRoute 
         <img src="/resident-hero/native-bonifacio-monument.webp" alt="" fetchPriority="high" />
       </div>
       <NativeAppHeader appearance="hero">
-        <Link to={residentSignedIn ? '/dashboard' : '/login'} className="native-home__account-link">
-          {t(residentSignedIn ? 'nativeAndroid.home.myReports' : 'nativeAndroid.home.signInShort')}
-        </Link>
+        <NativeResidentAccountLink signedIn={residentSignedIn} />
       </NativeAppHeader>
       <main className="native-home__main" id="native-home-content">
         <section className="native-home__hero" aria-labelledby="native-home-heading">

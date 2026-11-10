@@ -869,7 +869,7 @@ export default function Login() {
             {/* Clean background */}
 
             {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
-            {nativeAndroid ? <NativeAppHeader /> : (
+            {nativeAndroid ? <NativeAppHeader borderless /> : (
               <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 w-full flex justify-between items-center">
                 {/* Logo on top-left linking to home */}
                 <Link

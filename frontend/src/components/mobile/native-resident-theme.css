@@ -1,4 +1,4 @@
-:where(.native-resident-landing, .native-guide) {
+:where(.native-resident-landing, .native-guide, .native-app-header--hero, .native-bottom-sheet) {
   color-scheme: light;
   --home-canvas: var(--color-canvas);
   --home-ink: var(--color-ink);
@@ -10,7 +10,7 @@
   --home-focus: var(--color-focus);
   --home-gutter: 1.1rem;
 }
-:where(.native-resident-landing, .native-guide)[data-landing-theme='dark'] {
+:where(.native-resident-landing, .native-guide, .native-app-header--hero, .native-bottom-sheet)[data-landing-theme='dark'] {
   color-scheme: dark;
   --home-canvas: var(--color-canvas-dark);
   --home-ink: var(--color-slate-50);

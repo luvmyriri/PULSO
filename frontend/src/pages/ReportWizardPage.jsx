@@ -1,5 +1,5 @@
-import NativeAppHeader from '../components/mobile/NativeAppHeader';
-import React, { useState, useEffect } from 'react';
+import NativeAppHeader, { NativeResidentAccountLink } from '../components/mobile/NativeAppHeader';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
@@ -159,39 +159,48 @@ export default function ReportWizardPage() {
     };
   }, [currentStep, formData.evidence.file, formData.evidence.previewUrl, formData.evidence.previewDataUrl, formData.evidence.fileName, formData.evidence.mimeType]);
 
-  // Auto-Save Draft to LocalStorage (debounced 400ms)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const draftPayload = {
-          version: 2,
-          savedAt: Date.now(),
-          currentStep,
-          maxStepReached,
-          formData: {
-            category: formData.category,
-            location: formData.location,
-            evidence: {
-              fileName: formData.evidence.fileName,
-              fileSize: formData.evidence.fileSize,
-              mimeType: formData.evidence.mimeType,
-              previewDataUrl: formData.evidence.previewDataUrl || null,
-              aiCategorySuggestion: formData.evidence.aiCategorySuggestion,
-              aiConfidence: formData.evidence.aiConfidence,
-            },
-            details: formData.details,
-            contact: formData.contact,
-            consentAccepted: formData.consentAccepted,
-          }
-        };
-        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload));
-      } catch (e) {
-        console.warn('Failed to auto-save report draft:', e);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
+  const saveDraft = useCallback(() => {
+    try {
+      const draftPayload = {
+        version: 2,
+        savedAt: Date.now(),
+        currentStep,
+        maxStepReached,
+        formData: {
+          category: formData.category,
+          location: formData.location,
+          evidence: {
+            fileName: formData.evidence.fileName,
+            fileSize: formData.evidence.fileSize,
+            mimeType: formData.evidence.mimeType,
+            previewDataUrl: formData.evidence.previewDataUrl || null,
+            aiCategorySuggestion: formData.evidence.aiCategorySuggestion,
+            aiConfidence: formData.evidence.aiConfidence,
+          },
+          details: formData.details,
+          contact: formData.contact,
+          consentAccepted: formData.consentAccepted,
+        },
+      };
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload));
+    } catch (e) {
+      console.warn('Failed to auto-save report draft:', e);
+    }
   }, [formData, currentStep, maxStepReached]);
+
+  // Save in the background and flush pending edits before leaving via the header.
+  useEffect(() => {
+    const timer = setTimeout(saveDraft, 400);
+    return () => clearTimeout(timer);
+  }, [saveDraft]);
+
+  function handleHeaderNavigation(event) {
+    if (isSubmitting) {
+      event.preventDefault();
+      return;
+    }
+    saveDraft();
+  }
 
   // Step Navigation
   const goToNextStep = () => {
@@ -367,7 +376,11 @@ export default function ReportWizardPage() {
       </div>
 
       {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
-      {isNativeAndroid() ? <NativeAppHeader /> : (
+      {isNativeAndroid() ? (
+        <NativeAppHeader appearance="hero" onBrandClick={handleHeaderNavigation}>
+          <NativeResidentAccountLink signedIn={Boolean(getStoredToken()) && getStoredUser()?.role === 'resident'} onClick={handleHeaderNavigation} />
+        </NativeAppHeader>
+      ) : (
         <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 w-full flex justify-between items-center gap-3">
         {/* Logo on top-left linking to home */}
         <Link

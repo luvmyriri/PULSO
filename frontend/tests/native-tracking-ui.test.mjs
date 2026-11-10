@@ -74,7 +74,7 @@ test('receipt deep links keep both credential formats intact', () => {
     assert.doesNotMatch(html, /<button[^>]*type="submit"[^>]* disabled=/);
 
     const native = render(Home, `/track?id=FAKE-TEST-340&${parameter}=FAKE-SECRET`, { trackingRoute: true });
-    assert.match(native, /<dialog[^>]*class="native-track-sheet"/);
+    assert.match(native, /<dialog[^>]*class="native-bottom-sheet"/);
     assert.match(native, /id="track-ticket-id"[^>]*value="FAKE-TEST-340"/);
     assert.match(native, /id="track-token"[^>]*value="FAKE-SECRET"/);
   }

@@ -14,7 +14,6 @@ export default function LocationAddressPanel({ address, coordinates, showCoordin
     let message = '';
     if (loading) message = t(gpsAddress ? 'locationPrivacy.gpsAddressLoading' : 'locationPrivacy.loading');
     else if (status && status !== 'OK') message = t('locationPrivacy.unavailable');
-    else if (gpsAddress && status === 'OK' && !hasStreet) message = t('locationPrivacy.streetUnmatched');
     else if (!fields.length && !hasCoordinates) message = t('locationPrivacy.empty');
     return (
         <section className="min-w-0 space-y-2 text-slate-900 dark:text-slate-100" aria-label={title} aria-busy={loading}>
@@ -30,7 +29,7 @@ export default function LocationAddressPanel({ address, coordinates, showCoordin
                 </p>
             )}
             {showCoordinates && <LocationCoordinates coordinates={coordinates} />}
-            <p role="status" className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+            <p role="status" className={message ? 'text-xs leading-5 text-slate-600 dark:text-slate-300' : 'sr-only'}>
                 {message}
             </p>
         </section>

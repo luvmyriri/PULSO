@@ -43,73 +43,6 @@
   position: relative; border: 0; background: transparent; color: var(--home-ink);
   padding-top: var(--pulso-safe-top, 0px);
 }
-.native-app-header--hero > div {
-  max-width: 32rem; min-height: 3.5rem; flex-wrap: wrap; row-gap: .25rem;
-  padding: .375rem var(--home-gutter);
-}
-.native-app-header--hero > div > div { margin-inline-start: auto; }
-.native-app-header--hero .native-app-header__city { color: var(--home-muted); }
-.native-home__account-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
-  padding-inline: .25rem;
-  border-radius: .375rem;
-  color: var(--home-ink);
-  font-size: .8125rem;
-  font-weight: 650;
-  text-underline-offset: .2em;
-}
-.native-app-header__language { position: relative; }
-.native-app-header__language .native-app-header__language-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: .2rem;
-  min-width: 44px;
-  min-height: 44px;
-  padding-inline: .25rem;
-  border-radius: .25rem;
-  font-size: .8125rem;
-  font-weight: 500;
-  background: transparent;
-}
-.native-app-header__language .native-app-header__language-trigger:is(:hover, :active, :focus) { background: transparent; }
-.native-app-header__language-options {
-  position: absolute;
-  inset-block-start: calc(100% + .125rem);
-  inset-inline-end: 0;
-  z-index: 1;
-  min-width: 7rem;
-  padding: .125rem;
-  background: var(--home-surface);
-  border: 1px solid var(--home-rule);
-  border-radius: .375rem;
-}
-.native-app-header__language-options button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: .5rem;
-  width: 100%;
-  min-height: 44px;
-  padding: .5rem .625rem;
-  border-radius: .25rem;
-  font-size: .8125rem;
-  font-weight: 400;
-  line-height: 1.2;
-  text-align: start;
-}
-.native-app-header__language-options button[aria-pressed='true'] { font-weight: 600; }
-.native-app-header__language-options button[aria-pressed='true'] svg { color: var(--home-accent); }
-.native-app-header__language-options svg { width: 14px; height: 14px; }
-.native-app-header__language-options button:is(:hover, :focus-visible) {
-  background: color-mix(in srgb, var(--home-ink) 10%, var(--home-surface));
-}
-.native-app-header--hero button { color: var(--home-ink); }
-.native-app-header--hero button:active { background: var(--home-surface); }
 .native-home__main {
   position: relative;
   display: flex;
@@ -194,9 +127,7 @@
 .native-home__footer-cut { position: absolute; inset: auto 0 0; width: 100%; height: 1.25rem; color: var(--home-action); pointer-events: none; }
 .native-resident-landing :where(a, button):focus-visible { outline: 3px solid var(--home-focus); outline-offset: 4px; }
 @media (hover: hover) {
-  .native-app-header--hero button:hover { background: var(--home-surface); }
   .native-home__report:hover { background: var(--color-primary-hover); }
-  .native-home__account-link:hover { text-decoration: underline; }
   .native-home__track:hover { text-decoration: underline; text-underline-offset: 4px; }
 }
 .native-home__report:active { background: var(--color-primary-dark); }
@@ -238,11 +169,10 @@
   .native-home__backdrop { display: none; }
   .native-resident-landing, .native-resident-landing .native-app-header--hero,
   .native-home__hero, .native-home__intro, .native-home__hero h1 strong,
-  .native-app-header--hero .native-app-header__city,
   .native-home__how h2 strong, .native-home__community h2 strong { background: Canvas; color: CanvasText; }
   .native-home__report { background: ButtonFace; color: ButtonText; border: 1px solid ButtonText; }
   .native-home__report { text-shadow: none; }
   .native-home__report svg { filter: none; }
-  .native-home__track, .native-home__account-link { color: LinkText; }
+  .native-home__track { color: LinkText; }
   .native-home__step-icon > span { background: Highlight; color: HighlightText; }
 }

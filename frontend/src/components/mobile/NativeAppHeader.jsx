@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAndroidBack } from '../../utils/nativeAndroid';
+import './native-resident-theme.css';
+import './native-app-header.css';
 
 const focus = 'focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-300';
 const languages = [{ code: 'en', name: 'English' }, { code: 'tl', name: 'Filipino' }];
@@ -71,11 +73,11 @@ export function NativeLanguagePicker({ onLanguageChange }) {
     }} />;
 }
 
-export function NativeAppBrand({ linked = true, compact = false, appearance = 'default' }) {
+export function NativeAppBrand({ linked = true, compact = false, appearance = 'default', onClick }) {
   const { t } = useTranslation();
   const Root = linked ? Link : 'div';
   return (
-    <Root to={linked ? '/resident-home' : undefined} aria-label={linked ? t('nativeAndroid.navigation.home') : undefined}
+    <Root to={linked ? '/resident-home' : undefined} onClick={onClick} aria-label={linked ? t('nativeAndroid.navigation.home') : undefined}
       className={`native-app-brand${compact ? ' native-app-brand--compact' : ''} flex min-h-11 min-w-0 items-center ${compact ? 'gap-1.5' : 'gap-2'} rounded-sm ${focus}`}>
       <img src="/pulso-loading-mark.png" alt="" className={`${compact ? 'h-10 w-8' : 'size-10'} shrink-0`} />
       <span className="min-w-0">
@@ -101,8 +103,18 @@ export function NativeThemeToggle({ className = '' }) {
   );
 }
 
-export default function NativeAppHeader({ children, onLanguageChange, appearance = 'default' }) {
+export function NativeResidentAccountLink({ signedIn, onClick }) {
+  const { t } = useTranslation();
+  return (
+    <Link to={signedIn ? '/dashboard' : '/login'} onClick={onClick} className={`native-home__account-link ${focus}`}>
+      {t(signedIn ? 'nativeAndroid.home.myReports' : 'nativeAndroid.home.signInShort')}
+    </Link>
+  );
+}
+
+export default function NativeAppHeader({ children, onLanguageChange, onBrandClick, appearance = 'default', borderless = appearance === 'hero' }) {
   const { i18n } = useTranslation();
+  const { isDark } = useTheme();
   const filipino = i18n.resolvedLanguage === 'tl';
 
   const selectLanguage = (language) => {
@@ -113,9 +125,9 @@ export default function NativeAppHeader({ children, onLanguageChange, appearance
   };
 
   return (
-    <header data-native-app-header className={`${appearance === 'hero' ? 'native-app-header--hero ' : ''}sticky top-0 z-40 w-full shrink-0 border-b border-slate-300 bg-[#f7f9fc] text-[#172339] dark:border-slate-700 dark:bg-[#0c1421] dark:text-slate-50`}>
+    <header data-native-app-header data-landing-theme={isDark ? 'dark' : 'light'} className={`${appearance === 'hero' ? 'native-app-header--hero ' : ''}sticky top-0 z-40 w-full shrink-0 bg-[#f7f9fc] text-[#172339] dark:bg-[#0c1421] dark:text-slate-50 ${borderless ? '' : 'border-b border-slate-300 dark:border-slate-700'}`}>
       <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-2 px-4">
-        <NativeAppBrand appearance={appearance} />
+        <NativeAppBrand appearance={appearance} onClick={onBrandClick} />
         <div className="relative flex shrink-0 items-center gap-1">
           {children}
           {appearance === 'hero' ? (

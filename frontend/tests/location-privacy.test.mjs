@@ -149,7 +149,7 @@ test('rendered panel hides unavailable rows, escapes values, and supports Englis
     assert.doesNotMatch(gpsAddress, /CWC8\+R9|PRIVATE|Unit 88/);
     const area = render({ address: { ...fullAddress, street: '', streetAddress: '' }, gpsAddress: true, status: 'OK' });
     assert.match(area, /CWC8\+R9/);
-    assert.match(area, /No reliable street match/);
+    assert.doesNotMatch(area, /No reliable street match/);
     const gpsFallback = render({ coordinates: { lat: 14.5, lng: 121.5 }, gpsAddress: true, status: 'UNAVAILABLE' });
     assert.match(gpsFallback, new RegExp(encodePlusCode(14.5, 121.5).replace('+', '\\+')));
     assert.match(gpsFallback, /selected location is kept/);

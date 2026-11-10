@@ -4,7 +4,6 @@
       "title": "Current location",
       "mappedAddress": "Address near your GPS point",
       "gpsAddressLoading": "Looking up the address for your GPS point…",
-      "streetUnmatched": "No reliable street match for this point. Your GPS coordinates are kept.",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "fields": {
@@ -65,10 +64,17 @@
         "navigation": {
             "home": "PULSO home",
             "language": "Language",
-            "search": "Search reports, updates or help",
-            "assistant": "Assistant",
+            "search": "Search PULSO",
             "changeTheme": "Switch to {{theme}} theme",
             "themes": { "light": "light", "dark": "dark", "system": "system" }
+        },
+        "contact": {
+            "title": "Contact & Assistance",
+            "description": "Caloocan City Engineering Department & Emergency Hotlines",
+            "engineeringOffice": "City Engineering Office",
+            "emergencyHotlines": "Emergency Hotlines (24/7)",
+            "emergencyNumber": "911 (Rescue, Police & Fire)",
+            "close": "Close"
         },
         "version": "App version {{version}}",
         "home": {

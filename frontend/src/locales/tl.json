@@ -4,7 +4,6 @@
       "title": "Kasalukuyang lokasyon",
       "mappedAddress": "Address malapit sa lokasyon ng GPS",
       "gpsAddressLoading": "Hinahanap ang address para sa lokasyon ng GPS…",
-      "streetUnmatched": "Walang matiyak na kalye para sa lokasyong ito. Nananatili ang mga coordinate ng GPS.",
       "latitude": "Latitud",
       "longitude": "Longhitud",
       "fields": {
@@ -65,10 +64,17 @@
         "navigation": {
             "home": "Home ng PULSO",
             "language": "Wika",
-            "search": "Maghanap ng ulat, balita o tulong",
-            "assistant": "Katulong",
+            "search": "Maghanap sa PULSO",
             "changeTheme": "Gamitin ang temang {{theme}}",
             "themes": { "light": "maliwanag", "dark": "madilim", "system": "ayon sa system" }
+        },
+        "contact": {
+            "title": "Kontak at Tulong",
+            "description": "Kagawaran ng Inhinyeriya ng Caloocan at mga numerong pang-emergency",
+            "engineeringOffice": "Tanggapan ng Inhinyeriya ng Lungsod",
+            "emergencyHotlines": "Mga numerong pang-emergency (24/7)",
+            "emergencyNumber": "911 (Pagsagip, Pulis at Bumbero)",
+            "close": "Isara"
         },
         "version": "Bersyon ng app {{version}}",
         "home": {
