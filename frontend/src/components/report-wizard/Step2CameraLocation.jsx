@@ -26,7 +26,7 @@ import WizardCardFooter from './WizardCardFooter';
 import LocationAddressPanel from '../maps/LocationAddressPanel';
 import LocationCoordinates from '../maps/LocationCoordinates';
 import { reverseGeocodeLocation } from '../../utils/reverseGeocode';
-import { normalizeDisplayAddress, parseLegacyDisplayAddress, formatFullAddress, parseGeocodedAddress } from '../../utils/locationPrivacy';
+import { displayAddressFields, normalizeDisplayAddress, parseLegacyDisplayAddress, formatFullAddress, parseGeocodedAddress } from '../../utils/locationPrivacy';
 import { API_BASE_URL } from '../../utils/apiBase';
 import { getStoredToken } from '../../utils/auth';
 import { isNativeAndroid } from '../../utils/appContext';
@@ -49,8 +49,12 @@ export default function Step2CameraLocation({
 
   const fileInputRef = useRef(null);
   const addressRequest = useRef(0);
+  const gpsRequest = useRef(0);
   const shouldAutoAdvanceRef = useRef(false);
-  useEffect(() => () => { addressRequest.current += 1; }, []);
+  useEffect(() => () => {
+    addressRequest.current += 1;
+    gpsRequest.current += 1;
+  }, []);
 
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -62,7 +66,8 @@ export default function Step2CameraLocation({
   const displayStructuredAddress = locationData?.structuredAddress
     ? normalizeDisplayAddress(locationData.structuredAddress, locationData)
     : parseLegacyDisplayAddress(locationData?.address, locationData);
-  const displayAddress = formatFullAddress(displayStructuredAddress);
+  const displayAddress = displayAddressFields(displayStructuredAddress, locationData, { preferAddress: true })
+    .map(([, value]) => value).join(', ');
   const handleCopyAddress = async () => {
     if (!displayAddress) return;
     try {
@@ -84,8 +89,18 @@ export default function Step2CameraLocation({
   // -------------------------------------------------------------------------
   // Geolocation & Reverse Geocoding
   // -------------------------------------------------------------------------
-  const resolveAddressAndNotify = useCallback((lat, lng, accuracy = null, customAddress = '') => {
+  const lookupAddress = useCallback((lat, lng) => {
     const requestId = ++addressRequest.current;
+    reverseGeocodeLocation(lat, lng).then(result => {
+      if (requestId !== addressRequest.current) return;
+      onLocationChange(previous => {
+        if (previous.lat !== lat || previous.lng !== lng) return previous;
+        return { ...previous, address: result.address, structuredAddress: result.structuredAddress, addressStatus: result.status };
+      });
+    });
+  }, [onLocationChange]);
+
+  const resolveAddressAndNotify = useCallback((lat, lng, accuracy = null, customAddress = '') => {
     const inBounds = isInCaloocan(lat, lng);
     const brgyObj = findBarangayByCoordinates(lat, lng);
     const resolvedBrgy = brgyObj?.name || '';
@@ -102,14 +117,8 @@ export default function Step2CameraLocation({
       source: customAddress ? 'manual-geocode' : 'device-gps',
       capturedAt: Date.now(),
     }));
-    reverseGeocodeLocation(lat, lng).then(result => {
-      if (requestId !== addressRequest.current) return;
-      onLocationChange(previous => {
-        if (previous.lat !== lat || previous.lng !== lng) return previous;
-        return { ...previous, address: result.address, structuredAddress: result.structuredAddress, addressStatus: result.status };
-      });
-    });
-  }, [onLocationChange]);
+    lookupAddress(lat, lng);
+  }, [lookupAddress, onLocationChange]);
 
   const handleGeolocate = useCallback((isExplicit = false) => {
     if (!navigator.geolocation) {
@@ -119,15 +128,18 @@ export default function Step2CameraLocation({
 
     setIsLocating(true);
     setGeoError(null);
+    const requestId = ++gpsRequest.current;
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (requestId !== gpsRequest.current) return;
         const { latitude, longitude, accuracy } = position.coords;
         resolveAddressAndNotify(latitude, longitude, accuracy);
         setIsLocating(false);
         setGeoError(null);
       },
       (error) => {
+        if (requestId !== gpsRequest.current) return;
         console.warn('Geolocation capture failed:', error);
         setIsLocating(false);
         const key = error.code === 1 ? 'gpsDenied' : error.code === 2 ? 'gpsUnavailable' : error.code === 3 ? 'gpsTimeout' : 'gpsError';
@@ -140,6 +152,17 @@ export default function Step2CameraLocation({
   useEffect(() => {
     if (!hasCoordinates || !locationData?.confirmed) {
       handleGeolocate(false);
+    } else {
+      // Drafts may contain an older address label. Recheck at the saved point.
+      const { lat, lng } = locationData;
+      const fallback = parseGeocodedAddress([], lat, lng);
+      onLocationChange(previous => ({
+        ...previous,
+        address: formatFullAddress(fallback),
+        structuredAddress: fallback,
+        addressStatus: 'LOADING',
+      }));
+      lookupAddress(lat, lng);
     }
   }, []);
 
@@ -433,7 +456,8 @@ export default function Step2CameraLocation({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const canProceed = hasPhoto && !evidenceData?.isAiScanning && !evidenceData?.isInappropriate && hasCoordinates && isInsideJurisdiction;
+  const canProceed = hasPhoto && !evidenceData?.isAiScanning && !evidenceData?.isInappropriate && hasCoordinates
+    && isInsideJurisdiction && !isLocating && locationData?.addressStatus !== 'LOADING';
 
   useEffect(() => {
     if (shouldAutoAdvanceRef.current && canProceed) {
@@ -482,7 +506,7 @@ export default function Step2CameraLocation({
             <div className="flex-1 min-w-0">
               {/* Address Text + Copy Button */}
               <div className="flex items-start justify-between gap-2">
-                <LocationAddressPanel address={displayStructuredAddress} coordinates={locationData} showCoordinates={false} status={locationData?.addressStatus} loading={isLocating || locationData?.addressStatus === 'LOADING'} />
+                <LocationAddressPanel address={displayStructuredAddress} coordinates={locationData} gpsAddress showCoordinates={false} status={locationData?.addressStatus} loading={isLocating || locationData?.addressStatus === 'LOADING'} />
                 <button
                   type="button"
                   onClick={handleCopyAddress}

@@ -1,10 +1,12 @@
 /** Public address components; precise location metadata is explicitly requested. */
 import { encodePlusCode, formatPlusCode } from './openLocationCode.js';
+import { getHaversineDistanceMeters } from './geoDistance.js';
 const PRIVATE = /\b(?:bl(?:oc)?k|lot|unit|apartment|apt|flat|suite|room|rm|floor|flr|house|building|bldg|door|tower|condominium|condo|purok|sitio)(?:\b|(?=\d))|\bB\s*\d+\s*[-/]?\s*L\s*\d+\b|#|[<>]/iu;
 const CODE = /\b[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{2,7}\b/giu;
 const VILLAGE = /\b(?:village|subdivision|subd\.?|homes|heights|estate|ville|residential community)\b/iu;
 const BARANGAY = /^(?:barangay|brgy\.?|bgy\.?)\s+\S/iu;
 const DISPLAY_FIELDS = ['plusCode', 'subdivision', 'neighborhood', 'street', 'barangay', 'city', 'postalCode', 'region'];
+const MAX_STREET_MATCH_METERS = 25;
 
 // Reject ambiguous/private labels as a whole instead of guessing which words are public.
 export function safeAddressValue(value) {
@@ -59,6 +61,37 @@ export function parseGoogleDisplayAddress(results, apiPlusCode = '') {
     });
 }
 
+function parsePointAddress(results, lat, lng, apiPlusCode) {
+    const nearby = [];
+    const area = [];
+    for (const row of results || []) {
+        if (row.types?.some(type => type === 'political' || type === 'plus_code')) {
+            area.push(row);
+            continue;
+        }
+        const { location, location_type: type } = row.geometry || {};
+        if (!['ROOFTOP', 'RANGE_INTERPOLATED'].includes(type)) continue;
+        const rowLat = typeof location?.lat === 'function' ? location.lat() : location?.lat;
+        const rowLng = typeof location?.lng === 'function' ? location.lng() : location?.lng;
+        if (!Number.isFinite(rowLat) || !Number.isFinite(rowLng) || Math.abs(rowLat) > 90 || Math.abs(rowLng) > 180) continue;
+        const distance = getHaversineDistanceMeters(lat, lng, rowLat, rowLng);
+        if (distance <= MAX_STREET_MATCH_METERS) nearby.push({ row, distance });
+    }
+    nearby.sort((first, second) => first.distance - second.distance);
+    const nearbyRows = nearby.map(({ row }) => row);
+    const address = parseGoogleDisplayAddress([...nearbyRows, ...area], apiPlusCode);
+    const streets = new Map();
+    for (const row of nearbyRows) {
+        for (const component of row.address_components || []) {
+            if (!component.types?.includes('route')) continue;
+            const name = safeAddressValue(component.long_name || component.short_name);
+            if (name && !/^\d+$/u.test(name) && !streets.has(name.toLowerCase())) streets.set(name.toLowerCase(), name);
+        }
+    }
+    const street = streets.size === 1 ? streets.values().next().value : '';
+    return normalizeDisplayAddress({ ...address, street, streetAddress: street }, { lat, lng });
+}
+
 /** Old saved strings lack types. Retain only explicitly recognizable public fields. */
 export function parseLegacyDisplayAddress(value, coordinates = null) {
     const address = {};
@@ -93,15 +126,21 @@ export function parseLegacyDisplayAddress(value, coordinates = null) {
     return normalizeDisplayAddress(address, coordinates);
 }
 
-export function displayAddressFields(address, coordinates = null) {
+export function displayAddressFields(address, coordinates = null, { preferAddress = false } = {}) {
     const safe = normalizeDisplayAddress(address, coordinates);
     const seen = new Set();
-    return DISPLAY_FIELDS.filter(field => {
+    const fields = DISPLAY_FIELDS.filter(field => {
         const value = safe[field];
         if (!value || seen.has(value.toLowerCase())) return false;
         seen.add(value.toLowerCase());
         return true;
     }).map(field => [field, safe[field]]);
+    if (!preferAddress) return fields;
+
+    const named = fields.filter(([field]) => field !== 'plusCode');
+    const street = named.find(([field]) => field === 'street');
+    if (street) return [street, ...named.filter(([field]) => field !== 'street')];
+    return fields;
 }
 
 export function displayAddressText(address) {
@@ -110,7 +149,7 @@ export function displayAddressText(address) {
 
 // Compatibility exports for the existing address display call sites. Registry,
 // jurisdiction and precise coordinate helpers remain in philippineAddress.js.
-export const parseGeocodedAddress = (results, lat, lng, apiPlusCode = '') => normalizeDisplayAddress(parseGoogleDisplayAddress(results, apiPlusCode), { lat, lng });
+export const parseGeocodedAddress = (results, lat, lng, apiPlusCode = '') => parsePointAddress(results, lat, lng, apiPlusCode);
 export const parseAddressString = value => parseLegacyDisplayAddress(value);
 export const formatFullAddress = address => displayAddressText(address);
 export const cleanResidentAddress = value => displayAddressText(parseLegacyDisplayAddress(value));

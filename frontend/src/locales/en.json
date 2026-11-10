@@ -2,6 +2,9 @@
   "translation": {
     "locationPrivacy": {
       "title": "Current location",
+      "mappedAddress": "Address near your GPS point",
+      "gpsAddressLoading": "Looking up the address for your GPS point…",
+      "streetUnmatched": "No reliable street match for this point. Your GPS coordinates are kept.",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "fields": {

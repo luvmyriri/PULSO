@@ -2,6 +2,9 @@
   "translation": {
     "locationPrivacy": {
       "title": "Kasalukuyang lokasyon",
+      "mappedAddress": "Address malapit sa lokasyon ng GPS",
+      "gpsAddressLoading": "Hinahanap ang address para sa lokasyon ng GPS…",
+      "streetUnmatched": "Walang matiyak na kalye para sa lokasyong ito. Nananatili ang mga coordinate ng GPS.",
       "latitude": "Latitud",
       "longitude": "Longhitud",
       "fields": {

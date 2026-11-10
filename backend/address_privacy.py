@@ -1,10 +1,14 @@
 """Build display addresses from Google components, never formatted_address."""
+import math
 import re
+
+from utils.geometry_utils import get_distance_meters
 
 PRIVATE = re.compile(r"\b(?:bl(?:oc)?k|lot|unit|apartment|apt|flat|suite|room|rm|floor|flr|house|building|bldg|door|tower|condominium|condo|purok|sitio)(?:\b|(?=\d))|\bB\s*\d+\s*[-/]?\s*L\s*\d+\b|#|[<>]", re.I)
 VILLAGE = re.compile(r"\b(?:village|subdivision|subd\.?|homes|heights|estate|ville|residential community)\b", re.I)
 BARANGAY = re.compile(r"^(?:barangay|brgy\.?|bgy\.?)\s+\S", re.I)
 FIELDS = ("plusCode", "subdivision", "neighborhood", "street", "barangay", "city", "postalCode", "region")
+MAX_STREET_MATCH_METERS = 25
 
 
 def safe_value(value):
@@ -26,7 +30,6 @@ def safe_value(value):
 
 def precise_plus_code(lat, lng, short=True):
     """Encode the selected point with 11 significant Open Location Code digits."""
-    import math
     if not isinstance(lat, (int, float)) or not isinstance(lng, (int, float)):
         return ""
     if not math.isfinite(lat) or not math.isfinite(lng) or abs(lat) > 90 or abs(lng) > 180:
@@ -58,11 +61,38 @@ def extract_plus_code(value):
     return code[4:] if code.index("+") == 8 else code
 
 
-def parse_google_address(data):
-    """Inspect all results. Omit ambiguous barangay/city/premise classifications."""
+def _matching_rows(rows, lat, lng):
+    nearby = []
+    area = []
+    for row in rows:
+        types = row.get("types", [])
+        if "political" in types or "plus_code" in types:
+            area.append(row)
+            continue
+        geometry = row.get("geometry", {})
+        if geometry.get("location_type") not in ("ROOFTOP", "RANGE_INTERPOLATED"):
+            continue
+        point = geometry.get("location", {})
+        point_lat, point_lng = point.get("lat"), point.get("lng")
+        if not all(isinstance(value, (int, float)) and math.isfinite(value) and abs(value) <= limit
+                   for value, limit in ((point_lat, 90), (point_lng, 180))):
+            continue
+        distance = get_distance_meters(lat, lng, point_lat, point_lng)
+        if distance <= MAX_STREET_MATCH_METERS:
+            nearby.append((distance, row))
+    nearby.sort(key=lambda match: match[0])
+    return [row for _, row in nearby], area
+
+
+def parse_google_address(data, coordinates=None):
+    """Use nearby address results and containing area results for a GPS lookup."""
     if not isinstance(data, dict):
         data = {}
-    components = [c for row in data.get("results", []) for c in row.get("address_components", [])]
+    rows = data.get("results", [])
+    if coordinates is not None:
+        nearby, area = _matching_rows(rows, *coordinates)
+        rows = nearby + area
+    components = [c for row in rows for c in row.get("address_components", [])]
     entries = [(safe_value(c.get("long_name") or c.get("short_name")), c.get("types", [])) for c in components
                if not set(c.get("types", [])).intersection({"street_number", "subpremise", "floor", "room", "postal_code_suffix"})]
 
@@ -74,12 +104,23 @@ def parse_google_address(data):
     subdivision = first(political + ["premise"], lambda v: bool(VILLAGE.search(v)) and not BARANGAY.search(v))
     neighborhood = first(["neighborhood", "sublocality", "sublocality_level_1", "sublocality_level_2"], lambda v: v not in (barangay, subdivision) and not BARANGAY.search(v) and not VILLAGE.search(v))
     city = first(["locality", "postal_town"], lambda v: not BARANGAY.search(v) and not VILLAGE.search(v)) or first(["administrative_area_level_2", "administrative_area_level_3"], lambda v: bool(re.search(r"\b(?:city|municipality)\b", v, re.I)))
+    street = first(["route"])
+    if coordinates is not None:
+        # Political and Plus Code rows describe an area and cannot identify its street.
+        streets = {}
+        for row in nearby:
+            for component in row.get("address_components", []):
+                if "route" in component.get("types", []):
+                    name = safe_value(component.get("long_name") or component.get("short_name"))
+                    if name and not name.isdigit():
+                        streets.setdefault(name.casefold(), name)
+        street = next(iter(streets.values())) if len(streets) == 1 else ""
     codes = [data.get("plus_code", {}).get("global_code", "")]
     codes += [row.get("plus_code", {}).get("global_code", "") for row in data.get("results", [])]
     codes += [c.get("long_name", "") for c in components if "plus_code" in c.get("types", [])]
     address = {
         "plusCode": next((code for value in codes if (code := extract_plus_code(value))), ""),
-        "subdivision": subdivision, "neighborhood": neighborhood, "street": first(["route"]),
+        "subdivision": subdivision, "neighborhood": neighborhood, "street": street,
         "barangay": barangay, "city": city,
         "region": first(["administrative_area_level_1"]),
         "postalCode": first(["postal_code"]),
