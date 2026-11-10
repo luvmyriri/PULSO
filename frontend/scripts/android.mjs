@@ -4,6 +4,7 @@ import { isIP } from 'node:net';
 import { homedir, networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { loadEnv } from 'vite';
+import { nextAndroidVersion, publishAndroidUpdate } from './android-release.mjs';
 
 const mode = process.argv[2];
 const root = process.cwd();
@@ -72,6 +73,10 @@ ${domains}
 </network-security-config>
 `);
 
+if (mode === 'apk') {
+  const version = nextAndroidVersion(root);
+  console.log(`Building PULSO ${version.versionName} (${version.versionCode})`);
+}
 run(process.execPath, [join(root, 'node_modules/vite/bin/vite.js'), 'build', '--mode', 'android']);
 capacitor('sync', 'android');
 if (mode === 'run') capacitor('run', 'android', '--no-sync', ...process.argv.slice(3));
@@ -79,4 +84,6 @@ if (mode === 'apk') {
   const android = join(root, 'android');
   if (isWindows) run(process.env.ComSpec || 'cmd.exe', ['/d', '/c', 'gradlew.bat assembleDebug'], android);
   else run('./gradlew', ['assembleDebug'], android);
+  const release = publishAndroidUpdate(root);
+  console.log(`Published app update ${release.versionName} (${release.versionCode}) to the PULSO backend.`);
 }

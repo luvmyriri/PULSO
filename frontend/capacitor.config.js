@@ -6,6 +6,7 @@ export const webDir = 'dist';
 export const server = { androidScheme: 'https', cleartext: debug };
 export const android = { allowMixedContent: debug, webContentsDebuggingEnabled: debug, zoomEnabled: true };
 export const plugins = {
+  PulsoAppUpdate: { serverUrl: process.env.VITE_API_BASE_URL || '' },
   SplashScreen: {
     launchAutoHide: false,
     launchFadeOutDuration: 0,

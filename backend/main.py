@@ -132,6 +132,8 @@ app = FastAPI(
 )
 app.include_router(report_review_router.router)
 app.include_router(external_referrals.router)
+import android_updates
+app.include_router(android_updates.router)
 
 
 # ---------------------------------------------------------------------------

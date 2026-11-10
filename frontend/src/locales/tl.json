@@ -59,6 +59,23 @@
       }
     },
     "nativeAndroid": {
+        "appUpdate": {
+            "check": "Tingnan ang update",
+            "title": "Update ng app",
+            "description": "I-install ang update sa kasalukuyang PULSO para manatili ang data. Hindi kailangang mag-uninstall.",
+            "close": "Isara ang update ng app",
+            "installed": "Naka-install: {{version}} (build {{build}})",
+            "latest": "Available: {{version}} (build {{build}})",
+            "checking": "Tinitingnan ang mga update…",
+            "current": "Nasa iyo na ang pinakabagong available na bersyon.",
+            "available": "May bagong bersyong maaari nang i-download.",
+            "error": "Hindi matingnan ang update. Kumonekta sa parehong Wi-Fi ng PULSO server at subukang muli.",
+            "downloadOpened": "Buksan ang na-download na APK at piliin ang Install o Update. Hihingi ng kumpirmasyon ang Android.",
+            "downloadError": "Hindi mabuksan ang download. Subukang muli.",
+            "download": "I-download ang update",
+            "opening": "Binubuksan ang download…",
+            "retry": "Subukang muli"
+        },
         "backToExit": "Pindutin muli ang Bumalik para lumabas",
         "about": "Tungkol sa PULSO",
         "navigation": {

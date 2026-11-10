@@ -10,6 +10,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { App as NativeApp } from '@capacitor/app';
 import { isNativeAndroid } from '../utils/appContext';
 import { useAndroidBack } from '../utils/nativeAndroid';
+import NativeAppUpdateButton from '../components/mobile/NativeAppUpdateButton';
 import { useGovernmentData } from '../utils/governmentApi';
 import { residentDashboardRoute, residentDashboardUrl, residentNotificationTarget } from '../utils/residentDashboardRoute';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6652,6 +6653,7 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                     <p className="px-4 pb-4 text-sm text-slate-600 dark:text-slate-300">
                         {t('nativeAndroid.version', 'App version {{version}}', { version: androidVersion })}
                     </p>
+                    <div className="px-4 pb-3"><NativeAppUpdateButton /></div>
                 </details>
             )}
 

@@ -26,6 +26,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void load() {
         registerPlugin(PulsoAppearancePlugin.class);
+        registerPlugin(PulsoAppUpdatePlugin.class);
         super.load();
         bridge.getWebView().setWebChromeClient(new PulsoWebChromeClient(bridge));
     }

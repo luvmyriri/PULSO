@@ -59,6 +59,23 @@
       }
     },
     "nativeAndroid": {
+        "appUpdate": {
+            "check": "Check for updates",
+            "title": "App update",
+            "description": "Install updates over PULSO to keep your app data. No uninstall needed.",
+            "close": "Close app update",
+            "installed": "Installed: {{version}} (build {{build}})",
+            "latest": "Available: {{version}} (build {{build}})",
+            "checking": "Checking for updates…",
+            "current": "You have the latest available version.",
+            "available": "A new version is ready to download.",
+            "error": "Could not check for updates. Connect to the same Wi-Fi as the PULSO server and try again.",
+            "downloadOpened": "Open the downloaded APK and choose Install or Update. Android will ask you to confirm.",
+            "downloadError": "Could not open the download. Try again.",
+            "download": "Download update",
+            "opening": "Opening download…",
+            "retry": "Try again"
+        },
         "backToExit": "Press back again to exit",
         "about": "About PULSO",
         "navigation": {

@@ -150,9 +150,6 @@ const IDCameraModal = ({
     // Zoom state (1.0x to 5.0x, gestures & native/CSS scale)
     const [zoom, setZoom] = useState(1);
     const [hasNativeZoom, setHasNativeZoom] = useState(false);
-    const [isPinching, setIsPinching] = useState(false);
-    const [showZoomIndicator, setShowZoomIndicator] = useState(false);
-    const zoomIndicatorTimerRef = useRef(null);
     const touchStartRef = useRef({ dist: 0, initialZoom: 1 });
     const zoomRef = useRef(zoom);
     const viewfinderRef = useRef(null);
@@ -303,11 +300,6 @@ const IDCameraModal = ({
     const applyZoom = useCallback(async (newZoom) => {
         const clamped = Math.min(Math.max(Math.round(newZoom * 10) / 10, 1), 5);
         setZoom(clamped);
-        setShowZoomIndicator(true);
-        if (zoomIndicatorTimerRef.current) clearTimeout(zoomIndicatorTimerRef.current);
-        zoomIndicatorTimerRef.current = setTimeout(() => {
-            setShowZoomIndicator(false);
-        }, 1800);
 
         if (streamRef.current && hasNativeZoom) {
             const track = streamRef.current.getVideoTracks()[0];
@@ -330,19 +322,12 @@ const IDCameraModal = ({
                 e.touches[0].clientY - e.touches[1].clientY
             );
             touchStartRef.current = { dist, initialZoom: zoomRef.current };
-            setIsPinching(true);
-            setShowZoomIndicator(true);
         }
     };
 
     const handleTouchEnd = (e) => {
         if (e.touches.length < 2) {
-            setIsPinching(false);
             touchStartRef.current.dist = 0;
-            if (zoomIndicatorTimerRef.current) clearTimeout(zoomIndicatorTimerRef.current);
-            zoomIndicatorTimerRef.current = setTimeout(() => {
-                setShowZoomIndicator(false);
-            }, 1800);
         }
     };
 
@@ -1042,15 +1027,6 @@ const IDCameraModal = ({
                                         />
                                     )}
 
-                                    {/* Floating Zoom Indicator Pill (visible on zoom change or pinch) */}
-                                    {(showZoomIndicator || isPinching || zoom > 1) && (
-                                        <div className="absolute top-3 inset-x-0 flex justify-center pointer-events-none z-30 transition-opacity duration-200">
-                                            <div className="bg-black/75 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-mono font-bold border border-white/20 shadow-lg flex items-center gap-1.5 animate-in fade-in">
-                                                <span className="text-white font-bold">{zoom.toFixed(1)}x</span>
-                                                <span className="text-white/80 font-sans text-[11px]">Zoom</span>
-                                            </div>
-                                        </div>
-                                    )}
 
                                     {/* ID Card Silhouette (Only when capturing resident ID) */}
                                     {!isIssue && (

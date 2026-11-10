@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import NativeAppHeader, { NativeResidentAccountLink } from './NativeAppHeader';
 import NativeTrackSheet from './NativeTrackSheet';
+import NativeAppUpdateButton from './NativeAppUpdateButton';
 import './native-resident-theme.css';
 import './native-resident-landing.css';
 
@@ -82,6 +83,7 @@ export default function NativeResidentLanding({ residentSignedIn, trackingRoute 
         </aside>
         <footer className="native-home__footer">
           <Link to="/tutorial">{t('nativeAndroid.home.guide')}</Link>
+          <NativeAppUpdateButton />
           <p>{t('loadingScreen.department')}</p>
         </footer>
       </main>

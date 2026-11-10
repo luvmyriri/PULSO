@@ -101,5 +101,6 @@ app/src/main/assets/capacitor.plugins.json
 app/src/main/res/xml/config.xml
 app/src/debug/res/xml/pulso_debug_network.xml
 google-services.json
+updates/
 *.jks
 *.keystore
