@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next';
 import { useAndroidBack } from '../utils/nativeAndroid';
 import { isNativeAndroid } from '../utils/appContext';
+import './common/resident-checkbox.css';
 import {
     GoogleMap,
     MarkerF,
@@ -2707,21 +2708,25 @@ export default function NearbyIssuesMapModal({
                             <div className="space-y-2">
                                 <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 cursor-pointer">
                                     <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Civic Reports Pins</span>
-                                    <input
-                                        type="checkbox"
-                                        checked={mapLayers.reports}
-                                        onChange={(e) => toggleLayer('reports', e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#ea580c] focus:ring-[#ea580c] cursor-pointer"
-                                    />
+                                    <span className="resident-checkbox__control">
+                                        <input
+                                            type="checkbox"
+                                            checked={mapLayers.reports}
+                                            onChange={(e) => toggleLayer('reports', e.target.checked)}
+                                        />
+                                        <Check size={18} strokeWidth={3} aria-hidden="true" />
+                                    </span>
                                 </label>
                                 <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 cursor-pointer">
                                     <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Service Boundary Line</span>
-                                    <input
-                                        type="checkbox"
-                                        checked={mapLayers.serviceBoundary}
-                                        onChange={(e) => toggleLayer('serviceBoundary', e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#ea580c] focus:ring-[#ea580c] cursor-pointer"
-                                    />
+                                    <span className="resident-checkbox__control">
+                                        <input
+                                            type="checkbox"
+                                            checked={mapLayers.serviceBoundary}
+                                            onChange={(e) => toggleLayer('serviceBoundary', e.target.checked)}
+                                        />
+                                        <Check size={18} strokeWidth={3} aria-hidden="true" />
+                                    </span>
                                 </label>
                             </div>
                         </div>
