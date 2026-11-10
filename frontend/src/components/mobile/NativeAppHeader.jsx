@@ -86,12 +86,24 @@ export function NativeAppBrand({ linked = true, compact = false, appearance = 'd
   );
 }
 
-export default function NativeAppHeader({ children, onLanguageChange, appearance = 'default' }) {
-  const { t, i18n } = useTranslation();
+export function NativeThemeToggle({ className = '' }) {
+  const { t } = useTranslation();
   const { themeMode, changeTheme } = useTheme();
-  const filipino = i18n.resolvedLanguage === 'tl';
   const nextTheme = { light: 'dark', dark: 'system', system: 'light' }[themeMode] || 'light';
   const ThemeIcon = { light: Sun, dark: Moon, system: Monitor }[themeMode] || Sun;
+  return (
+    <button type="button" onClick={() => changeTheme(nextTheme)}
+      title={t(`nativeAndroid.navigation.themes.${themeMode}`)}
+      aria-label={t('nativeAndroid.navigation.changeTheme', { theme: t(`nativeAndroid.navigation.themes.${nextTheme}`) })}
+      className={`flex size-11 shrink-0 items-center justify-center rounded-md ${focus} ${className}`}>
+      <ThemeIcon size={20} aria-hidden="true" />
+    </button>
+  );
+}
+
+export default function NativeAppHeader({ children, onLanguageChange, appearance = 'default' }) {
+  const { i18n } = useTranslation();
+  const filipino = i18n.resolvedLanguage === 'tl';
 
   const selectLanguage = (language) => {
     void i18n.changeLanguage(language);
@@ -115,11 +127,7 @@ export default function NativeAppHeader({ children, onLanguageChange, appearance
               {filipino ? 'EN' : 'TL'}
             </button>
           )}
-          <button type="button" onClick={() => changeTheme(nextTheme)}
-            aria-label={t('nativeAndroid.navigation.changeTheme', { theme: t(`nativeAndroid.navigation.themes.${nextTheme}`) })}
-            className={`flex size-11 items-center justify-center rounded-md text-primary hover:bg-slate-200 dark:hover:bg-slate-800 ${focus}`}>
-            <ThemeIcon size={20} aria-hidden="true" />
-          </button>
+          <NativeThemeToggle className="text-primary hover:bg-slate-200 dark:hover:bg-slate-800" />
         </div>
       </div>
     </header>
