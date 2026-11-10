@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAndroidBack } from '../utils/nativeAndroid';
+import { isNativeAndroid } from '../utils/appContext';
 import {
     GoogleMap,
     MarkerF,
@@ -634,6 +635,7 @@ export default function NearbyIssuesMapModal({
     initialSelectedReport = null
 }) {
     const { t } = useTranslation();
+    const nativeViewport = isNativeAndroid() && !standalone;
     const { isLoaded: contextLoaded, loadError: contextError } = useGoogleMaps();
     const isLoaded = Boolean(
         (propIsLoaded !== undefined ? propIsLoaded : contextLoaded) &&
@@ -1287,9 +1289,18 @@ export default function NearbyIssuesMapModal({
     return (
         <div
             ref={mapContainerRef}
+            data-native-task-screen={nativeViewport ? 'community-map' : undefined}
+            data-native-system-bar-surface={nativeViewport || undefined}
+            style={nativeViewport ? {
+                paddingTop: 'var(--pulso-safe-top, 0px)',
+                paddingBottom: 'var(--pulso-safe-bottom, 0px)',
+                paddingLeft: 'var(--pulso-safe-left, 0px)',
+                paddingRight: 'var(--pulso-safe-right, 0px)',
+                backgroundColor: isDark ? '#0f172a' : '#ffffff',
+            } : undefined}
             className={`${
                 standalone ? 'absolute inset-0 z-10' : 'fixed inset-0 z-[60]'
-            } lg:top-14 xl:top-16 lg:bottom-0 lg:z-40 lg:h-[calc(100dvh-3.5rem)] xl:h-[calc(100dvh-4rem)] flex flex-col bg-[#F8FAFC] dark:bg-[#070D18] text-slate-900 dark:text-white overflow-hidden select-none`}
+            } ${nativeViewport ? '' : 'lg:top-14 xl:top-16 lg:bottom-0 lg:z-40 lg:h-[calc(100dvh-3.5rem)] xl:h-[calc(100dvh-4rem)]'} flex flex-col bg-[#F8FAFC] dark:bg-[#070D18] text-slate-900 dark:text-white overflow-hidden select-none`}
             role="region"
             aria-label="Community Map"
         >
@@ -1969,7 +1980,7 @@ export default function NearbyIssuesMapModal({
                     </div>
 
                     {/* Floating Exit Fullscreen Button on Mobile */}
-                    {isMobileFullscreenMap && (
+                    {isMobileFullscreenMap && !nativeViewport && (
                         <div className="lg:hidden absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
                             <button
                                 type="button"

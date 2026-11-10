@@ -49,6 +49,11 @@ try {
       localStorage.setItem('pulso_user', JSON.stringify(fixture));
       window.androidBridge = {};
       window.__barCalls = [];
+      Object.defineProperty(navigator, 'geolocation', { value: {
+        getCurrentPosition: (_success, error) => error?.({ code: 1, message: 'Synthetic permission denied' }),
+        watchPosition: (_success, error) => { error?.({ code: 1, message: 'Synthetic permission denied' }); return 1; },
+        clearWatch: () => {},
+      } });
       window.Capacitor = {
         PluginHeaders: [
           { name: 'SplashScreen', methods: [{ name: 'hide', rtype: 'promise' }] },
@@ -92,6 +97,32 @@ try {
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.equal(await page.evaluate(() => window.__barCalls.at(-1).topColor), statusColor, 'Orange action cannot recolor the status bar');
     await page.evaluate(() => document.getElementById('synthetic-edge-button').remove());
+    // Native full-screen tasks retain safe controls without a separately colored system strip.
+    await page.locator('[data-resident-bottom-nav] button[aria-label="Report an issue"]').click();
+    const quickReport = page.locator('[data-native-task-screen="quick-report"]');
+    await quickReport.waitFor();
+    await page.waitForFunction(() => window.__barCalls.at(-1)?.edgeToEdge === true && getComputedStyle(document.querySelector('[data-native-task-screen]')).paddingTop === '24px');
+    assert.equal(await quickReport.evaluate(el => el.getBoundingClientRect().top), 0);
+    assert.equal(await quickReport.evaluate(el => el.getBoundingClientRect().bottom), 844);
+    assert.equal(await quickReport.evaluate(el => getComputedStyle(el).paddingBottom), '24px');
+    assert.equal(await quickReport.getByRole('button', { name: 'Close report flow' }).evaluate(el => el.getBoundingClientRect().top >= 24), true);
+    assert.equal(await page.evaluate(() => window.__barCalls.at(-1).topColor), theme === 'light' ? '#ffffff' : '#0f172b');
+    if (screenshots) await page.screenshot({ path: join(screenshots, `quick-report-${language}-${theme}.png`) });
+    await quickReport.getByRole('button', { name: 'Close report flow' }).click();
+    await quickReport.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: 'Explore city map', exact: true }).click();
+    const communityMap = page.locator('[data-native-task-screen="community-map"]');
+    await communityMap.waitFor();
+    await page.waitForFunction(() => window.__barCalls.at(-1)?.edgeToEdge === true && getComputedStyle(document.querySelector('[data-native-task-screen]')).paddingTop === '24px');
+    assert.equal(await communityMap.evaluate(el => getComputedStyle(el).paddingBottom), '24px');
+    assert.equal(await page.evaluate(() => window.__barCalls.at(-1).topColor), theme === 'light' ? '#ffffff' : '#0f172a');
+    await communityMap.locator('button[title="View fullscreen map"]').click();
+    assert.equal(await communityMap.getByText('Exit fullscreen', { exact: true }).count(), 0, 'No floating Exit fullscreen pill in the APK');
+    assert.equal(await communityMap.locator('button[title="Exit fullscreen map"]').count(), 1, 'Header viewing control remains available');
+    if (screenshots) await page.screenshot({ path: join(screenshots, `community-map-${language}-${theme}.png`) });
+    await communityMap.getByRole('button', { name: 'Back to dashboard', exact: true }).click();
+    await communityMap.waitFor({ state: 'detached' });
+    await page.waitForFunction(() => window.__barCalls.at(-1)?.edgeToEdge === true && !document.querySelector('[data-native-task-screen]'));
     const searchTrigger = page.locator('.native-dashboard-search__trigger');
     await searchTrigger.click();
     const searchPanel = page.locator('.native-search-panel[open]');

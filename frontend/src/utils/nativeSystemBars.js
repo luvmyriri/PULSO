@@ -2,7 +2,7 @@ import { registerPlugin } from '@capacitor/core';
 
 const Appearance = registerPlugin('PulsoAppearance');
 
-/** Draw the native landing and guide behind the Android system bars. */
+/** Keep native full-screen surfaces behind Android's transparent system bars. */
 export function syncNativeSystemBars(fallbackColor) {
   const canvas = document.createElement('canvas');
   canvas.width = 1;
@@ -31,12 +31,14 @@ export function syncNativeSystemBars(fallbackColor) {
   const update = () => {
     if (stopped) return;
     const immersive = Boolean(document.querySelector('[data-native-camera]'));
-    const edgeToEdge = immersive || Boolean(document.querySelector('[data-native-splash], [data-native-resident-landing], [data-native-guide], [data-native-dashboard-home]'));
+    const taskScreen = document.querySelector('[data-native-task-screen]');
+    const edgeToEdge = immersive || Boolean(taskScreen) || Boolean(document.querySelector('[data-native-splash], [data-native-resident-landing], [data-native-guide], [data-native-dashboard-home]'));
     const pageSurface = [...document.querySelectorAll('[data-native-system-bar-surface]')]
       .filter(element => element.getClientRects().length).at(-1);
     // Scrolling report cards and action buttons must not recolor the status bar.
     const homeSurface = document.querySelector('[data-native-home-status-surface]');
-    const topElement = !immersive && homeSurface ? homeSurface
+    const topElement = !immersive && taskScreen && pageSurface ? pageSurface
+      : !immersive && homeSurface ? homeSurface
       : !edgeToEdge && pageSurface ? pageSurface : document.elementFromPoint(window.innerWidth / 2, 1);
     const topColor = elementColor(topElement);
     const bottomColor = elementColor(document.elementFromPoint(window.innerWidth / 2, window.innerHeight - 1));
