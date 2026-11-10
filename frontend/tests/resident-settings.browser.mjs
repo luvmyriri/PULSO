@@ -14,7 +14,7 @@ const fixture = { id: -1, role: 'resident', full_name: 'Sample Resident', email:
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome', headless: true });
 try {
   for (const [language, theme, width] of [['en', 'light', 390], ['tl', 'dark', 320]]) {
-    const page = await browser.newPage({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+    const page = await browser.newPage({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: language === 'en' ? 'no-preference' : 'reduce' });
     let preferences = { enabled: true, report_updates: true, related_updates: true, in_app: true, email: false, version: 3, email_service: 'not_configured', phone_push: 'not_configured' };
     const writes = [];
     let failSave = false;
@@ -158,8 +158,15 @@ try {
         }
         if (theme === 'light') assert.equal(before.toLowerCase(), '#f1f5f9', 'Light My Reports keeps a light status bar');
       }
+      await page.evaluate(() => {
+        window.__scrollSamples = [];
+        window.__captureScroll = () => window.__scrollSamples.push(scrollY);
+        window.addEventListener('scroll', window.__captureScroll, { passive: true });
+      });
       await page.locator('[data-resident-bottom-nav] button').nth({ reports: 1, updates: 3, profile: 4 }[tab]).click();
       await page.waitForFunction(() => scrollY < 2);
+      const samples = await page.evaluate(() => { window.removeEventListener('scroll', window.__captureScroll); return window.__scrollSamples; });
+      assert.equal(samples.some(value => value > 2 && value < 348), language === 'en', tab + ' animates normally and respects reduced motion');
       assert.equal(new URL(page.url()).searchParams.get('tab'), tab, 'Retapping keeps the current page');
       await page.evaluate(() => document.getElementById('synthetic-scroll-content').remove());
       if (tab === 'reports') {

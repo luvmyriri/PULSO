@@ -9625,6 +9625,12 @@ export default function ResidentDashboard() {
     const tabScrollPositionsRef = useRef({});
     const [accountSubView, setAccountSubView] = useState('settings'); // 'settings' | 'profile-details'
 
+    const scrollToDashboardTop = () => {
+        const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+        window.scrollTo({ top: 0, behavior });
+        mainScrollRef.current?.scrollTo({ top: 0, behavior });
+    };
+
     const handleGoHome = () => {
         setIsMoreMenuOpen(false);
         if (activeModal) {
@@ -9636,13 +9642,7 @@ export default function ResidentDashboard() {
         setAccountSubView('settings');
         setSelectedReportForDetails(null);
         setActiveTab('overview');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-        if (mainScrollRef.current) {
-            mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-            mainScrollRef.current.scrollTop = 0;
-        }
+        scrollToDashboardTop();
     };
 
     const handleSetTab = (tab) => {
@@ -9658,8 +9658,7 @@ export default function ResidentDashboard() {
         if (tab === activeTab) {
             if (isNativeAndroid()) {
                 tabScrollPositionsRef.current[tab] = 0;
-                window.scrollTo({ top: 0, behavior: 'instant' });
-                if (mainScrollRef.current) mainScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
+                scrollToDashboardTop();
                 return;
             }
             if (tab === 'reports') {
