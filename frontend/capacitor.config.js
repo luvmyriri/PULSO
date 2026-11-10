@@ -11,7 +11,6 @@ export const plugins = {
     launchAutoHide: false,
     launchFadeOutDuration: 0,
     androidSplashResourceName: 'pulso_launch_icon',
-    backgroundColor: '#F7F9FC',
     showSpinner: false,
   },
   // PulsoAppearance owns insets: the landing draws under the system bars while

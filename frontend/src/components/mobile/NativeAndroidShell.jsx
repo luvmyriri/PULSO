@@ -19,7 +19,6 @@ export default function NativeAndroidShell({ children }) {
   const [isStarting, setIsStarting] = useState(true);
   const [nativeSplashReleased, setNativeSplashReleased] = useState(false);
   const finishStartup = useCallback(() => setIsStarting(false), []);
-  const darkBars = isStarting || isDark;
 
   useEffect(() => {
     let active = true;
@@ -39,8 +38,8 @@ export default function NativeAndroidShell({ children }) {
   }, []);
 
   useEffect(() => {
-    return syncNativeSystemBars(darkBars ? '#0c1421' : '#f7f9fc');
-  }, [darkBars, pathname]);
+    return syncNativeSystemBars(isDark ? '#080d19' : '#f7f9fc');
+  }, [isDark, pathname]);
 
   useEffect(() => {
     lastBack.current = 0;
@@ -98,7 +97,7 @@ export default function NativeAndroidShell({ children }) {
       isReady={nativeSplashReleased}
       minDurationStartsOnReady
       loadsBundledApp
-      themeModeOverride="dark"
+      nativeEdgeToEdge
       reducedMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches}
     />
   ) : children;

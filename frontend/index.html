@@ -7,7 +7,8 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/pulso-apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="theme-color" content="#EAF2FF" media="(prefers-color-scheme: light)" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#F7F9FC" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#080D19" media="(prefers-color-scheme: dark)" />
   <script>
     (function () {
@@ -48,7 +49,8 @@
         root.classList.remove('light', 'dark');
         root.classList.add(isDark ? 'dark' : 'light');
         root.setAttribute('data-theme', isDark ? 'dark' : 'light');
-        var color = isDark ? '#080D19' : '#EAF2FF';
+        root.style.colorScheme = isDark ? 'dark' : 'light';
+        var color = isDark ? '#080D19' : '#F7F9FC';
         document.querySelectorAll('meta[name="theme-color"]').forEach(function (meta) {
           meta.setAttribute('content', color);
         });

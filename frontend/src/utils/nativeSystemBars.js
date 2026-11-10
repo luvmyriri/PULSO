@@ -31,7 +31,7 @@ export function syncNativeSystemBars(fallbackColor) {
   const update = () => {
     if (stopped) return;
     const immersive = Boolean(document.querySelector('[data-native-camera]'));
-    const edgeToEdge = immersive || Boolean(document.querySelector('[data-native-resident-landing], [data-native-guide]'));
+    const edgeToEdge = immersive || Boolean(document.querySelector('[data-native-splash], [data-native-resident-landing], [data-native-guide]'));
     const pageSurface = [...document.querySelectorAll('[data-native-system-bar-surface]')]
       .filter(element => element.getClientRects().length).at(-1);
     // Scrolling report cards and action buttons must not recolor the status bar.
