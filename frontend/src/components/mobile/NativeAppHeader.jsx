@@ -126,7 +126,7 @@ export function NativeResidentGreeting({ user, onOpenAccount }) {
   </button>;
 }
 
-export default function NativeAppHeader({ children, onLanguageChange, onBrandClick, brand, appearance = 'default', borderless = appearance === 'hero', transparent = false }) {
+export default function NativeAppHeader({ children, onLanguageChange, onBrandClick, brand, showThemeToggle = true, appearance = 'default', borderless = appearance === 'hero', transparent = false }) {
   const { i18n } = useTranslation();
   const { isDark } = useTheme();
   const filipino = i18n.resolvedLanguage === 'tl';
@@ -153,7 +153,7 @@ export default function NativeAppHeader({ children, onLanguageChange, onBrandCli
               {filipino ? 'EN' : 'TL'}
             </button>
           )}
-          <NativeThemeToggle className="text-primary hover:bg-slate-200 dark:hover:bg-slate-800" />
+          {showThemeToggle && <NativeThemeToggle className="text-primary hover:bg-slate-200 dark:hover:bg-slate-800" />}
         </div>
       </div>
     </header>

@@ -9345,7 +9345,7 @@ const TopNavigation = ({
         if (!isHomeTab || activeModal) return null;
         return (
             <div className="native-dashboard-topbar sticky top-0 z-50 shrink-0" data-scroll-hidden={isNativeHeaderHidden || undefined}>
-                <NativeAppHeader appearance="hero" brand={<NativeResidentGreeting user={user} onOpenAccount={() => {
+                <NativeAppHeader appearance="hero" showThemeToggle={false} brand={<NativeResidentGreeting user={user} onOpenAccount={() => {
                     setIsSearchOpen(false);
                     setShowNotifications(false);
                     handleSetTab('profile');
@@ -11872,8 +11872,10 @@ export default function ResidentDashboard() {
         action: f.modal ? () => handleSetModal(f.modal) : () => handleSetTab(f.tab)
     }));
 
+    const nativeHomeScreen = isNativeAndroid() && isHomeTab && !activeModal && !displayedReport && !dashboardRoute.reportId;
     return (
-        <div data-native-system-bar-surface className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col">
+        <div data-native-system-bar-surface data-native-dashboard-home={nativeHomeScreen || undefined} className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col">
+            {nativeHomeScreen && <div data-native-home-status-surface aria-hidden="true" />}
 
             {/* Global Toast Notification */}
             <AnimatePresence>
@@ -12246,7 +12248,7 @@ export default function ResidentDashboard() {
             )}
 
             {/* Top Navigation */}
-            {(!isNativeAndroid() || (isHomeTab && !activeModal && !displayedReport && !dashboardRoute.reportId)) && <TopNavigation
+            {(!isNativeAndroid() || nativeHomeScreen) && <TopNavigation
                 activeTab={activeTab}
                 activeModal={activeModal}
                 handleSetTab={handleSetTab}
@@ -12471,6 +12473,7 @@ export default function ResidentDashboard() {
                                     animate={{ opacity: 1, y: 0, x: 0 }}
                                     exit={{ opacity: 0, y: 14, x: 8 }}
                                     transition={{ type: 'spring', damping: 28, stiffness: 380 }}
+                                    style={isNativeAndroid() ? { bottom: 'calc(var(--pulso-native-nav-height) + var(--pulso-safe-bottom, 0px))' } : undefined}
                                     className="lg:hidden fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] right-0 z-[55] w-80 max-w-[calc(100vw-0.75rem)] bg-white dark:bg-slate-900 border-t border-l border-r-0 border-b-0 border-slate-200/90 dark:border-slate-800 shadow-[-8px_-6px_25px_rgba(0,0,0,0.15)] dark:shadow-[-8px_-6px_25px_rgba(0,0,0,0.4)] rounded-tl-2xl rounded-tr-none rounded-b-none p-3.5 overflow-hidden"
                                     role="dialog"
                                     aria-label="More navigation options"
@@ -12603,7 +12606,7 @@ export default function ResidentDashboard() {
                     <nav
                         data-resident-bottom-nav
                         className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
-                        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+                        style={{ paddingBottom: isNativeAndroid() ? 'var(--pulso-safe-bottom, 0px)' : 'env(safe-area-inset-bottom, 0px)', height: isNativeAndroid() ? 'calc(var(--pulso-native-nav-height) + var(--pulso-safe-bottom, 0px))' : undefined }}
                     >
                         {navItems.map((item) => {
                             if (item.id === 'report') {

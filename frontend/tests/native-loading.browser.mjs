@@ -83,6 +83,9 @@ try {
     await page.evaluate(() => window.__releaseSplash({}));
     await splash.waitFor({ state: 'detached' });
     await page.locator('.native-resident-greeting').waitFor();
+    await page.waitForFunction(() => window.__barCalls.at(-1)?.edgeToEdge === true && document.querySelector('[data-native-dashboard-home]'));
+    await page.locator('.native-resident-greeting').click();
+    await page.waitForURL('**/dashboard?tab=profile');
     await page.waitForFunction(() => window.__barCalls.at(-1)?.edgeToEdge === false);
     assert.deepEqual(errors, []);
     await page.close();

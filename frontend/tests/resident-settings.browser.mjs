@@ -56,7 +56,11 @@ try {
           { name: 'PulsoAppearance', methods: [{ name: 'setSystemBars', rtype: 'promise' }] },
         ],
         nativePromise: async (plugin, method, options) => {
-          if (plugin === 'PulsoAppearance') window.__barCalls.push(options);
+          if (plugin === 'PulsoAppearance') {
+            window.__barCalls.push(options);
+            document.documentElement.style.setProperty('--pulso-safe-top', options.edgeToEdge ? '24px' : '0px');
+            document.documentElement.style.setProperty('--pulso-safe-bottom', options.edgeToEdge ? '24px' : '0px');
+          }
           return plugin === 'App' && method === 'getInfo' ? { id: 'ph.gov.caloocan.pulso', version: '2.4.4', build: '5' } : {};
         },
         nativeCallback: async (_plugin, method, options, callback) => {
@@ -71,6 +75,11 @@ try {
     assert.equal(await greeting.locator('strong').innerText(), fixture.full_name);
     assert.equal(await greeting.locator('.native-resident-greeting__avatar').innerText(), 'SR');
     assert.equal(await page.locator('[data-native-app-header] .native-app-brand').count(), 0);
+    assert.equal(await page.locator('[data-native-app-header] .lucide-sun, [data-native-app-header] .lucide-moon, [data-native-app-header] .lucide-monitor').count(), 0, 'Dashboard header has no theme icon');
+    await page.waitForFunction(() => window.__barCalls.at(-1)?.edgeToEdge === true && getComputedStyle(document.querySelector('.native-dashboard-topbar')).paddingTop === '24px');
+    assert.equal(await greeting.evaluate(el => el.getBoundingClientRect().top >= 24), true, 'Greeting clears the status icons');
+    assert.equal(await page.locator('[data-resident-bottom-nav]').evaluate(el => getComputedStyle(el).paddingBottom), '24px');
+    assert.equal(await page.locator('[data-resident-bottom-nav]').evaluate(el => [...el.querySelectorAll('button')].every(button => button.getBoundingClientRect().bottom <= innerHeight - 24)), true, 'Bottom controls clear gesture navigation');
     if (screenshots) await page.screenshot({ path: join(screenshots, `dashboard-home-${language}-${theme}.png`) });
     await page.waitForFunction(() => window.__barCalls.length > 0);
     const statusColor = await page.evaluate(() => window.__barCalls.at(-1).topColor);
@@ -138,6 +147,7 @@ try {
       await page.locator('[data-resident-bottom-nav]').waitFor();
       await page.waitForTimeout(150);
       assert.equal(await page.locator('[data-native-app-header]').count(), 0, tab + ' has no top navbar');
+      await page.waitForFunction(() => window.__barCalls.at(-1)?.edgeToEdge === false);
       await page.evaluate(() => {
         const spacer = document.createElement('div'); spacer.id = 'synthetic-scroll-content'; spacer.style.height = '1500px';
         document.querySelector('[data-native-system-bar-surface]').appendChild(spacer);
