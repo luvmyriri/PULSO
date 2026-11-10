@@ -83,7 +83,7 @@ export default function NativeResidentLanding({ residentSignedIn, trackingRoute 
         </aside>
         <footer className="native-home__footer">
           <Link to="/tutorial">{t('nativeAndroid.home.guide')}</Link>
-          <NativeAppUpdateButton />
+          <NativeAppUpdateButton prominent />
           <p>{t('loadingScreen.department')}</p>
         </footer>
       </main>

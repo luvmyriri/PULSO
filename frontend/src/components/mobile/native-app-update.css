@@ -1,13 +1,15 @@
 .native-app-update-trigger { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; max-width: 100%; padding: .4rem 0; color: inherit; font: inherit; font-weight: 600; text-align: start; cursor: pointer; }
 .native-app-update-trigger:hover { text-decoration: underline; text-underline-offset: 3px; }
+.native-app-update-trigger--prominent { min-width: 7rem; padding-inline: .75rem; border: 1px solid var(--color-primary); border-radius: 999px; color: var(--home-ink); }
+.native-app-update-trigger--prominent svg { color: var(--color-primary); }
+.native-app-update__confirmation { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .native-app-update-trigger:focus-visible { outline: 3px solid var(--home-focus, Highlight); outline-offset: 2px; }
 .native-app-update { padding-block-end: .5rem; font-size: .9375rem; line-height: 1.5; }
 .native-app-update p { margin: 0 0 .75rem; overflow-wrap: anywhere; }
 .native-app-update__version { color: var(--home-muted); font-size: .8125rem; }
 .native-app-update button { display: flex; justify-content: center; align-items: center; gap: .5rem; width: 100%; min-height: 48px; padding: .625rem 1rem; border-radius: 999px; font-weight: 700; cursor: pointer; }
-.native-app-update__download { background: var(--home-accent); color: white; }
-.native-bottom-sheet[data-landing-theme='dark'] .native-app-update__download { color: var(--color-ink); }
-.native-app-update__download:hover { background: color-mix(in srgb, var(--home-accent) 90%, var(--home-ink)); }
+.native-app-update__download { background: var(--color-primary); color: white; text-shadow: 0 1px 2px var(--color-indigo-900); }
+.native-app-update__download:hover { background: var(--color-primary-hover); }
 .native-app-update__download:active { background: var(--color-primary-dark); }
 .native-app-update__download:disabled { opacity: .6; cursor: wait; }
 .native-app-update__retry { border: 1px solid var(--home-rule); color: var(--home-ink); }

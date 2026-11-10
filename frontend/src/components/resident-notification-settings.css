@@ -1,13 +1,36 @@
-.resident-notification-settings{display:grid;gap:16px;max-width:680px;color:#172536;font-size:14px;line-height:1.5}
-.resident-notification-settings p{margin:0;color:#526171;max-width:65ch;overflow-wrap:anywhere}
-.resident-notification-settings fieldset{min-width:0;border:0;border-top:1px solid #d4dce5;padding:16px 0 0;margin:0}
-.resident-notification-settings legend{font-weight:700;padding:0 8px 0 0}
-.resident-notification-settings label{display:flex;justify-content:space-between;align-items:center;gap:20px;min-height:48px;padding:10px 0}
-.resident-notification-settings label span{min-width:0;overflow-wrap:anywhere}
-.resident-notification-settings input{width:20px;height:20px;accent-color:#b84c00;flex-shrink:0}
-.resident-notification-settings button{min-height:44px;padding:10px 16px;justify-self:start;border:1px solid #b84c00;border-radius:8px;background:#b84c00;color:white;font-weight:600}
-.resident-notification-settings :focus-visible{outline:3px solid #2563eb!important;outline-offset:3px}
-.resident-notification-settings :disabled{opacity:.6;cursor:not-allowed}
-.dark .resident-notification-settings{color:#f0f4fa}.dark .resident-notification-settings p{color:#b4bfce}.dark .resident-notification-settings fieldset{border-color:#334155}
-.dark .resident-notification-settings button{background:#ff8b3d;color:#171a20;border-color:#ff8b3d}.dark .resident-notification-settings input{accent-color:#ff8b3d}
-@media(forced-colors:active){.resident-notification-settings button{border:1px solid ButtonText}.resident-notification-settings :focus-visible{outline-color:Highlight!important}}
+.resident-notification-settings {
+  --notification-ink: var(--color-ink); --notification-muted: var(--color-slate-600);
+  --notification-rule: var(--color-slate-300); --notification-field: var(--color-light);
+  max-width: 640px; color: var(--notification-ink); font-size: .9375rem; line-height: 1.5;
+}
+.dark .resident-notification-settings { --notification-ink: var(--color-slate-50); --notification-muted: var(--color-slate-300); --notification-rule: var(--color-slate-600); --notification-field: var(--color-slate-900); }
+.resident-notification-settings header { margin-bottom: 1rem; }
+.resident-notification-settings h2 { margin: 0 0 .35rem; font-size: 1.65rem; line-height: 1.2; letter-spacing: -.035em; font-weight: 800; overflow-wrap: anywhere; }
+.resident-notification-settings p { margin: 0; color: var(--notification-muted); overflow-wrap: anywhere; }
+.resident-notification-settings header p { font-size: .875rem; }
+.resident-notification-settings form { display: grid; gap: 1rem; }
+.resident-notification-settings__master { border-block: 1px solid var(--notification-rule); }
+.resident-notification-settings fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.resident-notification-settings legend { padding: 0 0 .2rem; color: var(--notification-muted); font-size: .75rem; line-height: 1.4; font-weight: 700; }
+.resident-notification-settings fieldset .resident-checkbox + .resident-checkbox { border-top: 1px solid color-mix(in srgb, var(--notification-rule) 55%, transparent); }
+.resident-notification-settings__privacy { display: flex; gap: .5rem; align-items: flex-start; }
+.resident-notification-settings__privacy svg { flex: none; margin-top: .1rem; color: var(--notification-muted); }
+.resident-notification-settings__privacy p, .resident-notification-settings__note, .resident-notification-settings__details p { font-size: .8125rem; }
+.resident-notification-settings__details summary { display: flex; gap: .5rem; align-items: center; justify-content: space-between; min-height: 44px; color: var(--notification-ink); font-size: .8125rem; font-weight: 600; cursor: pointer; list-style: none; }
+.resident-notification-settings__details summary::-webkit-details-marker { display: none; }
+.resident-notification-settings__details[open] summary svg { transform: rotate(180deg); }
+.resident-notification-settings__details p { margin-bottom: .65rem; }
+.resident-notification-settings__save { width: 100%; min-height: 48px; padding: .7rem 1rem; border-radius: 999px; background: var(--color-primary); color: #fff; font-weight: 750; text-shadow: 0 1px 2px var(--color-indigo-900); cursor: pointer; }
+.resident-notification-settings__save:hover { background: var(--color-primary-hover); }
+.resident-notification-settings__save:active { background: var(--color-primary-dark); }
+.resident-notification-settings__retry { min-height: 44px; padding: .5rem .75rem; border: 1px solid var(--notification-rule); border-radius: .5rem; font-weight: 600; cursor: pointer; }
+.resident-notification-settings__feedback { display: grid; gap: .5rem; }
+.resident-notification-settings__feedback button { justify-self: start; }
+.resident-notification-settings__saved { display: flex; gap: .4rem; align-items: center; }
+.resident-notification-settings :is(button, summary):focus-visible { outline: 3px solid var(--color-focus) !important; outline-offset: 3px !important; }
+.resident-notification-settings button:disabled { opacity: .6; cursor: wait; }
+@media (forced-colors: active) {
+  .resident-notification-settings { --notification-ink: CanvasText; --notification-muted: CanvasText; --notification-rule: ButtonText; --notification-field: Field; }
+  .resident-notification-settings button { border: 1px solid ButtonText; background: ButtonFace; color: ButtonText; text-shadow: none; }
+  .resident-notification-settings :focus-visible { outline-color: Highlight !important; }
+}

@@ -16,10 +16,12 @@ import { createInstance } from 'i18next';
 import { I18nextProvider } from 'react-i18next';
 import { ThemeContext } from './src/contexts/ThemeContext.jsx';
 import Home from './src/components/mobile/NativeResidentLanding.jsx';
+import { dismissAndroidLayer } from './src/utils/nativeAndroid';
 import en from './src/locales/en.json';
 import tl from './src/locales/tl.json';
 const params = new URLSearchParams(location.search);
 const dark = params.get('theme')==='dark';
+window.__dismissAndroidLayer = dismissAndroidLayer;
 document.documentElement.classList.toggle('dark',dark);
 const i18n=createInstance();
 await i18n.init({lng:params.get('lang')||'en',resources:{en,tl},fallbackLng:'en',interpolation:{escapeValue:false}});
@@ -75,11 +77,26 @@ try {
     assert.equal(await panel.evaluate(el => el.scrollWidth<=el.clientWidth), true);
     assert.equal(await panel.evaluate(el => Math.abs(el.getBoundingClientRect().bottom-innerHeight)<2), true);
     if (screenshots) await page.screenshot({ path: join(screenshots, `update-${lang}-${theme}.png`) });
-    await page.evaluate(() => { window.__downloadError=true; });
     await download.click();
+    const confirmation = panel.locator('.native-app-update__confirmation');
+    await confirmation.waitFor();
+    assert.equal(await page.evaluate(() => window.__downloads?.length || 0), 0, 'Opening confirmation does not download');
+    assert.equal(await confirmation.locator('button').first().evaluate(el => el===document.activeElement), true, 'Not now is focused');
+    if (screenshots) await page.screenshot({ path: join(screenshots, `update-confirm-${lang}-${theme}.png`) });
+    await confirmation.locator('button').first().click();
+    await download.waitFor();
+    assert.equal(await page.evaluate(() => window.__downloads?.length || 0), 0, 'Cancelling does not download');
+    await download.click();
+    await confirmation.waitFor();
+    await page.evaluate(() => window.__dismissAndroidLayer());
+    await confirmation.waitFor({ state: 'detached' });
+    assert.equal(await page.evaluate(() => window.__downloads?.length || 0), 0, 'Android Back cancels confirmation');
+    await download.click();
+    await page.evaluate(() => { window.__downloadError=true; });
+    await confirmation.locator('.native-app-update__download').click();
     await panel.getByRole('alert').waitFor();
     await page.evaluate(() => { window.__downloadError=false; });
-    await download.click();
+    await confirmation.locator('.native-app-update__download').click();
     await page.waitForFunction(() => window.__downloads?.length===2);
     await page.waitForFunction(() => !document.querySelector('[role="alert"]'));
     assert.deepEqual(await page.evaluate(() => window.__downloads[1]), { versionCode: 6 });
@@ -99,5 +116,5 @@ try {
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log('PASS: update available/current/error/retry/download handoff, focus return, bilingual themes, narrow bottom sheet.');
+  console.log('PASS: update available/current/error/retry, confirmation cancel/Android Back before any download, download handoff, focus return, bilingual themes and narrow bottom sheet.');
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

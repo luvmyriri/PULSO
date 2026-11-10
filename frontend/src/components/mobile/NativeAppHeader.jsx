@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Monitor, Moon, Sun } from 'lucide-react';
+import { Check, ChevronDown, Monitor, Moon, Sun, UserRound } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -112,7 +112,21 @@ export function NativeResidentAccountLink({ signedIn, onClick }) {
   );
 }
 
-export default function NativeAppHeader({ children, onLanguageChange, onBrandClick, appearance = 'default', borderless = appearance === 'hero', transparent = false }) {
+export function NativeResidentGreeting({ user, onGoHome }) {
+  const { t } = useTranslation();
+  const fullName = user?.fullName?.trim();
+  const name = (fullName && fullName !== 'Loading...' ? fullName : user?.name?.trim()) || '';
+  const words = name.split(/\s+/).filter(Boolean);
+  const initials = words.length ? `${words[0][0]}${words.length > 1 ? words.at(-1)[0] : ''}`.toLocaleUpperCase() : '';
+  return <button type="button" className="native-resident-greeting" onClick={onGoHome}
+    aria-label={t('nativeAndroid.dashboard.returnHome')}>
+    <span className="native-resident-greeting__avatar" aria-hidden="true">{initials || <UserRound size={20} />}</span>
+    <span className="native-resident-greeting__text"><span>{t('nativeAndroid.dashboard.hello')}</span>
+      <strong>{name || t('nativeAndroid.dashboard.resident')}</strong></span>
+  </button>;
+}
+
+export default function NativeAppHeader({ children, onLanguageChange, onBrandClick, brand, appearance = 'default', borderless = appearance === 'hero', transparent = false }) {
   const { i18n } = useTranslation();
   const { isDark } = useTheme();
   const filipino = i18n.resolvedLanguage === 'tl';
@@ -127,7 +141,7 @@ export default function NativeAppHeader({ children, onLanguageChange, onBrandCli
   return (
     <header data-native-app-header data-landing-theme={isDark ? 'dark' : 'light'} className={`${appearance === 'hero' ? 'native-app-header--hero ' : ''}${transparent ? 'native-app-header--transparent ' : ''}sticky top-0 z-40 w-full shrink-0 bg-[#f7f9fc] text-[#172339] dark:bg-[#0c1421] dark:text-slate-50 ${borderless ? '' : 'border-b border-slate-300 dark:border-slate-700'}`}>
       <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-2 px-4">
-        <NativeAppBrand appearance={appearance} onClick={onBrandClick} />
+        {brand || <NativeAppBrand appearance={appearance} onClick={onBrandClick} />}
         <div className="relative flex shrink-0 items-center gap-1">
           {children}
           {appearance === 'hero' ? (

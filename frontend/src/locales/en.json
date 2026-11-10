@@ -59,7 +59,15 @@
       }
     },
     "nativeAndroid": {
+        "notificationSettingsBack": "Settings",
+        "dashboard": { "hello": "Hello,", "resident": "Resident", "returnHome": "Return to dashboard Home" },
         "appUpdate": {
+            "shortLabel": "App update",
+            "confirmTitle": "Update PULSO?",
+            "confirmDescription": "Your app data stays in place. You do not need to uninstall PULSO.",
+            "confirm": "Download the new APK now? You will confirm installation with Android after the download.",
+            "confirmAction": "Update now",
+            "notNow": "Not now",
             "check": "Check for updates",
             "title": "App update",
             "description": "Install updates over PULSO to keep your app data. No uninstall needed.",

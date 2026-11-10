@@ -71,6 +71,12 @@
 }
 .native-app-header--hero button { color: var(--home-ink); }
 .native-app-header--hero button:active { background: var(--home-surface); }
+.native-resident-greeting { display: flex; flex: 1; min-width: 0; min-height: 48px; gap: .625rem; align-items: center; text-align: start; border-radius: .375rem; cursor: pointer; }
+.native-resident-greeting__avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: .875rem; font-weight: 750; text-shadow: 0 1px 2px var(--color-indigo-900); }
+.native-resident-greeting__text { display: grid; min-width: 0; gap: .1rem; }
+.native-resident-greeting__text > span { color: var(--home-muted); font-size: .75rem; line-height: 1.3; }
+.native-resident-greeting__text strong { font-size: .8125rem; font-weight: 750; line-height: 1.35; overflow-wrap: anywhere; }
+.native-resident-greeting:focus-visible { outline: 3px solid var(--home-focus); outline-offset: 2px; }
 .native-dashboard-topbar {
   transition: transform 180ms ease-out;
 }

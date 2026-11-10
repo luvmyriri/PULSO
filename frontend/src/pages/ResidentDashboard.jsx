@@ -1,4 +1,4 @@
-import NativeAppHeader from '../components/mobile/NativeAppHeader';
+import NativeAppHeader, { NativeResidentGreeting } from '../components/mobile/NativeAppHeader';
 import NativeBottomSheet from '../components/mobile/NativeBottomSheet';
 import NotificationDropdown from '../components/NotificationDropdown';
 import { exportResidentReportsToXLSX } from '../utils/xlsxExport';
@@ -3283,7 +3283,7 @@ const MyReports = ({
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0">
-                    {isLocalhost && (
+                    {isLocalhost && !isNativeAndroid() && (
                         <button
                             type="button"
                             onClick={handleExportXLSX}
@@ -5434,20 +5434,12 @@ const ProfileView = ({
                             <button
                                 type="button"
                                 onClick={() => changeSubView('settings')}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[38px] outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-                                aria-label="Back to Settings"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-11 focus-visible:outline-3 focus-visible:outline-blue-600"
+                                aria-label={t('nativeAndroid.notificationSettingsBack')}
                             >
                                 <ChevronLeft size={16} className="shrink-0" />
-                                <span>Settings</span>
+                                <span>{t('nativeAndroid.notificationSettingsBack')}</span>
                             </button>
-                            <div className="px-1">
-                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                    Notifications
-                                </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    Configure your alerts for public works, report updates, and civic advisories
-                                </p>
-                            </div>
                         </div>
 
                         <ResidentNotificationSettings onSaved={preferences=>setNotificationsEnabled(preferences.enabled)}/>
@@ -9341,9 +9333,10 @@ const TopNavigation = ({
     };
 
     if (nativeAndroid) {
+        if (!isHomeTab || activeModal) return null;
         return (
             <div className="native-dashboard-topbar sticky top-0 z-50 shrink-0" data-scroll-hidden={isNativeHeaderHidden || undefined}>
-                <NativeAppHeader appearance="hero">
+                <NativeAppHeader appearance="hero" brand={<NativeResidentGreeting user={user} onGoHome={handleNavGoHome} />}>
                     <button type="button" ref={nativeBellRef}
                         aria-label={t('notificationCenter.title', 'All notifications')}
                         aria-expanded={showNotifications}
@@ -12243,7 +12236,7 @@ export default function ResidentDashboard() {
             )}
 
             {/* Top Navigation */}
-            <TopNavigation
+            {(!isNativeAndroid() || (isHomeTab && !activeModal && !displayedReport && !dashboardRoute.reportId)) && <TopNavigation
                 activeTab={activeTab}
                 activeModal={activeModal}
                 handleSetTab={handleSetTab}
@@ -12278,7 +12271,7 @@ export default function ResidentDashboard() {
                 token={token}
                 isSearchOpen={isHeaderSearchOpen}
                 setIsSearchOpen={setIsHeaderSearchOpen}
-            />
+            />}
 
             {/* Main Layout Grid (Responsive 2-Column Content + Sticky Side Nav) */}
             <main ref={mainScrollRef} className="flex-1 w-full flex flex-col relative">

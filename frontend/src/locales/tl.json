@@ -59,7 +59,15 @@
       }
     },
     "nativeAndroid": {
+        "notificationSettingsBack": "Mga setting",
+        "dashboard": { "hello": "Kumusta,", "resident": "Residente", "returnHome": "Bumalik sa Home ng dashboard" },
         "appUpdate": {
+            "shortLabel": "Update ng app",
+            "confirmTitle": "I-update ang PULSO?",
+            "confirmDescription": "Mananatili ang data ng app. Hindi kailangang i-uninstall ang PULSO.",
+            "confirm": "I-download na ang bagong APK? Kukumpirmahin mo sa Android ang pag-install pagkatapos ng download.",
+            "confirmAction": "I-update ngayon",
+            "notNow": "Huwag muna",
             "check": "Tingnan ang update",
             "title": "Update ng app",
             "description": "I-install ang update sa kasalukuyang PULSO para manatili ang data. Hindi kailangang mag-uninstall.",
