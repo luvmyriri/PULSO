@@ -1,9 +1,17 @@
+import NativeAppHeader, { NativeResidentGreeting } from '../components/mobile/NativeAppHeader';
+import NativeDashboardSearch from '../components/mobile/NativeDashboardSearch';
+import NativeBottomSheet from '../components/mobile/NativeBottomSheet';
+import NotificationDropdown from '../components/NotificationDropdown';
 import { exportResidentReportsToXLSX } from '../utils/xlsxExport';
 import { residentPublication } from '../utils/publicationAdapter';
 import ResidentNotificationSettings from '../components/ResidentNotificationSettings';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { App as NativeApp } from '@capacitor/app';
+import { isNativeAndroid } from '../utils/appContext';
+import { useAndroidBack } from '../utils/nativeAndroid';
+import NativeAppUpdateButton from '../components/mobile/NativeAppUpdateButton';
 import { useGovernmentData } from '../utils/governmentApi';
 import { residentDashboardRoute, residentDashboardUrl, residentNotificationTarget } from '../utils/residentDashboardRoute';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -145,6 +153,9 @@ import {
     REPORT_WORKFLOW_STEPS
 } from '../utils/reportWorkflow';
 import { API_BASE_URL } from '../utils/apiBase';
+import { getReportPhotoUrl, resolveReportMediaUrl } from '../utils/reportMedia';
+import useReportPhotoPins from '../utils/useReportPhotoPins';
+import ReportEvidenceImage from '../components/ReportEvidenceImage';
 import { apiFetch, dedupeFetch, checkServerHealth, logApiFailure } from '../utils/apiFetch';
 import { GOOGLE_MAPS_LIBRARIES } from '../utils/mapsConfig';
 import { reverseGeocodeLocation } from '../utils/reverseGeocode';
@@ -2486,7 +2497,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                 <div className="relative w-12 h-12 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-center shadow-2xs">
                     {report.image_url ? (
                         <img
-                            src={`${API_BASE_URL}${report.image_url}`}
+                            src={resolveReportMediaUrl(report.image_url)}
                             alt=""
                             loading="lazy"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -2615,14 +2626,14 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                                 <div className="lg:col-span-7 flex flex-col gap-3">
                                     <div className="relative rounded-xl overflow-hidden bg-black/10 dark:bg-black/40 border border-slate-200/80 dark:border-slate-800 aspect-[16/9] max-h-64 sm:max-h-72 lg:max-h-none">
                                         <img
-                                            src={`${API_BASE_URL}${report.image_url}`}
+                                            src={resolveReportMediaUrl(report.image_url)}
                                             alt={`${report.category} photo proof`}
                                             className="w-full h-full object-cover"
                                         />
                                         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
                                         <button
                                             type="button"
-                                            onClick={() => setZoomedImage(`${API_BASE_URL}${report.image_url}`)}
+                                            onClick={() => setZoomedImage(resolveReportMediaUrl(report.image_url))}
                                             className="absolute bottom-2.5 right-2.5 px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/90 backdrop-blur-xs text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
                                         >
                                             <Maximize2 size={12} />
@@ -2752,7 +2763,7 @@ const ReportCard = ({ report, setZoomedImage, handleCancelReport, isLatest = fal
                             {isResolved && report.resolution_image_url && (
                                 <button
                                     type="button"
-                                    onClick={() => setZoomedImage(`${API_BASE_URL}${report.resolution_image_url}`)}
+                                    onClick={() => setZoomedImage(resolveReportMediaUrl(report.resolution_image_url))}
                                     className="text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/50 bg-emerald-50 dark:bg-emerald-950/40 px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer min-h-[44px]"
                                 >
                                     <ImageIcon size={14} />
@@ -3167,40 +3178,7 @@ const MyReports = ({
         return 'Reported civic concern';
     };
 
-    const getReportThumbnail = (report) => {
-        if (report.media_urls && report.media_urls.length > 0 && report.media_urls[0]) {
-            return report.media_urls[0];
-        }
-        if (report.image_url) return report.image_url;
-        if (report.photos && report.photos.length > 0 && report.photos[0]) {
-            return report.photos[0];
-        }
-        if (report.image) return report.image;
-
-        const cat = (report.category || report.ai_category || '').toLowerCase();
-        if (cat.includes('safety') || cat.includes('hazard')) {
-            return 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('light')) {
-            return 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('road') || cat.includes('pothole') || cat.includes('asphalt') || cat.includes('infrastructure')) {
-            return 'https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('water') || cat.includes('leak')) {
-            return 'https://images.unsplash.com/photo-1584467735871-8e85353a8413?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('drain') || cat.includes('flood')) {
-            return 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('electric') || cat.includes('wire')) {
-            return 'https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?auto=format&fit=crop&w=400&q=80';
-        }
-        if (cat.includes('sign') || cat.includes('traffic')) {
-            return 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=400&q=80';
-        }
-        return 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80';
-    };
+    const getReportThumbnail = getReportPhotoUrl;
 
     const getReportDisplayCategory = (report) => {
         const raw = (report.category || report.ai_category || '').toLowerCase();
@@ -3291,7 +3269,7 @@ const MyReports = ({
                 </div>
 
                 <div className="flex items-center gap-2.5 shrink-0">
-                    {isLocalhost && (
+                    {isLocalhost && !isNativeAndroid() && (
                         <button
                             type="button"
                             onClick={handleExportXLSX}
@@ -4140,13 +4118,10 @@ const MyReports = ({
                                     >
                                         {/* Top Photo Banner */}
                                         <div className="relative w-full h-44 sm:h-48 overflow-hidden bg-slate-900 shrink-0">
-                                            <img
+                                            <ReportEvidenceImage
                                                 src={thumbnailSrc}
                                                 alt={displayTitle}
                                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                                onError={(e) => {
-                                                    e.currentTarget.src = 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80';
-                                                }}
                                             />
 
                                             {/* Floating Status Pill (Top-Left overlay on photo) */}
@@ -4389,6 +4364,31 @@ const ProfileView = ({
     const [ratingScore, setRatingScore] = useState(5);
     const [ratingSubmitted, setRatingSubmitted] = useState(false);
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+    const nativeContactSheet = isNativeAndroid();
+    const closeContact = () => setIsContactModalOpen(false);
+    const contactTitle = t('nativeAndroid.contact.title');
+    const contactDescription = t('nativeAndroid.contact.description');
+    const contactCloseLabel = t('nativeAndroid.contact.close');
+    const contactDetails = (
+        <div className="space-y-2 pt-1 text-left">
+            <div className="space-y-0.5 rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{t('nativeAndroid.contact.engineeringOffice')}</div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">888-1234 / 8397-6212</div>
+                <div className="break-all text-sm text-slate-600 dark:text-slate-300">engineering@caloocancity.gov.ph</div>
+            </div>
+            <div className="space-y-0.5 rounded-xl border border-slate-200/80 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
+                <div className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">{t('nativeAndroid.contact.emergencyHotlines')}</div>
+                <div className="text-sm font-semibold text-orange-700 dark:text-orange-400">{t('nativeAndroid.contact.emergencyNumber')}</div>
+                <div className="text-sm text-slate-600 dark:text-slate-300">Caloocan DRRMO: 8397-6212</div>
+            </div>
+        </div>
+    );
+    const contactCloseButton = (
+        <button type="button" onClick={closeContact}
+            className="min-h-11 w-full cursor-pointer rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            {contactCloseLabel}
+        </button>
+    );
 
     // Password & Security States
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
@@ -5089,6 +5089,7 @@ const ProfileView = ({
                                         <button
                                             type="button"
                                             onClick={() => setIsContactModalOpen(true)}
+                                            aria-haspopup="dialog"
                                             className="w-full py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/60 dark:hover:bg-slate-800/40 -mx-2 px-2 rounded-xl transition-colors group cursor-pointer"
                                         >
                                             <div className="flex items-center gap-3.5 min-w-0">
@@ -5416,20 +5417,12 @@ const ProfileView = ({
                             <button
                                 type="button"
                                 onClick={() => changeSubView('settings')}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[38px] outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
-                                aria-label="Back to Settings"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-11 focus-visible:outline-3 focus-visible:outline-blue-600"
+                                aria-label={t('nativeAndroid.notificationSettingsBack')}
                             >
                                 <ChevronLeft size={16} className="shrink-0" />
-                                <span>Settings</span>
+                                <span>{t('nativeAndroid.notificationSettingsBack')}</span>
                             </button>
-                            <div className="px-1">
-                                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                    Notifications
-                                </h2>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                    Configure your alerts for public works, report updates, and civic advisories
-                                </p>
-                            </div>
                         </div>
 
                         <ResidentNotificationSettings onSaved={preferences=>setNotificationsEnabled(preferences.enabled)}/>
@@ -5927,11 +5920,19 @@ const ProfileView = ({
             </AnimatePresence>
 
             {/* Contact & Support Modal */}
+            {nativeContactSheet && isContactModalOpen && (
+                <NativeBottomSheet title={contactTitle} description={contactDescription} closeLabel={contactCloseLabel} onDismiss={closeContact}>
+                    <div className="space-y-3 pb-2">
+                        {contactDetails}
+                        {contactCloseButton}
+                    </div>
+                </NativeBottomSheet>
+            )}
             <AnimatePresence>
-                {isContactModalOpen && (
+                {!nativeContactSheet && isContactModalOpen && (
                     <div
                         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
-                        onClick={() => setIsContactModalOpen(false)}
+                        onClick={closeContact}
                     >
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
@@ -5944,9 +5945,9 @@ const ProfileView = ({
                         >
                             <button
                                 type="button"
-                                onClick={() => setIsContactModalOpen(false)}
+                                onClick={closeContact}
                                 className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg cursor-pointer"
-                                aria-label="Close"
+                                aria-label={contactCloseLabel}
                             >
                                 <X size={18} />
                             </button>
@@ -5954,30 +5955,13 @@ const ProfileView = ({
                                 <PhoneCall size={22} />
                             </div>
                             <div className="text-center space-y-1">
-                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Contact &amp; Assistance</h3>
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">{contactTitle}</h3>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    Caloocan City Engineering Department &amp; Emergency Hotlines
+                                    {contactDescription}
                                 </p>
                             </div>
-                            <div className="space-y-2 pt-1 text-left">
-                                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">City Engineering Office</div>
-                                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">888-1234 / 8397-6212</div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400">engineering@caloocancity.gov.ph</div>
-                                </div>
-                                <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-0.5">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Emergency Hotlines (24/7)</div>
-                                    <div className="text-xs font-semibold text-orange-600 dark:text-orange-400">911 (Rescue, Police &amp; Fire)</div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400">Caloocan DRRMO: 8397-6212</div>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsContactModalOpen(false)}
-                                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer min-h-[44px]"
-                            >
-                                Close
-                            </button>
+                            {contactDetails}
+                            {contactCloseButton}
                         </motion.div>
                     </div>
                 )}
@@ -6056,6 +6040,15 @@ const ProfileView = ({
 };
 
 const SettingsView = ({ user, handleLogout, containerVariants, token, showToast, t, onClearAIChatHistory }) => {
+    const [androidVersion, setAndroidVersion] = useState(null);
+    useEffect(() => {
+        if (!isNativeAndroid()) return;
+        let mounted = true;
+        void NativeApp.getInfo().then(info => {
+            if (mounted) setAndroidVersion(info.version);
+        }).catch(console.warn);
+        return () => { mounted = false; };
+    }, []);
     const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
     const [changing, setChanging] = useState(false);
     const [showPass, setShowPass] = useState({ current: false, new: false, confirm: false });
@@ -6626,6 +6619,18 @@ const SettingsView = ({ user, handleLogout, containerVariants, token, showToast,
                     </button>
                 </div>
             </div>
+
+            {androidVersion && (
+                <details className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                    <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">
+                        {t('nativeAndroid.about', 'About PULSO')}
+                    </summary>
+                    <p className="px-4 pb-4 text-sm text-slate-600 dark:text-slate-300">
+                        {t('nativeAndroid.version', 'App version {{version}}', { version: androidVersion })}
+                    </p>
+                    <div className="px-4 pb-3"><NativeAppUpdateButton /></div>
+                </details>
+            )}
 
             {/* ── Gmail 2FA Activation & OTP Verification Modal ── */}
             <AnimatePresence>
@@ -8617,6 +8622,8 @@ const TopNavigation = ({
     t,
     userReports = [],
     lguUpdates = [],
+    searchLoading = false,
+    searchUpdatesUnavailable = false,
     processedHazards = [],
     setSelectedPost,
     setSelectedHazard,
@@ -8634,6 +8641,12 @@ const TopNavigation = ({
         controlledSetIsSearchOpen?.(val);
     };
     const [recentSearches, setRecentSearches] = useState(() => {
+        if (isNativeAndroid()) {
+            try {
+                const stored = JSON.parse(localStorage.getItem('pulso_recent_searches') || '[]');
+                return Array.isArray(stored) ? stored.filter(value => typeof value === 'string').slice(0, 6) : [];
+            } catch { return []; }
+        }
         try {
             const saved = localStorage.getItem('pulso_recent_searches');
             return saved ? JSON.parse(saved) : ['Water Interruption', 'Street Lighting', 'Engineering Contact'];
@@ -8645,6 +8658,7 @@ const TopNavigation = ({
     const searchRef = useRef(null);
     const searchInputRef = useRef(null);
     const mobileSearchRef = useRef(null);
+    const nativeBellRef = useRef(null);
     const mobileSearchInputRef = useRef(null);
     const [searchPillWidth, setSearchPillWidth] = useState(240);
     const [recentSearchAnnouncement, setRecentSearchAnnouncement] = useState('');
@@ -8672,29 +8686,39 @@ const TopNavigation = ({
         return () => observer.disconnect();
     }, []);
 
-    // Mobile scroll-direction detection: collapse search Row 2 on scroll-down, restore on scroll-up
-    const [isScrolledDown, setIsScrolledDown] = useState(false);
-    const lastScrollYRef = useRef(0);
+    const nativeAndroid = isNativeAndroid();
+    const [isNativeHeaderHidden, setIsNativeHeaderHidden] = useState(false);
 
     useEffect(() => {
+        setIsNativeHeaderHidden(false);
+        if (!nativeAndroid || isSearchOpen || showNotifications) return;
+
+        let previousY = Math.max(0, window.scrollY);
+        let travel = 0;
         const handleScroll = () => {
-            const currentY = window.scrollY || document.documentElement.scrollTop;
-            if (isSearchOpen) {
-                setIsScrolledDown(false);
-                lastScrollYRef.current = currentY;
+            const limit = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+            const currentY = Math.min(limit, Math.max(0, window.scrollY));
+            const delta = currentY - previousY;
+            previousY = currentY;
+            if (currentY <= 24) {
+                travel = 0;
+                setIsNativeHeaderHidden(false);
                 return;
             }
-            if (currentY > 60 && currentY > lastScrollYRef.current + 6) {
-                setIsScrolledDown(true);
-            } else if (currentY < lastScrollYRef.current - 6 || currentY <= 25) {
-                setIsScrolledDown(false);
+            if (!delta) return;
+            travel = Math.sign(travel) === Math.sign(delta) ? travel + delta : delta;
+            if (travel >= 12 && currentY >= 72) {
+                travel = 0;
+                setIsNativeHeaderHidden(true);
+            } else if (travel <= -12) {
+                travel = 0;
+                setIsNativeHeaderHidden(false);
             }
-            lastScrollYRef.current = currentY;
         };
 
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
-    }, [isSearchOpen]);
+    }, [activeTab, nativeAndroid, isSearchOpen, showNotifications]);
 
     const saveRecentSearch = (query) => {
         if (!query || !query.trim()) return;
@@ -8717,7 +8741,7 @@ const TopNavigation = ({
             return updated;
         });
 
-        setRecentSearchAnnouncement(`${item} removed.`);
+        setRecentSearchAnnouncement(nativeAndroid ? t('nativeAndroid.search.removed', { query: item }) : `${item} removed.`);
 
         // Focus management: preserve focus without closing or jumping to top
         setTimeout(() => {
@@ -8743,7 +8767,7 @@ const TopNavigation = ({
         e.preventDefault();
         setRecentSearches([]);
         try { localStorage.removeItem('pulso_recent_searches'); } catch (err) { /* ignore */ }
-        setRecentSearchAnnouncement('All recent searches cleared.');
+        setRecentSearchAnnouncement(nativeAndroid ? t('nativeAndroid.search.cleared') : 'All recent searches cleared.');
 
         setTimeout(() => {
             const searchInput = document.querySelector('[data-pulso-search-input="true"]');
@@ -9299,6 +9323,44 @@ const TopNavigation = ({
         }
     };
 
+    if (nativeAndroid) {
+        if (!isHomeTab || activeModal) return null;
+        return (
+            <div className="native-dashboard-topbar sticky top-0 z-50 shrink-0" data-scroll-hidden={isNativeHeaderHidden || undefined}>
+                <NativeAppHeader appearance="hero" showThemeToggle={false} brand={<NativeResidentGreeting user={user} onOpenAccount={() => {
+                    setIsSearchOpen(false);
+                    setShowNotifications(false);
+                    handleSetTab('profile');
+                }} />}>
+                    <button type="button" ref={nativeBellRef}
+                        aria-label={t('notificationCenter.title', 'All notifications')}
+                        aria-expanded={showNotifications}
+                        onClick={() => { setShowNotifications(!showNotifications); setIsSearchOpen(false); }}
+                        className="relative flex size-11 items-center justify-center rounded-md text-slate-700 hover:bg-slate-200 focus-visible:outline-3 focus-visible:outline-blue-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:outline-blue-300">
+                        <Bell size={20} aria-hidden="true" />
+                        {unreadCount > 0 && <span className="absolute right-0 top-0 rounded-full bg-primary px-1 text-xs font-bold text-[#0b1630]">{unreadBadgeText}</span>}
+                    </button>
+                </NativeAppHeader>
+                <NativeDashboardSearch isOpen={isSearchOpen} onOpen={() => { setShowNotifications(false); setIsSearchOpen(true); }}
+                    onClose={() => setIsSearchOpen(false)} query={searchQuery} onQueryChange={setSearchQuery}
+                    actions={quickActions.map((action, index) => ({ ...action,
+                        id: ['report', 'map', 'services', 'help', 'reports', 'profile', 'settings'][index],
+                        label: t(`nativeAndroid.search.shortcuts.${['report', 'map', 'services', 'help', 'reports', 'profile', 'settings'][index]}`),
+                        searchText: action.label,
+                    }))}
+                    reports={matchedReports} updates={matchedAdvisories} guides={matchedKB} hotlines={matchedHotlines}
+                    recent={recentSearches} announcement={recentSearchAnnouncement} onClearRecent={clearAllRecent} onRemoveRecent={removeRecentSearch}
+                    onReport={handleSelectReport} onUpdate={handleSelectAdvisory} onGuide={handleSelectKB} onHotline={handleSelectHotline}
+                    loading={searchLoading} updatesUnavailable={searchUpdatesUnavailable} />
+                <NotificationDropdown isOpen={showNotifications} onClose={() => setShowNotifications(false)}
+                    notifications={notifications} onNotificationClick={handleNotificationClick}
+                    onMarkAllRead={handleMarkAllRead} onOpenAllNotifications={() => { setShowNotifications(false); handleSetModal('all-notifications'); }}
+                    unreadCount={unreadCount} loading={loadingNotifications} error={notificationsError}
+                    onRetry={onRetryNotifications} triggerRefs={[nativeBellRef]} activeTriggerRef={nativeBellRef} />
+            </div>
+        );
+    }
+
     return (
         <header className={`${isHeaderlessTab ? 'hidden md:block' : ''} app-header-landmark shrink-0 sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-full border-b border-slate-200/80 dark:border-slate-800`}>
             {/* Background 60% Navy Overlay on mobile when search is open: strictly starts below full header */}
@@ -9419,6 +9481,7 @@ export default function ResidentDashboard() {
     const [zoomedImage, setZoomedImage] = useState(null);
     const [reportToCancel, setReportToCancel] = useState(null);
     const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
+    useAndroidBack(isMoreMenuOpen, 20, () => setIsMoreMenuOpen(false));
 
     // Close mobile "More" menu on Escape key
     useEffect(() => {
@@ -9479,9 +9542,7 @@ export default function ResidentDashboard() {
         gestureHandling: 'greedy',
     }), [theme]);
 
-    const pinIconCache = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
     const iconCacheRef = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
-    const [photoPinIcons, setPhotoPinIcons] = useState({});
 
     // Memoized Google Maps Icon Object Cache to prevent MarkerF re-render flicker
     const getCachedIcon = (url, w, h, ax, ay) => {
@@ -9544,6 +9605,12 @@ export default function ResidentDashboard() {
     const tabScrollPositionsRef = useRef({});
     const [accountSubView, setAccountSubView] = useState('settings'); // 'settings' | 'profile-details'
 
+    const scrollToDashboardTop = () => {
+        const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+        window.scrollTo({ top: 0, behavior });
+        mainScrollRef.current?.scrollTo({ top: 0, behavior });
+    };
+
     const handleGoHome = () => {
         setIsMoreMenuOpen(false);
         if (activeModal) {
@@ -9555,13 +9622,7 @@ export default function ResidentDashboard() {
         setAccountSubView('settings');
         setSelectedReportForDetails(null);
         setActiveTab('overview');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-        if (mainScrollRef.current) {
-            mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-            mainScrollRef.current.scrollTop = 0;
-        }
+        scrollToDashboardTop();
     };
 
     const handleSetTab = (tab) => {
@@ -9575,6 +9636,11 @@ export default function ResidentDashboard() {
             return;
         }
         if (tab === activeTab) {
+            if (isNativeAndroid()) {
+                tabScrollPositionsRef.current[tab] = 0;
+                scrollToDashboardTop();
+                return;
+            }
             if (tab === 'reports') {
                 setSelectedReportForDetails(null);
                 setActiveTab('reports');
@@ -9641,6 +9707,7 @@ export default function ResidentDashboard() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [toast, setToast] = useState({ message: '', type: 'success' });
     const [isIDCameraOpen, setIsIDCameraOpen] = useState(false);
+    useAndroidBack(showSearchDropdown, 20, () => setShowSearchDropdown(false));
 
     const showToast = useCallback((message, type = 'success') => {
         // Robust check to prevent rendering objects as React children which crashes the UI
@@ -10514,19 +10581,7 @@ export default function ResidentDashboard() {
             const lat = parseFloat(r.location_lat || r.lat);
             const lng = parseFloat(r.location_lng || r.lng);
 
-            let image = r.image_url || r.photo_url;
-            if (!image && r.image_paths) {
-                if (typeof r.image_paths === 'string') {
-                    try {
-                        const parsed = JSON.parse(r.image_paths);
-                        image = Array.isArray(parsed) ? parsed[0] : parsed;
-                    } catch (e) {
-                        image = r.image_paths;
-                    }
-                } else if (Array.isArray(r.image_paths)) {
-                    image = r.image_paths[0];
-                }
-            }
+            const image = getReportPhotoUrl(r);
 
             const formattedTicket = formatTicketId(r.ticket_id, r.id);
             return {
@@ -10718,151 +10773,7 @@ export default function ResidentDashboard() {
         });
     }, [processedHazards, mapCategoryFilter]);
 
-    // Generate photo-pins for hazards with images (matching government DispatcherDashboard)
-    useEffect(() => {
-        if (!processedHazards || processedHazards.length === 0) return;
-
-        let batchTimer = null;
-        const pendingBatch = {};
-
-        const flushBatch = () => {
-            if (Object.keys(pendingBatch).length > 0) {
-                setPhotoPinIcons(prev => {
-                    let hasNew = false;
-                    for (const k in pendingBatch) {
-                        if (!prev[k]) {
-                            hasNew = true;
-                            break;
-                        }
-                    }
-                    return hasNew ? { ...prev, ...pendingBatch } : prev;
-                });
-            }
-        };
-
-        processedHazards.forEach(hazard => {
-            const rawImg = hazard.image || hazard.photo_url || hazard.photo_thumbnail || hazard.image_url || hazard.media_url;
-            if (!rawImg) return;
-
-            [false, true].forEach(isSelected => {
-                const cacheKey = `${hazard.id}-${isSelected ? 'sel' : 'norm'}`;
-                if (pinIconCache.current.has(cacheKey)) return;
-
-                let thumbUrl = rawImg;
-                if (!rawImg.startsWith('http') && !rawImg.startsWith('data:')) {
-                    const cleanPath = rawImg.startsWith('/') ? rawImg : `/${rawImg}`;
-                    thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
-                }
-
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    try {
-                        const size = isSelected ? 46 : 36;
-                        const pointerH = isSelected ? 8 : 7;
-                        const totalW = size + 6;
-                        const totalH = size + pointerH + 2;
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = totalW;
-                        canvas.height = totalH;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) return;
-
-                        const cx = totalW / 2;
-                        const cy = size / 2 + 1;
-                        const radius = (size - 4) / 2;
-
-                        const borderColor = getReportCategoryMeta(hazard).color;
-
-                        // Pointer Arrow
-                        ctx.beginPath();
-                        ctx.moveTo(cx - 5, cy + radius - 2);
-                        ctx.lineTo(cx + 5, cy + radius - 2);
-                        ctx.lineTo(cx, cy + radius + pointerH);
-                        ctx.closePath();
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Outer Glow if Selected
-                        if (isSelected) {
-                            ctx.beginPath();
-                            ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
-                            ctx.fillStyle = `${borderColor}59`;
-                            ctx.fill();
-                        }
-
-                        // Outer Border Ring
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Inner background
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                        ctx.fillStyle = '#0c1424';
-                        ctx.fill();
-
-                        // Circular photo clip
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.clip();
-
-                        const aspect = img.width / img.height;
-                        let dw, dh, dx, dy;
-                        if (aspect > 1) {
-                            dh = (radius - 0.5) * 2;
-                            dw = dh * aspect;
-                            dx = cx - dw / 2;
-                            dy = cy - radius + 0.5;
-                        } else {
-                            dw = (radius - 0.5) * 2;
-                            dh = dw / aspect;
-                            dx = cx - radius + 0.5;
-                            dy = cy - dh / 2;
-                        }
-                        ctx.drawImage(img, dx, dy, dw, dh);
-                        ctx.restore();
-
-                        // White inner accent ring
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1.0;
-                        ctx.stroke();
-
-                        const dataUrl = canvas.toDataURL('image/png');
-                        pinIconCache.current.set(cacheKey, dataUrl);
-                        pendingBatch[cacheKey] = dataUrl;
-
-                        if (batchTimer) clearTimeout(batchTimer);
-                        batchTimer = setTimeout(flushBatch, 100);
-                    } catch (err) {
-                        // fallback to svg
-                    }
-                };
-                img.onerror = () => {
-                    if (thumbUrl.includes('/api/thumbnails')) {
-                        const fallbackImg = new Image();
-                        fallbackImg.crossOrigin = 'anonymous';
-                        fallbackImg.onload = img.onload;
-                        fallbackImg.onerror = () => {
-                            // Safely handle missing fallback image; marker will use SVG pin
-                        };
-                        fallbackImg.src = `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
-                    }
-                };
-                img.src = thumbUrl;
-            });
-        });
-
-        return () => {
-            if (batchTimer) clearTimeout(batchTimer);
-        };
-    }, [processedHazards]);
-
+    const photoPinIcons = useReportPhotoPins(processedHazards, getReportCategoryMeta);
 
     const stopDeviceLocationTracking = useCallback(() => {
         if (locationWatchRef.current !== null && navigator.geolocation) {
@@ -11877,8 +11788,10 @@ export default function ResidentDashboard() {
         action: f.modal ? () => handleSetModal(f.modal) : () => handleSetTab(f.tab)
     }));
 
+    const nativeHomeScreen = isNativeAndroid() && isHomeTab && !activeModal && !displayedReport && !dashboardRoute.reportId;
     return (
-        <div className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col">
+        <div data-native-system-bar-surface data-native-dashboard-home={nativeHomeScreen || undefined} className="min-h-screen bg-slate-100 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 flex flex-col">
+            {nativeHomeScreen && <div data-native-home-status-surface aria-hidden="true" />}
 
             {/* Global Toast Notification */}
             <AnimatePresence>
@@ -12251,7 +12164,7 @@ export default function ResidentDashboard() {
             )}
 
             {/* Top Navigation */}
-            <TopNavigation
+            {(!isNativeAndroid() || nativeHomeScreen) && <TopNavigation
                 activeTab={activeTab}
                 activeModal={activeModal}
                 handleSetTab={handleSetTab}
@@ -12278,6 +12191,8 @@ export default function ResidentDashboard() {
                 t={t}
                 userReports={allAvailableReports}
                 lguUpdates={lguUpdates}
+                searchLoading={loadingReports || loadingAdvisories}
+                searchUpdatesUnavailable={Boolean(advisoriesError)}
                 processedHazards={processedHazards}
                 setSelectedPost={setSelectedPost}
                 setSelectedHazard={setSelectedHazard}
@@ -12286,7 +12201,7 @@ export default function ResidentDashboard() {
                 token={token}
                 isSearchOpen={isHeaderSearchOpen}
                 setIsSearchOpen={setIsHeaderSearchOpen}
-            />
+            />}
 
             {/* Main Layout Grid (Responsive 2-Column Content + Sticky Side Nav) */}
             <main ref={mainScrollRef} className="flex-1 w-full flex flex-col relative">
@@ -12483,6 +12398,7 @@ export default function ResidentDashboard() {
                                     animate={{ opacity: 1, y: 0, x: 0 }}
                                     exit={{ opacity: 0, y: 14, x: 8 }}
                                     transition={{ type: 'spring', damping: 28, stiffness: 380 }}
+                                    style={isNativeAndroid() ? { bottom: 'calc(var(--pulso-native-nav-height) + var(--pulso-safe-bottom, 0px))' } : undefined}
                                     className="lg:hidden fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] sm:bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] right-0 z-[55] w-80 max-w-[calc(100vw-0.75rem)] bg-white dark:bg-slate-900 border-t border-l border-r-0 border-b-0 border-slate-200/90 dark:border-slate-800 shadow-[-8px_-6px_25px_rgba(0,0,0,0.15)] dark:shadow-[-8px_-6px_25px_rgba(0,0,0,0.4)] rounded-tl-2xl rounded-tr-none rounded-b-none p-3.5 overflow-hidden"
                                     role="dialog"
                                     aria-label="More navigation options"
@@ -12613,8 +12529,9 @@ export default function ResidentDashboard() {
                     </AnimatePresence>
 
                     <nav
+                        data-resident-bottom-nav
                         className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-4px_25px_rgba(0,0,0,0.12)] min-h-[4.25rem] sm:min-h-[4.5rem] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] px-3 sm:px-6 flex items-center justify-around select-none w-full"
-                        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+                        style={{ paddingBottom: isNativeAndroid() ? 'var(--pulso-safe-bottom, 0px)' : 'env(safe-area-inset-bottom, 0px)', height: isNativeAndroid() ? 'calc(var(--pulso-native-nav-height) + var(--pulso-safe-bottom, 0px))' : undefined }}
                     >
                         {navItems.map((item) => {
                             if (item.id === 'report') {
@@ -12637,13 +12554,15 @@ export default function ResidentDashboard() {
                             const isActive = isMoreItem
                                 ? (isMoreMenuOpen || activeModal === 'map' || activeTab === 'profile')
                                 : ((item.id === 'overview' && (activeTab === 'overview' || activeTab === 'home')) || activeTab === item.id) && activeModal !== 'map' && activeTab !== 'profile';
-                            const showBadge = item.id === 'updates' && unreadUpdatesCount > 0;
                             return (
                                 <button
                                     key={item.id}
                                     onClick={() => {
                                         if (isMoreItem) {
-                                            setIsMoreMenuOpen(prev => !prev);
+                                            if (isNativeAndroid() && ['profile', 'settings', 'account'].includes(activeTab) &&
+                                                (window.scrollY > 0 || mainScrollRef.current?.scrollTop > 0)) {
+                                                handleSetTab(activeTab);
+                                            } else setIsMoreMenuOpen(prev => !prev);
                                         } else {
                                             setIsMoreMenuOpen(false);
                                             handleSetTab(item.id);
@@ -12664,14 +12583,7 @@ export default function ResidentDashboard() {
                                             'aria-hidden': 'true',
                                             className: `transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110 text-[#D95700] dark:text-[#FF6B00]' : 'text-[#5B6B88] dark:text-[#9AA8C7]'}`
                                         })}
-                                        {showBadge && (
-                                            <span
-                                                className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#f05a00] text-white text-[9px] font-bold flex items-center justify-center leading-none ring-2 ring-white dark:ring-slate-900 pointer-events-none tabular-nums shadow-xs"
-                                                aria-label={`${unreadUpdatesCount} unread updates`}
-                                            >
-                                                {unreadUpdatesBadgeText || (unreadUpdatesCount > 9 ? '9+' : unreadUpdatesCount)}
-                                            </span>
-                                        )}
+
                                     </div>
                                     <span className={`text-[10px] mt-1 tracking-tight truncate max-w-[64px] ${isActive ? 'font-bold text-[#D95700] dark:text-[#FF6B00]' : 'font-medium text-[#5B6B88] dark:text-[#9AA8C7]'}`}>
                                         {item.label}

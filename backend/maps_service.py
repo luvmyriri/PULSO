@@ -41,7 +41,7 @@ async def reverse_geocode_details(lat: float, lng: float) -> dict:
             data = {"status": "UNAVAILABLE", "results": []}
 
     status = data.get("status", "UNAVAILABLE")
-    address = parse_google_address(data if status in ("OK", "ZERO_RESULTS") else {})
+    address = parse_google_address(data if status in ("OK", "ZERO_RESULTS") else {}, (lat, lng))
     address["plusCode"] = precise_plus_code(lat, lng)
     return {"address": address_text(address), "structuredAddress": address, "status": status}
 

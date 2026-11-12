@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import NativeAppHeader, { NativeResidentAccountLink } from '../components/mobile/NativeAppHeader';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getStoredToken, getStoredUser } from '../utils/auth';
+import { useAndroidBack } from '../utils/nativeAndroid';
+import { isNativeAndroid } from '../utils/appContext';
 
 import Branding from '../components/Branding';
 import ThemeToggle from '../components/ThemeToggle';
@@ -156,39 +159,48 @@ export default function ReportWizardPage() {
     };
   }, [currentStep, formData.evidence.file, formData.evidence.previewUrl, formData.evidence.previewDataUrl, formData.evidence.fileName, formData.evidence.mimeType]);
 
-  // Auto-Save Draft to LocalStorage (debounced 400ms)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const draftPayload = {
-          version: 2,
-          savedAt: Date.now(),
-          currentStep,
-          maxStepReached,
-          formData: {
-            category: formData.category,
-            location: formData.location,
-            evidence: {
-              fileName: formData.evidence.fileName,
-              fileSize: formData.evidence.fileSize,
-              mimeType: formData.evidence.mimeType,
-              previewDataUrl: formData.evidence.previewDataUrl || null,
-              aiCategorySuggestion: formData.evidence.aiCategorySuggestion,
-              aiConfidence: formData.evidence.aiConfidence,
-            },
-            details: formData.details,
-            contact: formData.contact,
-            consentAccepted: formData.consentAccepted,
-          }
-        };
-        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload));
-      } catch (e) {
-        console.warn('Failed to auto-save report draft:', e);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
+  const saveDraft = useCallback(() => {
+    try {
+      const draftPayload = {
+        version: 2,
+        savedAt: Date.now(),
+        currentStep,
+        maxStepReached,
+        formData: {
+          category: formData.category,
+          location: formData.location,
+          evidence: {
+            fileName: formData.evidence.fileName,
+            fileSize: formData.evidence.fileSize,
+            mimeType: formData.evidence.mimeType,
+            previewDataUrl: formData.evidence.previewDataUrl || null,
+            aiCategorySuggestion: formData.evidence.aiCategorySuggestion,
+            aiConfidence: formData.evidence.aiConfidence,
+          },
+          details: formData.details,
+          contact: formData.contact,
+          consentAccepted: formData.consentAccepted,
+        },
+      };
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload));
+    } catch (e) {
+      console.warn('Failed to auto-save report draft:', e);
+    }
   }, [formData, currentStep, maxStepReached]);
+
+  // Save in the background and flush pending edits before leaving via the header.
+  useEffect(() => {
+    const timer = setTimeout(saveDraft, 400);
+    return () => clearTimeout(timer);
+  }, [saveDraft]);
+
+  function handleHeaderNavigation(event) {
+    if (isSubmitting) {
+      event.preventDefault();
+      return;
+    }
+    saveDraft();
+  }
 
   // Step Navigation
   const goToNextStep = () => {
@@ -207,12 +219,18 @@ export default function ReportWizardPage() {
       setCurrentStep(prev);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setAnnouncement(`Step ${prev} of 5`);
+    } else if (isNativeAndroid()) {
+      navigate('/', { replace: true });
     } else {
       const enteredAsGuest = new URLSearchParams(location.search).get('source') === 'guest';
       const isResident = Boolean(getStoredToken()) && getStoredUser()?.role === 'resident';
       navigate(enteredAsGuest ? '/login' : isResident ? '/dashboard' : '/resident-home');
     }
   };
+
+  useAndroidBack(isHelpGuideOpen, 30, () => setIsHelpGuideOpen(false));
+  useAndroidBack(isSubmitting, 10, () => {});
+  useAndroidBack(currentStep > 1, 0, goToPreviousStep);
 
   const jumpToStep = (stepNumber) => {
     if (stepNumber >= 1 && stepNumber <= 5 && stepNumber <= maxStepReached) {
@@ -358,22 +376,27 @@ export default function ReportWizardPage() {
       </div>
 
       {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
-      <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 w-full flex justify-between items-center">
+      {isNativeAndroid() ? (
+        <NativeAppHeader appearance="hero" transparent onBrandClick={handleHeaderNavigation}>
+          <NativeResidentAccountLink signedIn={Boolean(getStoredToken()) && getStoredUser()?.role === 'resident'} onClick={handleHeaderNavigation} />
+        </NativeAppHeader>
+      ) : (
+        <header className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 w-full flex justify-between items-center gap-3">
         {/* Logo on top-left linking to home */}
         <Link
           to="/resident-home"
-          className="flex items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
+          className="flex min-w-0 flex-1 items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
           title="Caloocan City PULSO Home"
         >
-          <Branding size="h-8 w-8 sm:h-9 sm:w-9" />
+          <Branding size="h-8 w-8 sm:h-9 sm:w-9" className="min-w-0 max-w-full" />
         </Link>
 
         {/* Right side: Theme Toggle & Home Navigation */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
           <ThemeToggle />
           <Link
             to="/resident-home"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
             title="Return to Home Section"
             aria-label="Home"
           >
@@ -382,6 +405,7 @@ export default function ReportWizardPage() {
           </Link>
         </div>
       </header>
+      )}
 
       {/* Main Responsive Container */}
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-2 sm:pt-3 pb-32 lg:pb-6 flex flex-col">

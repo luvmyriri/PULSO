@@ -22,6 +22,7 @@ import concurrent.futures
 import pytest
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
+from types import SimpleNamespace
 
 # Ensure backend directory is in sys.path
 BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -29,6 +30,7 @@ if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
 from fastapi.testclient import TestClient
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
@@ -94,7 +96,7 @@ def setup_challenge_db(clean_postgis):
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(ProxyHeadersMiddleware(app, trusted_hosts=["testclient", "10.0.0.1"]))
 
 
 @pytest.fixture
@@ -286,7 +288,7 @@ class TestRateLimiterEmpiricalChallenge:
         )
         assert r2_allowed.status_code == 201, "Client 2 was improperly throttled by Client 1 traffic!"
 
-        # Client 3 uses X-Real-IP
+        # Client 3 connects directly and does not need forwarding headers.
         r3_allowed = client.post(
             "/api/reports",
             data={
@@ -295,7 +297,6 @@ class TestRateLimiterEmpiricalChallenge:
                 "lat": 14.7620,
                 "lng": 121.0520,
             },
-            headers={"X-Real-IP": "198.51.100.3"}
         )
         assert r3_allowed.status_code == 201
 
@@ -305,12 +306,7 @@ class TestRateLimiterEmpiricalChallenge:
         """
         limiter = SlidingWindowRateLimiter(max_requests=3, window_seconds=10, error_detail="Rate exceeded")
         
-        class MockRequest:
-            headers = {}
-            client = None
-
-        req = MockRequest()
-        req.headers = {"X-Forwarded-For": "10.10.10.10"}
+        req = SimpleNamespace(client=SimpleNamespace(host="10.10.10.10"))
 
         # Consume 3 slots
         limiter.check(req)
@@ -342,8 +338,7 @@ class TestRateLimiterEmpiricalChallenge:
         
         class MockRequest:
             def __init__(self, ip):
-                self.headers = {"X-Forwarded-For": ip}
-                self.client = None
+                self.client = SimpleNamespace(host=ip)
 
         target_ip = "192.168.1.100"
         results = {"success": 0, "blocked": 0}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAndroidBack } from '../utils/nativeAndroid';
+import { isNativeAndroid } from '../utils/appContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -186,6 +188,7 @@ function QuickReportWizardModal({
     currentUser = null
 }) {
     const { t } = useTranslation();
+    const nativeViewport = isNativeAndroid();
     // -------------------------------------------------------------------------
     // Wizard State
     // -------------------------------------------------------------------------
@@ -813,6 +816,16 @@ function QuickReportWizardModal({
         onClose();
     };
 
+    useAndroidBack(isOpen, 40, () => {
+        if (isSubmitting) return;
+        if (isDiscardPromptOpen) setIsDiscardPromptOpen(false);
+        else if (isFullscreenPhotoOpen) setIsFullscreenPhotoOpen(false);
+        else if (isLocationPickerOpen) setIsLocationPickerOpen(false);
+        else if (isPhotoTipsOpen) setIsPhotoTipsOpen(false);
+        else if (step > 1 && step < 4) setStep(step - 1);
+        else handleCloseAttempt();
+    });
+
     // -------------------------------------------------------------------------
     // Step 3 Submission
     // -------------------------------------------------------------------------
@@ -935,7 +948,7 @@ function QuickReportWizardModal({
 
     return (
         <div
-            className="fixed inset-0 z-[75] flex items-center justify-center bg-black/65 sm:backdrop-blur-xs p-0 sm:p-4 md:p-6 overflow-hidden select-none"
+            className={`fixed inset-0 z-[75] flex items-center justify-center bg-black/65 p-0 overflow-hidden select-none ${nativeViewport ? '' : 'sm:backdrop-blur-xs sm:p-4 md:p-6'}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="quick-report-wizard-title"
@@ -944,7 +957,15 @@ function QuickReportWizardModal({
             {/* Modal Card: 100% Fullscreen on mobile, centered floating card on desktop */}
             <div
                 onClick={(e) => e.stopPropagation()}
-                className={`w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-lg md:max-w-xl flex flex-col bg-white dark:bg-slate-900 rounded-none sm:rounded-3xl sm:border border-slate-200 dark:border-slate-800 sm:shadow-2xl overflow-hidden relative ${
+                data-native-task-screen={nativeViewport ? 'quick-report' : undefined}
+                data-native-system-bar-surface={nativeViewport || undefined}
+                style={nativeViewport ? {
+                    paddingTop: 'var(--pulso-safe-top, 0px)',
+                    paddingBottom: 'var(--pulso-safe-bottom, 0px)',
+                    paddingLeft: 'var(--pulso-safe-left, 0px)',
+                    paddingRight: 'var(--pulso-safe-right, 0px)',
+                } : undefined}
+                className={`w-full h-full ${nativeViewport ? '' : 'sm:h-auto sm:max-h-[90vh] sm:max-w-lg md:max-w-xl sm:rounded-3xl sm:border sm:shadow-2xl'} flex flex-col bg-white dark:bg-slate-900 rounded-none border-slate-200 dark:border-slate-800 overflow-hidden relative ${
                     theme === 'dark' ? 'dark' : ''
                 }`}
             >
@@ -2196,10 +2217,15 @@ function QuickReportWizardModal({
                 <AnimatePresence>
                     {isFullscreenPhotoOpen && photo && (
                         <motion.div
+                            data-native-system-bar-surface={nativeViewport || undefined}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsFullscreenPhotoOpen(false)}
+                            style={nativeViewport ? {
+                                paddingTop: 'max(var(--pulso-safe-top, 0px), 0.75rem)',
+                                paddingBottom: 'max(var(--pulso-safe-bottom, 0px), 0.75rem)',
+                            } : undefined}
                             className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-3 sm:p-6 cursor-pointer select-none"
                         >
                             <motion.div

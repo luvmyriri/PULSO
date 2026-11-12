@@ -1,0 +1,17 @@
+.resident-checkbox { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 56px; padding: .75rem 0; cursor: pointer; }
+.resident-checkbox__text { display: grid; gap: .2rem; min-width: 0; }
+.resident-checkbox__label { font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.resident-checkbox small { color: var(--notification-muted, inherit); font-size: .8125rem; line-height: 1.45; overflow-wrap: anywhere; }
+.resident-checkbox__control { position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; flex: none; }
+.resident-checkbox__control input { appearance: none; -webkit-appearance: none; width: 24px; height: 24px; margin: 0; border: 1.5px solid var(--notification-rule, #64748b); border-radius: 6px; background: var(--notification-field, transparent); cursor: inherit; }
+.resident-checkbox__control input:checked { background: var(--color-primary); border-color: var(--color-primary); }
+.resident-checkbox__control svg { position: absolute; color: #fff; pointer-events: none; visibility: hidden; filter: drop-shadow(0 1px 1px #172339); }
+.resident-checkbox__control input:checked + svg { visibility: visible; }
+.resident-checkbox__control input:focus-visible { outline: 3px solid var(--color-focus, #2563eb) !important; outline-offset: 3px !important; }
+.resident-checkbox:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+@media (hover: hover) { .resident-checkbox:not(:has(input:disabled)):hover .resident-checkbox__control input { border-color: var(--color-primary); } }
+@media (forced-colors: active) {
+  .resident-checkbox__control input { appearance: auto; -webkit-appearance: auto; background: Field; border-color: ButtonText; accent-color: Highlight; }
+  .resident-checkbox__control svg { display: none; }
+  .resident-checkbox__control input:focus-visible { outline-color: Highlight !important; }
+}

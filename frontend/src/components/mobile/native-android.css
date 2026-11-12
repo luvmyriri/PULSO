@@ -1,0 +1,13 @@
+.pulso-native-keyboard-open [data-resident-bottom-nav] {
+  display: none;
+}
+
+:root { --pulso-native-nav-height: 4.25rem; }
+@media (min-width: 640px) { :root { --pulso-native-nav-height: 4.5rem; } }
+.native-dashboard-topbar { padding-top: var(--pulso-safe-top, 0px); background: var(--color-canvas); }
+.dark .native-dashboard-topbar { background: var(--color-canvas-dark); }
+[data-native-home-status-surface] {
+  position: fixed; inset: 0 0 auto; height: var(--pulso-safe-top, 0px);
+  z-index: 45; background: var(--color-canvas); pointer-events: none;
+}
+.dark [data-native-home-status-surface] { background: var(--color-canvas-dark); }

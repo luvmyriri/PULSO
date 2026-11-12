@@ -1174,13 +1174,13 @@ def test_report_request_info_and_docket(client, seeded_users_and_geo):
     assert req_res.json()["new_status"] == "needs_information"
 
     # Verify database state and notification created
-    db = TestingSessionLocal()
-    r = db.query(models.Report).filter(models.Report.id == rep_id).first()
-    assert r.status == "needs_information"
-    notif = db.query(models.Notification).filter(models.Notification.resident_id == 901).first()
-    assert notif is not None
-    assert "Landmark verification" in req_payload["reason"]
-    db.close()
+    with TestingSessionLocal() as db:
+        r = db.query(models.Report).filter(models.Report.id == rep_id).first()
+        assert r.status == "needs_information"
+        assert outbox_worker.deliver_pending(db) == 1
+        notif = db.query(models.Notification).filter(models.Notification.resident_id == 901).first()
+        assert notif is not None
+        assert notif.target_url == f"/dashboard?tab=reports&reportId={rep_id}"
 
     # Docket verification
     docket_res = client.get(f"/api/gov/reports/{rep_id}/docket", headers=eng_hdr)

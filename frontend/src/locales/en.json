@@ -1,7 +1,10 @@
 {
   "translation": {
+    "reportMedia": { "photoUnavailable": "Photo unavailable", "loading": "Loading photo", "retry": "Retry photo" },
     "locationPrivacy": {
       "title": "Current location",
+      "mappedAddress": "Address near your GPS point",
+      "gpsAddressLoading": "Looking up the address for your GPS point…",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "fields": {
@@ -55,6 +58,88 @@
         "inProgress": "Work in progress",
         "resolved": "Resolved"
       }
+    },
+    "nativeAndroid": {
+        "search": {
+            "back": "Back to dashboard", "clear": "Clear search", "intro": "Your reports, city updates and help.",
+            "reports": "My reports", "actions": "Quick actions", "updates": "City updates", "guides": "Help guides", "hotlines": "Hotlines",
+            "recent": "Recent searches", "clearAll": "Clear all", "removeRecent": "Remove {{query}} from recent searches",
+            "removed": "{{query}} removed.", "cleared": "Recent searches cleared.",
+            "results_one": "{{count}} match", "results_other": "{{count}} matches",
+            "empty": "No matches found", "emptyHelp": "Try a ticket ID, location, service or another keyword.",
+            "loading": "Reports and city updates are still loading. More matches may appear.",
+            "updatesUnavailable": "City updates are temporarily unavailable. Other search results are still available.",
+            "shortcuts": { "report": "File a report", "map": "Community map", "services": "City services", "help": "Help guides", "reports": "My reports", "profile": "My account", "settings": "Settings and security" }
+        },
+        "notificationSettingsBack": "Settings",
+        "dashboard": { "hello": "Hello,", "resident": "Resident", "openAccount": "Open Account and Profile" },
+        "appUpdate": {
+            "shortLabel": "App update",
+            "confirmTitle": "Update PULSO?",
+            "confirmDescription": "Your app data stays in place. You do not need to uninstall PULSO.",
+            "confirm": "Download the new APK now? You will confirm installation with Android after the download.",
+            "confirmAction": "Update now",
+            "notNow": "Not now",
+            "check": "Check for updates",
+            "title": "App update",
+            "description": "Install updates over PULSO to keep your app data. No uninstall needed.",
+            "close": "Close app update",
+            "installed": "Installed: {{version}} (build {{build}})",
+            "latest": "Available: {{version}} (build {{build}})",
+            "checking": "Checking for updates…",
+            "current": "You have the latest available version.",
+            "available": "A new version is ready to download.",
+            "error": "Could not check for updates. Connect to the same Wi-Fi as the PULSO server and try again.",
+            "downloadOpened": "Open the downloaded APK and choose Install or Update. Android will ask you to confirm.",
+            "downloadError": "Could not open the download. Try again.",
+            "download": "Download update",
+            "opening": "Opening download…",
+            "retry": "Try again"
+        },
+        "backToExit": "Press back again to exit",
+        "about": "About PULSO",
+        "navigation": {
+            "home": "PULSO home",
+            "language": "Language",
+            "search": "Search PULSO",
+            "changeTheme": "Switch to {{theme}} theme",
+            "themes": { "light": "light", "dark": "dark", "system": "system" }
+        },
+        "contact": {
+            "title": "Contact & Assistance",
+            "description": "Caloocan City Engineering Department & Emergency Hotlines",
+            "engineeringOffice": "City Engineering Office",
+            "emergencyHotlines": "Emergency Hotlines (24/7)",
+            "emergencyNumber": "911 (Rescue, Police & Fire)",
+            "close": "Close"
+        },
+        "version": "App version {{version}}",
+        "home": {
+            "heading": "Report a problem in your neighborhood",
+            "description": "Tell the City Engineering Department about damaged roads, blocked drains, and other public infrastructure issues in Caloocan.",
+            "actions": "Resident services",
+            "report": "Report a Problem",
+            "track": "Track a report",
+            "signIn": "Resident sign in",
+            "myReports": "My reports",
+            "guide": "How to use PULSO",
+            "headlineStart": "Report an",
+            "headlineMiddle": "issue in",
+            "welcome": "A safer, cleaner, and better Caloocan for everyone.",
+            "signInShort": "Sign In",
+            "createAccount": "Create Account",
+            "howTitle": "How It",
+            "howAccent": "Works",
+            "steps": {
+                "capture": { "title": "Report", "description": "Add a photo and describe the issue." },
+                "submit": { "title": "Submit", "description": "Review and send your report." },
+                "follow": { "title": "Track", "description": "Follow updates using your receipt." }
+            },
+            "communityStart": "Let’s build a better",
+            "communityEnd": " together.",
+            "communityTagline": "Bayanihan. Para sa Caloocan.",
+            "citySeal": "Caloocan City seal"
+        }
     },
     "loadingScreen": {
       "ariaLabel": "Loading PULSO",
@@ -752,21 +837,24 @@
     },
     "track": {
       "header": {
-        "title": "Track Public Infrastructure Report",
-        "subtitle": "Read the latest recorded status and public timeline for your Caloocan City ticket.",
-        "badge": "Civic Aperture · Transparent Public Works"
+        "title": "Track a report",
+        "subtitle": "Enter the ticket ID and tracking code from your report receipt."
       },
       "lookup": {
         "title": "Ticket Lookup",
-        "subtitle": "Enter your Ticket ID and Secret Tracking Token from your receipt.",
+        "subtitle": "Enter the ticket ID and tracking code from your report receipt.",
         "ticketLabel": "Ticket ID",
-        "ticketPlaceholder": "e.g. RPT-20260902-8F92E1B4 or PULSO-10492",
-        "tokenLabel": "Secret Tracking Token",
-        "tokenPlaceholder": "TRK-XXXX-XXXX-XXXX-XXXX",
-        "submitBtn": "Track Report",
-        "searching": "Searching Civic Registry...",
-        "errorNotFound": "Report not found or invalid tracking credentials. Please check your Ticket ID and Token.",
-        "networkError": "Could not reach the civic registry. Check your connection and try again."
+        "ticketPlaceholder": "Enter ticket ID",
+        "ticketExample": "e.g. PUL-2026-0842",
+        "tokenLabel": "Tracking code",
+        "tokenPlaceholder": "Enter tracking code",
+        "tokenReceiptPlaceholder": "Code from your receipt",
+        "submitBtn": "Track report",
+        "closeSheet": "Close tracking panel",
+        "searching": "Checking…",
+        "errorNotFound": "We could not find a report with those details. Check the ticket ID and tracking code.",
+        "networkError": "Could not connect. Check your connection and try again.",
+        "serviceError": "Could not load your report. Try again."
       },
       "reply": {
         "title": "Additional information requested",
@@ -800,11 +888,12 @@
         "lastUpdated": "Last Updated",
         "currentStageLabel": "Current Operational Stage",
         "publicSummary": "Location Summary",
-        "privacyNotice": "Public Privacy Mode Active: Reporter details, private contact info, and internal staff notes are protected and redacted.",
+        "privacyNotice": "Your name and contact details are kept private.",
         "pulseLineTitle": "PulseLine 6-Stage Progress",
         "timelineTitle": "Public Milestone Timeline",
         "claimPrompt": "Is this your report? Link it to your account for unified management",
-        "claimBtn": "Claim This Report"
+        "claimBtn": "Claim This Report",
+        "claimDescription": "Sign in to save this report to your account."
       },
       "stages": {
         "received": {

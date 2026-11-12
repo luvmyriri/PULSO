@@ -25,6 +25,7 @@ from typing import Optional, List, Dict, Any
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
@@ -84,7 +85,7 @@ def setup_stress_test_db(clean_postgis):
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(ProxyHeadersMiddleware(app, trusted_hosts=["testclient"]))
 
 
 @pytest.fixture

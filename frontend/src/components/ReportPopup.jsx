@@ -16,7 +16,8 @@ import {
     Building2,
     MoreHorizontal
 } from 'lucide-react';
-import { API_BASE_URL } from '../utils/apiBase';
+import { getReportPhotoUrl } from '../utils/reportMedia';
+import useReportImageSource from '../utils/useReportImageSource';
 import PulsoPulseLine from './common/PulsoPulseLine';
 
 /**
@@ -141,6 +142,7 @@ export default function ReportPopup({
 }) {
     const closeBtnRef = useRef(null);
     const [imageFailed, setImageFailed] = useState(false);
+    const photo = useReportImageSource(getReportPhotoUrl(report));
     const [hasStreetView, setHasStreetView] = useState(true);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const [ariaAnnouncement, setAriaAnnouncement] = useState('');
@@ -215,13 +217,7 @@ export default function ReportPopup({
 
     if (!isOpen || !report) return null;
 
-    const rawImg = report.photo_url || report.photo_thumbnail || report.image_url || report.media_url || report.image;
-    let fullPhotoUrl = null;
-    if (rawImg && !imageFailed) {
-        fullPhotoUrl = rawImg.startsWith('http') || rawImg.startsWith('data:')
-            ? rawImg
-            : `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
-    }
+    const fullPhotoUrl = imageFailed ? null : photo.src;
 
     const categoryTitle = report.category || report.raw_category || report.report_type || report.title || 'Civic Infrastructure';
     const CategoryIcon = getCategoryIconComponent(categoryTitle, report.raw_category);

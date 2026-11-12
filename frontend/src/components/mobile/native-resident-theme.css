@@ -1,0 +1,22 @@
+:where(.native-resident-landing, .native-guide, .native-app-header--hero, .native-bottom-sheet) {
+  color-scheme: light;
+  --home-canvas: var(--color-canvas);
+  --home-ink: var(--color-ink);
+  --home-muted: var(--color-slate-600);
+  --home-rule: var(--color-slate-300);
+  --home-surface: var(--color-light);
+  --home-accent: var(--color-resident-action);
+  --home-action: var(--color-primary);
+  --home-focus: var(--color-focus);
+  --home-gutter: 1.1rem;
+}
+:where(.native-resident-landing, .native-guide, .native-app-header--hero, .native-bottom-sheet)[data-landing-theme='dark'] {
+  color-scheme: dark;
+  --home-canvas: var(--color-canvas-dark);
+  --home-ink: var(--color-slate-50);
+  --home-muted: var(--color-slate-300);
+  --home-rule: var(--color-slate-700);
+  --home-surface: var(--color-slate-900);
+  --home-accent: var(--color-resident-action-dark);
+  --home-focus: var(--color-focus-dark);
+}

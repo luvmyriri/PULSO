@@ -1,3 +1,5 @@
+import NativeAppHeader from '../components/mobile/NativeAppHeader';
+import { isNativeAndroid } from '../utils/appContext';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -101,6 +103,7 @@ export default function ResetPassword() {
     return (
         <div className={`relative min-h-screen w-full overflow-hidden font-inter transition-colors duration-500 ${theme === 'dark' ? 'bg-[#0f172a] text-white' : 'bg-slate-50 text-slate-900'}`}>
             
+            {isNativeAndroid() && <NativeAppHeader />}
             {/* CLEAN CSS BACKGROUND (Subtle Grid & Gradient) */}
             <div className="absolute inset-0 z-0">
                 <div className={`absolute inset-0 opacity-[0.4] dark:opacity-[0.2] h-full w-full [background-image:linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] [background-size:24px_24px]`} />

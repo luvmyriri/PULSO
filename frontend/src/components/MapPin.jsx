@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { API_BASE_URL } from '../utils/apiBase';
+import { getReportPhotoUrl } from '../utils/reportMedia';
+import useReportImageSource from '../utils/useReportImageSource';
 import { getCategoryIconComponent, getFriendlyStatusName } from './ReportPopup';
 
 /**
@@ -20,7 +21,9 @@ export default function MapPin({
     innerRef,
     reportLocation
 }) {
-    const [imgFailed, setImgFailed] = useState(false);
+    const [failedPhoto, setFailedPhoto] = useState(null);
+    const resolvedPhoto = getReportPhotoUrl(report);
+    const photo = useReportImageSource(resolvedPhoto, 80);
 
     if (!report) return null;
 
@@ -39,21 +42,7 @@ export default function MapPin({
 
     const categoryPinColor = categoryColor || getCategoryColorFallback(report);
 
-    const rawImg = (
-        report.photo_url ||
-        report.image_url ||
-        report.image ||
-        report.photo_thumbnail ||
-        report.media_url ||
-        (Array.isArray(report.photos) ? report.photos[0] : null) ||
-        (Array.isArray(report.media_urls) ? report.media_urls[0] : null)
-    );
-    let photoUrl = null;
-    if (rawImg && !imgFailed) {
-        photoUrl = rawImg.startsWith('http') || rawImg.startsWith('data:')
-            ? rawImg
-            : `${API_BASE_URL}${rawImg.startsWith('/') ? rawImg : `/${rawImg}`}`;
-    }
+    const photoUrl = photo.src !== failedPhoto ? photo.src : null;
     const pinColor = categoryPinColor;
 
     const categoryName = report.category || report.raw_category || report.report_type || report.title || 'Civic Infrastructure';
@@ -90,7 +79,7 @@ export default function MapPin({
                     src={photoUrl}
                     alt=""
                     aria-hidden="true"
-                    onError={() => setImgFailed(true)}
+                    onError={() => setFailedPhoto(photo.src)}
                     className="w-full h-full object-cover rounded-full"
                 />
             ) : (

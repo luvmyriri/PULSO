@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAndroidBack } from '../utils/nativeAndroid';
+import { isNativeAndroid } from '../utils/appContext';
+import './common/resident-checkbox.css';
+import ReportEvidenceImage from './ReportEvidenceImage';
 import {
     GoogleMap,
     MarkerF,
@@ -50,7 +54,8 @@ import {
 } from '../data/caloocanBoundaries';
 import { CALOOCAN_ALL_BARANGAYS_OPTIONS, CALOOCAN_BARANGAYS } from '../utils/philippineAddress';
 import { cleanResidentAddress } from '../utils/locationPrivacy';
-import { API_BASE_URL } from '../utils/apiBase';
+import { getReportPhotoUrl } from '../utils/reportMedia';
+import useReportPhotoPins, { reportPhotoPinKey } from '../utils/useReportPhotoPins';
 import PhotoMapPin from './MapPin';
 
 export function getDistance(loc1, loc2) {
@@ -518,32 +523,7 @@ export function getCategoryIconComponent(category, rawCategory) {
     return meta.icon;
 }
 
-export function getReportPhoto(report) {
-    if (!report) return null;
-    const raw = (
-        report.photo_url ||
-        report.image_url ||
-        report.image ||
-        report.photo_thumbnail ||
-        report.media_url ||
-        (Array.isArray(report.photos) ? report.photos[0] : null) ||
-        (Array.isArray(report.media_urls) ? report.media_urls[0] : null) ||
-        (typeof report.image_paths === 'string' ? (() => {
-            try {
-                const p = JSON.parse(report.image_paths);
-                return Array.isArray(p) ? p[0] : p;
-            } catch {
-                return report.image_paths;
-            }
-        })() : (Array.isArray(report.image_paths) ? report.image_paths[0] : null))
-    );
-    if (!raw) return null;
-    if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:')) {
-        return raw;
-    }
-    const clean = raw.startsWith('/') ? raw : `/${raw}`;
-    return `${API_BASE_URL}${clean}`;
-}
+export const getReportPhoto = getReportPhotoUrl;
 
 // System Pin Design: SVG pin with embedded category icon and exact anchor
 export function getMarkerSVG(categoryOrReport, status, isSelected = false) {
@@ -633,6 +613,7 @@ export default function NearbyIssuesMapModal({
     initialSelectedReport = null
 }) {
     const { t } = useTranslation();
+    const nativeViewport = isNativeAndroid() && !standalone;
     const { isLoaded: contextLoaded, loadError: contextError } = useGoogleMaps();
     const isLoaded = Boolean(
         (propIsLoaded !== undefined ? propIsLoaded : contextLoaded) &&
@@ -653,14 +634,7 @@ export default function NearbyIssuesMapModal({
     const pinRef = useRef(null);
 
     // Photo pin caching and generation
-    const pinIconCache = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
     const iconCacheRef = useRef(typeof window !== 'undefined' && window.Map ? new window.Map() : new Map());
-    const [internalPhotoPinIcons, setInternalPhotoPinIcons] = useState({});
-
-    const photoPinIcons = useMemo(() => {
-        return { ...(externalPhotoPinIcons || {}), ...internalPhotoPinIcons };
-    }, [externalPhotoPinIcons, internalPhotoPinIcons]);
-
     // Memoized Google Maps Icon Object Cache to prevent MarkerF re-render flicker
     const getCachedIcon = useCallback((url, w, h, ax, ay) => {
         if (!window.google || !window.google.maps || !url) return undefined;
@@ -716,6 +690,15 @@ export default function NearbyIssuesMapModal({
 
     // Mobile sheet position: 'collapsed' | 'half' | 'full'
     const [mobileSheetSnap, setMobileSheetSnap] = useState('collapsed');
+    const mobileSheetRef = useRef(null);
+    const [mobileSheetHeight, setMobileSheetHeight] = useState(74);
+    useEffect(() => {
+        if (!isOpen || !mobileSheetRef.current) return;
+        const sheet = mobileSheetRef.current;
+        const observer = new ResizeObserver(() => setMobileSheetHeight(Math.ceil(sheet.getBoundingClientRect().height)));
+        observer.observe(sheet);
+        return () => observer.disconnect();
+    }, [isOpen]);
     const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
     const [isBarangayPickerOpen, setIsBarangayPickerOpen] = useState(false);
@@ -949,144 +932,9 @@ export default function NearbyIssuesMapModal({
         }).slice(0, 5);
     }, [areaFilteredReports, searchQuery]);
 
-    // Generate Canvas Image Pins for Native Google Maps MarkerF with Incident Pictures
-    useEffect(() => {
-        if (!filteredReports || filteredReports.length === 0) return;
-
-        let isMounted = true;
-        let batchTimer = null;
-        const pendingBatch = {};
-
-        const flushBatch = () => {
-            if (!isMounted || Object.keys(pendingBatch).length === 0) return;
-            setInternalPhotoPinIcons(prev => ({ ...prev, ...pendingBatch }));
-        };
-
-        filteredReports.forEach(report => {
-            const photoUrl = getReportPhoto(report);
-            if (!photoUrl) return;
-
-            const meta = getReportCategoryMeta(report);
-            const borderColor = meta.color;
-
-            [false, true].forEach(isSelected => {
-                const cacheKey = `${report.id}-${meta.color}-${isSelected ? 'sel' : 'norm'}`;
-                if (pinIconCache.current.has(cacheKey) || photoPinIcons[cacheKey]) return;
-
-                let thumbUrl = photoUrl;
-                if (photoUrl.includes('/api/thumbnails?')) {
-                    thumbUrl = photoUrl.replace(/([?&]size=)512(&|$)/, (_, prefix, suffix) => `${prefix}80${suffix}`);
-                } else if (!photoUrl.startsWith('http') && !photoUrl.startsWith('data:')) {
-                    const cleanPath = photoUrl.startsWith('/') ? photoUrl : `/${photoUrl}`;
-                    thumbUrl = `${API_BASE_URL}/api/thumbnails?src=${encodeURIComponent(cleanPath)}&size=80`;
-                }
-
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    if (!isMounted) return;
-                    try {
-                        const size = isSelected ? 46 : 36;
-                        const pointerH = isSelected ? 8 : 7;
-                        const totalW = size + 6;
-                        const totalH = size + pointerH + 2;
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = totalW;
-                        canvas.height = totalH;
-                        const ctx = canvas.getContext('2d');
-                        if (!ctx) return;
-
-                        const cx = totalW / 2;
-                        const cy = size / 2 + 1;
-                        const radius = (size - 4) / 2;
-
-                        // Pointer Arrow
-                        ctx.beginPath();
-                        ctx.moveTo(cx - 5, cy + radius - 2);
-                        ctx.lineTo(cx + 5, cy + radius - 2);
-                        ctx.lineTo(cx, cy + radius + pointerH);
-                        ctx.closePath();
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Outer Glow if Selected
-                        if (isSelected) {
-                            ctx.beginPath();
-                            ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
-                            ctx.fillStyle = `${borderColor}59`;
-                            ctx.fill();
-                        }
-
-                        // Outer Border Ring
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
-                        ctx.fillStyle = borderColor;
-                        ctx.fill();
-
-                        // Inner background
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                        ctx.fillStyle = '#0c1424';
-                        ctx.fill();
-
-                        // Circular photo clip
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.clip();
-
-                        const aspect = img.width / img.height;
-                        let dw, dh, dx, dy;
-                        if (aspect > 1) {
-                            dh = (radius - 0.5) * 2;
-                            dw = dh * aspect;
-                            dx = cx - dw / 2;
-                            dy = cy - radius + 0.5;
-                        } else {
-                            dw = (radius - 0.5) * 2;
-                            dh = dw / aspect;
-                            dx = cx - radius + 0.5;
-                            dy = cy - dh / 2;
-                        }
-                        ctx.drawImage(img, dx, dy, dw, dh);
-                        ctx.restore();
-
-                        // White inner accent ring
-                        ctx.beginPath();
-                        ctx.arc(cx, cy, radius - 0.5, 0, Math.PI * 2);
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1.0;
-                        ctx.stroke();
-
-                        const dataUrl = canvas.toDataURL('image/png');
-                        pinIconCache.current.set(cacheKey, dataUrl);
-                        pendingBatch[cacheKey] = dataUrl;
-
-                        if (batchTimer) clearTimeout(batchTimer);
-                        batchTimer = setTimeout(flushBatch, 100);
-                    } catch (err) {
-                        // fallback to default svg
-                    }
-                };
-                img.onerror = () => {
-                    if (thumbUrl.includes('/api/thumbnails')) {
-                        const fallbackImg = new Image();
-                        fallbackImg.crossOrigin = 'anonymous';
-                        fallbackImg.onload = img.onload;
-                        fallbackImg.onerror = () => {};
-                        fallbackImg.src = photoUrl;
-                    }
-                };
-                img.src = thumbUrl;
-            });
-        });
-
-        return () => {
-            isMounted = false;
-            if (batchTimer) clearTimeout(batchTimer);
-        };
-    }, [filteredReports, photoPinIcons]);
+    const internalPhotoPinIcons = useReportPhotoPins(filteredReports, getReportCategoryMeta);
+    const photoPinIcons = useMemo(() => ({ ...(externalPhotoPinIcons || {}), ...internalPhotoPinIcons }),
+        [externalPhotoPinIcons, internalPhotoPinIcons]);
 
     // 4. Update "Reports in view" on map idle
     const handleMapIdle = useCallback(() => {
@@ -1193,6 +1041,17 @@ export default function NearbyIssuesMapModal({
         }
     }, [initialSelectedReport, map, reports, handleSelectHazard]);
 
+    useAndroidBack(isOpen, 30, () => {
+        if (isBarangayPickerOpen) setIsBarangayPickerOpen(false);
+        else if (isBarangayDropdownOpen) setIsBarangayDropdownOpen(false);
+        else if (isFilterSheetOpen) setIsFilterSheetOpen(false);
+        else if (isLayersSheetOpen) setIsLayersSheetOpen(false);
+        else if (isLegendOpen) setIsLegendOpen(false);
+        else if (isMobileDrawerOpen) setIsMobileDrawerOpen(false);
+        else if (selectedHazard) handleCloseDetail();
+        else onClose?.();
+    });
+
     // Keyboard support: Escape closes detail panel or modal
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -1275,9 +1134,18 @@ export default function NearbyIssuesMapModal({
     return (
         <div
             ref={mapContainerRef}
+            data-native-task-screen={nativeViewport ? 'community-map' : undefined}
+            data-native-system-bar-surface={nativeViewport || undefined}
+            style={nativeViewport ? {
+                paddingTop: 'var(--pulso-safe-top, 0px)',
+                paddingBottom: 'var(--pulso-safe-bottom, 0px)',
+                paddingLeft: 'var(--pulso-safe-left, 0px)',
+                paddingRight: 'var(--pulso-safe-right, 0px)',
+                backgroundColor: isDark ? '#0f172a' : '#ffffff',
+            } : undefined}
             className={`${
                 standalone ? 'absolute inset-0 z-10' : 'fixed inset-0 z-[60]'
-            } lg:top-14 xl:top-16 lg:bottom-0 lg:z-40 lg:h-[calc(100dvh-3.5rem)] xl:h-[calc(100dvh-4rem)] flex flex-col bg-[#F8FAFC] dark:bg-[#070D18] text-slate-900 dark:text-white overflow-hidden select-none`}
+            } ${nativeViewport ? '' : 'lg:top-14 xl:top-16 lg:bottom-0 lg:z-40 lg:h-[calc(100dvh-3.5rem)] xl:h-[calc(100dvh-4rem)]'} flex flex-col bg-[#F8FAFC] dark:bg-[#070D18] text-slate-900 dark:text-white overflow-hidden select-none`}
             role="region"
             aria-label="Community Map"
         >
@@ -1957,7 +1825,7 @@ export default function NearbyIssuesMapModal({
                     </div>
 
                     {/* Floating Exit Fullscreen Button on Mobile */}
-                    {isMobileFullscreenMap && (
+                    {isMobileFullscreenMap && !nativeViewport && (
                         <div className="lg:hidden absolute top-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
                             <button
                                 type="button"
@@ -2023,7 +1891,7 @@ export default function NearbyIssuesMapModal({
                                 if (isSelected) return null; // Rendered as rich PhotoMapPin via OverlayViewF below
 
                                 const meta = getReportCategoryMeta(h);
-                                const cacheKey = `${h.id}-${meta.color}-norm`;
+                                const cacheKey = reportPhotoPinKey(h, meta.color);
                                 const customIconUrl = photoPinIcons[cacheKey];
 
                                 const size = 36;
@@ -2120,7 +1988,7 @@ export default function NearbyIssuesMapModal({
                                 : mobileSheetSnap === 'collapsed'
                                 ? 'calc(env(safe-area-inset-bottom, 0px) + 88px)'
                                 : mobileSheetSnap === 'half'
-                                ? 'calc(env(safe-area-inset-bottom, 0px) + 380px)'
+                                ? `calc(env(safe-area-inset-bottom, 0px) + ${mobileSheetHeight + 15}px)`
                                 : '-999px',
                             opacity: mobileSheetSnap === 'full' && !isMobileFullscreenMap ? 0 : 1,
                             pointerEvents: mobileSheetSnap === 'full' && !isMobileFullscreenMap ? 'none' : 'auto'
@@ -2145,13 +2013,16 @@ export default function NearbyIssuesMapModal({
 
                     {/* ── MOBILE DRAGGABLE BOTTOM SHEET (3 POSITIONS: COLLAPSED, HALF, FULL) ── */}
                     <div
+                        ref={mobileSheetRef}
+                        data-map-report-sheet
+                        data-sheet-snap={mobileSheetSnap}
                         className={`lg:hidden absolute inset-x-0 bottom-0 z-30 bg-white dark:bg-slate-900 rounded-t-[24px] border-t border-slate-200/90 dark:border-slate-800 shadow-[0_-8px_30px_rgba(0,0,0,0.15)] flex flex-col transition-all duration-300 ease-out select-none ${
                             isMobileFullscreenMap || (isSearchFocused && matchingSearchReports.length > 0)
                                 ? 'translate-y-full opacity-0 pointer-events-none'
                                 : mobileSheetSnap === 'collapsed'
                                 ? 'h-[74px] pb-[env(safe-area-inset-bottom,0px)]'
                                 : mobileSheetSnap === 'half'
-                                ? 'h-[365px] max-h-[75vh] pb-[calc(env(safe-area-inset-bottom,0px)+6px)]'
+                                ? 'h-auto max-h-[75dvh] pb-[calc(env(safe-area-inset-bottom,0px)+6px)]'
                                 : 'h-[calc(100%-60px)] max-h-[calc(100%-60px)] pb-[env(safe-area-inset-bottom,0px)]'
                         }`}
                     >
@@ -2232,12 +2103,15 @@ export default function NearbyIssuesMapModal({
                                 {selectedHazard ? (
                                     <div className="flex-1 overflow-y-auto px-4 py-2.5 pb-2 space-y-2.5 custom-scrollbar">
                                         {/* Top Card: Photo + Title + Meta (Responsive) */}
-                                        <div className="flex flex-col sm:flex-row items-start gap-3">
-                                            {selectedHazardPhotoUrl ? <img
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-24 h-24 sm:w-[100px] sm:h-24 rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shrink-0">
+                                            {selectedHazardPhotoUrl ? <ReportEvidenceImage
                                                 src={selectedHazardPhotoUrl}
                                                 alt={selectedHazard.title || 'Report preview'}
-                                                className="w-20 h-20 sm:w-[100px] sm:h-[80px] rounded-xl object-cover border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 shrink-0 self-start"
-                                                /> : <div className="w-20 h-20 sm:w-[100px] sm:h-[80px] rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-300 shrink-0 self-start" aria-label={t('mapPublicReports.photoPrivate', { defaultValue: 'No report photo available' })}><FileText size={24} aria-hidden="true" /></div>}
+                                                className="w-full h-full object-cover"
+                                                compact size={80}
+                                                /> : <div className="w-full h-full flex items-center justify-center text-slate-500 dark:text-slate-300" aria-label={t('mapPublicReports.photoPrivate', { defaultValue: 'No report photo available' })}><FileText size={24} aria-hidden="true" /></div>}
+                                            </div>
                                             <div className="flex-1 min-w-0 flex flex-col justify-between w-full">
                                                 <div>
                                                     <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white leading-snug break-words">
@@ -2422,7 +2296,7 @@ export default function NearbyIssuesMapModal({
 
                             {/* Photo Preview */}
                             <div className="w-full h-44 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800">
-                                {selectedHazardPhotoUrl ? <img
+                                {selectedHazardPhotoUrl ? <ReportEvidenceImage
                                     src={selectedHazardPhotoUrl}
                                     alt={selectedHazard.title || 'Report photo'}
                                     className="w-full h-full object-cover"
@@ -2684,21 +2558,25 @@ export default function NearbyIssuesMapModal({
                             <div className="space-y-2">
                                 <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 cursor-pointer">
                                     <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Civic Reports Pins</span>
-                                    <input
-                                        type="checkbox"
-                                        checked={mapLayers.reports}
-                                        onChange={(e) => toggleLayer('reports', e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#ea580c] focus:ring-[#ea580c] cursor-pointer"
-                                    />
+                                    <span className="resident-checkbox__control">
+                                        <input
+                                            type="checkbox"
+                                            checked={mapLayers.reports}
+                                            onChange={(e) => toggleLayer('reports', e.target.checked)}
+                                        />
+                                        <Check size={18} strokeWidth={3} aria-hidden="true" />
+                                    </span>
                                 </label>
                                 <label className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 cursor-pointer">
                                     <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Service Boundary Line</span>
-                                    <input
-                                        type="checkbox"
-                                        checked={mapLayers.serviceBoundary}
-                                        onChange={(e) => toggleLayer('serviceBoundary', e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#ea580c] focus:ring-[#ea580c] cursor-pointer"
-                                    />
+                                    <span className="resident-checkbox__control">
+                                        <input
+                                            type="checkbox"
+                                            checked={mapLayers.serviceBoundary}
+                                            onChange={(e) => toggleLayer('serviceBoundary', e.target.checked)}
+                                        />
+                                        <Check size={18} strokeWidth={3} aria-hidden="true" />
+                                    </span>
                                 </label>
                             </div>
                         </div>

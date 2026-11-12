@@ -68,13 +68,46 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
+def create_account_access_token(user):
+    from models import Official
+
+    return create_access_token(
+        {
+            "sub": user.email,
+            "account_type": "staff" if isinstance(user, Official) else "resident",
+            "account_id": user.id,
+            "sv": user.access_version or 0,
+        },
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+
+def _resolve_token_account(db, payload):
+    import models
+
+    email = payload.get("sub")
+    if not isinstance(email, str) or not email:
+        return None
+
+    account_types = {"staff": models.Official, "resident": models.Resident}
+    if "account_type" in payload or "account_id" in payload:
+        account_type = payload.get("account_type")
+        account_id = payload.get("account_id")
+        model = account_types.get(account_type) if isinstance(account_type, str) else None
+        if model is None or type(account_id) is not int:
+            return None
+        return db.query(model).filter(model.id == account_id, model.email == email).first()
+
+    # Pre-upgrade tokens carry only an email. Accept them only when it
+    # identifies a single account across both account tables.
+    official = db.query(models.Official).filter(models.Official.email == email).first()
+    resident = db.query(models.Resident).filter(models.Resident.email == email).first()
+    if official and resident:
+        return None
+    return official or resident
+
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """
-    Shared FastAPI dependency — decodes JWT and returns the user object.
-    Probes both Official and Resident tables to resolve the identity.
-    """
-    from database import get_db
-    import crud
     import models
 
     credentials_exception = HTTPException(
@@ -82,42 +115,22 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    unverified_exception = HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Account not confirmed. Check your email or text messages for the registration code.",
-    )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"require_exp": True})
+    except JWTError as error:
+        raise credentials_exception from error
 
-    # 1. Try Official table first
-    user = db.query(models.Official).filter(models.Official.email == email).first()
-    if user:
-        if not user.is_active or user.is_suspended:
-            raise HTTPException(status_code=403, detail="Account is inactive or suspended.")
-        if payload.get('sv',0) != (user.access_version or 0):
-            raise credentials_exception
-        return user
-        
-    # 2. Try Resident table
-    user = db.query(models.Resident).filter(models.Resident.email == email).first()
-    if user:
-        if not user.is_active or user.is_suspended:
-            raise HTTPException(status_code=403, detail="Account is inactive.")
-        if payload.get('sv',0) != (user.access_version or 0):
-            raise credentials_exception
-        if not user.is_verified:
-            raise unverified_exception
-        return user
-        
-    # 3. Import logging for failed lookups
-    import logging
-    logging.getLogger(__name__).warning(f"Auth failed: User {email} not found in any table")
-    raise credentials_exception
+    user = _resolve_token_account(db, payload)
+    if user is None:
+        raise credentials_exception
+    if not user.is_active or user.is_suspended:
+        detail = "Account is inactive or suspended." if isinstance(user, models.Official) else "Account is inactive."
+        raise HTTPException(status_code=403, detail=detail)
+    if payload.get("sv", 0) != (user.access_version or 0):
+        raise credentials_exception
+    if isinstance(user, models.Resident) and not user.is_verified:
+        raise HTTPException(403, "Account not confirmed. Check your email or text messages for the registration code.")
+    return user
 
 
 def get_optional_current_user(
@@ -133,25 +146,7 @@ def get_optional_current_user(
     """
     if not token or not token.strip():
         return None
-        
-    import models
-
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            return None
-    except (JWTError, Exception):
+        return get_current_user(token, db)
+    except HTTPException:
         return None
-
-    # 1. Probe Official table first
-    official = db.query(models.Official).filter(models.Official.email == email).first()
-    if official:
-        return official if official.is_active and not official.is_suspended and payload.get('sv',0)==(official.access_version or 0) else None
-        
-    # 2. Probe Resident table
-    resident = db.query(models.Resident).filter(models.Resident.email == email).first()
-    if resident and resident.is_active and not resident.is_suspended and resident.is_verified and payload.get('sv',0)==(resident.access_version or 0):
-        return resident
-
-    return None

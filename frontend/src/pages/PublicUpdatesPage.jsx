@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next';
+import { isNativeAndroid } from '../utils/appContext';
+import NativeAppHeader from '../components/mobile/NativeAppHeader';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import PublicationArticle from '../components/government/PublicationArticle';
@@ -14,8 +17,9 @@ const AMOUNT_LABELS = { approved_budget_for_contract: ['Approved budget for the 
 
 export default function PublicUpdatesPage() {
     const { updateId } = useParams();
+    const { i18n } = useTranslation();
     const [params, setParams] = useSearchParams();
-    const language = params.get('lang') === 'fil' ? 'fil' : 'en';
+    const language = params.get('lang') === 'fil' || (isNativeAndroid() && i18n.resolvedLanguage === 'tl') ? 'fil' : 'en';
     const copy = COPY[language];
     const user = getAuthUser();
     const resident = user?.role === 'resident';
@@ -23,8 +27,16 @@ export default function PublicUpdatesPage() {
     const context = useGovernmentData(updateId && resident ? `/api/announcements/${updateId}/my-report-context` : null);
     const date = value => new Date(value).toLocaleString(language === 'fil' ? 'fil-PH' : 'en-PH', { dateStyle: 'long', timeStyle: 'short' });
     const title = item => language === 'fil' && item.title_fil ? item.title_fil : item.title_en;
-    return <div className="public-updates-page" lang={language === 'fil' ? 'fil' : 'en'}>
+    return <>
+        {isNativeAndroid() && <NativeAppHeader onLanguageChange={language => {
+            const next = new URLSearchParams(params);
+            next.set('lang', language === 'tl' ? 'fil' : 'en');
+            setParams(next);
+        }} />}
+        <div className="public-updates-page" lang={language === 'fil' ? 'fil' : 'en'}>
+        {!isNativeAndroid() && (
         <header><Link to="/resident-home" className="public-updates-brand">PULSO <span>Caloocan City</span></Link><nav aria-label="Page navigation"><Link to="/resident-home">{copy.home}</Link><button aria-pressed={language === 'en'} onClick={() => setParams({ lang: 'en' })}>English</button><button aria-pressed={language === 'fil'} onClick={() => setParams({ lang: 'fil' })}>Filipino</button><ThemeToggle responsiveBreakpoint="xl" /></nav></header>
+        )}
         <main>{updateId && <Link to={`/updates?lang=${language}`} className="public-updates-back"><ArrowLeft size={16} />{copy.updates}</Link>}
             {loading ? <p role="status">{copy.loading}</p> : error ? <section role="alert"><h1>{copy.error}</h1><button onClick={reload}>{copy.retry}</button></section> : !updateId ? <><h1>{copy.title}</h1>{!data?.length && <p>{copy.empty}</p>}<ul className="public-update-list">{(data || []).map(item => <li key={item.id}><span>{item.publication_format} · {date(item.published_at)}</span><h2><Link to={`/updates/${item.id}?lang=${language}`}>{title(item)}</Link></h2><p>{(language === 'fil' && item.content_fil ? item.content_fil : item.content_en).slice(0, 220)}</p></li>)}</ul></> : data && <article>
                 <PublicationArticle item={data} language={language} />
@@ -33,5 +45,5 @@ export default function PublicUpdatesPage() {
                 {data.corrections?.length > 0 && <section><h2>{copy.corrections}</h2><ul>{data.corrections.map((c, i) => <li key={i}>{c.summary} · {date(c.created_at)}</li>)}</ul></section>}
             </article>}
         </main>
-    </div>;
+    </div></>;
 }

@@ -68,6 +68,14 @@ def clean_postgis(postgis_database):
     return sessionmaker(autocommit=False, autoflush=False, bind=postgis_database)
 
 
+@pytest.fixture(autouse=True)
+def reset_auth_limits():
+    from utils.rate_limiter import auth_limiter, otp_verification_limiter
+
+    for limiter in (auth_limiter, otp_verification_limiter):
+        limiter.reset()
+
+
 @pytest.fixture
 def synthetic_boundaries(clean_postgis, postgis_database):
     """Fake rectangles for deterministic tests, never a civic boundary source."""

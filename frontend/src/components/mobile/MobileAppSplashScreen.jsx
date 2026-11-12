@@ -7,6 +7,9 @@ export default function MobileAppSplashScreen({
   onFinish,
   minDurationMs = 1200,
   isReady = true,
+  minDurationStartsOnReady = false,
+  loadsBundledApp = false,
+  nativeEdgeToEdge = false,
   isTestMode = false,
   forceSlow = false,
   forceOffline = false,
@@ -58,7 +61,9 @@ export default function MobileAppSplashScreen({
 
   useEffect(() => {
     if (forceSlow || forceOffline || !isReady) return;
-    const remainingTime = Math.max(0, minDurationMs - (Date.now() - mountTimeRef.current));
+    const remainingTime = minDurationStartsOnReady
+      ? minDurationMs
+      : Math.max(0, minDurationMs - (Date.now() - mountTimeRef.current));
     let finishTimeout;
     const dismissTimeout = setTimeout(() => {
       setIsFadingOut(true);
@@ -71,7 +76,7 @@ export default function MobileAppSplashScreen({
       clearTimeout(dismissTimeout);
       clearTimeout(finishTimeout);
     };
-  }, [forceSlow, forceOffline, isReady, minDurationMs, isTestMode, onFinish, reducedMotion]);
+  }, [forceSlow, forceOffline, isReady, minDurationMs, minDurationStartsOnReady, isTestMode, onFinish, reducedMotion]);
 
   const handleRetry = () => {
     if (isTestMode) {
@@ -85,8 +90,8 @@ export default function MobileAppSplashScreen({
 
   const selectedTheme = themeModeOverride || theme || 'light';
   const isDark = selectedTheme === 'dark' || (selectedTheme === 'system' && osPrefersDark);
-  const showError = isOffline || elapsedSeconds >= 12 || forceOffline;
-  const showSlow = !showError && (elapsedSeconds >= 5 || forceSlow);
+  const showError = !loadsBundledApp && (isOffline || elapsedSeconds >= 12 || forceOffline);
+  const showSlow = !showError && !loadsBundledApp && (elapsedSeconds >= 5 || forceSlow);
 
   return (
     <div
@@ -94,9 +99,14 @@ export default function MobileAppSplashScreen({
       aria-live="polite"
       aria-label={t('loadingScreen.ariaLabel', 'Loading PULSO')}
       data-theme={isDark ? 'dark' : 'light'}
+      data-native-splash={nativeEdgeToEdge || undefined}
       style={{
+        colorScheme: isDark ? 'dark' : 'light',
         backgroundColor: isDark ? '#080D19' : '#F7F9FC',
         color: isDark ? '#F8FAFC' : '#0B1630',
+        paddingTop: nativeEdgeToEdge ? 'var(--pulso-safe-top, 0px)' : undefined,
+        paddingLeft: nativeEdgeToEdge ? 'var(--pulso-safe-left, 0px)' : undefined,
+        paddingRight: nativeEdgeToEdge ? 'var(--pulso-safe-right, 0px)' : undefined,
         opacity: isFadingOut ? 0 : 1,
         transition: reducedMotion ? 'none' : 'opacity 250ms ease-out'
       }}
@@ -110,7 +120,7 @@ export default function MobileAppSplashScreen({
           className="mb-3 h-[clamp(190px,55vw,240px)] w-[clamp(190px,55vw,240px)] object-contain"
         />
         <div className="text-[clamp(2.5rem,12vw,3.5rem)] font-extrabold leading-none tracking-[-0.035em]">PULSO</div>
-        <div className={`mt-2 text-[clamp(1rem,4.3vw,1.3rem)] ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{t('loadingScreen.city', 'Caloocan City')}</div>
+        <div className="mt-2 text-[clamp(1rem,4.3vw,1.3rem)]" style={{ color: isDark ? '#CBD5E1' : '#475569' }}>{t('loadingScreen.city', 'Caloocan City')}</div>
 
         <div className="mt-12 flex min-h-[112px] flex-col items-center justify-start gap-5">
           {!showError && (
@@ -125,17 +135,17 @@ export default function MobileAppSplashScreen({
               <button type="button" onClick={handleRetry} className="min-h-12 rounded-xl bg-[#EA580C] px-6 py-2.5 text-sm font-bold text-white focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#ff6b00]">{t('loadingScreen.retry', 'Try again')}</button>
             </div>
           ) : (
-            <p className={`text-[clamp(0.875rem,3.7vw,1rem)] ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
+            <p className="text-[clamp(0.875rem,3.7vw,1rem)]" style={{ color: isDark ? '#CBD5E1' : '#475569' }}>
               {showSlow ? t('loadingScreen.slow', 'Still loading. Please wait a moment.') : t('loadingScreen.readying', 'Getting things ready...')}
             </p>
           )}
         </div>
       </main>
 
-      <footer className="w-full shrink-0 px-4 pt-3 text-center" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
+      <footer className="w-full shrink-0 px-4 pt-3 text-center" style={{ paddingBottom: 'max(2rem, var(--pulso-safe-bottom, env(safe-area-inset-bottom, 0px)))' }}>
         <span className="mx-auto mb-4 block h-1 w-9 rounded-full bg-[#ff6b00]" aria-hidden="true" />
         <div className="text-sm font-semibold">{t('loadingScreen.department', 'City Engineering Department')}</div>
-        <div className={`mt-1 text-sm ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>{t('loadingScreen.government', 'Caloocan City Government')}</div>
+        <div className="mt-1 text-sm" style={{ color: isDark ? '#CBD5E1' : '#475569' }}>{t('loadingScreen.government', 'Caloocan City Government')}</div>
       </footer>
     </div>
   );

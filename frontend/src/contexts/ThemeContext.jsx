@@ -94,6 +94,7 @@ export function ThemeProvider({ children }) {
         const activeDark = activeTheme === 'dark';
         root.classList.add(activeDark ? 'dark' : 'light');
         root.setAttribute('data-theme', activeDark ? 'dark' : 'light');
+        root.style.colorScheme = activeDark ? 'dark' : 'light';
         updateStatusBarColor(activeDark);
     }, [updateStatusBarColor]);
 

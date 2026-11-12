@@ -15,6 +15,13 @@ export default defineConfig(({ mode }) => {
       },
     }),
     tailwindcss(),
+    mode === 'android' && {
+      name: 'android-safe-viewport',
+      // Let Capacitor reserve the system bars for every route and fixed overlay.
+      transformIndexHtml(html) {
+        return html.replace('viewport-fit=cover', 'viewport-fit=contain')
+      },
+    },
   ],
   server: {
     allowedHosts: true,

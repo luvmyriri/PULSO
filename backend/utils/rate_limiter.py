@@ -26,15 +26,7 @@ class SlidingWindowRateLimiter:
         self._lock = threading.Lock()
 
     def _get_client_ip(self, request: Request) -> str:
-        """Extracts the client's public IP address from headers or connection."""
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            ip = forwarded.split(",")[0].strip()
-            if ip:
-                return ip
-        real_ip = request.headers.get("X-Real-IP")
-        if real_ip:
-            return real_ip.strip()
+        """Use the peer address resolved by the server's trusted proxy handling."""
         if request.client and request.client.host:
             return request.client.host.strip()
         return "127.0.0.1"
@@ -44,8 +36,8 @@ class SlidingWindowRateLimiter:
         Evaluates the rate limit for the incoming request IP.
         Raises HTTP 429 Too Many Requests if the limit is exceeded.
         """
-        # Only callers that have authenticated the request may supply an account key.
-        # Never derive quota identity from an unverified bearer-token payload.
+        # An identifier must come from an authenticated account or a server-resolved
+        # challenge. Apply a separate IP limit before checking a challenge quota.
         client_ip = f"account:{identifier}" if identifier else self._get_client_ip(request)
         now = time.time()
 
@@ -109,6 +101,12 @@ auth_limiter = SlidingWindowRateLimiter(
     max_requests=30,
     window_seconds=60,   # 1 minute
     error_detail="Too many authentication attempts. Please try again in 1 minute."
+)
+
+otp_verification_limiter = SlidingWindowRateLimiter(
+    max_requests=10,
+    window_seconds=900,
+    error_detail="Too many code attempts. Please try again in 15 minutes."
 )
 
 availability_check_limiter = SlidingWindowRateLimiter(

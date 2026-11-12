@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PULSO</string>
+    <string name="camera_permission_reason">PULSO uses your camera to take a photo of the problem.</string>
+    <string name="location_permission_reason">PULSO uses your location to find where the problem is.</string>
+    <string name="title_activity_main">PULSO</string>
+    <string name="package_name">ph.gov.caloocan.pulso</string>
+    <string name="custom_url_scheme">ph.gov.caloocan.pulso</string>
+</resources>

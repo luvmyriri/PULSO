@@ -1,0 +1,102 @@
+.native-app-header--hero {
+  border: 0;
+  background: var(--home-canvas);
+  color: var(--home-ink);
+}
+.native-app-header--hero.native-app-header--transparent { background: transparent; }
+.native-app-header--hero > div {
+  max-width: 32rem; min-height: 3.5rem; flex-wrap: wrap; row-gap: .25rem;
+  padding: .375rem var(--home-gutter);
+}
+.native-app-header--hero > div > div { margin-inline-start: auto; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+.native-app-header--hero .native-app-header__city { color: var(--home-muted); }
+.native-home__account-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: .25rem;
+  border-radius: .375rem;
+  color: var(--home-ink);
+  font-size: .8125rem;
+  font-weight: 650;
+  text-underline-offset: .2em;
+}
+.native-app-header__language { position: relative; }
+.native-app-header__language .native-app-header__language-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .2rem;
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: .25rem;
+  border-radius: .25rem;
+  font-size: .8125rem;
+  font-weight: 500;
+  background: transparent;
+}
+.native-app-header__language .native-app-header__language-trigger:is(:hover, :active, :focus) { background: transparent; }
+.native-app-header__language-options {
+  position: absolute;
+  inset-block-start: calc(100% + .125rem);
+  inset-inline-end: 0;
+  z-index: 1;
+  min-width: 7rem;
+  padding: .125rem;
+  background: var(--home-surface);
+  border: 1px solid var(--home-rule);
+  border-radius: .375rem;
+}
+.native-app-header__language-options button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  width: 100%;
+  min-height: 44px;
+  padding: .5rem .625rem;
+  border-radius: .25rem;
+  font-size: .8125rem;
+  font-weight: 400;
+  line-height: 1.2;
+  text-align: start;
+}
+.native-app-header__language-options button[aria-pressed='true'] { font-weight: 600; }
+.native-app-header__language-options button[aria-pressed='true'] svg { color: var(--home-accent); }
+.native-app-header__language-options svg { width: 14px; height: 14px; }
+.native-app-header__language-options button:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--home-ink) 10%, var(--home-surface));
+}
+.native-app-header--hero button { color: var(--home-ink); }
+.native-app-header--hero button:active { background: var(--home-surface); }
+.native-resident-greeting { display: flex; flex: 1; min-width: 0; min-height: 48px; gap: .625rem; align-items: center; text-align: start; border-radius: .375rem; cursor: pointer; }
+.native-resident-greeting__avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: .875rem; font-weight: 750; text-shadow: 0 1px 2px var(--color-indigo-900); }
+.native-resident-greeting__text { display: grid; min-width: 0; gap: .1rem; }
+.native-resident-greeting__text > span { color: var(--home-muted); font-size: .75rem; line-height: 1.3; }
+.native-resident-greeting__text strong { font-size: .8125rem; font-weight: 750; line-height: 1.35; overflow-wrap: anywhere; }
+.native-resident-greeting:focus-visible { outline: 3px solid var(--home-focus); outline-offset: 2px; }
+.native-dashboard-topbar {
+  transition: transform 180ms ease-out;
+}
+.native-dashboard-topbar[data-scroll-hidden='true']:not(:has(:focus-visible, .native-app-header__language-trigger[aria-expanded='true'])) {
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+.native-dashboard-topbar:has(:focus-visible) { transition-duration: 0s; }
+@media (prefers-reduced-motion: reduce) {
+  .native-dashboard-topbar { transition: none; }
+}
+@media (hover: hover) {
+  .native-app-header--hero button:hover { background: var(--home-surface); }
+  .native-home__account-link:hover { text-decoration: underline; }
+}
+@media (max-width: 359px) {
+  .native-app-header--hero { --home-gutter: 1rem; }
+}
+@media (forced-colors: active) {
+  .native-app-header--hero,
+  .native-app-header--hero .native-app-header__city { background: Canvas; color: CanvasText; }
+  .native-home__account-link { color: LinkText; }
+}

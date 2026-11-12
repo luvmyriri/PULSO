@@ -22,7 +22,6 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import random
 import urllib.request
 import xml.etree.ElementTree as ET
 import email.utils
@@ -68,7 +67,7 @@ from services.spatial_service import PUBLIC_REPORT_STATUSES
 from public_reports import safe_public_area, safe_public_category, public_incident_description, public_report_photo
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
-from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter, availability_check_limiter
+from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter, availability_check_limiter, otp_verification_limiter
 from utils.contact_normalizer import normalize_email, normalize_phone_number, mask_email, mask_phone_number
 
 from contextlib import asynccontextmanager
@@ -133,6 +132,8 @@ app = FastAPI(
 )
 app.include_router(report_review_router.router)
 app.include_router(external_referrals.router)
+import android_updates
+app.include_router(android_updates.router)
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +149,6 @@ class PublicUploadFiles(StaticFiles):
         if path.replace("\\", "/").lstrip("/").split("/", 1)[0].lower() == "docs":
             raise HTTPException(status_code=404, detail="File not found")
         response = await super().get_response(path, scope)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         return response
 
@@ -243,10 +242,13 @@ if env_allowed:
         if cleaned and cleaned not in ALLOWED_ORIGINS:
             ALLOWED_ORIGINS.append(cleaned)
 
+if os.getenv("PULSO_ENV", "").lower() == "development":
+    ALLOWED_ORIGINS.extend(("https://localhost", "http://localhost", "capacitor://localhost"))
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?$",
+    allow_origin_regex=r"^(?!https?://localhost$)https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -329,8 +331,6 @@ async def get_thumbnail(src: str = Query(..., description="Relative path to uplo
             media_type="image/jpeg",
             headers={
                 "Cache-Control": "public, max-age=31536000, immutable",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
                 "Cross-Origin-Resource-Policy": "cross-origin",
             }
         )
@@ -699,10 +699,7 @@ async def google_auth(
 
         # Check if already verified
         if resident.is_verified:
-            access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-            access_token = auth.create_access_token(
-                data={"sub": resident.email, "sv": resident.access_version or 0}, expires_delta=access_token_expires
-            )
+            access_token = auth.create_account_access_token(resident)
             return {
                 "status": "authenticated",
                 "linked_existing": True,
@@ -878,10 +875,7 @@ async def google_complete_verification(
     db.refresh(resident)
 
     if resident.is_verified:
-        access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = auth.create_access_token(
-            data={"sub": resident.email, "sv": resident.access_version or 0}, expires_delta=access_token_expires
-        )
+        access_token = auth.create_account_access_token(resident)
         return {
             "status": "verified",
             "message": "Government ID verified successfully. Full portal access granted.",
@@ -1038,7 +1032,7 @@ async def login(
     captcha_token: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    import logging
+    auth_limiter.check(request)
     
     # 1. Verify basic credentials first (to determine if we should challenge with reCAPTCHA)
     candidate_users = crud.get_users_by_identifier(db, identifier=form_data.username)
@@ -1093,11 +1087,7 @@ async def login(
             detail=msg,
         )
         
-    from datetime import timedelta
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth.create_access_token(
-        data={"sub": user.email, "sv": user.access_version or 0}, expires_delta=access_token_expires
-    )
+    access_token = auth.create_account_access_token(user)
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -1424,215 +1414,154 @@ def send_otp_email(to_email: str, code: str, type: str = "Verification", ref_id:
         print(f"[MAIL ERROR] Unexpected email error: {e.__class__.__name__}")
         return False
 
-@app.post("/api/auth/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    """Send an expiring recovery code through the confirmed email channel."""
-    email = req.email.strip().lower()
+def _email_challenge_account(db, email, *, lock=False):
+    email = email.strip().lower()
+    if "@" not in email:
+        return None
     user = crud.get_user_by_email(db, email=email)
-    if not user:
-        # For security, don't reveal if the email is registered
-        return {"message": "If this email is registered, a security code will be sent."}
-    
-    if isinstance(user,models.Official):
-        raise HTTPException(409,'Use the staff sign-in recovery request or a recovery link supplied by your administrator.')
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account not verified"
-        )
-    
-    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-    ref_id = f"PC-{random.randint(10000, 99999)}"
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
-    
-    # Invalidate all prior tokens for this email so old codes are strictly voided
-    db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.email == email
-    ).delete(synchronize_session=False)
+    if user and lock:
+        db.refresh(user, with_for_update=True)
+    return user
 
-    reset_token = models.PasswordResetToken(
-        email=email,
-        token=code,
-        expires_at=expires_at,
-        used=False
-    )
-    db.add(reset_token)
+
+def _email_challenge_key(purpose, user):
+    account_type = "staff" if isinstance(user, models.Official) else "resident"
+    return f"{purpose}:{account_type}:{user.id}:{user.email.lower()}"
+
+
+def _otp_hash(key, code):
+    return hmac.new(auth.SECRET_KEY.encode("utf-8"), f"{key}:{code}".encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _latest_otp(db, key, *, lock=False):
+    query = db.query(models.PasswordResetToken).filter_by(email=key).order_by(models.PasswordResetToken.id.desc())
+    return (query.with_for_update() if lock else query).first()
+
+
+def _issue_email_code(db, user, *, purpose, email_type, ref_prefix, validity_minutes):
+    # The caller locks the account before issuing or replacing a challenge.
+    key = _email_challenge_key(purpose, user)
+    now = datetime.now(timezone.utc)
+    validity = timedelta(minutes=validity_minutes)
+    token = _latest_otp(db, key, lock=True)
+    if token and token.expires_at > now + validity - timedelta(minutes=1):
+        raise HTTPException(429, "Wait one minute before requesting another code.", headers={"Retry-After": "60"})
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    ref_id = f"{ref_prefix}-{secrets.randbelow(90_000) + 10_000}"
+    code_hash = _otp_hash(key, code)
+    if token is None:
+        token = models.PasswordResetToken(email=key)
+        db.add(token)
+    token.token = code_hash
+    token.expires_at = now + validity
+    token.used = False
+    recipient, name = user.email, format_resident_name(user.full_name)
     db.commit()
 
-    # Format greeting: First name + Last name
-    greeting_name = format_resident_name(getattr(user, "full_name", None))
-    phone_number = getattr(user, "phone_number", None)
-
-
-    sms_dispatched = False
-
-    # Also dispatch email notification as channel parity / backup
-    email_dispatched = False
-    try:
-        email_dispatched = send_otp_email(req.email, code, "Recovery", ref_id=ref_id, name=greeting_name)
-    except Exception as em_err:
-        print(f"[MAIL ERROR] Failed to dispatch verification email: {em_err}")
-
-    if not sms_dispatched and not email_dispatched:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to send the verification email. Please try again later."
+    if not send_otp_email(recipient, code, email_type, ref_id=ref_id, name=name):
+        db.query(models.PasswordResetToken).filter_by(email=key, token=code_hash).update(
+            {"used": True, "expires_at": now}
         )
+        db.commit()
+        raise HTTPException(503, "Unable to send the verification email. Please try again later.")
+    return ref_id
 
-    phone_hint = None
 
+def _check_email_code(db, request, user, purpose, code, *, consume=False):
+    invalid = HTTPException(400, "Invalid or expired verification code.")
+    if not user or not user.is_active or user.is_suspended:
+        raise invalid
+    key = _email_challenge_key(purpose, user)
+    token = _latest_otp(db, key, lock=consume)
+    if not token or token.used or token.expires_at <= datetime.now(timezone.utc):
+        raise invalid
+    otp_verification_limiter.check(request, identifier=key)
+    cleaned = code.replace(" ", "").replace("-", "").strip()
+    if len(cleaned) != 6 or not cleaned.isascii() or not cleaned.isdigit():
+        raise invalid
+    if not hmac.compare_digest(token.token, _otp_hash(key, cleaned)):
+        raise invalid
+    if consume:
+        token.used = True
+
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(req: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    """Send an expiring recovery code through the confirmed email channel."""
+    auth_limiter.check(request)
+    user = _email_challenge_account(db, req.email, lock=True)
+    if not user or not user.is_active or user.is_suspended:
+        return {"message": "If this email is registered, a security code will be sent."}
+    if isinstance(user, models.Official):
+        raise HTTPException(409, "Use the staff sign-in recovery request or a recovery link supplied by your administrator.")
+    if not user.is_verified:
+        raise HTTPException(403, "Account not verified")
+
+    ref_id = _issue_email_code(db, user, purpose="recovery", email_type="Recovery", ref_prefix="PC", validity_minutes=10)
     return {
         "message": "Reset code sent successfully.",
         "reference_id": ref_id,
-        "phone_hint": phone_hint,
-        "sms_sent": sms_dispatched
+        "phone_hint": None,
+        "sms_sent": False,
     }
+
 
 @app.post("/api/auth/verify-reset-code")
-async def verify_reset_code(req: VerifyResetCodeRequest, db: Session = Depends(get_db)):
-    """Verifies that the provided 6-digit sync code is valid and active."""
-    email = req.email.strip().lower()
-    import re
-    cleaned_code = re.sub(r"\D", "", req.code)
-    # Only validate against the single latest active token
-    latest_token = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.email == email,
-        models.PasswordResetToken.used == False
-    ).order_by(models.PasswordResetToken.id.desc()).first()
-    
-    if not latest_token or latest_token.token != cleaned_code:
-        raise HTTPException(status_code=400, detail="Incorrect code. Please check and try again.")
-    reset_token = latest_token
+def verify_reset_code(req: VerifyResetCodeRequest, request: Request, db: Session = Depends(get_db)):
+    auth_limiter.check(request)
+    user = _email_challenge_account(db, req.email)
+    if not isinstance(user, models.Resident) or not user.is_verified:
+        raise HTTPException(400, "Invalid or expired verification code.")
+    _check_email_code(db, request, user, "recovery", req.code)
+    return {"message": "Recovery code verified."}
 
-    # Explicitly compare aware UTC datetimes to ensure registry synchronization
-    current_time = datetime.now(timezone.utc)
-    db_expires_at = reset_token.expires_at
-    if db_expires_at.tzinfo is None:
-        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
-
-    if db_expires_at < current_time:
-        raise HTTPException(status_code=400, detail="Security token expired.")
-        
-    return {"message": "Identity synchronized. Identity verified."}
 
 @app.post("/api/auth/reset-password")
-async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
-    """Verifies the 6-digit code and updates the user's password."""
-    email = req.email.strip().lower()
-    import re
-    cleaned_code = re.sub(r"\D", "", req.code)
-
-    # Find and validate ONLY against the single latest active token
-    latest_token = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.email == email,
-        models.PasswordResetToken.used == False
-    ).order_by(models.PasswordResetToken.id.desc()).first()
-    
-    if not latest_token or latest_token.token != cleaned_code:
-        raise HTTPException(status_code=400, detail="Incorrect code. Please check and try again.")
-    reset_token = latest_token
-
-    # Explicitly compare aware UTC datetimes for credential update validation
-    current_time = datetime.now(timezone.utc)
-    db_expires_at = reset_token.expires_at
-    if db_expires_at.tzinfo is None:
-        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
-
-    if db_expires_at < current_time:
-        raise HTTPException(status_code=400, detail="Security token expired.")
-    
-    # Update user password
-    user = crud.get_user_by_email(db, email=email)
-    if not user:
-        raise HTTPException(status_code=404, detail="Subject not found in registry.")
-    
-    if isinstance(user,models.Official):
-        raise HTTPException(409,'Use the staff recovery link supplied by your administrator.')
-    if not user.is_verified:
-        from resident_contacts import ensure_available, normalize_resident
-        ensure_available(db, user.email, user.phone_number, exclude_id=user.id)
-        normalize_resident(user)
-    if isinstance(user, models.Official):
-        raise HTTPException(409, "Use the staff recovery link supplied by your administrator.")
+def reset_password(req: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    auth_limiter.check(request)
+    if len(req.new_password) < 8 or len(req.new_password.encode("utf-8")) > 72:
+        raise HTTPException(422, "Use a password of at least 8 characters and at most 72 UTF-8 bytes.")
+    user = _email_challenge_account(db, req.email, lock=True)
+    if not isinstance(user, models.Resident) or not user.is_verified:
+        raise HTTPException(400, "Invalid or expired verification code.")
+    _check_email_code(db, request, user, "recovery", req.code, consume=True)
     user.password_hash = auth.get_password_hash(req.new_password)
-    user.is_verified = True  # Resident email recovery confirms ownership
-    reset_token.used = True  # Mark as used
-    
+    user.access_version = (user.access_version or 0) + 1
     db.commit()
-    return {"message": "Credentials updated successfully. System synchronized."}
+    return {"message": "Password updated successfully."}
+
 
 @app.post("/api/auth/send-2fa-code")
-async def send_2fa_code(req: Send2FARequest, db: Session = Depends(get_db)):
-    """Generates and dispatches a live 6-digit 2FA OTP code directly to the resident's Gmail."""
-    email = req.email.strip().lower()
-    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-    ref_id = f"2FA-{random.randint(10000, 99999)}"
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
-    
-    # Store token in database
-    token_record = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.email == email).first()
-    if token_record:
-        token_record.token = code
-        token_record.expires_at = expires_at
-        token_record.used = False
-    else:
-        token_record = models.PasswordResetToken(
-            email=email,
-            token=code,
-            expires_at=expires_at
-        )
-        db.add(token_record)
-    
-    db.commit()
-    
-    # Send actual official Gmail message
-    email_sent = send_otp_email(email, code, "2-Step Verification", ref_id=ref_id)
-    if not email_sent:
-        print(f"[2FA WARNING] Failed to send email to {email}, but code {code} generated.")
-        
+def send_2fa_code(req: Send2FARequest, request: Request, db: Session = Depends(get_db)):
+    auth_limiter.check(request)
+    user = _email_challenge_account(db, req.email, lock=True)
+    if not user or not user.is_active or user.is_suspended:
+        raise HTTPException(400, "Verification code unavailable.")
+    ref_id = _issue_email_code(db, user, purpose="email-2fa", email_type="2-Step Verification", ref_prefix="2FA", validity_minutes=15)
     return {
         "status": "success",
-        "message": "Security PIN dispatched to your Gmail account.",
-        "code": code,
+        "message": "Security PIN dispatched to your email account.",
         "reference_id": ref_id,
-        "email_sent": email_sent
+        "email_sent": True,
     }
 
+
 @app.post("/api/auth/verify-2fa-code")
-async def verify_2fa_code(req: Verify2FARequest, db: Session = Depends(get_db)):
-    """Verifies that the provided 2FA security PIN matches and is valid."""
-    email = req.email.strip().lower()
-    cleaned_code = req.code.replace(" ", "").strip()
-    
-    if cleaned_code == "123456":
-        return {"status": "success", "message": "2FA code verified."}
-        
-    token_record = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.email == email,
-        models.PasswordResetToken.token == cleaned_code,
-        models.PasswordResetToken.used == False
-    ).first()
-    
-    if not token_record:
-        raise HTTPException(status_code=400, detail="Invalid 2FA security PIN. Please check your Gmail.")
-        
-    current_time = datetime.now(timezone.utc)
-    db_expires_at = token_record.expires_at
-    if db_expires_at.tzinfo is None:
-        db_expires_at = db_expires_at.replace(tzinfo=timezone.utc)
-        
-    if db_expires_at < current_time:
-        raise HTTPException(status_code=400, detail="2FA security PIN has expired. Please request a new code.")
-        
-    token_record.used = True
+def verify_2fa_code(req: Verify2FARequest, request: Request, db: Session = Depends(get_db)):
+    auth_limiter.check(request)
+    user = _email_challenge_account(db, req.email, lock=True)
+    _check_email_code(db, request, user, "email-2fa", req.code, consume=True)
     db.commit()
     return {"status": "success", "message": "2FA verification successful."}
+
 
 @app.post("/api/auth/phone/send-otp")
 async def send_phone_otp(req: SendPhoneOTPRequest, request: Request, db: Session = Depends(get_db)):
     """
     Dispatches a 6-digit SMS OTP to the resident's registered Philippine mobile phone.
     """
+    auth_limiter.check(request)
     raw_phone = req.phone_number.strip()
     norm_phone = crud.normalize_ph_phone(raw_phone)
     if not norm_phone or len(norm_phone) != 11 or not norm_phone.startswith("09"):
@@ -1673,11 +1602,7 @@ async def send_phone_otp(req: SendPhoneOTPRequest, request: Request, db: Session
 
     # A keyed hash prevents a database read from exposing a usable six-digit code.
     token_key = f"phone:{norm_phone}"
-    code_hash = hmac.new(
-        auth.SECRET_KEY.encode("utf-8"),
-        f"{token_key}:{code}".encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
+    code_hash = _otp_hash(token_key, code)
     token_record = db.query(models.PasswordResetToken).filter(models.PasswordResetToken.email == token_key).first()
     if token_record:
         token_record.token = code_hash
@@ -1711,10 +1636,11 @@ async def send_phone_otp(req: SendPhoneOTPRequest, request: Request, db: Session
     }
 
 @app.post("/api/auth/phone/verify-otp")
-async def verify_phone_otp(req: VerifyPhoneOTPRequest, db: Session = Depends(get_db)):
+def verify_phone_otp(req: VerifyPhoneOTPRequest, request: Request, db: Session = Depends(get_db)):
     """
     Verifies the SMS OTP and authenticates the resident into the portal.
     """
+    auth_limiter.check(request)
     raw_phone = req.phone_number.strip()
     norm_phone = crud.normalize_ph_phone(raw_phone)
     if not norm_phone:
@@ -1725,16 +1651,11 @@ async def verify_phone_otp(req: VerifyPhoneOTPRequest, db: Session = Depends(get
         raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
     token_key = f"phone:{norm_phone}"
 
-    token_record = db.query(models.PasswordResetToken).filter(
-        models.PasswordResetToken.email == token_key,
-        models.PasswordResetToken.used == False,
-    ).first()
-    code_hash = hmac.new(
-        auth.SECRET_KEY.encode("utf-8"),
-        f"{token_key}:{cleaned_code}".encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-    if not token_record or not hmac.compare_digest(token_record.token, code_hash):
+    token_record = _latest_otp(db, token_key, lock=True)
+    if not token_record or token_record.used:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
+    otp_verification_limiter.check(request, identifier=token_key)
+    if not hmac.compare_digest(token_record.token, _otp_hash(token_key, cleaned_code)):
         raise HTTPException(status_code=400, detail="Invalid or expired verification code.")
 
     current_time = datetime.now(timezone.utc)
@@ -1757,10 +1678,7 @@ async def verify_phone_otp(req: VerifyPhoneOTPRequest, db: Session = Depends(get
     db.commit()
 
     # Generate JWT
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth.create_access_token(
-        data={"sub": user.email, "sv": user.access_version or 0}, expires_delta=access_token_expires
-    )
+    access_token = auth.create_account_access_token(user)
 
     return {
         "access_token": access_token,

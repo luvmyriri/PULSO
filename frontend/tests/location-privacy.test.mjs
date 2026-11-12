@@ -143,6 +143,16 @@ test('rendered panel hides unavailable rows, escapes values, and supports Englis
     assert.doesNotMatch(html, /<dt|<dd/);
     const fullAddress = privacy.parseGoogleDisplayAddress(syntheticResults, { global_code: '849VCWC8+R9' });
     assert.match(render({ address: fullAddress }), /<strong class="font-extrabold">CWC8\+R9<\/strong>, Sample Village Phase 2, Sample Community, Acacia Road, Barangay Sample, Example City, 1234, Example Region/);
+    const gpsAddress = render({ address: fullAddress, gpsAddress: true, status: 'OK' });
+    assert.match(gpsAddress, /Address near your GPS point/);
+    assert.match(gpsAddress, /Acacia Road, Sample Village Phase 2, Sample Community, Barangay Sample, Example City, 1234, Example Region/);
+    assert.doesNotMatch(gpsAddress, /CWC8\+R9|PRIVATE|Unit 88/);
+    const area = render({ address: { ...fullAddress, street: '', streetAddress: '' }, gpsAddress: true, status: 'OK' });
+    assert.match(area, /CWC8\+R9/);
+    assert.doesNotMatch(area, /No reliable street match/);
+    const gpsFallback = render({ coordinates: { lat: 14.5, lng: 121.5 }, gpsAddress: true, status: 'UNAVAILABLE' });
+    assert.match(gpsFallback, new RegExp(encodePlusCode(14.5, 121.5).replace('+', '\\+')));
+    assert.match(gpsFallback, /selected location is kept/);
     const coordinates = render({ coordinates: { lat: 0, lng: -121.123456 }, status: 'UNAVAILABLE' });
     assert.match(coordinates, /title="Latitude"/);
     assert.match(coordinates, /0\.000000/);
@@ -182,15 +192,33 @@ test('lookup shares in-flight work, falls back only to Google, and handles API f
     assert.equal((await first).address, `${encodePlusCode(14.5, 121.5)}, Example City`);
     assert.equal(calls, 1);
     let browserCalls = 0;
+    const browserResults = [
+        {
+            ...syntheticResults[0],
+            types: ['street_address'],
+            geometry: { location_type: 'ROOFTOP', location: { lat: () => 14.60005, lng: () => 121.6 } },
+        },
+        {
+            types: ['street_address'],
+            address_components: [component('Distant Road', 'route')],
+            geometry: { location_type: 'ROOFTOP', location: { lat: () => 14.6025, lng: () => 121.6 } },
+        },
+        { ...syntheticResults[1], types: ['political', 'sublocality'] },
+    ];
     globalThis.window = { google: { maps: { Geocoder: class {
-        geocode() { browserCalls += 1; return Promise.resolve({ results: syntheticResults, plus_code: { global_code: '849VCWC8+R9' } }); }
+        geocode() { browserCalls += 1; return Promise.resolve({ results: browserResults, plus_code: { global_code: '849VCWC8+R9' } }); }
     } } } };
     globalThis.__testApiFetch = async () => ({ ok: false });
     assert.equal((await reverseGeocodeLocation(14.6, 121.6)).structuredAddress.street, 'Acacia Road');
     assert.equal(browserCalls, 1);
+    browserResults.shift();
+    const areaOnly = await reverseGeocodeLocation(14.6, 121.6);
+    assert.equal(areaOnly.structuredAddress.street, '');
+    assert.equal(areaOnly.structuredAddress.barangay, 'Barangay Sample');
+    assert.equal(areaOnly.structuredAddress.plusCode, encodePlusCode(14.6, 121.6));
     globalThis.__testApiFetch = async () => ({ ok: true, data: { status: 'ZERO_RESULTS', structuredAddress: {} } });
     assert.equal((await reverseGeocodeLocation(14.7, 121.7)).status, 'ZERO_RESULTS');
-    assert.equal(browserCalls, 1);
+    assert.equal(browserCalls, 2);
     globalThis.__testApiFetch = async () => { throw new Error('offline'); };
     globalThis.window.google.maps.Geocoder = class { geocode() { return Promise.reject({ code: 'REQUEST_DENIED' }); } };
     const failed = await reverseGeocodeLocation(14.8, 121.8);

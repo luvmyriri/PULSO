@@ -4,7 +4,7 @@ import GovAccountPage from './pages/GovAccountPage';
 import GovAssistant from './components/government/GovAssistant';
 import { GovAssistantProvider } from './components/government/GovAssistantHost';
 import StaffPasswordPage from './pages/StaffPasswordPage';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { GoogleMapsProvider } from './contexts/GoogleMapsContext';
@@ -53,7 +53,9 @@ import ProtectedRoute, {
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import { initAuthSession, getAuthToken, getAuthUser } from './utils/authSession';
-import { isInstalledApp } from './utils/appContext';
+import { isInstalledApp, isNativeAndroid, isTutorialCompleted } from './utils/appContext';
+import NativeAndroidShell from './components/mobile/NativeAndroidShell';
+import NativeResidentLanding from './components/mobile/NativeResidentLanding';
 import './index.css';
 import './resident/evangelista.css';
 
@@ -111,8 +113,13 @@ function authenticatedDestination() {
     return GOV_ROLES.includes(user.role) ? '/gov/my-dashboard' : '/gov/account';
 }
 
-function ResidentEntry() {
+function ResidentEntry({ trackingRoute = false }) {
+    const [briefingComplete, setBriefingComplete] = useState(isTutorialCompleted);
     const destination = authenticatedDestination();
+    if (isNativeAndroid() && !trackingRoute && !briefingComplete) {
+        return <MobileAppTutorial firstLaunch isAuthenticated={destination === '/dashboard'} onComplete={() => setBriefingComplete(true)} />;
+    }
+    if (isNativeAndroid()) return <NativeResidentLanding residentSignedIn={destination === '/dashboard'} trackingRoute={trackingRoute} />;
     if (isInstalledApp() && destination) return <Navigate to={destination} replace />;
     return <Landing />;
 }
@@ -124,6 +131,8 @@ function AuthEntry({ children }) {
 }
 
 function App() {
+    const PlatformShell = isNativeAndroid() ? NativeAndroidShell : React.Fragment;
+
     useEffect(() => {
         // The first-HTML splash must leave even when an authenticated entry
         // redirects before Landing mounts.
@@ -134,16 +143,17 @@ function App() {
         <ThemeProvider>
             <GoogleMapsProvider>
                 <BrowserRouter>
+                <PlatformShell>
                 <ErrorBoundary>
                     <GovAssistantProvider>
                     <Routes>
                         {/* ── PUBLIC RESIDENT ROUTES ─────────────────────────── */}
                         <Route path="/"               element={<ResidentSurface><ResidentEntry /></ResidentSurface>} />
-                        <Route path="/resident-home"  element={<ResidentSurface><Landing directLanding /></ResidentSurface>} />
+                        <Route path="/resident-home"  element={isNativeAndroid() ? <Navigate to="/" replace /> : <ResidentSurface><Landing directLanding /></ResidentSurface>} />
                         <Route path="/tutorial"       element={<ResidentSurface><MobileAppTutorial replayMode={true} /></ResidentSurface>} />
                         <Route path="/report"         element={<ResidentSurface><ReportWizardPage /></ResidentSurface>} />
                         <Route path="/report/success" element={<ResidentSurface><ReportSuccessPage /></ResidentSurface>} />
-                        <Route path="/track"          element={<ResidentSurface><PublicTrackPage /></ResidentSurface>} />
+                        <Route path="/track"          element={<ResidentSurface>{isNativeAndroid() ? <ResidentEntry trackingRoute /> : <PublicTrackPage />}</ResidentSurface>} />
                         <Route path="/updates" element={<PublicUpdatesPage />} />
                         <Route path="/updates/:updateId" element={<PublicUpdatesPage />} />
                         <Route path="/login"          element={<AuthEntry><ResidentSurface><Login /></ResidentSurface></AuthEntry>} />
@@ -377,6 +387,7 @@ function App() {
                 </ErrorBoundary>
 
                 <ScrollToTop />
+                </PlatformShell>
             </BrowserRouter>
         </GoogleMapsProvider>
     </ThemeProvider>

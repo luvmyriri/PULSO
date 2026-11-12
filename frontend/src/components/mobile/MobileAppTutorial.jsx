@@ -1,3 +1,5 @@
+import NativeAppHeader from './NativeAppHeader';
+import NativeAppGuide from './NativeAppGuide';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -21,7 +23,8 @@ import {
   User,
   ArrowRight
 } from 'lucide-react';
-import { markTutorialCompleted } from '../../utils/appContext';
+import { isNativeAndroid, markTutorialCompleted } from '../../utils/appContext';
+import { useAndroidBack } from '../../utils/nativeAndroid';
 import { getAuthToken } from '../../utils/authSession';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ONBOARDING_CONTENT } from '../../data/onboardingContent';
@@ -34,7 +37,11 @@ import { ONBOARDING_CONTENT } from '../../data/onboardingContent';
  * media_1793045604744_055e2adc.png) and Light Mode (media_1793046317843_f67d95de.png).
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export default function MobileAppTutorial({
+export default function MobileAppTutorial(props) {
+  return isNativeAndroid() && !props.isTestMode ? <NativeAppGuide {...props} /> : <LegacyMobileAppTutorial {...props} />;
+}
+
+function LegacyMobileAppTutorial({
   replayMode = false,
   isAuthenticated,
   onComplete,
@@ -83,7 +90,7 @@ export default function MobileAppTutorial({
   const [currentStep, setCurrentStep] = useState(stepOverride || 1);
   const totalSteps = 5;
   const homeRoute = getAuthToken() ? '/dashboard' : '/resident-home';
-  const reportRoute = getAuthToken() ? '/dashboard?openReport=true' : '/report';
+  const reportRoute = getAuthToken() ? '/dashboard?openReport=true' : isNativeAndroid() ? '/report?source=guest' : '/report';
 
   const containerRef = useRef(null);
 
@@ -124,6 +131,8 @@ export default function MobileAppTutorial({
   const handleSkip = () => {
     finishTutorial(homeRoute, 'Skip tapped');
   };
+
+  useAndroidBack(currentStep > 1, 0, handleBack);
 
   // Keyboard navigation
   useEffect(() => {
@@ -213,11 +222,13 @@ export default function MobileAppTutorial({
       role="region"
       aria-label="PULSO Mobile Onboarding"
     >
+      {isNativeAndroid() && !isTestMode && <NativeAppHeader />}
       {/* Centered Phone Column */}
-      <div className="relative z-10 w-full max-w-[430px] mx-auto h-full max-h-full flex flex-col justify-between px-6 pt-3 pb-[max(0.9rem,env(safe-area-inset-bottom))] overflow-hidden">
+      <div className="relative z-10 w-full max-w-[430px] mx-auto h-full min-h-0 max-h-full flex flex-col justify-between px-6 pt-3 pb-[max(0.9rem,env(safe-area-inset-bottom))] overflow-hidden">
 
         {/* ── 1. Top Bar: Department Seal + Titles + Skip ── */}
-        <header className="w-full flex items-center justify-between min-h-[46px] shrink-0">
+        <header className={isNativeAndroid() && !isTestMode ? "w-full flex items-center justify-end min-h-[46px] shrink-0" : "w-full flex items-center justify-between min-h-[46px] shrink-0"}>
+          {(!isNativeAndroid() || isTestMode) && (
           <div className="flex items-center gap-2.5 text-left leading-tight">
             <div className={`w-8 h-8 rounded-full overflow-hidden shrink-0 border ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} p-0.5 shadow-2xs`}>
               <img
@@ -240,6 +251,7 @@ export default function MobileAppTutorial({
               </div>
             </div>
           </div>
+          )}
 
           <button
             type="button"

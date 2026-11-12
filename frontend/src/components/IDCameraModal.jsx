@@ -11,6 +11,8 @@ import {
 import { drawEvidenceWatermark, burnEvidenceWatermark, formatWatermarkTimestamp, formatWatermarkCoordinates } from '../utils/watermark';
 import { formatWatermarkAddress } from '../utils/locationPrivacy';
 import { API_BASE_URL } from '../utils/apiBase';
+import { useAndroidBack } from '../utils/nativeAndroid';
+import { isNativeAndroid } from '../utils/appContext';
 import PulsoPulseLine from './common/PulsoPulseLine';
 import CameraTopBar from './camera/CameraTopBar';
 import CameraMessage from './camera/CameraMessage';
@@ -94,6 +96,9 @@ const IDCameraModal = ({
     ratioOverride = null,
     onRatioChange = null
 }) => {
+    useAndroidBack(isOpen, 50, onClose);
+    const nativeCamera = isNativeAndroid() && !standalone;
+
     // Dynamic theme awareness: uses prop if supplied, otherwise observes html.dark class
     const [isSystemDark, setIsSystemDark] = useState(() => {
         if (typeof document !== 'undefined') {
@@ -145,9 +150,6 @@ const IDCameraModal = ({
     // Zoom state (1.0x to 5.0x, gestures & native/CSS scale)
     const [zoom, setZoom] = useState(1);
     const [hasNativeZoom, setHasNativeZoom] = useState(false);
-    const [isPinching, setIsPinching] = useState(false);
-    const [showZoomIndicator, setShowZoomIndicator] = useState(false);
-    const zoomIndicatorTimerRef = useRef(null);
     const touchStartRef = useRef({ dist: 0, initialZoom: 1 });
     const zoomRef = useRef(zoom);
     const viewfinderRef = useRef(null);
@@ -298,11 +300,6 @@ const IDCameraModal = ({
     const applyZoom = useCallback(async (newZoom) => {
         const clamped = Math.min(Math.max(Math.round(newZoom * 10) / 10, 1), 5);
         setZoom(clamped);
-        setShowZoomIndicator(true);
-        if (zoomIndicatorTimerRef.current) clearTimeout(zoomIndicatorTimerRef.current);
-        zoomIndicatorTimerRef.current = setTimeout(() => {
-            setShowZoomIndicator(false);
-        }, 1800);
 
         if (streamRef.current && hasNativeZoom) {
             const track = streamRef.current.getVideoTracks()[0];
@@ -325,19 +322,12 @@ const IDCameraModal = ({
                 e.touches[0].clientY - e.touches[1].clientY
             );
             touchStartRef.current = { dist, initialZoom: zoomRef.current };
-            setIsPinching(true);
-            setShowZoomIndicator(true);
         }
     };
 
     const handleTouchEnd = (e) => {
         if (e.touches.length < 2) {
-            setIsPinching(false);
             touchStartRef.current.dist = 0;
-            if (zoomIndicatorTimerRef.current) clearTimeout(zoomIndicatorTimerRef.current);
-            zoomIndicatorTimerRef.current = setTimeout(() => {
-                setShowZoomIndicator(false);
-            }, 1800);
         }
     };
 
@@ -837,6 +827,7 @@ const IDCameraModal = ({
         <AnimatePresence>
             {isOpen && (
                 <div
+                    data-native-camera={nativeCamera || undefined}
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="camera-screen-title"
@@ -848,14 +839,14 @@ const IDCameraModal = ({
                     } overflow-hidden select-none touch-none`}
                     style={{
                         touchAction: 'none',
-                        paddingTop: standalone ? '0px' : 'env(safe-area-inset-top, 0px)',
-                        paddingBottom: standalone ? '0px' : 'env(safe-area-inset-bottom, 0px)'
+                        paddingTop: standalone || nativeCamera ? '0px' : 'env(safe-area-inset-top, 0px)',
+                        paddingBottom: standalone || nativeCamera ? '0px' : 'env(safe-area-inset-bottom, 0px)'
                     }}
                 >
                     {/* Smartphone Camera Frame: Fullscreen on mobile/standalone, sleek smartphone viewport on desktop */}
                     <div
                         className={`relative w-full h-full ${
-                            standalone
+                            standalone || nativeCamera
                                 ? ''
                                 : `sm:w-[412px] sm:h-[min(92dvh,860px)] sm:rounded-[2.25rem] sm:border-[3px] ${
                                     isDark
@@ -879,6 +870,7 @@ const IDCameraModal = ({
                             titleId="camera-screen-title"
                             isDark={isDark}
                             translucent={isFullBleed16x9}
+                            nativeCamera={nativeCamera}
                             showRatioControl={isIssue && isLiveState}
                             photoRatio={photoRatio}
                             centerContent={isLiveState ? <CameraZoomControls zoom={zoom} onZoomChange={applyZoom} /> : null}
@@ -1035,15 +1027,6 @@ const IDCameraModal = ({
                                         />
                                     )}
 
-                                    {/* Floating Zoom Indicator Pill (visible on zoom change or pinch) */}
-                                    {(showZoomIndicator || isPinching || zoom > 1) && (
-                                        <div className="absolute top-3 inset-x-0 flex justify-center pointer-events-none z-30 transition-opacity duration-200">
-                                            <div className="bg-black/75 backdrop-blur-md px-3.5 py-1 rounded-full text-white text-xs font-mono font-bold border border-white/20 shadow-lg flex items-center gap-1.5 animate-in fade-in">
-                                                <span className="text-white font-bold">{zoom.toFixed(1)}x</span>
-                                                <span className="text-white/80 font-sans text-[11px]">Zoom</span>
-                                            </div>
-                                        </div>
-                                    )}
 
                                     {/* ID Card Silhouette (Only when capturing resident ID) */}
                                     {!isIssue && (
@@ -1096,6 +1079,7 @@ const IDCameraModal = ({
                         {/* ─────────────────────────────────────────────────────────── */}
                         <footer
                             className="w-full bg-transparent px-4 pt-2.5 pb-4 z-30 shrink-0 transition-colors duration-300"
+                            style={nativeCamera ? { paddingBottom: 'max(1rem, var(--pulso-safe-bottom, 0px))' } : undefined}
                         >
                             {isPreviewAcceptedState ? (
                                 /* Acceptance actions in bottom deck */

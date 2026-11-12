@@ -9,7 +9,7 @@ import PwaModal from '../components/landing/PwaModal';
 import MobileAppTutorial from '../components/mobile/MobileAppTutorial';
 import MobileAppSplashScreen from '../components/mobile/MobileAppSplashScreen';
 import PulsoPulseLine from '../components/common/PulsoPulseLine';
-import { isInstalledApp, isTutorialCompleted } from '../utils/appContext';
+import { isInstalledApp, isNativeAndroid, isTutorialCompleted } from '../utils/appContext';
 import { getAuthToken } from '../utils/authSession';
 
 // Lazy-load below-the-fold components for ultra-fast initial paint
@@ -92,6 +92,8 @@ export default function Landing({ directLanding = false }) {
     if (isAuthenticated) {
       return <Navigate to="/dashboard" replace />;
     }
+
+    if (isNativeAndroid()) return <Navigate to="/report?source=guest" replace />;
 
     // Returning guests use the public entry below. The report flow remains an
     // explicit choice and its Home action can return here.

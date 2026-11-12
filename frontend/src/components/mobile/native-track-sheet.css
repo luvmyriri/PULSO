@@ -1,0 +1,32 @@
+.native-track-sheet__form, .native-track-sheet__fields { display: grid; gap: .75rem; }
+.native-track-sheet__fields label { margin-bottom: .25rem; }
+.native-track-sheet__input { position: relative; }
+.native-track-sheet__input > svg {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: .875rem;
+  transform: translateY(-50%);
+  color: var(--home-muted);
+  pointer-events: none;
+}
+.native-track-sheet__fields input {
+  min-height: 48px;
+  padding-block: .5rem;
+  padding-inline: 1rem 2.75rem;
+  border: 2px solid var(--home-action);
+  border-radius: .875rem;
+  background: color-mix(in srgb, var(--home-ink) 5%, var(--home-surface));
+  color: var(--home-ink);
+}
+.native-track-sheet__fields input::placeholder { color: var(--home-muted); font-weight: 500; opacity: 1; }
+.native-track-sheet__form button[type='submit'] { min-height: 44px; padding-block: .5rem; }
+.native-track-sheet__form button[type='submit']:disabled {
+  background: color-mix(in srgb, var(--home-ink) 9%, var(--home-surface));
+  color: var(--home-muted);
+  opacity: 1;
+}
+
+@media (forced-colors: active) {
+  .native-track-sheet__fields input { background: Field; color: FieldText; border-color: CanvasText; }
+  .native-track-sheet__fields input::placeholder { color: GrayText; }
+}

@@ -2046,7 +2046,7 @@ def get_my_work_orders(
             from government_access import can, scoped_reports
             report = scoped_reports(db.query(models.Report), current_user).filter(models.Report.id == wo.report_id).first() if can(current_user, 'reports') else None
             if report:
-                loc_string = report.location_string
+                loc_string = report.location_string or report.location_barangay
                 loc_lat = report.location_lat
                 loc_lng = report.location_lng
                 report_image = report.image_url
@@ -2064,9 +2064,9 @@ def get_my_work_orders(
             "priority": wo.priority,
             "wo_type": wo.wo_type,
             "description": wo.description,
-            "location_string": loc_string or wo.location_string,
-            "location_lat": loc_lat if loc_lat is not None else wo.location_lat,
-            "location_lng": loc_lng if loc_lng is not None else wo.location_lng,
+            "location_string": loc_string or (wo.barangay_ref.name if wo.barangay_ref else None),
+            "location_lat": loc_lat,
+            "location_lng": loc_lng,
             "report_id": wo.report_id,
             "report_image": report_image,
             "proof_image": latest_update.image_url if latest_update and latest_update.image_url else None,
