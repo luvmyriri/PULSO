@@ -34,6 +34,9 @@ build/
 .pub-cache/
 .pub/
 
+# Retired Flutter app: preserve local SDK/build remnants after the Android migration.
+mobile_app/
+
 # Local databases
 *.db
 *.sqlite3

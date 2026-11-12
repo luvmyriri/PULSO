@@ -129,7 +129,10 @@ try {
     assert.equal(await header.evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)');
     assert.equal(await header.locator('a[href="/login"]').count(), 1, 'Guest header offers sign-in');
     if(screenshots) await page.screenshot({path:join(screenshots,'guest-header-'+theme+'.png')});
+    await page.waitForFunction(() => document.querySelector('fieldset') && !document.querySelector('fieldset').disabled);
+    await header.locator('a[href="/login"]').click();
+    await page.waitForURL('**/login');
     await page.close();
   }
-  console.log('PASS: report photos use backend URLs, missing evidence has an honest localized fallback, only bell shows unread count, guest header is transparent in both themes.');
+  console.log('PASS: native photos, localized missing evidence, bell-only badges, transparent guest headers and draft-safe header navigation in both themes.');
 } finally {await browser.close();}
