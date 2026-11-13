@@ -49,7 +49,7 @@ class RoutingAreaDecision(BaseModel):
 
 
 def _clerk_owner(db, user, report, action):
-    if user.role not in review.CLERK_ROLES:
+    if not review.permitted(user,'intake'):
         raise HTTPException(403,'This intake handoff is available only to an assigned clerk.')
     review.require_decision(db,user,report,action)
     if report.status not in review.INTAKE:
@@ -57,7 +57,7 @@ def _clerk_owner(db, user, report, action):
 
 
 def _handoff_owner(db, user, report):
-    action = 'intake' if user.role in review.CLERK_ROLES else 'review'
+    action = 'intake' if review.permitted(user,'intake') and not review.permitted(user,'review') else 'review'
     if review.permitted(user,'verify'):
         raise HTTPException(403,'An authorized engineering verifier should make the report decision directly.')
     review.require_decision(db,user,report,action)
@@ -68,7 +68,9 @@ def _handoff_owner(db, user, report):
 
 
 def require_report_access(db,user,report):
-    require(user,'reports')
+    if not isinstance(user,models.Official): raise HTTPException(403,'Staff access is required.')
+    owned = report.review_assigned_to_id == user.id or db.query(gm.WorkOrder.id).filter_by(report_id=report.id,assigned_to_id=user.id).first() is not None
+    if not owned: require(user,'reports')
     require_report_scope(db,user,report)
     from gov_router import FIELD_SELF_ROLES
     if user.role in FIELD_SELF_ROLES and not db.query(gm.WorkOrder.id).filter_by(report_id=report.id,assigned_to_id=user.id).first():
@@ -76,7 +78,6 @@ def require_report_access(db,user,report):
 
 
 def get_report(db,user,id,lock=False):
-    require(user,'reports')
     query = db.query(models.Report).filter_by(id=id)
     report = (query.with_for_update() if lock else query).first()
     if not report: raise HTTPException(404,'Report not found.')
@@ -98,9 +99,16 @@ def report_operations(ids: str = Query('',max_length=12000),db:Session=Depends(g
 
 @router.get('/{report_id}/reviewers')
 def eligible_reviewers(report_id:int,db:Session=Depends(get_db),user=Depends(get_current_user)):
+    from reviewer_availability import snapshot
     report = get_report(db,user,report_id)
     review.require_decision(db,user,report,'assign')
-    return [dict(id=p.id,full_name=p.full_name,role=p.role) for p in review.eligible(db,report,manual=True)]
+    people = []
+    for person in review.eligible(db,report,manual=True):
+        status = snapshot(db,person)
+        people.append(dict(id=person.id,full_name=person.full_name,role=person.role,
+            availability=status['effective_state'] if status['eligible'] else 'manual intake',
+            open_reviews=status['open_reviews'], capacity=status['capacity']))
+    return people
 
 
 @router.get('/{report_id}/routing-areas')

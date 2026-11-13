@@ -1,0 +1,7 @@
+.role-editor { max-width: 760px; }
+.role-editor__modules { max-height: 42dvh; overflow-y: auto; padding-inline-end: 4px; }
+.role-editor__modules .gov-access-choices { margin-block: 10px; }
+.role-editor__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; }
+.role-grant-line { display: contents; }
+.role-grant-line dd { overflow-wrap: anywhere; }
+@media (max-width: 540px) { .role-editor__actions { grid-template-columns: 1fr; } }

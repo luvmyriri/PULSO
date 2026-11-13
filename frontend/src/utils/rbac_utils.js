@@ -1,4 +1,4 @@
-import { adminAllows } from './adminAccess';
+import { adminAllows } from './adminAccess.js';
 /**
  * rbac_utils.js
  * ──────────────────────────────────────────────────────────────────────
@@ -45,6 +45,11 @@ export const checkPermission = (user, rawModule, action) => {
     
     const userRole = user.role;
     const capabilities = user.capabilities || {};
+    // A stored restriction must win over role defaults and related-module aliases.
+    if (Object.prototype.hasOwnProperty.call(capabilities, rawModule)) {
+        const grant = capabilities[rawModule];
+        return Array.isArray(grant) && (grant.includes('*') || grant.includes(action));
+    }
     
     if (userRole === 'system_admin' || userRole === 'city_engineer' || userRole === 'asst_city_engineer' || userRole === 'manager') return true;
     if (userRole === 'dispatcher' && (rawModule === 'ops' || rawModule === 'reports' || rawModule === 'dispatch')) return true;

@@ -1,3 +1,4 @@
+import { fieldIncidentPoint } from '../utils/fieldSurvey';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -296,7 +297,7 @@ export default function FieldWorkspacePage() {
                                     latitude: Number(pos.coords.latitude.toFixed(7)),
                                     longitude: Number(pos.coords.longitude.toFixed(7)),
                                     status: dutyStatus,
-                                    accuracy: pos.coords.accuracy ? Number(pos.coords.accuracy.toFixed(1)) : 5.0,
+                                    accuracy: Number.isFinite(pos.coords.accuracy) && pos.coords.accuracy > 0 ? pos.coords.accuracy : null,
                                     battery_level: batteryLevel,
                                     location_name: `Caloocan Field Crew - ${dutyStatus.replace('_', ' ').toUpperCase()}`
                                 })
@@ -1329,8 +1330,13 @@ function FieldIncidentForm({ currentCoords, onSubmitted }) {
         setSubmitting(true);
         setStatusMessage('');
 
-        const lat = currentCoords?.lat || 14.7565;
-        const lng = currentCoords?.lng || 121.0435;
+        const point = fieldIncidentPoint(currentCoords);
+        if (!point) {
+            setStatusMessage('A device location is needed for this field report. Enable location and try again; your description is kept.');
+            setSubmitting(false);
+            return;
+        }
+        const { lat, lng } = point;
 
         const token = getAuthToken();
 

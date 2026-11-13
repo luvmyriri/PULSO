@@ -36,6 +36,12 @@ def can(user, module, action='view'):
         return role in COORDINATORS | VERIFIERS | {'design_engineer', 'estimator', 'system_admin'} or (isinstance(caps.get('analytics'), list) and 'view' in caps['analytics'])
     if module == 'overview':
         return can(user, 'insights', action)
+    if module == 'analytics':
+        return can(user, 'insights', action)
+    if module == 'obo':
+        return action == 'view' or role in {'city_engineer', 'asst_city_engineer', 'manager', 'system_admin', 'admin', 'building_inspector', 'electrical_inspector', 'mechanical_inspector', 'admin_clerk'}
+    if module == 'field':
+        return action == 'view' and role in {'project_engineer', 'dispatcher', 'building_inspector', 'asst_city_engineer', 'city_engineer', 'manager', 'foreman', 'construction_foreman', 'field_worker', 'system_admin', 'admin'}
     if module == 'reports':
         return action == 'view' or role in COORDINATORS
     return False

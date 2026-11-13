@@ -6,6 +6,7 @@ import { useGovernmentData } from '../utils/governmentApi';
 import { exportWorkQueueToXLSX } from '../utils/xlsxExport';
 import ReportPriority from '../components/government/ReportPriority';
 import ReportDocket from '../components/government/ReportDocket';
+import { WorkOrderRecord } from './WorkOrdersWorkspace';
 
 const BUCKETS = [{ value: 'all', label: 'All work' }, { value: 'assigned_to_me', label: 'Assigned to me' }, { value: 'needs_my_review', label: 'Needs review' }, { value: 'waiting_on_others', label: 'Waiting on others' }, { value: 'review_overdue', label: 'Review overdue' }, { value: 'recently_completed', label: 'Completed recently' }];
 const key = row => `${row.entity_type}:${row.id}`;
@@ -13,7 +14,7 @@ const reviewOverdue = row => Boolean(row.review_target?.overdue || (row.next_rev
 
 export default function GovTodayPage() {
     const location = useLocation();
-    const { data, loading, error, reload, fetchedAt } = useGovernmentData('/api/gov/operations/today');
+    const { data, loading, error, reload, fetchedAt } = useGovernmentData('/api/gov/operations/today', { pollMs: 15000 });
     const [params, setParams] = useSearchParams();
     const returnFocus = useRef(null);
     const [exporting, setExporting] = useState(false);
@@ -68,7 +69,8 @@ export default function GovTodayPage() {
                     { key: 'updated_at', label: 'Updated', render: r => <>{formatDate(r.updated_at)}{r.review_target&&<small>{r.review_target.overdue?'Review overdue':'Review due'} · {formatDate(r.review_target.due_at)}</small>}{r.next_review_at&&<small>{reviewOverdue(r)?'Review overdue':'Review due'} · {formatDate(r.next_review_at)}</small>}</> },
                 ]} />
                 {selected?.entity_type === 'report' && <div className="gov-work-report-docket"><ReportDocket key={selected.id} selected={{ id: selected.id, ticket_id: selected.ticket_id, title: selected.title, barangay: selected.barangay }} onClose={close} onChanged={reload} showFullReportLink={false} /></div>}
-                {selected && selected.entity_type !== 'report' && <GovDetail title={selected.title} onClose={close} actions={<Link className="gov-button is-primary" to={recordUrl}>{selected.recommended_action}<ArrowUpRight size={15} /></Link>}>
+                {selected?.entity_type === 'work_order' && <WorkOrderRecord key={selected.id} id={selected.id} onClose={close} onChanged={reload} />}
+                {selected && !['report','work_order'].includes(selected.entity_type) && <GovDetail title={selected.title} onClose={close} actions={<Link className="gov-button is-primary" to={recordUrl}>{selected.recommended_action}<ArrowUpRight size={15} /></Link>}>
                     <section><GovStatus value={selected.status} /><p className="gov-note">{selected.ticket_id}</p><dl className="gov-facts"><dt>Location</dt><dd>{selected.barangay || 'Not recorded'}</dd><dt>Owner</dt><dd>{selected.assigned_to_name || 'Shared review queue'}</dd><dt>Priority</dt><dd>{selected.entity_type==='report'?<ReportPriority grade={selected.priority}/>:<GovStatus value={selected.priority}/>}</dd><dt>Updated</dt><dd>{formatDate(selected.updated_at)}</dd>{selected.review_target&&<><dt>Initial review target</dt><dd>{formatDate(selected.review_target.due_at)}{selected.review_target.overdue&&<small>Overdue</small>}</dd></>}</dl></section>
                     <section><h3>Why this is here</h3><p>{selected.why_in_inbox}</p><h3>Next step</h3><p>{selected.recommended_action}. Open the record to inspect the evidence and available actions.</p></section>
                 </GovDetail>}

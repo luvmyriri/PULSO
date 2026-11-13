@@ -165,15 +165,17 @@ def test_rejection_requires_reason_and_eligible_intake_state(monkeypatch):
     assert reason_error.value.status_code == 422
 
 
-def test_report_and_internal_timeline_reads_reject_unscoped_official(monkeypatch):
-    monkeypatch.setattr(main.crud, "get_report", lambda *_args, **_kwargs: SimpleNamespace(id=4, resident_id=9, claimed_by_user_id=None))
-    actor = models.Official(id=12, role="records_officer")
-    with pytest.raises(HTTPException) as report_error:
-        main.read_report(report_id=4, db=SimpleNamespace(), current_user=actor)
-    assert report_error.value.status_code == 403
-    with pytest.raises(HTTPException) as timeline_error:
-        main.read_report_timeline(report_id=4, db=SimpleNamespace(), current_user=actor)
-    assert timeline_error.value.status_code == 403
+def test_report_and_internal_timeline_reads_require_view_and_jurisdiction(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        restricted_role(db,2)
+    for suffix in ('','/timeline'):
+        assert client.get(f'/api/reports/1{suffix}',headers=tokens['clerk']).status_code==403
+    with sessions() as db:
+        db.get(models.Official,1).primary_jurisdiction=[2]
+        db.commit()
+    for suffix in ('','/timeline'):
+        assert client.get(f'/api/reports/1{suffix}',headers=tokens['chief']).status_code==403
 
 
 def test_public_static_mount_does_not_serve_documents():
@@ -365,3 +367,97 @@ def test_field_worker_cannot_read_another_assignment():
     with pytest.raises(HTTPException) as error:
         gov_router._require_work_order_view(wo, worker)
     assert error.value.status_code == 403
+
+
+def restricted_role(db, user_id, **overrides):
+    caps = {key: [] for key in ('reports','work_orders','field','maintenance','analytics','insights','records','projects','announcements','admin','report_review','obo','procurement')}
+    caps['overview'] = ['view']
+    caps.update(overrides)
+    role=models.SystemRole(name='FAKE restricted operational profile',capabilities=caps)
+    db.add(role); db.flush()
+    db.get(models.Official,user_id).role_id=role.id
+    db.commit()
+
+
+def test_only_granted_sections_appear_and_direct_queues_are_denied(context):
+    client,sessions,tokens=context
+    with sessions() as db: restricted_role(db,1)
+    response=client.get('/api/gov/navigation',headers=tokens['chief'])
+    assert response.status_code==200
+    assert set(response.json()['modules'])=={'my-work','overview'}
+    for path in ('/api/reports','/api/reports/user/1','/api/reports/1','/api/reports/1/timeline','/api/gov/report-map','/api/gov/work-orders','/api/gov/work-order-workspace','/api/gov/analytics/summary','/api/gov/predictive/health','/api/gov/reports/1/docket','/api/gov/obo','/api/gov/obo-workspace'):
+        response=client.get(path,headers=tokens['chief'])
+        assert response.status_code==403,(path,response.text)
+    overview=client.get('/api/gov/overview',headers=tokens['chief'])
+    assert overview.status_code==200
+    assert overview.json()['dashboard']=={'report_types':None,'work':None,'projects':None,'inventory':None,'feedback':None}
+    assert client.get('/api/gov/operations/today',headers=tokens['chief']).status_code==200
+
+
+def test_view_only_report_and_work_permissions_hide_commands_and_deny_posts(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        restricted_role(db,1,reports=['view'],work_orders=['view'])
+        db.add(gm.WorkOrder(id=501,wo_number='FAKE-PERMISSION-WORK',title='FAKE restricted assignment',status='open',district_id=1))
+        db.commit()
+    docket=client.get('/api/gov/reports/1/docket',headers=tokens['chief'])
+    assert docket.status_code==200,docket.text
+    assert docket.json()['allowed_actions']==[]
+    assert docket.json()['can_assign_review'] is False
+    assert docket.json()['can_grade_priority'] is False
+    assert client.get('/api/gov/work-order-workspace',headers=tokens['chief']).json()['can_create'] is False
+    commands=client.get('/api/gov/work-order-actions/501',headers=tokens['chief'])
+    assert commands.status_code==200
+    assert 'assign' not in commands.json()['allowed_actions']
+    assignment=client.post('/api/gov/report-review/1/assignment',headers=tokens['chief'],json={'expected_version':1,'assigned_to_id':2,'reason':'FAKE forbidden assignment attempt'})
+    assert assignment.status_code==403,assignment.text
+    assert client.post('/api/gov/report-review/1/take',headers=tokens['chief'],json={'expected_version':1}).status_code==403
+    assert client.post('/api/gov/work-orders/501/assignment',headers=tokens['chief'],json={'assigned_to_id':4,'reason':'FAKE forbidden work assignment'}).status_code==403
+    assert client.post('/api/gov/work-orders/501/verify',headers=tokens['chief'],json={'passed':True}).status_code==403
+    assert client.patch('/api/gov/work-orders/501/status',headers=tokens['chief'],json={'status':'in_progress'}).status_code==403
+
+
+def test_hidden_report_queue_does_not_break_assigned_my_work_docket(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        restricted_role(db,2,report_review=['intake','peer_transfer'])
+        db.get(models.Report,1).review_assigned_to_id=2
+        db.commit()
+    assert client.get('/api/reports',headers=tokens['clerk']).status_code==403
+    owned=client.get('/api/gov/reports/1/docket',headers=tokens['clerk'])
+    assert owned.status_code==200,owned.text
+    assert owned.json()['can_assign_review'] is False
+    assert 'verify' not in owned.json()['allowed_actions']
+    assert client.get('/api/reports/1',headers=tokens['clerk']).status_code==200
+    assert client.get('/api/reports/1/timeline',headers=tokens['clerk']).status_code==200
+    assert client.get('/api/gov/reports/2/docket',headers=tokens['clerk']).status_code==403
+
+
+def test_staff_and_resident_ids_cannot_cross_account_types(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        db.add(models.Resident(id=1,full_name='FAKE numeric collision',email='collision@test.invalid',password_hash='test-not-login',is_active=True,is_verified=True))
+        db.get(models.Report,1).resident_id=1
+        restricted_role(db,1)
+    assert client.get('/api/me/reports',headers=tokens['chief']).status_code==403
+    assert client.get('/api/reports/user/1',headers=tokens['chief']).status_code==403
+    assert client.get('/api/me/reports',headers=tokens['owner']).status_code==200
+    assert client.get('/api/reports/user/101',headers=tokens['owner']).status_code==403
+
+
+def test_personal_work_does_not_include_unauthorized_independent_reviews(context):
+    client,sessions,tokens=context
+    with sessions() as db:
+        restricted_role(db,1)
+        db.add_all([
+            gm.WorkOrder(id=501,wo_number='FAKE-OWN-WORK',title='FAKE own work',status='assigned',assigned_to_id=1,district_id=1),
+            gm.WorkOrder(id=502,wo_number='FAKE-OTHER-REVIEW',title='FAKE unauthorized review',status='completed_pending_review',assigned_to_id=4,district_id=1),
+        ])
+        db.commit()
+    personal=client.get('/api/gov/operations/today',headers=tokens['chief'])
+    assert personal.status_code==200,personal.text
+    assert [row['id'] for row in personal.json()['needs_attention'] if row['entity_type']=='work_order']==[501]
+    assert personal.json()['can_route_reports'] is False
+    assert client.get('/api/gov/work-orders/501',headers=tokens['chief']).status_code==200
+    assert client.get('/api/gov/timeline/work-order/501',headers=tokens['chief']).status_code==200
+    assert client.get('/api/gov/work-orders/502',headers=tokens['chief']).status_code==403

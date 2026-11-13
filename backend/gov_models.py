@@ -14,7 +14,7 @@ Covers:
 
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime,
-    Float, ForeignKey, Text, Enum, JSON, Date, UniqueConstraint, Numeric
+    Float, ForeignKey, Text, Enum, JSON, Date, UniqueConstraint, Numeric, CheckConstraint
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -756,6 +756,41 @@ class AssetInspectionOutcome(Base):
     recorded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     review_status = Column(String(16), nullable=False, default="pending", index=True)
     reviewed_by_id = Column(Integer, ForeignKey("officials.id", ondelete="RESTRICT"), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    review_reason = Column(Text, nullable=True)
+
+
+class AssetFieldObservation(Base):
+    """First-party survey claims, including unobserved sites; not model labels."""
+    __tablename__ = 'asset_field_observations'
+    __table_args__ = (
+        UniqueConstraint('evidence_reference', name='uq_field_observation_evidence_reference'),
+        CheckConstraint("visibility IN ('visible','not_visible','unsafe','missing')", name='ck_field_visibility'),
+        CheckConstraint("condition IN ('defect_observed','no_defect_observed','not_assessed')", name='ck_field_condition'),
+        CheckConstraint("visibility = 'visible' OR condition = 'not_assessed'", name='ck_field_unknown_condition'),
+        CheckConstraint("review_status IN ('pending','accepted','rejected')", name='ck_field_review_status'),
+    )
+    id = Column(String(36), primary_key=True)
+    command_hash = Column(String(64), nullable=False, unique=True)
+    payload_hash = Column(String(64), nullable=False)
+    asset_id = Column(String, ForeignKey('infrastructure_assets.asset_id', ondelete='RESTRICT'), nullable=False, index=True)
+    source_report_id = Column(Integer, ForeignKey('reports.id', ondelete='RESTRICT'), nullable=True)
+    observed_at = Column(DateTime(timezone=True), nullable=False)
+    visibility = Column(String(20), nullable=False)
+    condition = Column(String(24), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    accuracy_m = Column(Float, nullable=True)
+    location_metadata = Column(JSON, nullable=False)
+    boundary_status = Column(String(32), nullable=False)
+    notes = Column(Text, nullable=False)
+    evidence_reference = Column(String(36), ForeignKey('asset_inspection_evidence.id', ondelete='RESTRICT'), nullable=True)
+    recorded_by_id = Column(Integer, ForeignKey('officials.id', ondelete='RESTRICT'), nullable=False)
+    recorded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    review_status = Column(String(16), nullable=False, default='pending')
+    identity_confirmed = Column(Boolean, nullable=False, default=False)
+    location_reviewed = Column(Boolean, nullable=False, default=False)
+    reviewed_by_id = Column(Integer, ForeignKey('officials.id', ondelete='RESTRICT'), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     review_reason = Column(Text, nullable=True)
 

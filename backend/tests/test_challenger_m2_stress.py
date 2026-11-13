@@ -477,7 +477,7 @@ class TestConcurrencyAndRaceConditions:
         """
         Duplicate detection test: Multiple submissions for the exact same category
         at the exact same GPS coordinates (14.7565, 121.0450) with distinct IPs.
-        First one succeeds with 201 Created; subsequent ones within 15m receive 409 Conflict.
+        Each independent operation receives its own ticket; concern linking is separate.
         """
         results = []
         for i in range(5):
@@ -495,8 +495,9 @@ class TestConcurrencyAndRaceConditions:
         created_count = status_codes.count(status.HTTP_201_CREATED)
         conflict_count = status_codes.count(status.HTTP_409_CONFLICT)
 
-        assert created_count == 1, f"Exactly one submission must succeed (got {created_count})"
-        assert conflict_count == 4, f"Subsequent 4 duplicates must be rejected with 409 (got {conflict_count})"
+        assert created_count == 5, f"Each independent submission must succeed (got {created_count})"
+        assert conflict_count == 0
+        assert len({body["ticket_id"] for _, body in results}) == 5
 
     def test_concurrent_claim_race_condition_different_residents(self, client, resident_alpha, resident_beta):
         """

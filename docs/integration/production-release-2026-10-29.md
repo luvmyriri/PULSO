@@ -42,3 +42,9 @@ The preceding source release remains `/opt/pulso/releases/20261028-admin-navigat
 The activation procedure has an application rollback path that retains the database and its newer compatible columns. Do not restore the database backup automatically: doing so could discard legitimate records created after the backup. No rollback was required.
 
 Actual SMTP/SMS delivery, provider login/CAPTCHA completion, validated predictive scoring, and every upstream hazard feed were outside these read-only deployment checks.
+
+## Report handling and access release
+
+Release `20261029-e789baca-report-decisions-v1` was deployed to the same VPS on 29 October after the user authorized System Admin technical report decisions. Its source is local commit `e789baca` plus the 41-file report handling and role-access overlay; the overlay SHA-256 is `9c3f9c13a7d2525caa520739bc75dba1d6acb401f1f3ff9d3b25caf75f153ded`. No database migration or civic-record import was needed. The production backup is `/opt/pulso/backups/20261029T071957Z`.
+
+The isolated PostGIS regression run passed 151 tests. API and web images built and became healthy. Public root, API health and the government route returned HTTP 200; anonymous government navigation returned HTTP 401. A read-only production check found an active System Admin and a pending report whose docket now offers verify, reject, request information and take. The prior release source and images remain available for rollback. No live report decision was submitted during deployment verification.

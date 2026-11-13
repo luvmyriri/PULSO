@@ -90,15 +90,16 @@ def test_guest_and_registered_intake_reach_government_and_my_work(connected):
     assert client.get('/api/reports').status_code in (401, 403)
 
 
-def test_duplicate_protection_survives_the_merge(connected, monkeypatch):
+def test_same_problem_preserves_independent_resident_reports(connected, monkeypatch):
     client, sessions, headers, uploads = connected
     monkeypatch.delenv('PYTEST_CURRENT_TEST', raising=False)
     first = submit(client)
     assert first.status_code == 201, first.text
     second = submit(client)
-    assert second.status_code == 409, second.text
+    assert second.status_code == 201, second.text
+    assert second.json()['ticket_id'] != first.json()['ticket_id']
     with sessions() as db:
-        assert db.query(models.Report).count() == 1
+        assert db.query(models.Report).count() == 2
 
 
 def test_snapshot_paging_does_not_omit_older_reports(connected):

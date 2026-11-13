@@ -32,6 +32,7 @@ class AndroidUpdateTests(unittest.TestCase):
 
     def test_unpublished_is_unavailable_not_current(self):
         self.assertEqual(self.client.get('/api/mobile/app-updates/latest').status_code, 503)
+        self.assertEqual(self.client.get('/api/mobile/app-updates/download').status_code, 503)
 
     def test_latest_and_download_are_uncached_and_consistent(self):
         self.publish_fixture()
@@ -42,6 +43,12 @@ class AndroidUpdateTests(unittest.TestCase):
         self.assertEqual(apk.content, b'apk')
         self.assertEqual(apk.headers['content-type'], 'application/vnd.android.package-archive')
         self.assertEqual(apk.headers['cache-control'], 'no-store')
+        stable = self.client.get('/api/mobile/app-updates/download')
+        self.assertEqual(stable.content, apk.content)
+        self.assertEqual(stable.headers['content-type'], apk.headers['content-type'])
+        self.assertEqual(stable.headers['cache-control'], 'no-store')
+        self.assertEqual(stable.headers['x-content-type-options'], 'nosniff')
+        self.assertIn('PULSO-2.4.4.apk', stable.headers['content-disposition'])
 
     def test_replaced_version_requires_fresh_check(self):
         self.publish_fixture()

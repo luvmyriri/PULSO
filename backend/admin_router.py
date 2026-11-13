@@ -183,7 +183,7 @@ def accept_staff_credentials(payload: StaffCredentialAccept, db: Session = Depen
 
 @router.get('/access')
 def admin_access(admin=Depends(require_admin)):
-    return dict(tabs=[name for name,action in [('staff','staff_view'),('residents','residents_view'),('settings','settings_view'),('automated-ai','settings_view'),('audit','audit_view')] if staff_accounts.allowed(admin,action)])
+    return dict(tabs=[name for name,action in [('staff','staff_view'),('roles','staff_view'),('residents','residents_view'),('settings','settings_view'),('automated-ai','settings_view'),('audit','audit_view')] if staff_accounts.allowed(admin,action)], can_manage_roles='*' in staff_accounts.admin_grants(admin))
 
 
 @router.get('/staff-options')
@@ -200,7 +200,7 @@ def staff_options(db: Session = Depends(get_db), admin=Depends(admin_action('sta
         roles={name:item for name,item in roles.items() if name not in ('admin','system_admin') and not any(r.name==name and (r.capabilities or {}).get('admin') for r in stored)}
     return dict(can_manage=staff_accounts.allowed(admin,'staff_manage'),can_grant_citywide=not ids and '*' in staff_accounts.admin_grants(admin),
         roles=sorted(roles.values(),key=lambda r:r['label']),districts=[dict(id=d.id,name=d.name) for d in districts.order_by(models.District.id)],
-        tabs=[name for name,action in [('staff','staff_view'),('residents','residents_view'),('settings','settings_view'),('automated-ai','settings_view')] if staff_accounts.allowed(admin,action)])
+        tabs=[name for name,action in [('staff','staff_view'),('roles','staff_view'),('residents','residents_view'),('settings','settings_view'),('automated-ai','settings_view')] if staff_accounts.allowed(admin,action)])
 
 
 @router.get("/staff")

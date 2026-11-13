@@ -351,10 +351,10 @@ class TestCaloocanBoundarySuite:
 # ========================================================================================
 
 class TestSpatialDeduplicationSuite:
-    """Adversarial challenge suite for 15-meter spatial proximity deduplication and canonical header."""
+    """Nearby submissions remain independent; same-problem grouping is reviewed separately."""
 
     def test_spatial_dedup_exact_location_triggers_409_with_header(self, client: TestClient):
-        """Submitting identical category at exact same GPS coordinates must trigger 409 Conflict with X-Canonical-Ticket-ID."""
+        """Independent residents at identical coordinates retain different tickets."""
         lat, lng = 14.75650, 121.04500
         # 1. Create first report
         data1 = {
@@ -377,12 +377,11 @@ class TestSpatialDeduplicationSuite:
             "location_barangay": "Barangay 171"
         }
         res2 = client.post("/api/reports", data=data2)
-        assert res2.status_code == 409, f"Expected 409 Conflict for duplicate location, got {res2.status_code}"
-        assert res2.headers.get("X-Canonical-Ticket-ID") == ticket1
-        assert "already being processed" in res2.json().get("detail", "")
+        assert res2.status_code == 201, res2.text
+        assert res2.json()["ticket_id"] != ticket1
 
     def test_spatial_dedup_within_3m_and_10m_triggers_409(self, client: TestClient):
-        """Reports within 3m and 10m radius must trigger 409 Conflict."""
+        """Proximity alone cannot reject an independent resident submission."""
         base_lat, base_lng = 14.756500, 121.045000
         res1 = client.post("/api/reports", data={
             "category": "Flooding",
@@ -407,8 +406,8 @@ class TestSpatialDeduplicationSuite:
             "lng": str(lng_3m),
             "location_barangay": "Barangay 171"
         })
-        assert res_3m.status_code == 409
-        assert res_3m.headers.get("X-Canonical-Ticket-ID") == canonical_ticket
+        assert res_3m.status_code == 201, res_3m.text
+        assert res_3m.json()["ticket_id"] != canonical_ticket
 
         # Shift by ~10 meters (0.000090 deg lat ~ 10 meters)
         lat_10m = base_lat + 0.000090
@@ -423,8 +422,8 @@ class TestSpatialDeduplicationSuite:
             "lng": str(lng_10m),
             "location_barangay": "Barangay 171"
         })
-        assert res_10m.status_code == 409
-        assert res_10m.headers.get("X-Canonical-Ticket-ID") == canonical_ticket
+        assert res_10m.status_code == 201, res_10m.text
+        assert res_10m.json()["ticket_id"] != canonical_ticket
 
     def test_spatial_dedup_outside_15m_allowed(self, client: TestClient):
         """Reports at 25 meters distance must NOT be blocked (201 Created)."""

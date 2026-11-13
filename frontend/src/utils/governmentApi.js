@@ -28,9 +28,14 @@ export async function governmentRequest(path, options = {}) {
     return data;
 }
 
-export function useGovernmentData(path) {
+export function useGovernmentData(path, { pollMs = 0 } = {}) {
     const [state, setState] = useState({ path: null, data: null, loading: true, error: '', fetchedAt: null });
     const [revision, setRevision] = useState(0);
+    useEffect(() => {
+        if (!path || !pollMs) return;
+        const timer = setInterval(() => { if (document.visibilityState === 'visible') setRevision(r => r + 1); }, pollMs);
+        return () => clearInterval(timer);
+    }, [path, pollMs]);
     useEffect(() => {
         if (!path) return;
         const controller = new AbortController();
@@ -38,7 +43,10 @@ export function useGovernmentData(path) {
         governmentRequest(path, { signal: controller.signal }).then(data => {
             if (!controller.signal.aborted) setState({ path, data, loading: false, error: '', fetchedAt: new Date() });
         }).catch(error => {
-            if (error.name !== 'AbortError') setState(s => ({ ...s, path, loading: false, error: error.message }));
+            if (!controller.signal.aborted) {
+                const accessDenied = error.status === 401 || error.status === 403;
+                setState(s => ({ ...s, path, data: accessDenied ? null : s.data, fetchedAt: accessDenied ? null : s.fetchedAt, loading: false, error: error.message }));
+            }
         });
         return () => controller.abort();
     }, [path, revision]);

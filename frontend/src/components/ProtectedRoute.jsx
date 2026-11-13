@@ -17,6 +17,8 @@
  */
 
 import React from 'react';
+import GovModuleGate from './government/GovModuleGate';
+import { governmentRouteModule } from '../utils/governmentRouteAccess';
 import { Navigate, useLocation } from 'react-router-dom';
 import { ShieldX, LogOut, ChevronLeft } from 'lucide-react';
 import { checkPermission } from '../utils/rbac_utils';
@@ -156,7 +158,9 @@ const ProtectedRoute = ({ children, allowedRoles = null, requiredPermission = nu
     if (governmentOnly && user.role === 'resident') return <UnauthorizedPage userRole={user.role} allowedRoles={GOV_ROLES} />;
 
     // Role check — if allowedRoles is null, any authenticated user is OK
-    if (allowedRoles !== null && !allowedRoles.includes(user.role)) {
+    // Stored staff roles are not part of the legacy role lists. Government
+    // sections are checked against the server navigation response below.
+    if (allowedRoles !== null && !allowedRoles.includes(user.role) && !(location.pathname.startsWith('/gov/') && user.role !== 'resident')) {
         return <UnauthorizedPage userRole={user.role} allowedRoles={allowedRoles} />;
     }
 
@@ -165,9 +169,11 @@ const ProtectedRoute = ({ children, allowedRoles = null, requiredPermission = nu
         return <UnauthorizedPage userRole={user.role} allowedRoles={null} />; // Or a specialized "No Capability" page
     }
 
+    const module = governmentRouteModule(location.pathname, location.search);
+    const content = module ? <GovModuleGate module={module}>{children}</GovModuleGate> : children;
     return location.pathname.startsWith('/gov') || governmentOnly
-        ? <div className="gov-experience">{children}</div>
-        : children;
+        ? <div className="gov-experience">{content}</div>
+        : content;
 };
 
 export default ProtectedRoute;

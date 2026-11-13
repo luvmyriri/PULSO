@@ -12,6 +12,7 @@
     "app:open": "node scripts/android.mjs open",
     "app:run": "node scripts/android.mjs run",
     "app:apk": "node scripts/android.mjs apk",
+    "app:apk-public": "node scripts/android.mjs apk-public",
     "app:lan-ip": "node scripts/android.mjs ip"
   },
   "dependencies": {

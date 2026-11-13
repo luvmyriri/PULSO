@@ -1,3 +1,5 @@
+import ReportScreeningNotice from './ReportScreeningNotice';
+import { isReportPhotoRestricted, canAutoAdvancePhoto } from '../../utils/reportScreening';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -30,6 +32,7 @@ import { displayAddressFields, normalizeDisplayAddress, parseLegacyDisplayAddres
 import { API_BASE_URL } from '../../utils/apiBase';
 import { getStoredToken } from '../../utils/auth';
 import { isNativeAndroid } from '../../utils/appContext';
+import {locationEvidence} from '../../utils/reportIntake';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
@@ -48,6 +51,8 @@ export default function Step2CameraLocation({
   const { theme } = useTheme();
 
   const fileInputRef = useRef(null);
+  const analysisRequest = useRef(null);
+  useEffect(() => () => analysisRequest.current?.abort(), []);
   const addressRequest = useRef(0);
   const gpsRequest = useRef(0);
   const shouldAutoAdvanceRef = useRef(false);
@@ -83,6 +88,7 @@ export default function Step2CameraLocation({
   const currentLat = locationData?.lat ?? CALOOCAN_CENTERS.north.lat;
   const currentLng = locationData?.lng ?? CALOOCAN_CENTERS.north.lng;
   const hasCoordinates = Number.isFinite(locationData?.lat) && Number.isFinite(locationData?.lng);
+  const pointUsesDeviceFix=locationEvidence(locationData || {}).source==='device';
   const isInsideJurisdiction = hasCoordinates && locationData?.isInCaloocan === true;
   const hasPhoto = Boolean(evidenceData?.previewUrl);
 
@@ -100,7 +106,7 @@ export default function Step2CameraLocation({
     });
   }, [onLocationChange]);
 
-  const resolveAddressAndNotify = useCallback((lat, lng, accuracy = null, customAddress = '') => {
+  const resolveAddressAndNotify = useCallback((lat, lng, accuracy = null, customAddress = '', measuredAt = null) => {
     const inBounds = isInCaloocan(lat, lng);
     const brgyObj = findBarangayByCoordinates(lat, lng);
     const resolvedBrgy = brgyObj?.name || '';
@@ -113,9 +119,10 @@ export default function Step2CameraLocation({
       addressStatus: 'LOADING',
       barangay: resolvedBrgy,
       isInCaloocan: inBounds,
-      confirmed: inBounds,
+      confirmed: false,
+      pinConfirmed: false,
       source: customAddress ? 'manual-geocode' : 'device-gps',
-      capturedAt: Date.now(),
+      deviceFix: customAddress ? previous.deviceFix : { latitude: lat, longitude: lng, accuracy_m: accuracy, measured_at: measuredAt },
     }));
     lookupAddress(lat, lng);
   }, [lookupAddress, onLocationChange]);
@@ -134,7 +141,7 @@ export default function Step2CameraLocation({
       (position) => {
         if (requestId !== gpsRequest.current) return;
         const { latitude, longitude, accuracy } = position.coords;
-        resolveAddressAndNotify(latitude, longitude, accuracy);
+        resolveAddressAndNotify(latitude, longitude, accuracy, '', position.timestamp ? new Date(position.timestamp).toISOString() : null);
         setIsLocating(false);
         setGeoError(null);
       },
@@ -150,7 +157,7 @@ export default function Step2CameraLocation({
   }, [resolveAddressAndNotify, t]);
 
   useEffect(() => {
-    if (!hasCoordinates || !locationData?.confirmed) {
+    if (!hasCoordinates) {
       handleGeolocate(false);
     } else {
       // Drafts may contain an older address label. Recheck at the saved point.
@@ -207,7 +214,7 @@ export default function Step2CameraLocation({
   };
 
   const normalizeAiUrgency = (rawUrgency) => {
-    if (!rawUrgency) return 'high';
+    if (!rawUrgency) return null;
     const lower = String(rawUrgency).toLowerCase();
     if (lower.includes('crit') || lower.includes('high') || lower.includes('severe')) return 'high';
     if (lower.includes('low') || lower.includes('minor')) return 'low';
@@ -231,9 +238,13 @@ export default function Step2CameraLocation({
   };
 
   const triggerAIAnalysis = async (file) => {
+    analysisRequest.current?.abort();
+    const controller = new AbortController();
+    analysisRequest.current = controller;
     onEvidenceChange(prev => ({
       ...prev,
       isAiScanning: true,
+      screening: null,
       analysisStatus: 'pending',
       aiCategorySuggestion: null,
       aiConfidence: null,
@@ -256,11 +267,15 @@ export default function Step2CameraLocation({
         method: 'POST',
         headers,
         body: formData,
+        signal: controller.signal,
       });
 
+      if (controller.signal.aborted || analysisRequest.current !== controller) return;
       if (res.ok) {
         const data = await res.json();
-        if (data.is_inappropriate && !file.isSampleInfrastructure) {
+        if (controller.signal.aborted || analysisRequest.current !== controller) return;
+        shouldAutoAdvanceRef.current = canAutoAdvancePhoto(data);
+        if (isReportPhotoRestricted(data) && !file.isSampleInfrastructure) {
           const reason = data.rejection_reason || "We couldn't clearly see an infrastructure issue. Please retake photo.";
           setPhotoError(reason);
           onEvidenceChange(prev => ({
@@ -269,7 +284,7 @@ export default function Step2CameraLocation({
             isInappropriate: true,
             rejectionReason: reason,
           }));
-        } else if (data.is_inappropriate && file.isSampleInfrastructure) {
+        } else if (isReportPhotoRestricted(data) && file.isSampleInfrastructure) {
           applySampleInfrastructureFallback();
         } else {
           setPhotoError(null);
@@ -278,6 +293,7 @@ export default function Step2CameraLocation({
             ...prev,
             isAiScanning: false,
             analysisStatus: 'complete',
+            screening: data.screening,
             aiCategorySuggestion: normalizedCat,
             aiConfidence: typeof data.confidence === 'number' ? Math.round(data.confidence * 100) : (file.isSampleInfrastructure ? 96 : null),
             autoDescription: data.auto_description || (file.isSampleInfrastructure ? 'A large and deep pothole is present on the asphalt road, exposing the aggregate base. The surrounding pavement shows extensive cracking and deterioration. This poses a significant hazard to vehicles and pedestrians.' : ''),
@@ -289,18 +305,22 @@ export default function Step2CameraLocation({
       } else if (file.isSampleInfrastructure) {
         applySampleInfrastructureFallback();
       } else {
-        onEvidenceChange(prev => ({ ...prev, isAiScanning: false, analysisStatus: 'failed' }));
+        shouldAutoAdvanceRef.current = false;
+        onEvidenceChange(prev => ({ ...prev, isAiScanning: false, screening: null, analysisStatus: 'failed' }));
       }
     } catch (err) {
+      if (controller.signal.aborted || analysisRequest.current !== controller) return;
       if (file.isSampleInfrastructure) {
         applySampleInfrastructureFallback();
       } else {
-        onEvidenceChange(prev => ({ ...prev, isAiScanning: false, analysisStatus: 'failed' }));
+        shouldAutoAdvanceRef.current = false;
+        onEvidenceChange(prev => ({ ...prev, isAiScanning: false, screening: null, analysisStatus: 'failed' }));
       }
     }
   };
 
   const handleCameraPhotoCaptured = (capturedFile, aiData) => {
+    analysisRequest.current?.abort();
     setIsCameraModalOpen(false);
     if (!capturedFile) return;
 
@@ -310,22 +330,27 @@ export default function Step2CameraLocation({
 
     const previewUrl = URL.createObjectURL(capturedFile);
     setPhotoError(null);
-    shouldAutoAdvanceRef.current = !aiData?.is_inappropriate;
+    shouldAutoAdvanceRef.current = canAutoAdvancePhoto(aiData);
 
     onEvidenceChange({
       file: capturedFile,
+      capturedAt: capturedFile.pulsoCapture?.capturedAt || null,
+      photoDeviceFix: capturedFile.pulsoCapture?.deviceFix || null,
+      photoLocationRequest: capturedFile.pulsoCapture?.locationRequest || null,
+      source: capturedFile.pulsoCapture ? 'camera' : 'unknown',
       previewUrl,
       previewDataUrl: capturedFile.isSampleInfrastructure ? '/sample-infrastructure-pothole.jpg' : null,
       fileName: capturedFile.name || `photo_${Date.now()}.jpg`,
       fileSize: capturedFile.size || 0,
       mimeType: capturedFile.type || 'image/jpeg',
       isAiScanning: false,
+      screening: aiData?.screening || null,
       aiCategorySuggestion: normalizeAiCategory(aiData?.category),
       aiConfidence: aiData?.confidence ? Math.round(aiData.confidence * 100) : null,
       autoDescription: aiData?.auto_description || '',
       imageAnalysis: aiData?.image_analysis || '',
       urgency: normalizeAiUrgency(aiData?.urgency),
-      isInappropriate: Boolean(aiData?.is_inappropriate),
+      isInappropriate: isReportPhotoRestricted(aiData),
       rejectionReason: aiData?.rejection_reason || '',
     });
 
@@ -365,6 +390,11 @@ export default function Step2CameraLocation({
     shouldAutoAdvanceRef.current = true;
     onEvidenceChange({
       file,
+      capturedAt: null,
+      screening: null,
+      photoDeviceFix: null,
+      photoLocationRequest: null,
+      source: 'upload',
       previewUrl,
       previewDataUrl: file.isSampleInfrastructure ? '/sample-infrastructure-pothole.jpg' : null,
       fileName: file.name,
@@ -394,12 +424,17 @@ export default function Step2CameraLocation({
   };
 
   const handleRemovePhoto = () => {
+    analysisRequest.current?.abort();
     shouldAutoAdvanceRef.current = false;
     if (evidenceData?.previewUrl) {
       URL.revokeObjectURL(evidenceData.previewUrl);
     }
     onEvidenceChange({
       file: null,
+      screening: null,
+      capturedAt: null,
+      photoDeviceFix: null,
+      photoLocationRequest: null,
       previewUrl: null,
       fileName: '',
       fileSize: 0,
@@ -457,7 +492,7 @@ export default function Step2CameraLocation({
   };
 
   const canProceed = hasPhoto && !evidenceData?.isAiScanning && !evidenceData?.isInappropriate && hasCoordinates
-    && isInsideJurisdiction && !isLocating && locationData?.addressStatus !== 'LOADING';
+    && isInsideJurisdiction && locationData?.pinConfirmed && !isLocating && locationData?.addressStatus !== 'LOADING';
 
   useEffect(() => {
     if (shouldAutoAdvanceRef.current && canProceed) {
@@ -468,7 +503,7 @@ export default function Step2CameraLocation({
 
   return (
     <div className="flex flex-col justify-between flex-1 h-full space-y-4">
-      {/* ── Compact Header ── */}
+      {/* â”€â”€ Compact Header â”€â”€ */}
       <div className="space-y-0.5">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-[#ff8a3d]">
@@ -479,7 +514,7 @@ export default function Step2CameraLocation({
           {t('reportWizard.step2CameraLocation.title', 'Take photo and auto-locate')}
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          {t('reportWizard.step2CameraLocation.subtitle', 'Capture a photo with your camera; verified GPS location is tagged automatically.')}
+          {t('reportIntelligence.captureLocation')}
         </p>
       </div>
 
@@ -493,11 +528,11 @@ export default function Step2CameraLocation({
         aria-hidden="true"
       />
 
-      {/* ── Main Vertical Stack (Exact match to Quick Report reference) ── */}
+      {/* â”€â”€ Main Vertical Stack (Exact match to Quick Report reference) â”€â”€ */}
       <div className="space-y-3.5">
-        {/* ── 1. Location Card (Matches reference image) ── */}
+        {/* â”€â”€ 1. Location Card (Matches reference image) â”€â”€ */}
         <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/60 rounded-2xl transition-all shadow-2xs">
-          <div className="flex items-start gap-3">
+          <div className="flex flex-col sm:flex-row items-start gap-3">
             {/* MapPin Badge Icon */}
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 text-[#ff6b00] border border-orange-500/25 flex items-center justify-center shrink-0 mt-0.5">
               <MapPin size={20} className="text-[#ff6b00]" />
@@ -526,15 +561,15 @@ export default function Step2CameraLocation({
               {/* Location Badges & Accuracy Indicator (Single line) */}
               <LocationCoordinates coordinates={locationData}>
                 {/* Accuracy Pill matching reference */}
-                {locationData?.accuracy && locationData.accuracy > 25 ? (
+                {pointUsesDeviceFix && locationData?.accuracy && locationData.accuracy > 25 ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50">
                     <Info size={13} className="text-amber-500 shrink-0" />
                     <span>{t('locationPrivacy.approximateAccuracy', { accuracy: Math.round(locationData.accuracy) })}</span>
                   </span>
                 ) : hasCoordinates ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50">
-                    <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                    <span>{locationData?.accuracy ? t('locationPrivacy.accurateAccuracy', { accuracy: Math.round(locationData.accuracy) }) : t('locationPrivacy.gpsSelected')}</span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/50">
+                    <Info size={13} className="shrink-0" />
+                    <span>{pointUsesDeviceFix?t('locationPrivacy.gpsSelected'):t('residentDraft.manualLocation')}</span>
                   </span>
                 ) : null}
 
@@ -562,7 +597,7 @@ export default function Step2CameraLocation({
           </div>
         </div>
 
-        {/* ── 2. Photo / Camera Box (Exact match to reference) ── */}
+        {/* â”€â”€ 2. Photo / Camera Box (Exact match to reference) â”€â”€ */}
         {!hasPhoto ? (
           <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 sm:p-7 bg-slate-50/50 dark:bg-slate-950/40 text-center flex flex-col items-center justify-center gap-3 transition-all">
             <div className="w-14 h-14 rounded-full bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300">
@@ -623,7 +658,7 @@ export default function Step2CameraLocation({
                   {evidenceData.fileName || 'evidence_photo.jpg'}
                 </p>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {formatFileSize(evidenceData.fileSize)} · {evidenceData.mimeType || 'image/jpeg'}
+                  {formatFileSize(evidenceData.fileSize)} Â· {evidenceData.mimeType || 'image/jpeg'}
                 </p>
               </div>
             </div>
@@ -632,9 +667,11 @@ export default function Step2CameraLocation({
             {evidenceData.isAiScanning && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-orange-50 dark:bg-orange-950/30 text-xs text-orange-800 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/60">
                 <Loader2 size={13} className="animate-spin text-orange-600" />
-                <span>AI verifying infrastructure evidence...</span>
+                <span>{t('reportScreening.checking')}</span>
               </div>
             )}
+
+            {!evidenceData.isAiScanning && <ReportScreeningNotice analysis={evidenceData} />}
 
             {photoError && (
               <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-xs text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800">
@@ -642,7 +679,7 @@ export default function Step2CameraLocation({
               </div>
             )}
 
-            <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setIsCameraModalOpen(true)}
@@ -664,14 +701,20 @@ export default function Step2CameraLocation({
         )}
       </div>
 
-      {/* ── Pinned Card Footer ── */}
+      {hasCoordinates && <label className="flex items-center gap-3 min-h-11 text-sm text-slate-900 dark:text-white">
+        <input type="checkbox" checked={Boolean(locationData?.pinConfirmed)}
+          className="size-5 focus-visible:outline-3 focus-visible:outline-blue-600"
+          onChange={event => onLocationChange(previous => ({ ...previous, pinConfirmed: event.target.checked, confirmed: event.target.checked, confirmedAt: event.target.checked ? new Date().toISOString() : null }))} />
+        {t('reportIntelligence.confirmIssuePin')}
+      </label>}
+      {/* â”€â”€ Pinned Card Footer â”€â”€ */}
       <WizardCardFooter
         onBack={onBack}
         onContinue={onContinue}
         isContinueDisabled={!canProceed}
       />
 
-      {/* ── Live In-App Camera Viewfinder Modal ── */}
+      {/* â”€â”€ Live In-App Camera Viewfinder Modal â”€â”€ */}
       <IDCameraModal
         isOpen={isCameraModalOpen}
         onClose={() => setIsCameraModalOpen(false)}

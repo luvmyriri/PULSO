@@ -2,6 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import UserMenu, { formatRoleLabel } from './UserMenu';
 import { getAuthUser, clearAuthSession } from '../utils/authSession';
+import { governmentRequest } from '../utils/governmentApi';
+import ReviewerAvailability from './government/ReviewerAvailability';
 
 /**
  * GovUserDropdown:
@@ -20,7 +22,9 @@ export default function GovUserDropdown({ currentUser }) {
     const avatarUrl = user.avatar_url || user.avatarUrl || user.avatarPhoto || null;
     const updatedAt = user.updated_at || user.updatedAt || null;
 
-    const handleSignOut = () => {
+    const handleSignOut = async () => {
+        try { await governmentRequest('/api/gov/report-review/availability/me/offline', { method: 'POST', signal: AbortSignal.timeout(2000) }); }
+        catch { /* A failed sign-out notice cannot keep the presence lease fresh. */ }
         clearAuthSession();
         window.location.href = '/gov';
     };
@@ -48,7 +52,8 @@ export default function GovUserDropdown({ currentUser }) {
         },
     ];
 
-    return (
+    return (<>
+        <ReviewerAvailability userId={user.id} />
         <UserMenu
             name={userName}
             avatarUrl={avatarUrl}
@@ -59,5 +64,5 @@ export default function GovUserDropdown({ currentUser }) {
             showConfirmation={true}
             align="right"
         />
-    );
+    </>);
 }

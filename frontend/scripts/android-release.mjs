@@ -3,13 +3,16 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFil
 import { join } from 'node:path';
 
 export const applicationId = 'ph.gov.caloocan.pulso';
-const metadataPath = root => join(root, 'android/app/build/outputs/apk/debug/output-metadata.json');
+const metadataPath = (root, variant) => join(root, 'android/app/build/outputs/apk', variant, 'output-metadata.json');
 
-export function nextAndroidVersion(root) {
+export function nextAndroidVersion(root, variant = 'debug') {
+  if (!['debug', 'release'].includes(variant)) throw new Error('Unknown Android build variant.');
   const file = join(root, 'android/version.properties');
   const properties = Object.fromEntries(readFileSync(file, 'utf8').trim().split(/\r?\n/).map(line => line.split('=')));
   const versions = [{ versionCode: Number(properties.versionCode), versionName: properties.versionName }];
-  if (existsSync(metadataPath(root))) versions.push(JSON.parse(readFileSync(metadataPath(root), 'utf8')).elements[0]);
+  for (const build of ['debug', 'release']) {
+    if (existsSync(metadataPath(root, build))) versions.push(JSON.parse(readFileSync(metadataPath(root, build), 'utf8')).elements[0]);
+  }
   const latest = join(root, 'android/updates/latest.json');
   if (existsSync(latest)) versions.push(JSON.parse(readFileSync(latest, 'utf8')));
   if (versions.some(v => !Number.isSafeInteger(v.versionCode) || v.versionCode < 1 || !/^\d+\.\d+\.\d+$/.test(v.versionName))) {
@@ -22,12 +25,13 @@ export function nextAndroidVersion(root) {
   return version;
 }
 
-export function publishAndroidUpdate(root) {
-  const metadata = JSON.parse(readFileSync(metadataPath(root), 'utf8'));
+export function publishAndroidUpdate(root, variant = 'debug') {
+  if (!['debug', 'release'].includes(variant)) throw new Error('Unknown Android build variant.');
+  const metadata = JSON.parse(readFileSync(metadataPath(root, variant), 'utf8'));
   if (metadata.applicationId !== applicationId || metadata.elements.length !== 1) throw new Error('Unexpected Android package.');
   const { versionCode, versionName, outputFile } = metadata.elements[0];
-  if (outputFile !== 'app-debug.apk' || !Number.isSafeInteger(versionCode) || versionCode < 1) throw new Error('Invalid APK metadata.');
-  const apk = join(root, 'android/app/build/outputs/apk/debug', outputFile);
+  if (outputFile !== `app-${variant}.apk` || !Number.isSafeInteger(versionCode) || versionCode < 1) throw new Error('Invalid APK metadata.');
+  const apk = join(root, 'android/app/build/outputs/apk', variant, outputFile);
   const bytes = readFileSync(apk);
   const directory = join(root, 'android/updates');
   mkdirSync(directory, { recursive: true });

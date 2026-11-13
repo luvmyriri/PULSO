@@ -7,18 +7,18 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import WizardHeader from '../components/report-wizard/WizardHeader';
+import {reportReceipt} from '../utils/reportReceipt';
 
 export default function ReportSuccessPage() {
   const { t } = useTranslation();
   const location = useLocation();
 
   const receiptState = location.state || {};
-  const ticketId = receiptState.ticketId || 'RPT-SAMPLE-RECEIPT';
-  const trackingToken = receiptState.trackingToken || 'TRK-XXXX-XXXX-XXXX';
-  const trackingUrl = receiptState.trackingUrl || `${window.location.origin}/track?id=${ticketId}&token=${trackingToken}`;
-  const category = receiptState.category || 'Infrastructure Repair';
-  const locationString = receiptState.locationString || 'Caloocan City';
-  const createdAt = receiptState.createdAt ? new Date(receiptState.createdAt).toLocaleString() : new Date().toLocaleString();
+  const receipt=reportReceipt(receiptState);
+  const {ticketId,trackingToken,trackingUrl}=receipt || {};
+  const category=receipt?.category || t('residentDraft.notRecorded');
+  const locationString=receipt?.locationString || t('residentDraft.notRecorded');
+  const createdAt=receipt?.createdAt?new Date(receipt.createdAt).toLocaleString():t('residentDraft.notRecorded');
 
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -42,6 +42,7 @@ export default function ReportSuccessPage() {
   }, [trackingUrl]);
 
   const handleCopyToken = () => {
+    if(!trackingToken)return;
     navigator.clipboard.writeText(trackingToken);
     setCopiedToken(true);
     setLiveAnnouncement(t('receipt.trackingTokenSection.tokenCopied', 'Tracking code copied to clipboard!'));
@@ -52,6 +53,7 @@ export default function ReportSuccessPage() {
   };
 
   const handleCopyUrl = () => {
+    if(!trackingUrl)return;
     navigator.clipboard.writeText(trackingUrl);
     setCopiedUrl(true);
     setLiveAnnouncement(t('receipt.trackingTokenSection.urlCopied', 'Tracking link copied to clipboard!'));
@@ -61,6 +63,12 @@ export default function ReportSuccessPage() {
     }, 3000);
   };
 
+  if(!receipt)return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white">
+    <WizardHeader currentStep={5} totalSteps={5}/><main className="max-w-3xl mx-auto p-6 space-y-4">
+      <h1 className="text-2xl font-bold">{t('residentDraft.noReceiptTitle')}</h1>
+      <p role="status">{t('residentDraft.noReceipt')}</p>
+      <Link className="inline-flex min-h-11 items-center px-4 py-2 rounded-lg bg-orange-600 text-white focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-orange-500" to="/report">{t('residentDraft.returnDraft')}</Link>
+    </main></div>;
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
       {/* Screen Reader Live Region */}
@@ -72,6 +80,7 @@ export default function ReportSuccessPage() {
       <WizardHeader currentStep={6} totalSteps={6} />
 
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-6">
+        {receiptState.draftCleanupWarning&&<p role="alert" className="text-sm text-amber-800 dark:text-amber-200">{t('residentDraft.cleanup')}</p>}
         
         {/* ── SUCCESS HERO DOCKET ────────────────────────────────────────────── */}
         <div className="text-center space-y-3">
@@ -106,7 +115,7 @@ export default function ReportSuccessPage() {
               </span>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-bold">
                 <Clock size={13} />
-                <span>{t('receipt.statusReceived', 'Received & Queued for Triage')}</span>
+                <span>{receipt.status?t(`track.status.${receipt.status}`,{defaultValue:receipt.status}):t('residentDraft.notRecorded')}</span>
               </div>
             </div>
           </div>
@@ -140,9 +149,10 @@ export default function ReportSuccessPage() {
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <div className="flex-1 p-3 bg-white dark:bg-slate-900 rounded-xl border border-amber-300 dark:border-amber-700/60 font-mono font-bold text-sm text-slate-900 dark:text-white tracking-widest text-center sm:text-left select-all">
-                {trackingToken}
+                {trackingToken || t('residentDraft.notRecorded')}
               </div>
               <button
+                disabled={!trackingToken}
                 type="button"
                 onClick={handleCopyToken}
                 className="px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 cursor-pointer"
@@ -169,14 +179,14 @@ export default function ReportSuccessPage() {
                 </div>
               )}
               <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 font-medium">
-                {t('receipt.qrSection.desc', 'Scan with phone camera to open on mobile')}
+                {trackingUrl?t('receipt.qrSection.desc', 'Scan with phone camera to open on mobile'):t('residentDraft.trackingUnavailable')}
               </span>
             </div>
 
             {/* Quick CTAs */}
             <div className="sm:col-span-2 flex flex-col gap-3">
               <Link
-                to={`/track?id=${ticketId}&token=${trackingToken}`}
+                to={trackingUrl || '/track'}
                 className="w-full py-3.5 px-5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 <span>{t('receipt.actions.trackNow', 'Track This Report Now')}</span>
@@ -184,6 +194,7 @@ export default function ReportSuccessPage() {
               </Link>
 
               <button
+                disabled={!trackingUrl}
                 type="button"
                 onClick={handleCopyUrl}
                 className="w-full py-3 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl font-bold text-xs sm:text-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 cursor-pointer"
@@ -193,7 +204,7 @@ export default function ReportSuccessPage() {
               </button>
 
               <Link
-                to={`/login?claim_ticket=${ticketId}&claim_token=${trackingToken}`}
+                to={trackingToken?`/login?claim_ticket=${encodeURIComponent(ticketId)}&claim_token=${encodeURIComponent(trackingToken)}`:'/login'}
                 className="w-full py-3 px-4 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-xl font-bold text-xs sm:text-sm border border-blue-200 dark:border-blue-800/60 flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 <UserPlus size={16} />
@@ -220,7 +231,7 @@ export default function ReportSuccessPage() {
               </p>
             </div>
             <Link
-              to={`/register?claim_ticket=${ticketId}&claim_token=${trackingToken}`}
+              to={trackingToken?`/register?claim_ticket=${encodeURIComponent(ticketId)}&claim_token=${encodeURIComponent(trackingToken)}`:'/register'}
               className="shrink-0 w-full sm:w-auto px-6 py-3.5 bg-[#ff6b00] hover:bg-[#e65c00] active:scale-[0.99] text-white rounded-xl font-heading font-bold text-xs uppercase tracking-wider shadow-md hover:shadow-lg hover:shadow-orange-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <span>Create Free Account</span>

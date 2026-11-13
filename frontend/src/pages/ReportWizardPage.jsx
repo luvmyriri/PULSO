@@ -1,8 +1,12 @@
 import NativeAppHeader, { NativeResidentAccountLink } from '../components/mobile/NativeAppHeader';
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
+import { finishReportIntake, locationEvidence, submitReportIntake, pendingReportIntake, recoverReportIntake } from '../utils/reportIntake';
+import useResidentReportDraft, {useReportDraftPrincipal} from '../hooks/useResidentReportDraft';
+import {packResidentPhoto,unpackResidentPhoto,reportDraftPrincipal} from '../utils/residentReportDraft';
+import ResidentDraftStatus from '../components/report-wizard/ResidentDraftStatus';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getStoredToken, getStoredUser } from '../utils/auth';
 import { useAndroidBack } from '../utils/nativeAndroid';
@@ -18,7 +22,22 @@ import Step5ContactPreferences from '../components/report-wizard/Step5ContactPre
 import Step6ReviewConsent from '../components/report-wizard/Step6ReviewConsent';
 import { Home } from 'lucide-react';
 
-const DRAFT_STORAGE_KEY = 'pulso_report_wizard_draft_v1';
+function wizardForm(data) {
+  const saved=data?.formData || {}, savedLocation=saved.location || {}, restored=unpackResidentPhoto(data?.photo);
+  const rawArea=savedLocation.barangay;
+  const area=typeof rawArea==='string'?rawArea:rawArea?.name || rawArea?.displayName || '';
+  return {
+    category:typeof saved.category==='string'?saved.category:'',
+    location:{lat:null,lng:null,address:'',landmark:'',isInCaloocan:false,...savedLocation,
+      barangay:area,confirmed:false,pinConfirmed:false},
+    evidence:{file:restored.file,previewUrl:restored.file?URL.createObjectURL(restored.file):null,
+      fileName:restored.file?.name || '',fileSize:restored.file?.size || 0,mimeType:restored.file?.type || '',
+      ...restored.provenance,aiCategorySuggestion:saved.evidence?.aiCategorySuggestion || null,
+      aiConfidence:saved.evidence?.aiConfidence || null,isAiScanning:false},
+    details:{description:'',urgency:'medium',...saved.details},
+    contact:{type:'notify',name:'',email:'',phone:'',...saved.contact},consentAccepted:false,
+  };
+}
 
 export default function ReportWizardPage() {
   const { t } = useTranslation();
@@ -28,182 +47,67 @@ export default function ReportWizardPage() {
   // Centralized Google Maps API loader state
   const { isLoaded: isMapLoaded } = useGoogleMaps();
 
-  const [restoredDraft] = useState(() => {
+  const firstStepRequested=useRef(Boolean(location.state?.startAtStepOne));
+  const [currentStep,setCurrentStep]=useState(1);
+  const [maxStepReached,setMaxStepReached]=useState(1);
+  const [isSubmitting,setIsSubmitting]=useState(false);
+  const [announcement,setAnnouncement]=useState('');
+  const [submissionError,setSubmissionError]=useState(null);
+  const [isHelpGuideOpen,setIsHelpGuideOpen]=useState(false);
+  const [pendingSubmission,setPendingSubmission]=useState(false);
+  const [formData,setFormData]=useState(()=>wizardForm(null));
+  const principal=useReportDraftPrincipal();
+  const stepSection=useRef(null);
+  const {category,location:issueLocation,details,contact,evidence}=formData;
+  const storedEvidence=useMemo(()=>({source:evidence.source,capturedAt:evidence.capturedAt,
+    photoDeviceFix:evidence.photoDeviceFix,aiCategorySuggestion:evidence.aiCategorySuggestion,aiConfidence:evidence.aiConfidence}),
+    [evidence.source,evidence.capturedAt,evidence.photoDeviceFix,evidence.aiCategorySuggestion,evidence.aiConfidence]);
+  const draftData=useMemo(()=>({currentStep,maxStepReached,
+    formData:{category,location:issueLocation,details,contact,evidence:storedEvidence},
+    photo:packResidentPhoto(evidence.file,storedEvidence)}),
+    [currentStep,maxStepReached,category,issueLocation,details,contact,storedEvidence,evidence.file]);
+  const restoreDraft=useCallback(value=>{
+    setFormData(wizardForm(value));
+    setCurrentStep(firstStepRequested.current?1:Math.min(5,Math.max(1,Number(value?.currentStep)||1)));
+    setMaxStepReached(Math.min(5,Math.max(1,Number(value?.maxStepReached)||1)));
+    setAnnouncement('');
+    if(value)firstStepRequested.current=false;
+  },[]);
+  const draft=useResidentReportDraft({kind:'wizard',principal,data:draftData,restore:restoreDraft,
+    hasContent:Boolean(evidence.file||category||details.description||contact.name||contact.email||contact.phone)});
+  useEffect(()=>{
+    const check=()=>{try{setPendingSubmission(Boolean(pendingReportIntake('wizard',getStoredToken())));}
+      catch(error){setPendingSubmission(true);setSubmissionError(error.message);}};
+    check();window.addEventListener('storage',check);window.addEventListener('pulso-intake-state',check);
+    return()=>{window.removeEventListener('storage',check);window.removeEventListener('pulso-intake-state',check);};
+  },[principal]);
+  useEffect(()=>{if(draft.ready&&!pendingSubmission)stepSection.current?.focus({preventScroll:true});},[draft.ready,pendingSubmission,currentStep]);
+  useEffect(()=>{
+    const url=formData.evidence.previewUrl;
+    return()=>{if(url?.startsWith('blob:'))URL.revokeObjectURL(url);};
+  },[formData.evidence.previewUrl]);
+  useEffect(()=>{
+    if(!location.state?.startAtStepOne)return;
+    const state={...location.state};delete state.startAtStepOne;
+    navigate({pathname:location.pathname,search:location.search,hash:location.hash},{replace:true,state});
+  },[location,navigate]);
+
+  // Retain account-scoped photo drafts before native or web header navigation.
+  async function handleHeaderNavigation(event) {
+    event.preventDefault();
+    if (isSubmitting || draft.locked || pendingSubmission) return;
+    const destination = event.currentTarget.getAttribute('href') || '/';
     try {
-      const draft = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || 'null');
-      return [1, 2].includes(draft?.version) && draft.formData && typeof draft.formData === 'object' ? draft : null;
-    } catch { return null; }
-  });
-
-  // Stepper State (1 - 5)
-  const [currentStep, setCurrentStep] = useState(() => location.state?.startAtStepOne ? 1 : Math.min(5, Math.max(1, Number(restoredDraft?.currentStep) || 1)));
-  const [maxStepReached, setMaxStepReached] = useState(() => Math.min(5, Math.max(1, Number(restoredDraft?.maxStepReached) || 1)));
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [announcement, setAnnouncement] = useState('');
-  const [submissionError, setSubmissionError] = useState(null);
-  const [isHelpGuideOpen, setIsHelpGuideOpen] = useState(false);
-
-  // Consume explicit guest entry once so reload still resumes the saved step.
-  useEffect(() => {
-    if (!location.state?.startAtStepOne) return;
-    const state = { ...location.state };
-    delete state.startAtStepOne;
-    navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state });
-  }, [location, navigate]);
-
-  // Consolidated Form State
-  const [formData, setFormData] = useState(() => {
-    const initial = {
-      category: '',
-      location: {
-        lat: null,
-        lng: null,
-        address: '',
-        barangay: '',
-        landmark: '',
-        isInCaloocan: false,
-        confirmed: false,
-      },
-      evidence: {
-        file: null,
-        previewUrl: null,
-        fileName: '',
-        fileSize: 0,
-        mimeType: '',
-        aiCategorySuggestion: null,
-        aiConfidence: null,
-        isAiScanning: false,
-      },
-      details: {
-        description: '',
-        urgency: 'medium',
-      },
-      contact: {
-        type: 'notify', // 'anonymous' | 'notify' | 'authenticated'
-        name: '',
-        email: '',
-        phone: '',
-      },
-      consentAccepted: false,
-    };
-    const saved = restoredDraft?.formData || {};
-    const savedLoc = saved.location || {};
-    const rawBrgy = savedLoc.barangay;
-    const cleanBrgy = (typeof rawBrgy === 'object' && rawBrgy !== null)
-      ? (rawBrgy.name || rawBrgy.displayName || '')
-      : (typeof rawBrgy === 'string' ? rawBrgy : '');
-    const cleanAddress = typeof savedLoc.address === 'string'
-      ? (savedLoc.address.includes('[object Object]')
-          ? (cleanBrgy ? `${cleanBrgy}, Caloocan City, Metro Manila` : 'Caloocan City')
-          : savedLoc.address)
-      : '';
-
-    return {
-      ...initial,
-      category: typeof saved.category === 'string' ? saved.category : '',
-      location: {
-        ...initial.location,
-        ...savedLoc,
-        barangay: cleanBrgy,
-        address: cleanAddress || savedLoc.address || '',
-        confirmed: savedLoc.confirmed === true || (Number.isFinite(savedLoc.lat) && Number.isFinite(savedLoc.lng)),
-      },
-      details: { ...initial.details, ...saved.details },
-      contact: { ...initial.contact, ...saved.contact },
-      // A File cannot survive JSON storage. Require reattachment and fresh consent.
-      evidence: {
-        ...initial.evidence,
-        fileName: saved.evidence?.fileName || '',
-        fileSize: saved.evidence?.fileSize || 0,
-        mimeType: saved.evidence?.mimeType || 'image/jpeg',
-        previewUrl: saved.evidence?.previewDataUrl?.startsWith('data:image/') ? saved.evidence.previewDataUrl : null,
-        previewDataUrl: saved.evidence?.previewDataUrl?.startsWith('data:image/') ? saved.evidence.previewDataUrl : null,
-        aiCategorySuggestion: saved.evidence?.aiCategorySuggestion || null,
-        aiConfidence: saved.evidence?.aiConfidence || null,
-      },
-      consentAccepted: false,
-    };
-  });
-
-  // Rehydrate File object when draft is restored from storage
-  useEffect(() => {
-    if (formData.evidence.file) return;
-    const sourceUrl = formData.evidence.previewUrl || formData.evidence.previewDataUrl;
-    if (!sourceUrl) return;
-    let cancelled = false;
-    fetch(sourceUrl)
-      .then(res => (res.ok ? res.blob() : null))
-      .then(blob => {
-        if (!blob || cancelled) return;
-        const reconstructedFile = new File(
-          [blob],
-          formData.evidence.fileName || 'evidence_photo.jpg',
-          { type: blob.type || formData.evidence.mimeType || 'image/jpeg' }
-        );
-        setFormData(prev => ({
-          ...prev,
-          evidence: {
-            ...prev.evidence,
-            file: prev.evidence.file || reconstructedFile,
-            previewUrl: prev.evidence.previewUrl || sourceUrl,
-            previewDataUrl: prev.evidence.previewDataUrl || sourceUrl,
-            fileName: prev.evidence.fileName || reconstructedFile.name,
-            fileSize: prev.evidence.fileSize || reconstructedFile.size,
-            mimeType: prev.evidence.mimeType || reconstructedFile.type || 'image/jpeg',
-          },
-        }));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [currentStep, formData.evidence.file, formData.evidence.previewUrl, formData.evidence.previewDataUrl, formData.evidence.fileName, formData.evidence.mimeType]);
-
-  const saveDraft = useCallback(() => {
-    try {
-      const draftPayload = {
-        version: 2,
-        savedAt: Date.now(),
-        currentStep,
-        maxStepReached,
-        formData: {
-          category: formData.category,
-          location: formData.location,
-          evidence: {
-            fileName: formData.evidence.fileName,
-            fileSize: formData.evidence.fileSize,
-            mimeType: formData.evidence.mimeType,
-            previewDataUrl: formData.evidence.previewDataUrl || null,
-            aiCategorySuggestion: formData.evidence.aiCategorySuggestion,
-            aiConfidence: formData.evidence.aiConfidence,
-          },
-          details: formData.details,
-          contact: formData.contact,
-          consentAccepted: formData.consentAccepted,
-        },
-      };
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftPayload));
-    } catch (e) {
-      console.warn('Failed to auto-save report draft:', e);
+      await draft.flush();
+      navigate(destination);
+    } catch (error) {
+      setSubmissionError(error.message || t('residentDraft.save_error'));
     }
-  }, [formData, currentStep, maxStepReached]);
-
-  // Save in the background and flush pending edits before leaving via the header.
-  useEffect(() => {
-    const timer = setTimeout(saveDraft, 400);
-    return () => clearTimeout(timer);
-  }, [saveDraft]);
-
-  function handleHeaderNavigation(event) {
-    if (isSubmitting) {
-      event.preventDefault();
-      return;
-    }
-    saveDraft();
   }
 
   // Step Navigation
   const goToNextStep = () => {
+    if(draft.locked||pendingSubmission)return;
     if (currentStep < 5) {
       const next = currentStep + 1;
       setCurrentStep(next);
@@ -233,6 +137,7 @@ export default function ReportWizardPage() {
   useAndroidBack(currentStep > 1, 0, goToPreviousStep);
 
   const jumpToStep = (stepNumber) => {
+    if(draft.locked||pendingSubmission)return;
     if (stepNumber >= 1 && stepNumber <= 5 && stepNumber <= maxStepReached) {
       setCurrentStep(stepNumber);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -241,9 +146,28 @@ export default function ReportWizardPage() {
   };
 
   // Final Atomic Report Submission
+  const acceptReceipt=async(lastSuccessData,token)=>{
+    if(reportDraftPrincipal(getStoredToken(),getStoredUser())!==principal)throw new Error('The account changed. Recover the original report from its original account.');
+    finishReportIntake('wizard',token);
+    let draftCleanupWarning=false;
+    try{await draft.clear({confirmed:true});}catch{draftCleanupWarning=true;}
+    if(reportDraftPrincipal(getStoredToken(),getStoredUser())!==principal)throw new Error(t('residentDraft.accountChanged'));
+    setPendingSubmission(false);
+    navigate('/report/success',{state:{ticketId:lastSuccessData.ticket_id,
+      trackingToken:lastSuccessData.tracking_token,trackingUrl:lastSuccessData.tracking_url,
+      category:(lastSuccessData.categories||[lastSuccessData.category]).join(' + '),
+      locationString:lastSuccessData.location_string,createdAt:lastSuccessData.created_at || null,
+      reporterType:lastSuccessData.reporter_type,report:lastSuccessData,draftCleanupWarning}});
+  };
+  const handleRecover=async()=>{
+    if(isSubmitting)return;setIsSubmitting(true);setSubmissionError(null);
+    try{const token=getStoredToken();const receipt=await recoverReportIntake({token,apiBase:API_BASE_URL,draftKey:'wizard'});await acceptReceipt(receipt,token);}
+    catch(error){setSubmissionError(error.message);try{setPendingSubmission(Boolean(pendingReportIntake('wizard',getStoredToken())));}catch{setPendingSubmission(true);}}
+    finally{setIsSubmitting(false);}
+  };
   const handleSubmitReport = async () => {
-    if (!formData.consentAccepted || isSubmitting) return;
-    if (!Number.isFinite(formData.location.lat) || !Number.isFinite(formData.location.lng) || formData.location.isInCaloocan === false) {
+    if (!formData.consentAccepted || isSubmitting || draft.locked || pendingSubmission) return;
+    if (!Number.isFinite(formData.location.lat) || !Number.isFinite(formData.location.lng) || formData.location.isInCaloocan === false || !formData.location.pinConfirmed) {
       setCurrentStep(1);
       setSubmissionError('Select the issue location before submitting.');
       return;
@@ -268,98 +192,35 @@ export default function ReportWizardPage() {
     }
     setIsSubmitting(true);
     setSubmissionError(null);
+    const submissionToken=getStoredToken();
 
     try {
+      await draft.flush();
+      if(reportDraftPrincipal(getStoredToken(),getStoredUser())!==principal)throw new Error(t('residentDraft.accountChanged'));
       const selectedCats = parseSelectedCategoryIds(formData.category);
       const categoriesToSubmit = selectedCats.length > 0 ? selectedCats.slice(0, 3) : [formData.category || 'Roads & Bridges'];
-      const token = getStoredToken();
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      const token = submissionToken;
 
-      let lastSuccessData = null;
-      const createdTicketIds = [];
-
-      for (const cat of categoriesToSubmit) {
-        const submitData = new FormData();
-        submitData.append('category', cat);
-        submitData.append('description', formData.details.description);
-        submitData.append('lat', String(formData.location.lat));
-        submitData.append('lng', String(formData.location.lng));
-        submitData.append('location_string', [formData.location.address || `Lat: ${formData.location.lat}, Lng: ${formData.location.lng}`, formData.location.landmark?.trim()].filter(Boolean).join(' · '));
-        submitData.append('location_barangay', formData.location.barangay || '');
-        submitData.append('urgency', formData.details.urgency || 'medium');
-
-        if (formData.location.landmark) {
-          submitData.append('landmark', formData.location.landmark);
-        }
-
-        if (formData.contact?.name) { submitData.append('reporter_name', formData.contact.name.trim()); }
-        if (formData.contact?.email) {
-          submitData.append('contact_email', formData.contact.email.trim());
-        }
-        if (formData.contact?.phone) {
-          submitData.append('contact_phone', formData.contact.phone.trim());
-        }
-
-        submitData.append('submission_source', token ? 'web_resident' : 'web_guest');
-
-        if (evidenceFile) { submitData.append('image', evidenceFile, formData.evidence.fileName || 'evidence.jpg'); } else if (formData.evidence.file) {
-          submitData.append('image', formData.evidence.file, formData.evidence.fileName || 'evidence.jpg');
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/reports`, {
-          method: 'POST',
-          headers,
-          body: submitData,
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          lastSuccessData = data;
-          createdTicketIds.push(data.ticket_id || data.id);
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-
-          if (response.status === 400 && errorData.detail?.toLowerCase().includes('outside')) {
-            setCurrentStep(1);
-            setSubmissionError(errorData.detail || 'Selected location is outside Caloocan City jurisdiction.');
-          } else if (response.status === 409) {
-            const ticket = response.headers.get('X-Canonical-Ticket-ID');
-            setSubmissionError(`${typeof errorData.detail === 'string' ? errorData.detail : 'A similar report is already being processed.'}${ticket ? ` Existing ticket: ${ticket}.` : ''}`);
-          } else if (response.status === 422) {
-            setSubmissionError(typeof errorData.detail === 'string' ? errorData.detail : 'Form validation failed. Please check your inputs.');
-          } else if (response.status === 429) {
-            setSubmissionError('Submission rate limit reached. Please wait a moment before trying again.');
-          } else {
-            setSubmissionError(errorData.detail || errorData.message || 'Submission failed. Please check your connection.');
-          }
-          return;
-        }
-      }
-
-      if (lastSuccessData) {
-        // Purge draft from storage on success
-        localStorage.removeItem(DRAFT_STORAGE_KEY);
-
-        // Transition to success receipt page
-        navigate('/report/success', {
-          state: {
-            ticketId: createdTicketIds.join(', '),
-            trackingToken: lastSuccessData.tracking_token,
-            trackingUrl: lastSuccessData.tracking_url || `/track?id=${createdTicketIds[0]}&token=${lastSuccessData.tracking_token || ''}`,
-            category: categoriesToSubmit.join(' + '),
-            locationString: lastSuccessData.location_string || formData.location.address,
-            createdAt: lastSuccessData.created_at || new Date().toISOString(),
-            reporterType: lastSuccessData.reporter_type || (token ? 'registered' : 'guest'),
-            report: lastSuccessData,
-          }
-        });
-      }
+      const lastSuccessData = await submitReportIntake({
+        fields: {
+          category: categoriesToSubmit[0], categories: categoriesToSubmit,
+          description: formData.details.description,
+          lat: formData.location.lat, lng: formData.location.lng,
+          location_string: [formData.location.address, formData.location.landmark?.trim()].filter(Boolean).join(' Â· '),
+          location_barangay: formData.location.barangay || '',
+          location_metadata: locationEvidence(formData.location, formData.evidence),
+          urgency: formData.details.urgency || 'medium',
+          reporter_name: formData.contact?.name?.trim(),
+          contact_email: formData.contact?.email, contact_phone: formData.contact?.phone,
+          submission_source: token ? 'web_resident' : 'web_guest',
+        },
+        image: evidenceFile || formData.evidence.file, token, apiBase: API_BASE_URL, draftKey: 'wizard',
+      });
+      await acceptReceipt(lastSuccessData,token);
     } catch (err) {
       console.error('Submission network error:', err);
-      setSubmissionError('An unexpected network error occurred. Your draft remains safely preserved.');
+      setSubmissionError(err.message || 'An unexpected network error occurred. Your draft remains safely preserved.');
+      try{setPendingSubmission(Boolean(pendingReportIntake('wizard',getStoredToken())));}catch{setPendingSubmission(true);}
     } finally {
       setIsSubmitting(false);
     }
@@ -375,7 +236,7 @@ export default function ReportWizardPage() {
         {announcement}
       </div>
 
-      {/* ── Top Header: Logo on top-left & Home Section ───────────── */}
+      {/* â”€â”€ Top Header: Logo on top-left & Home Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {isNativeAndroid() ? (
         <NativeAppHeader appearance="hero" transparent onBrandClick={handleHeaderNavigation}>
           <NativeResidentAccountLink signedIn={Boolean(getStoredToken()) && getStoredUser()?.role === 'resident'} onClick={handleHeaderNavigation} />
@@ -385,6 +246,7 @@ export default function ReportWizardPage() {
         {/* Logo on top-left linking to home */}
         <Link
           to="/resident-home"
+          onClick={handleHeaderNavigation}
           className="flex min-w-0 flex-1 items-center gap-2 group transition-opacity hover:opacity-90 cursor-pointer"
           title="Caloocan City PULSO Home"
         >
@@ -396,6 +258,7 @@ export default function ReportWizardPage() {
           <ThemeToggle />
           <Link
             to="/resident-home"
+            onClick={handleHeaderNavigation}
             className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#ff6b00] dark:hover:text-[#ff6b00] border border-slate-200/90 dark:border-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
             title="Return to Home Section"
             aria-label="Home"
@@ -409,6 +272,9 @@ export default function ReportWizardPage() {
 
       {/* Main Responsive Container */}
       <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-2 sm:pt-3 pb-32 lg:pb-6 flex flex-col">
+        <ResidentDraftStatus draft={draft} pending={pendingSubmission} recovering={isSubmitting} onRecover={handleRecover}/>
+        {submissionError&&<p role="alert" className="text-sm text-red-700 dark:text-red-300 py-2">{submissionError}</p>}
+        <fieldset disabled={draft.locked||pendingSubmission||isSubmitting} className={draft.ready&&!pendingSubmission?'contents':'hidden'} aria-label={t('residentDraft.editing')}>
         {/* Step-by-Step Segmented Stepper Bar (<1024px / lg:hidden) */}
         <nav
           aria-label="Report progress steps"
@@ -471,11 +337,12 @@ export default function ReportWizardPage() {
           />
 
           {/* Right Column: Rounded Main Card */}
-          <section
+          {draft.ready&&!pendingSubmission&&<section
+            ref={stepSection} tabIndex={-1}
             aria-label={`Step ${currentStep} form content`}
             className="lg:flex-1 w-full lg:min-h-[540px] rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 md:p-6 shadow-2xs flex flex-col justify-between"
           >
-            {currentStep === 1 && (
+            {draft.ready && !pendingSubmission && currentStep === 1 && (
               <Step2CameraLocation
                 isMapLoaded={isMapLoaded}
                 evidenceData={formData.evidence}
@@ -561,8 +428,9 @@ export default function ReportWizardPage() {
                 onSubmit={handleSubmitReport}
               />
             )}
-          </section>
+          </section>}
         </div>
+        </fieldset>
       </main>
     </div>
   );

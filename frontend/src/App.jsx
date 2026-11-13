@@ -110,7 +110,7 @@ function authenticatedDestination() {
         return null;
     }
     if (user.role === 'resident') return '/dashboard';
-    return GOV_ROLES.includes(user.role) ? '/gov/my-dashboard' : '/gov/account';
+    return '/gov/my-dashboard';
 }
 
 function ResidentEntry({ trackingRoute = false }) {

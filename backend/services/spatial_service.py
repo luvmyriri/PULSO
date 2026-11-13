@@ -19,9 +19,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import json
-from public_reports import safe_public_area, safe_public_category, public_incident_description, public_report_photo
-
-PUBLIC_REPORT_STATUSES = ("pending_approval", "validated", "dispatched", "approved_internal", "in_progress", "resolved")
+from public_reports import PUBLIC_REPORT_STATUSES, safe_public_area, safe_public_category, public_incident_description, public_report_photo
 
 
 # ─────────────────────────────────────────────────────────────────────────────

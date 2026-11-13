@@ -10,7 +10,7 @@ def test_public_incident_text_removes_reporter_contact_details():
 
 def test_public_photo_uses_metadata_free_local_copy_only():
     photo = public_report_photo("/api/uploads/reports/report_abcdef0123456789.jpg")
-    assert photo == "/api/thumbnails?src=%2Fapi%2Fuploads%2Freports%2Freport_abcdef0123456789.jpg&size=512"
+    assert photo == "/api/thumbnails?src=%2Fapi%2Fuploads%2Freports%2Freport_abcdef0123456789.jpg&size=512&v=2"
     assert public_report_photo("https://example.com/private.jpg") is None
     assert public_report_photo("/api/uploads/docs/private.jpg") is None
     assert public_report_photo("/api/uploads/reports/../private.jpg") is None

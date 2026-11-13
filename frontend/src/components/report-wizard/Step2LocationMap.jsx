@@ -132,8 +132,10 @@ export default function Step2LocationMap({
       barangay: estimatedBarangay,
       isInCaloocan: valid,
       confirmed: true,
-      source: addressString ? 'place-search' : 'selected-map-or-device',
-      capturedAt: Date.now(),
+      pinConfirmed: true,
+      accuracy: null,
+      source: addressString ? 'place-search' : 'selected-map',
+      confirmedAt: new Date().toISOString(),
     }));
   };
 
@@ -154,8 +156,10 @@ export default function Step2LocationMap({
   };
 
   const acceptPosition = (position) => {
-    const { latitude, longitude } = position.coords;
-    updateCoordinates(latitude, longitude);
+    const { latitude, longitude, accuracy } = position.coords;
+    onLocationChange(previous => ({ ...previous, lat: latitude, lng: longitude, accuracy,
+      source: 'device-gps', confirmed: false, pinConfirmed: false,
+      deviceFix: { latitude, longitude, accuracy_m: accuracy, measured_at: position.timestamp ? new Date(position.timestamp).toISOString() : null } }));
     if (mapRef.current) {
       mapRef.current.panTo({ lat: latitude, lng: longitude });
       mapRef.current.setZoom(16);

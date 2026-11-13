@@ -21,3 +21,13 @@ output
 .impeccable
 scratch
 .agent
+
+**/.gradle
+**/.android-sdk
+**/.android
+**/android/app/build
+**/android/build
+**/android/updates
+**/*.jks
+**/*.keystore
+**/local.properties

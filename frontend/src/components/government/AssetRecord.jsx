@@ -6,6 +6,7 @@ import { governmentRequest, useGovernmentData } from '../../utils/governmentApi'
 import AssetLocationPreview from '../maps/AssetLocationPreview';
 import AssetInspectionPanel from './AssetInspectionPanel';
 import AssetHazardContext from './AssetHazardContext';
+import FieldObservationsPanel from './FieldObservationsPanel';
 
 export default function AssetRecord({ assetId, permissions, onClose, onSaved }) {
     const record=useGovernmentData(`/api/gov/assets/${encodeURIComponent(assetId)}`);
@@ -54,6 +55,7 @@ export default function AssetRecord({ assetId, permissions, onClose, onSaved }) 
             <section><h3>Open work orders</h3>{asset.active_work_orders.length?<ul className="gov-inline-list">{asset.active_work_orders.map(work=><li key={work.id}><Link className="gov-record-link" to={`/gov/work-orders?wo=${work.id}`}>{work.wo_number||`Work #${work.id}`} · {work.title}</Link><p><GovStatus value={work.status}/></p></li>)}</ul>:<p>No open work orders recorded.</p>}</section>
             <section><h3>Maintenance history</h3>{asset.maintenance_history.length?<ul className="gov-inline-list">{asset.maintenance_history.map(log=><li key={log.log_id}><strong>{log.completion_date}</strong> · {log.work_type}</li>)}</ul>:<p>No completed maintenance recorded.</p>}</section>
             <section><h3>Condition assessment history</h3>{asset.condition_assessments?.length?<ul className="gov-inline-list">{asset.condition_assessments.map(entry=><li key={entry.id}><strong>{entry.condition_score}/100</strong><p>{entry.notes}</p><small>{entry.actor} · {formatDate(entry.created_at)}</small></li>)}</ul>:<p>No condition assessment event has been recorded. Earlier register values may have no review history.</p>}</section>
+            <FieldObservationsPanel assetId={assetId} onSaved={()=>{record.reload();onSaved?.();}} />
             <AssetInspectionPanel assetId={assetId} permissions={permissions} onVerified={()=>{record.reload();context.reload();onSaved?.();}} />
         </>}
         <GovConfirm open={verifying} title="Verify this asset registry record?" confirmLabel="Verify registry" onConfirm={verifyRegistry} onClose={()=>setVerifying(false)} busy={busy} error={error}>

@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, AlertTriangle } from 'lucide-react';
+import {
+    ArrowUpRight, Building2, ChevronRight, CirclePause, ClipboardCheck, ClipboardList,
+    Clock3, Download, Droplet, FileText, Info, Layers, MapPinned, MessageSquare, Search, TriangleAlert, Wrench,
+} from 'lucide-react';
+import OverviewAreaMap from './OverviewAreaMap';
 import './gov-bi-dashboard.css';
 import { GovAssistantSlot } from './government/GovAssistantHost';
+import { GovButton } from './government/GovWorkspace';
 
 const count = value => new Intl.NumberFormat('en-PH').format(value || 0);
 const dateLabel = value => {
@@ -42,99 +47,11 @@ function ExportActions({ label, onExport }) {
     </span>;
 }
 
-function KpiCard({ title, value, detail, url, action, segments, total, onExport, children }) {
-    return <section className="gov-bi-surface gov-bi-kpi" aria-label={title}>
-        <header className="gov-bi-kpi__head"><h2>{title}</h2><div className="gov-bi-head-actions"><ExportActions label={title} onExport={onExport}/><Link to={url} aria-label={action} title={action}><ArrowUpRight size={16} aria-hidden="true"/></Link></div></header>
-        <div className="gov-bi-kpi__value"><strong>{count(value)}</strong><span>{detail}</span></div>
-        <div className="gov-bi-kpi__meter" role="img" aria-label={segments.map(segment => `${segment.label}: ${count(segment.value)}`).join('; ')}>
-            {segments.map(segment => <span key={segment.label} className={`gov-bi-kpi__segment gov-bi-kpi__segment--${segment.kind}`} style={{ width: `${total ? segment.value / total * 100 : 0}%` }}/>) }
-        </div>
-        <div className="gov-bi-kpi__breakdown">{children}</div>
-    </section>;
-}
-
-function KpiSummary({ data, onExport }) {
-    const relation = data.relationships;
-    const open = relation.open_reports;
-    const work = relation.current_work_orders;
-    const needsReview = data.totals.unreviewed_reports;
-    const otherWork = Math.max(0, work - relation.blocked_orders - relation.awaiting_verification);
-    return <div className="gov-bi-kpis" aria-label="Operational key indicators">
-        <KpiCard title="Open reports" value={open} detail="Current report workload" url="/gov/reports?overview=open" action="Open all open reports" onExport={onExport && (format => onExport('open_reports', format))} total={open} segments={[
-            { label: 'With current work', value: relation.reports_with_current_work, kind: 'active' },
-            { label: 'Without current work', value: relation.reports_without_current_work, kind: 'neutral' },
-        ]}>
-            <Link to="/gov/reports?overview=with_work"><i className="gov-bi-kpi__key gov-bi-kpi__key--active" aria-hidden="true"/>{count(relation.reports_with_current_work)} with work</Link>
-            <Link to="/gov/reports?overview=without_work"><i className="gov-bi-kpi__key gov-bi-kpi__key--neutral" aria-hidden="true"/>{count(relation.reports_without_current_work)} without</Link>
-        </KpiCard>
-        <KpiCard title="Current work orders" value={work} detail="Across permitted records" url="/gov/work-orders?tab=current" action="Open current work orders" onExport={onExport && (format => onExport('current_work_orders', format))} total={work} segments={[
-            { label: 'Blocked', value: relation.blocked_orders, kind: 'warning' },
-            { label: 'For verification', value: relation.awaiting_verification, kind: 'active' },
-            { label: 'Other current work', value: otherWork, kind: 'neutral' },
-        ]}>
-            <Link to="/gov/work-orders?tab=blocked"><i className="gov-bi-kpi__key gov-bi-kpi__key--warning" aria-hidden="true"/>{count(relation.blocked_orders)} blocked</Link>
-            <Link to="/gov/work-orders?tab=completed_pending_review"><i className="gov-bi-kpi__key gov-bi-kpi__key--active" aria-hidden="true"/>{count(relation.awaiting_verification)} for verification</Link>
-            <span><i className="gov-bi-kpi__key gov-bi-kpi__key--neutral" aria-hidden="true"/>{count(otherWork)} other</span>
-        </KpiCard>
-        <KpiCard title="Needs triage or owner" value={needsReview} detail="Of currently open reports" url="/gov/reports?overview=triage" action="Open reports needing triage or an owner" onExport={onExport && (format => onExport('needs_triage', format))} total={open} segments={[
-            { label: 'Needs triage or owner', value: needsReview, kind: 'active' },
-            { label: 'Other open reports', value: Math.max(0, open - needsReview), kind: 'neutral' },
-        ]}>
-            <span><i className="gov-bi-kpi__key gov-bi-kpi__key--active" aria-hidden="true"/>{count(needsReview)} of {count(open)} open</span>
-            <Link to="/gov/reports?overview=triage">Open queue <ArrowUpRight size={13} aria-hidden="true"/></Link>
-        </KpiCard>
-    </div>;
-}
-
-function AttentionPanel({ data, onExport }) {
-    const items = [
-        { label: 'Needs triage or owner', count: data.totals.unreviewed_reports, url: '/gov/reports?overview=triage', detail: 'Open reports' },
-        { label: 'Urgent P4–P5', count: data.totals.urgent_reports, url: '/gov/reports?overview=urgent', detail: 'Open reports' },
-        { label: 'Blocked work', count: data.totals.blocked_work_orders, url: '/gov/work-orders?tab=blocked', detail: 'Current orders' },
-        { label: 'Awaiting verification', count: data.totals.awaiting_verification, url: '/gov/work-orders?tab=completed_pending_review', detail: 'Current orders' },
-    ];
-    return <aside className="gov-bi-surface gov-bi-attention" aria-labelledby="gov-bi-attention-title">
-        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-attention-title">Needs attention</h2><p>Recorded queues to inspect next</p></div><div className="gov-bi-head-actions"><ExportActions label="needs attention queues" onExport={onExport && (format => onExport('attention', format))}/><AlertTriangle size={19} aria-hidden="true"/></div></header>
-        <div className="gov-bi-attention__list">{items.map(item => <Link key={item.label} to={item.url} className="gov-bi-attention__row"><span><strong>{item.label}</strong><small>{item.detail}</small></span><span className="gov-bi-attention__count">{count(item.count)}<ArrowUpRight size={13} aria-hidden="true"/></span></Link>)}</div>
-        {(Array.isArray(data.asset_exceptions) || Array.isArray(data.update_exceptions)) && <div className="gov-bi-attention__related">
-            {Array.isArray(data.asset_exceptions) && <Link to="/gov/assets">{count(data.asset_exceptions.length)} infrastructure exceptions shown <ArrowUpRight size={13}/></Link>}
-            {Array.isArray(data.update_exceptions) && <Link to="/gov/announcements">{count(data.update_exceptions.length)} public updates shown <ArrowUpRight size={13}/></Link>}
-        </div>}
-    </aside>;
-}
-
-function IntakeChart({ intake, onExport }) {
-    const [days, setDays] = useState(14);
-    const plot = useRef(null);
-    const [plotWidth, setPlotWidth] = useState(360);
-    const all = intake?.series || [];
-    const points = all.slice(-days);
-    const total = points.reduce((sum, point) => sum + point.count, 0);
-    useEffect(() => {
-        if (!plot.current) return;
-        const observer = new ResizeObserver(([entry]) => setPlotWidth(Math.max(220, Math.round(entry.contentRect.width))));
-        observer.observe(plot.current);
-        return () => observer.disconnect();
-    }, [total]);
-    const previousSeven = all.slice(-14, -7).reduce((sum, point) => sum + point.count, 0);
-    const lastSeven = all.slice(-7).reduce((sum, point) => sum + point.count, 0);
-    const max = Math.max(4, Math.ceil(Math.max(0, ...points.map(point => point.count)) / 4) * 4);
-    const left = 32, right = plotWidth - 12, top = 12, bottom = 108;
-    const x = index => left + (points.length < 2 ? 0 : index / (points.length - 1)) * (right - left);
-    const y = value => bottom - value / max * (bottom - top);
-    const line = points.map((point, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(point.count)}`).join(' ');
-    const fill = points.length ? `${line} L ${x(points.length - 1)} ${bottom} L ${left} ${bottom} Z` : '';
-    const labels = new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]);
-    return <section className="gov-bi-surface gov-bi-intake" aria-labelledby="gov-bi-intake-title">
-        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-intake-title">Incoming reports</h2><p>Daily submissions · Asia/Manila · includes reports now closed</p></div><div className="gov-bi-head-actions"><ExportActions label={`${days}-day incoming reports`} onExport={onExport && (format => onExport('intake', format, { days }))}/><div className="gov-bi-period" role="group" aria-label="Report intake period">{[7, 14].map(value => <button key={value} type="button" aria-pressed={days === value} onClick={() => setDays(value)}>{value} days</button>)}</div></div></header>
-        <div className="gov-bi-intake__summary"><strong>{count(total)}</strong><span>received in {days} days</span><small>Last 7: {count(lastSeven)} · previous 7: {count(previousSeven)}</small></div>
-        {total ? <figure ref={plot} className="gov-bi-intake__chart" aria-label={`${count(total)} reports received across the selected ${days} days. The line shows daily counts; exact values are in the table below.`}><svg viewBox={`0 0 ${plotWidth} 136`} preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
-            {[0, .5, 1].map(fraction => { const ordinate = y(max * fraction); return <g key={fraction}><line x1={left} x2={right} y1={ordinate} y2={ordinate} className="gov-bi-gridline"/><text x={left - 9} y={ordinate + 4} textAnchor="end" className="gov-bi-axis-label">{max * fraction}</text></g>; })}
-            <path d={fill} className="gov-bi-area"/><path d={line} className="gov-bi-line"/>
-            {points.map((point, index) => <g key={point.date}><circle cx={x(index)} cy={y(point.count)} r="3.5" className="gov-bi-point"/>{labels.has(index) && <text x={x(index)} y="129" textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'} className="gov-bi-axis-label">{dateLabel(point.date)}</text>}</g>)}
-        </svg></figure> : <p className="gov-bi-empty">No reports were submitted in this period.</p>}
-        <DataTable label="daily report intake" columns={['Date (Asia/Manila)', 'Reports received']} rows={points.map(point => [dateLabel(point.date), count(point.count)])}/>
-    </section>;
+function ExportMenu({ label, onExport }) {
+    return onExport && <details className="gov-bi-export-menu">
+        <summary aria-label={`Export ${label}`} title={`Export ${label}`}><Download size={14} aria-hidden="true"/></summary>
+        <div><ExportActions label={label} onExport={onExport}/></div>
+    </details>;
 }
 
 function DemandChart({ data, onExport }) {
@@ -145,16 +62,29 @@ function DemandChart({ data, onExport }) {
     const shownPriorities = PRIORITIES.filter(([key]) => data.priorities?.[key]);
     const priorityMax = Math.max(1, ...shownPriorities.map(([key]) => data.priorities[key]));
     const splitBar = (withWork, withoutWork, max, label, filter) => <span className="gov-bi-demand__track" role="group" aria-label={`${label}: ${count(withWork)} with current work, ${count(withoutWork)} without current work`}>
-        {withWork > 0 && <Link className="gov-bi-demand__with" to={`/gov/reports?overview=with_work&${filter}`} style={{ width: `${withWork / max * 100}%` }} aria-label={`${label}: open ${count(withWork)} reports with current work`} title={`${count(withWork)} with current work`}/>}
-        {withoutWork > 0 && <Link className="gov-bi-demand__without" to={`/gov/reports?overview=without_work&${filter}`} style={{ width: `${withoutWork / max * 100}%` }} aria-label={`${label}: open ${count(withoutWork)} reports without current work`} title={`${count(withoutWork)} without current work`}/>}
+        {[['with', withWork], ['without', withoutWork]].filter(([, value]) => value > 0).map(([kind, value]) => {
+            const props = { className: `gov-bi-demand__${kind}`, style: { width: `${value / max * 100}%` } };
+            return filter
+                ? <Link key={kind} {...props} to={`/gov/reports?overview=${kind}_work&${filter}`} aria-label={`${label}: open ${count(value)} reports ${kind} current work`}/>
+                : <span key={kind} {...props} aria-hidden="true"/>;
+        })}
     </span>;
-    return <section className="gov-bi-surface gov-bi-demand" aria-labelledby="gov-bi-demand-title">
-        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-demand-title">{view === 'areas' ? 'Open reports by area' : 'Open reports by priority'}</h2><p>{view === 'areas' ? 'Up to six recorded areas' : 'Recorded staff priority'} · select a bar to inspect reports</p></div><div className="gov-bi-head-actions"><ExportActions label={`open reports by ${view === 'areas' ? 'area' : 'priority'}`} onExport={onExport && (format => onExport(view === 'areas' ? 'areas' : 'priorities', format))}/><div className="gov-bi-period" role="group" aria-label="Report breakdown">{[['areas', 'Areas'], ['priority', 'Priority']].map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>)}</div></div></header>
+    const areaFilter = area => area.url === '/gov/reports?overview=unlocated' ? null : `area=${encodeURIComponent(area.barangay)}`;
+    return <Panel id="demand" className="gov-bi-demand" description={view === 'areas' ? 'Current workload by recorded area' : 'Current workload by recorded priority'} actions={<div className="gov-bi-head-actions">
+        <div className="gov-bi-period" role="group" aria-label="Report breakdown">{[['areas', 'Areas'], ['priority', 'Priority']].map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => setView(key)}>{label}</button>)}</div>
+        <ExportMenu label={`open reports by ${view === 'areas' ? 'area' : 'priority'}`} onExport={onExport && (format => onExport(view === 'areas' ? 'areas' : 'priorities', format))}/>
+    </div>}>
         <div className="gov-bi-demand__legend"><span><i className="gov-bi-demand__key gov-bi-demand__key--with" aria-hidden="true"/>With current work</span><span><i className="gov-bi-demand__key gov-bi-demand__key--without" aria-hidden="true"/>Without current work</span></div>
         {view === 'areas' ? <>
-            {shown.length ? <div className="gov-bi-demand__bars">{shown.map(area => <div key={area.barangay} className="gov-bi-demand__row"><Link to={area.url} title={`Open ${count(area.count)} reports in ${area.barangay}`}>{area.barangay}</Link>{splitBar(area.with_work_count, area.without_work_count, areaMax, area.barangay, `area=${encodeURIComponent(area.barangay)}`)}<strong>{count(area.count)}</strong></div>)}</div> : <p className="gov-bi-empty">No open reports have a recorded area in this scope.</p>}
+            {shown.length ? <div className="gov-bi-demand__bars">{shown.map(area => <div key={area.barangay} className="gov-bi-demand__row"><Link to={area.url}>{area.barangay}</Link>{splitBar(area.with_work_count, area.without_work_count, areaMax, area.barangay, areaFilter(area))}<strong>{count(area.count)}</strong></div>)}</div> : <p className="gov-bi-empty">No open reports have a recorded area in this scope.</p>}
             {data.coverage?.unlocated_reports > 0 && <Link className="gov-bi-demand__missing" to="/gov/reports?overview=unlocated">{count(data.coverage.unlocated_reports)} open reports have no recorded area <ArrowUpRight size={13} aria-hidden="true"/></Link>}
-            <DataTable note="Without current work may still be in review. Counts show distinct open reports, not overdue work." label="area and current work" columns={['Recorded area', 'Open reports', 'With current work', 'Without current work']} rows={areas.map(area => [area.barangay, count(area.count), <Link key="with" to={`/gov/reports?overview=with_work&area=${encodeURIComponent(area.barangay)}`}>{count(area.with_work_count)}</Link>, <Link key="without" to={`/gov/reports?overview=without_work&area=${encodeURIComponent(area.barangay)}`}>{count(area.without_work_count)}</Link>])}/>
+            <DataTable note="Reports without current work may still be in review." label="area and current work" columns={['Recorded area', 'Open reports', 'With current work', 'Without current work']} rows={areas.map(area => {
+                const filter = areaFilter(area);
+                const values = [['with', area.with_work_count], ['without', area.without_work_count]];
+                return [area.barangay, count(area.count), ...values.map(([kind, value]) => filter
+                    ? <Link key={kind} to={`/gov/reports?overview=${kind}_work&${filter}`}>{count(value)}</Link>
+                    : count(value))];
+            })}/>
         </> : <>
             {shownPriorities.length ? <div className="gov-bi-demand__bars">{shownPriorities.map(([key, label]) => {
                 const split = data.priority_work[key];
@@ -162,37 +92,343 @@ function DemandChart({ data, onExport }) {
             })}</div> : <p className="gov-bi-empty">No open reports are recorded in this scope.</p>}
             <DataTable note="Without current work may still be in review. Counts show distinct open reports, not overdue work." label="priority and current work" columns={['Priority', 'Open reports', 'With current work', 'Without current work']} rows={PRIORITIES.map(([key, label]) => [label, count(data.priorities?.[key]), <Link key="with" to={`/gov/reports?overview=with_work&priority=${encodeURIComponent(key)}`}>{count(data.priority_work[key].with_work)}</Link>, <Link key="without" to={`/gov/reports?overview=without_work&priority=${encodeURIComponent(key)}`}>{count(data.priority_work[key].without_work)}</Link>])}/>
         </>}
+    </Panel>;
+}
+
+const PANELS = [
+    ['areas', 'Work orders by area'], ['inventory', 'Infrastructure status'], ['intake', 'Service requests'],
+    ['trend', 'Work order trend'], ['types', 'Reports by type'], ['stages', 'Work progress by stage'],
+    ['performance', 'Key performance indicators'], ['timeline', 'Project timeline'], ['resources', 'Resource utilization'],
+    ['actions', 'Quick actions'], ['alerts', 'Alerts and notifications'], ['infrastructure', 'City infrastructure at a glance'],
+];
+const DEMAND_PANEL = ['demand', 'Open report demand'];
+const PANEL_TITLES = Object.fromEntries([...PANELS, DEMAND_PANEL]);
+const COLORS = ['green', 'blue', 'orange', 'slate', 'mint', 'steel'];
+const panelId = id => `overview-${id}`;
+
+export function OverviewSearch({ canViewDemand }) {
+    const [query, setQuery] = useState('');
+    const [message, setMessage] = useState('');
+    const options = useId();
+    const panels = canViewDemand ? [...PANELS, DEMAND_PANEL] : PANELS;
+    function submit(event) {
+        event.preventDefault();
+        const keyword = query.trim().toLowerCase();
+        if (!keyword) return;
+        const match = panels.find(([, title]) => title.toLowerCase().includes(keyword));
+        if (!match) {
+            setMessage('No matching dashboard panel.');
+            return;
+        }
+        const panel = document.getElementById(panelId(match[0]));
+        panel?.focus({ preventScroll: true });
+        panel?.scrollIntoView({ block: 'nearest' });
+        setMessage('');
+    }
+    return <form className="gov-overview-search" role="search" onSubmit={submit}>
+        <label className="gov-search">
+            <Search size={15} aria-hidden="true"/>
+            <span className="sr-only">Find a dashboard panel</span>
+            <input type="search" value={query} list={options} placeholder="Find a dashboard panel" onChange={event => { setQuery(event.target.value); setMessage(''); }}/>
+        </label>
+        <datalist id={options}>{panels.map(([id, title]) => <option key={id} value={title}/>)}</datalist>
+        <span role="status" className={message ? 'gov-overview-search__message' : 'sr-only'}>{message}</span>
+    </form>;
+}
+
+export function OverviewLoading() {
+    return <div className="gov-bi-dashboard" role="status">
+        <span className="sr-only">Loading operations overview</span>
+        <div className="gov-bi-kpis" aria-hidden="true">
+            {Array.from({ length: 5 }, (_, i) => <div className="gov-bi-surface gov-bi-kpi gov-bi-skeleton" key={i}><span/><span/></div>)}
+        </div>
+        <div className="gov-bi-workbench" aria-hidden="true">
+            {[PANELS.slice(0, 9), PANELS.slice(9)].map((panels, index) => <div className={index ? 'gov-bi-rail' : 'gov-bi-charts'} key={index}>
+                {panels.map(([id]) => <div className="gov-bi-surface gov-bi-skeleton" key={id}><span/><span/></div>)}
+            </div>)}
+        </div>
+    </div>;
+}
+
+function Panel({ id, description, actions, children, className = '' }) {
+    return <section className={`gov-bi-surface gov-bi-panel ${className}`} id={panelId(id)} tabIndex={-1} aria-labelledby={`${panelId(id)}-title`}>
+        <header className="gov-bi-surface__head">
+            <div><h2 id={`${panelId(id)}-title`}>{PANEL_TITLES[id]}</h2><p>{description}</p></div>
+            {actions}
+        </header>
+        {children}
     </section>;
 }
 
-function WorkStageChart({ data, onExport }) {
-    const stages = data.work_stages || [];
+function Badge({ icon, tone = 'orange' }) {
+    return <span className={`gov-bi-badge is-${tone}`} aria-hidden="true">{createElement(icon, { size: 17 })}</span>;
+}
+function DrillLink({ to, children }) {
+    return to && <Link className="gov-bi-text-link" to={to}>{children}<ArrowUpRight size={12} aria-hidden="true"/></Link>;
+}
+
+function Ring({ rows, total, label }) {
+    let offset = 0;
+    const segments = rows.map(([value, tone]) => {
+        const start = offset;
+        offset += 100 * value / total;
+        return `var(--bi-${tone}) ${start}% ${Math.min(100, offset)}%`;
+    });
+    return <div className="gov-bi-ring" aria-hidden="true" style={total > 0 && segments.length ? { backgroundImage: `conic-gradient(${segments.join(',')})` } : undefined}>
+        <div>{label && <><strong>{count(total)}</strong><small>{label}</small></>}</div>
+    </div>;
+}
+
+function Kpis({ data, has, onExport }) {
+    const { relationships: r, totals, dashboard } = data;
+    const completion = dashboard?.work?.completion;
+    const eligible = completion?.eligible;
+    const percent = eligible ? Math.round(1000 * completion.completed / eligible) / 10 : null;
+    const cards = [
+        { title: 'Open reports', value: r.open_reports, detail: `${count(r.reports_with_current_work)} with work · ${count(r.reports_without_current_work)} without`, icon: ClipboardList, tone: 'orange', to: has('reports') && '/gov/reports?overview=open', kind: 'open_reports' },
+        { title: 'Active work orders', value: r.current_work_orders, detail: `${count(r.blocked_orders)} blocked · ${count(r.awaiting_verification)} for verification`, icon: Wrench, tone: 'blue', to: has('work-orders') && '/gov/work-orders?tab=current', kind: 'current_work_orders' },
+        { title: 'Projects in progress', value: dashboard?.projects?.in_progress, detail: dashboard?.projects ? 'Recorded delivery stages' : 'Project records unavailable', icon: Layers, tone: 'green', to: has('projects') && '/gov/projects' },
+        { title: 'Needs attention', value: totals.unreviewed_reports, detail: 'Reports awaiting triage or a review owner', icon: TriangleAlert, tone: 'warning', to: has('reports') && '/gov/reports?overview=triage', kind: 'needs_triage' },
+        { title: 'Completion rate', value: percent == null ? null : `${percent}%`, detail: eligible ? `${count(completion.completed)} of ${count(eligible)} orders opened in 30 days` : completion ? 'No eligible orders opened in 30 days' : 'Completion records unavailable', icon: ClipboardCheck, tone: 'green', ratio: percent },
+    ];
+    return <div className="gov-bi-kpis" aria-label="Operational indicators">{cards.map(card => <section className="gov-bi-surface gov-bi-kpi" key={card.title}>
+        <Badge icon={card.icon} tone={card.tone}/>
+        <div>
+            <h2>{card.to ? <Link to={card.to}>{card.title}</Link> : card.title}</h2>
+            <strong>{card.value == null ? '—' : typeof card.value === 'number' ? count(card.value) : card.value}</strong>
+            <small>{card.detail}</small>
+        </div>
+        {card.ratio != null && <div className="gov-bi-kpi__ring"><Ring rows={[[card.ratio, 'green'], [100 - card.ratio, 'track']]} total={100}/></div>}
+        {card.kind && onExport && <div className="gov-bi-kpi__export"><ExportMenu label={card.title.toLowerCase()} onExport={format => onExport(card.kind, format)}/></div>}
+    </section>)}</div>;
+}
+
+function Distribution({ rows, noun }) {
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
+    if (!total) return <p className="gov-bi-empty">No {noun} are recorded in this scope.</p>;
+    const ordered = [...rows].sort((a, b) => b.count - a.count);
+    const leading = ordered.slice(0, 5);
+    const tail = ordered.slice(5).reduce((sum, row) => sum + row.count, 0);
+    const visible = tail ? [...leading, { label: 'Other recorded values', count: tail }] : leading;
+    return <>
+        <div className="gov-bi-distribution">
+            <Ring rows={visible.map((row, i) => [row.count, COLORS[i]])} total={total} label={noun}/>
+            <ul className="gov-bi-legend" aria-label={`${count(total)} ${noun}`}>{visible.map(({ label, count: value }, i) => <li key={i}>
+                <i className={`gov-bi-dot is-${COLORS[i]}`} aria-hidden="true"/><span>{label}</span><strong>{count(value)}</strong>
+            </li>)}</ul>
+        </div>
+        {tail > 0 && <DataTable label={noun} columns={['Recorded value', 'Count']} rows={ordered.map(row => [row.label, count(row.count)])}/>}
+    </>;
+}
+
+function Trend({ id, series, lines, onExport }) {
+    const [days, setDays] = useState(id === 'intake' ? 14 : 30);
+    const points = series?.slice(-days) || [];
+    const totals = lines.map(({ key }) => points.reduce((sum, point) => sum + point[key], 0));
+    const max = Math.max(2, Math.ceil(Math.max(0, ...points.flatMap(point => lines.map(({ key }) => point[key]))) / 2) * 2);
+    const paths = lines.map(({ key }) => points.map((point, index) =>
+        `${index ? 'L' : 'M'} ${4 + index * 312 / Math.max(1, points.length - 1)} ${68 - point[key] / max * 65}`).join(' '));
+    const periods = (id === 'intake' ? [7, 14] : [7, 14, 30]).filter(value => value <= (series?.length ?? 0));
+    return <Panel id={id} description={id === 'intake' ? 'Incoming resident reports · Manila time' : 'Orders created and completed · Manila time'} actions={<div className="gov-bi-head-actions">
+        {periods.length > 1 && <select className="gov-bi-select" aria-label={`${PANEL_TITLES[id]} period`} value={days} onChange={event => setDays(Number(event.target.value))}>
+            {periods.map(value => <option key={value} value={value}>{value} days</option>)}
+        </select>}
+        <ExportMenu label={`${days}-day incoming reports`} onExport={onExport && (format => onExport('intake', format, { days }))}/>
+    </div>}>
+        {!points.length ? <p className="gov-bi-empty">Daily records are unavailable.</p> : <>
+            <div className="gov-bi-trend-summary" aria-live="polite">{lines.map(({ label, tone }, index) => <span key={label}><i className={`gov-bi-dot is-${tone}`} aria-hidden="true"/><strong>{count(totals[index])}</strong> {label.toLowerCase()}</span>)}</div>
+            <div className="gov-bi-trend" aria-hidden="true">
+                <div className="gov-bi-trend__ticks"><span>{max}</span><span>{max / 2}</span><span>0</span></div>
+                <svg viewBox="0 0 320 70" preserveAspectRatio="none" focusable="false">
+                    <path className="gov-bi-gridline" d="M0 2H320 M0 35H320 M0 68H320"/>
+                    <g key={days} className="gov-bi-trend__series">
+                        <path className="gov-bi-area" d={`${paths[0]} L ${points.length > 1 ? 316 : 4} 68 H4Z`}/>
+                        {paths.map((path, index) => <path key={lines[index].key} className={`gov-bi-line is-${lines[index].tone}`} d={path}/>)}
+                    </g>
+                </svg>
+                <div className="gov-bi-trend__dates"><span>{dateLabel(points[0].date)}</span><span>{dateLabel(points.at(-1).date)}</span></div>
+            </div>
+            <DataTable label="daily" columns={['Date', ...lines.map(line => line.label)]} rows={points.map(point => [dateLabel(point.date), ...lines.map(line => count(point[line.key]))])}/>
+        </>}
+    </Panel>;
+}
+
+function WorkAreas({ scope, has }) {
+    return <Panel id="areas" description="Current orders within your permitted areas" actions={<DrillLink to={has('reports') && '/gov/map'}>Open reports map</DrillLink>}>
+        <OverviewAreaMap scope={scope}/>
+    </Panel>;
+}
+
+function WorkStages({ data, has, onExport }) {
+    const stages = data.work_stages;
     const total = data.relationships.current_work_orders;
     const max = Math.max(1, ...stages.map(stage => stage.count));
-    return <section className="gov-bi-surface gov-bi-stage" aria-labelledby="gov-bi-stage-title">
-        <header className="gov-bi-surface__head"><div><h2 id="gov-bi-stage-title">Current work by stage</h2><p>Recorded work orders, grouped by their current state</p></div><div className="gov-bi-head-actions"><ExportActions label="current work by stage" onExport={onExport && (format => onExport('work_stages', format))}/><Link to="/gov/work-orders?tab=current" className="gov-bi-text-link">All work <ArrowUpRight size={15} aria-hidden="true"/></Link></div></header>
-        {total ? <div className="gov-bi-stage__plot" role="group" aria-label="Select a work stage to open its work orders">
-            {stages.map(stage => {
-                const content = <><strong>{count(stage.count)}</strong><span className="gov-bi-stage__slot"><span className="gov-bi-stage__bar" data-empty={stage.count === 0} style={{ height: `${stage.count ? Math.max(7, stage.count / max * 100) : 0}%` }}/></span><span className="gov-bi-stage__label">{stage.label}</span></>;
-                return stage.url ? <Link key={stage.key} to={stage.url} className={`gov-bi-stage__item is-${stage.key}`} aria-label={`${stage.label}: ${count(stage.count)} work orders. Open matching work orders.`}>{content}</Link>
-                    : <div key={stage.key} className={`gov-bi-stage__item is-${stage.key}`} aria-label={`${stage.label}: ${count(stage.count)} work orders`}>{content}</div>;
-            })}
-        </div> : <p className="gov-bi-empty">No current work orders are recorded in this scope.</p>}
-        <DataTable label="current work stages" columns={['Recorded stage', 'Work orders']} rows={stages.map(stage => [stage.label, stage.url ? <Link key={stage.key} to={stage.url}>{count(stage.count)}</Link> : count(stage.count)])}/>
-    </section>;
+    return <Panel id="stages" description={`${count(total)} current work orders`} actions={<div className="gov-bi-head-actions">
+        <DrillLink to={has('work-orders') && '/gov/work-orders?tab=current'}>View orders</DrillLink>
+        <ExportMenu label="current work by stage" onExport={onExport && (format => onExport('work_stages', format))}/>
+    </div>}>
+        {total ? <ul className="gov-bi-stage-list">{stages.map(({ key, label, count: value, url }) => <li key={key}>
+            {url && has('work-orders') ? <Link to={url}>{label}</Link> : <span>{label}</span>}
+            <span className="gov-bi-track" aria-hidden="true"><i className={key === 'blocked' ? 'is-orange' : 'is-green'} style={{ width: `${100 * value / max}%` }}/></span>
+            <strong>{count(value)}</strong>
+        </li>)}</ul> : <p className="gov-bi-empty">No current work orders in this scope.</p>}
+    </Panel>;
 }
 
-export default function GovBiDashboard({ data, onExport }) {
+function ProjectTimeline({ projects, has, asOf }) {
+    const date = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' });
+    const start = Date.parse(asOf);
+    const windowMs = 30 * 24 * 60 * 60 * 1000;
+    return <Panel id="timeline" description="Recorded reviews in the next 30 days" actions={<DrillLink to={has('projects') && '/gov/projects'}>View projects</DrillLink>}>
+        {!projects ? <p className="gov-bi-empty">Project review dates are unavailable.</p> : projects.reviews.length ? <ul className="gov-bi-timeline">
+            {projects.reviews.map(review => <li key={review.url}>
+                <Clock3 size={14} aria-hidden="true"/>
+                {has('projects') ? <Link to={review.url}>{review.title}</Link> : <span>{review.title}</span>}
+                <time dateTime={review.date}>{date.format(new Date(review.date))}</time>
+                {Number.isFinite(start) && <span className="gov-bi-track" aria-hidden="true"><i style={{ '--review-position': `${Math.min(100, Math.max(0, (Date.parse(review.date) - start) / windowMs * 100))}%` }}/></span>}
+            </li>)}
+        </ul> : <p className="gov-bi-empty">No upcoming project reviews are recorded.</p>}
+    </Panel>;
+}
+
+function Performance({ completion, feedback }) {
+    const rate = completion?.eligible ? `${(100 * completion.completed / completion.eligible).toFixed(1)}%` : '—';
+    const tiles = [
+        ['Average response time', '—', 'No governed response measure'],
+        ['Work-order completion', rate, '30-day intake cohort'],
+        ['On-time delivery', '—', 'Due-date coverage unavailable'],
+        ['Resident feedback', feedback?.count ? `${feedback.average.toFixed(1)} / 5` : '—',
+            feedback ? `${count(feedback.count)} rated reports opened in 30 days` : 'Feedback unavailable'],
+    ];
+    return <Panel id="performance" description="Service measures within your scope">
+        <div className="gov-bi-mini-grid">{tiles.map(([label, value, note]) => <div className="gov-bi-mini" key={label}>
+            <strong>{value}</strong><span>{label}</span><small>{note}</small>
+        </div>)}</div>
+    </Panel>;
+}
+
+function Attention({ data, has, onExport }) {
+    const { totals } = data;
+    const items = [
+        ['Needs triage or owner', totals.unreviewed_reports, 'Open reports', ClipboardList, 'orange', has('reports') && '/gov/reports?overview=triage'],
+        ['Urgent P4–P5', totals.urgent_reports, 'Open reports', TriangleAlert, 'warning', has('reports') && '/gov/reports?overview=urgent'],
+        ['Blocked work', totals.blocked_work_orders, 'Current orders', CirclePause, 'blue', has('work-orders') && '/gov/work-orders?tab=blocked'],
+        ['Awaiting verification', totals.awaiting_verification, 'Current orders', ClipboardCheck, 'green', has('work-orders') && '/gov/work-orders?tab=completed_pending_review'],
+    ];
+    return <Panel id="alerts" description="Recorded queues to inspect next" actions={<div className="gov-bi-head-actions">
+        <DrillLink to={has('my-work') && '/gov/my-work'}>My work</DrillLink>
+        <ExportMenu label="needs attention queues" onExport={onExport && (format => onExport('attention', format))}/>
+    </div>}>
+        <ul className="gov-bi-alerts">{items.map(([label, value, detail, icon, tone, url]) => {
+            const row = <><Badge icon={icon} tone={tone}/><span><b>{label}</b><small>{detail}</small></span><strong>{count(value)}</strong>{url && <ChevronRight size={13} aria-hidden="true"/>}</>;
+            return <li key={label}>{url ? <Link className="gov-bi-alert" to={url}>{row}</Link> : <div className="gov-bi-alert">{row}</div>}</li>;
+        })}</ul>
+        <div className="gov-bi-attention__related">
+            {Array.isArray(data.asset_exceptions) && has('assets') && <DrillLink to="/gov/assets">{count(data.asset_exceptions.length)} flagged assets shown</DrillLink>}
+            {Array.isArray(data.update_exceptions) && has('announcements') && <DrillLink to="/gov/announcements">{count(data.update_exceptions.length)} updates in review shown</DrillLink>}
+        </div>
+    </Panel>;
+}
+
+function QuickActions({ has, onExport }) {
+    const routes = [
+        ['work-orders', 'Work orders', '/gov/work-orders', Wrench, 'blue'],
+        ['reports', 'Reports map', '/gov/map', MapPinned, 'orange'],
+        ['records', 'Documents', '/gov/records-workspace?view=documents', FileText, 'blue'],
+    ];
+    return <Panel id="actions" description="Open your next workspace">
+        <div className="gov-bi-quick">
+            {routes.filter(([module]) => has(module)).map(([module, title, to, icon, tone]) => <Link className="gov-button" key={module} to={to}><Badge icon={icon} tone={tone}/>{title}</Link>)}
+            <GovButton onClick={() => onExport?.('summary', 'csv')} disabled={!onExport}><Badge icon={Download} tone="green"/>Export CSV</GovButton>
+        </div>
+    </Panel>;
+}
+
+const ASSET_TILES = [
+    ['Road assets', /^(road|roads|road network)$/, MapPinned],
+    ['Bridges', /^bridges?$/, Layers],
+    ['Drainage assets', /^drainage( systems?)?$/, Droplet],
+    ['Buildings and facilities', /^(public )?(buildings?|facilit(y|ies))$/, Building2],
+];
+
+function Infrastructure({ inventory, has }) {
+    const categories = Object.entries(inventory?.categories ?? {});
+    const tiles = ASSET_TILES.map(([label, match, icon], index) => ({
+        label, icon, tone: ['orange', 'blue', 'green', 'blue'][index],
+        total: categories.reduce((sum, [key, value]) => sum + (match.test(key.trim().toLowerCase()) ? value : 0), 0),
+    }));
+    const other = inventory ? inventory.total - tiles.reduce((sum, tile) => sum + tile.total, 0) : 0;
+    return <Panel id="infrastructure" description={inventory ? `${count(inventory.total)} registered assets in scope` : 'Recorded infrastructure inventory'} actions={<DrillLink to={has('assets') && '/gov/assets'}>Inventory</DrillLink>}>
+        <img className="gov-bi-infrastructure-art" src="/caloocan-city-hall.jpg" alt="" loading="lazy"/>
+        {inventory ? <>
+            <div className="gov-bi-mini-grid">{tiles.map(({ label, total, icon, tone }) =>
+                <div className="gov-bi-mini gov-bi-mini--asset" key={label}><Badge icon={icon} tone={tone}/><div><strong>{count(total)}</strong><span>{label}</span></div></div>
+            )}</div>
+            {categories.length > 0 && <div className="gov-bi-infrastructure-breakdown">
+                {other > 0 && <span><strong>{count(other)}</strong> other assets</span>}
+                <DataTable label="asset category" columns={['Recorded category', 'Assets']} rows={categories.map(([name, value]) => [name, count(value)])}/>
+            </div>}
+        </> : <p className="gov-bi-empty">Inventory totals are unavailable.</p>}
+    </Panel>;
+}
+
+function OverviewTools({ data, onExport, showAssistant }) {
+    const [assistantOpen, setAssistantOpen] = useState(false);
+    return <>
+        <footer className="gov-bi-surface gov-bi-footer" aria-labelledby="overview-tools-title">
+            <header className="gov-bi-surface__head">
+                <div><h2 id="overview-tools-title">Overview tools</h2></div>
+                <ExportMenu label="overview summary" onExport={onExport && (format => onExport('summary', format))}/>
+            </header>
+            <div className="gov-bi-footer__actions">
+                <details><summary><Info size={14} aria-hidden="true"/> Coverage and interpretation</summary><div className="gov-bi-footer__detail">
+                    <p>Counts reflect permitted records at the source time shown above.</p>
+                    <ul>{(data.limitations || []).map(limit => <li key={limit}>{limit}</li>)}</ul>
+                    <p>Completion is the share of non-cancelled work orders opened in the last 30 days that have a recorded completion date.</p>
+                    <p>Infrastructure figures count registry records. Road length and total city coverage are separate measures.</p>
+                </div></details>
+                {showAssistant && <GovButton aria-expanded={assistantOpen} onClick={() => setAssistantOpen(open => !open)}><MessageSquare size={14} aria-hidden="true"/>{assistantOpen ? 'Close overview assistant' : 'Overview assistant'}</GovButton>}
+            </div>
+        </footer>
+        {assistantOpen && <GovAssistantSlot/>}
+    </>;
+}
+
+export default function GovBiDashboard({ data, modules = [], onExport, showAssistant }) {
+    const has = name => modules.includes(name);
+    const details = data.dashboard;
+    const inventory = details?.inventory;
+    const reportTypes = details?.report_types;
     return <div className="gov-bi-dashboard">
-        <KpiSummary data={data} onExport={onExport}/>
+        <Kpis data={data} has={has} onExport={onExport}/>
         <div className="gov-bi-workbench">
             <div className="gov-bi-charts">
-                <DemandChart data={data} onExport={onExport}/>
-                <AttentionPanel data={data} onExport={onExport}/>
-                <div className="gov-bi-analysis"><IntakeChart intake={data.report_intake} onExport={onExport}/><WorkStageChart data={data} onExport={onExport}/></div>
+                <WorkAreas scope={details?.work?.area_map} has={has}/>
+                <Panel id="inventory" description="Status recorded in the asset registry">
+                    {inventory ? <Distribution rows={Object.entries(inventory.statuses).map(([key, value]) => ({ label: key.replaceAll('_', ' '), count: value }))} noun="assets"/> : <p className="gov-bi-empty">Infrastructure status is unavailable.</p>}
+                </Panel>
+                <Trend id="intake" series={data.report_intake.series} lines={[{ key: 'count', label: 'Received', tone: 'orange' }]} onExport={onExport}/>
+                <Trend id="trend" series={details?.work?.series} lines={[{ key: 'created', label: 'Created', tone: 'orange' }, { key: 'completed', label: 'Completed', tone: 'green' }]}/>
+                <Panel id="types" description="Primary category of open reports">
+                    {reportTypes ? <Distribution rows={reportTypes} noun="reports"/> : <p className="gov-bi-empty">Report category totals are unavailable.</p>}
+                </Panel>
+                <WorkStages data={data} has={has} onExport={onExport}/>
+                <Performance completion={details?.work?.completion} feedback={details?.feedback}/>
+                <ProjectTimeline projects={details?.projects} has={has} asOf={data.as_of}/>
+                <Panel id="resources" description="Equipment, staff, vehicles and materials">
+                    <ul className="gov-bi-stage-list gov-bi-resources">{['Equipment', 'Staff', 'Vehicles', 'Materials'].map(resource => <li key={resource}>
+                        <span>{resource}</span><span className="gov-bi-track" aria-hidden="true"/><span aria-label="Unavailable">—</span>
+                    </li>)}</ul>
+                    <p className="gov-bi-empty">Utilization requires both allocation and capacity records.</p>
+                </Panel>
+                {has('reports') && <DemandChart data={data} onExport={onExport}/>}
             </div>
-            <GovAssistantSlot />
+            <aside className="gov-bi-rail" aria-label="Actions, alerts, and infrastructure">
+                <QuickActions has={has} onExport={onExport}/>
+                <Attention data={data} has={has} onExport={onExport}/>
+                <Infrastructure inventory={inventory} has={has}/>
+                <OverviewTools data={data} onExport={onExport} showAssistant={showAssistant}/>
+            </aside>
         </div>
-        <footer className="gov-bi-footer"><span>Counts are from permitted records at the as-of time above, not a live stream.</span><details><summary>Coverage and interpretation</summary><div className="gov-bi-footer__detail"><p>{count(data.coverage?.total_open_reports - data.coverage?.unlocated_reports)} of {count(data.coverage?.total_open_reports)} open reports have a recorded barangay. {count(data.coverage?.total_open_reports - data.coverage?.unassigned_reports)} have a review owner.</p><ul>{(data.limitations || []).map(limit => <li key={limit}>{limit}</li>)}</ul></div></details></footer>
     </div>;
 }

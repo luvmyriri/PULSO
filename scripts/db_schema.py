@@ -20,11 +20,11 @@ from sqlalchemy.engine import make_url
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / "backend" / "schema" / "baseline_c455ca49f6d5.sql"
 BASELINE_INVENTORY = ROOT / "backend" / "schema" / "baseline_c455ca49f6d5.inventory.json"
-HEAD_INVENTORY = ROOT / "backend" / "schema" / "head_23a7b8c9d0e1.inventory.json"
-PREVIOUS_INVENTORY = ROOT / "backend" / "schema" / "head_22f6a7b8c9d0.inventory.json"
+HEAD_INVENTORY = ROOT / "backend" / "schema" / "head_31c5d6e7f8a9.inventory.json"
+PREVIOUS_INVENTORY = ROOT / "backend" / "schema" / "head_30b4c5d6e7f8.inventory.json"
 BASELINE_REVISION = "c455ca49f6d5"
-HEAD_REVISION = "23a7b8c9d0e1"
-PREVIOUS_REVISION = "22f6a7b8c9d0"
+HEAD_REVISION = "31c5d6e7f8a9"
+PREVIOUS_REVISION = "30b4c5d6e7f8"
 
 
 def connection_kwargs(database: str | None = None) -> dict:
@@ -300,6 +300,30 @@ def command_check_existing(*, require_head: bool = False) -> None:
     elif revision == PREVIOUS_REVISION:
         expected = load_inventory(PREVIOUS_INVENTORY)
         state = "previous"
+    elif revision == "29a3b4c5d6e7":
+        expected = load_inventory(ROOT / 'backend/schema/head_29a3b4c5d6e7.inventory.json')
+        state = "previous"
+    elif revision == '28f2a3b4c5d6':
+        expected = load_inventory(ROOT / 'backend/schema/head_28f2a3b4c5d6.inventory.json')
+        state = 'previous'
+    elif revision == '27e1f2a3b4c5':
+        expected = load_inventory(ROOT / 'backend/schema/head_27e1f2a3b4c5.inventory.json')
+        state = 'previous'
+    elif revision == '26d0e1f2a3b4':
+        expected = load_inventory(ROOT / 'backend/schema/head_26d0e1f2a3b4.inventory.json')
+        state = 'previous'
+    elif revision == '25c9d0e1f2a3':
+        expected = load_inventory(ROOT / 'backend/schema/head_25c9d0e1f2a3.inventory.json')
+        state = 'previous'
+    elif revision == '24b8c9d0e1f2':
+        expected = load_inventory(ROOT / 'backend/schema/head_24b8c9d0e1f2.inventory.json')
+        state = 'previous'
+    elif revision == '23a7b8c9d0e1':
+        expected = load_inventory(ROOT / 'backend/schema/head_23a7b8c9d0e1.inventory.json')
+        state = 'previous'
+    elif revision == '22f6a7b8c9d0':
+        expected = load_inventory(ROOT / 'backend/schema/head_22f6a7b8c9d0.inventory.json')
+        state = 'previous'
     elif revision == '21e5f6a7b8c9':
         expected = load_inventory(ROOT / 'backend/schema/head_21e5f6a7b8c9.inventory.json')
         state = 'previous'

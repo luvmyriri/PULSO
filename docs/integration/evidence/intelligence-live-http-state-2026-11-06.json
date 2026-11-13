@@ -1,0 +1,85 @@
+{
+  "sample_only": true,
+  "reports": [
+    {
+      "id": 1,
+      "ticket_id": "PUL-2026-7733",
+      "categories": [
+        "Roads & Bridges",
+        "Drainage & Flooding"
+      ],
+      "status": "pending",
+      "version": 3,
+      "review_owner_id": 2,
+      "assignment_mode": "automatic",
+      "accuracy_m": null,
+      "location_metadata": {
+        "source": "manual",
+        "device_fix": null,
+        "issue_pin_confirmed": true,
+        "confirmed_at": "2026-11-05T22:45:59.890000Z",
+        "photo_captured_at": null,
+        "photo_source": "upload",
+        "photo_device_fix": null,
+        "quality": "manual_or_unknown"
+      }
+    },
+    {
+      "id": 2,
+      "ticket_id": "PUL-2026-9480",
+      "categories": [
+        "Roads & Bridges"
+      ],
+      "status": "pending",
+      "version": 2,
+      "review_owner_id": 2,
+      "assignment_mode": "automatic",
+      "accuracy_m": null,
+      "location_metadata": {
+        "source": "manual",
+        "device_fix": null,
+        "issue_pin_confirmed": true,
+        "confirmed_at": "2026-11-05T22:46:25.534000Z",
+        "photo_captured_at": null,
+        "photo_source": "upload",
+        "photo_device_fix": null,
+        "quality": "manual_or_unknown"
+      }
+    },
+    {
+      "id": 3,
+      "ticket_id": "PUL-2026-2084",
+      "categories": [
+        "Roads & Bridges"
+      ],
+      "status": "pending",
+      "version": 2,
+      "review_owner_id": 2,
+      "assignment_mode": "automatic",
+      "accuracy_m": null,
+      "location_metadata": {
+        "source": "manual",
+        "device_fix": null,
+        "issue_pin_confirmed": true,
+        "confirmed_at": "2026-11-05T22:47:33.434000Z",
+        "photo_captured_at": null,
+        "photo_source": "upload",
+        "photo_device_fix": null,
+        "quality": "manual_or_unknown"
+      }
+    }
+  ],
+  "report_count": 3,
+  "observation_count": 3,
+  "active_concern_count": 2,
+  "human_pair_reviews": 1,
+  "membership_decisions": 1,
+  "image_jobs": [
+    {
+      "id": "b65ebebf-0ec6-476b-b1a7-caee849232bf",
+      "status": "completed",
+      "attempts": 1,
+      "failure_code": null
+    }
+  ]
+}

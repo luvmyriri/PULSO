@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -13,13 +14,14 @@ import {
 import { useMobileInstallLink } from './useMobileInstallLink';
 
 export default function PwaModal({ isOpen, onClose }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isEditingIp, setIsEditingIp] = useState(false);
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
-  const { activeUrl, apkUrl, needsDiscovery, wifiIp, setWifiIp } = useMobileInstallLink(isOpen);
+  const { activeUrl, apkUrl, needsDiscovery, wifiIp, setWifiIp, isLanDownload, release, downloadState, retryDownloadCheck } = useMobileInstallLink(isOpen);
   const canCopy = typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText);
 
   useEffect(() => {
@@ -125,7 +127,7 @@ export default function PwaModal({ isOpen, onClose }) {
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
                   {apkUrl ? <Wifi size={13} /> : <Globe size={13} />}
-                  {apkUrl ? 'Development only · Same Wi-Fi' : 'PULSO on mobile'}
+                  {apkUrl ? isLanDownload ? t('mobileInstall.sameWifi') : t('mobileInstall.publicBuild', {version: release?.versionName}) : t('mobileInstall.mobileWebsite')}
                 </span>
               </div>
               <h3 id="pwa-modal-title" className="font-heading font-black text-lg sm:text-xl text-slate-900 dark:text-white leading-tight mt-0.5">
@@ -157,7 +159,7 @@ export default function PwaModal({ isOpen, onClose }) {
                 size={144}
                 level="H"
                 marginSize={4}
-                title={apkUrl ? 'QR code for the development APK download page' : 'QR code for the PULSO website'}
+                title={apkUrl ? t('mobileInstall.qrLabel') : t('mobileInstall.openWebsite')}
               />
               <span className="text-[10px] font-mono font-bold text-slate-500 mt-1.5 uppercase tracking-wider flex items-center gap-1">
                 <Wifi size={10} className="text-[#ff6b00]" />
@@ -174,7 +176,7 @@ export default function PwaModal({ isOpen, onClose }) {
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
                 {apkUrl
-                  ? 'Use the same Wi-Fi as this computer and keep the development download server running.'
+                  ? isLanDownload ? t('mobileInstall.sameWifi') : t('mobileInstall.installHelp')
                   : needsDiscovery
                     ? 'Enter your computer’s Wi-Fi address to show the Android APK QR code.'
                     : 'Open PULSO on your phone.'}
@@ -220,6 +222,16 @@ export default function PwaModal({ isOpen, onClose }) {
                   </button>
                 )}
               </div>
+
+              {apkUrl && <a href={apkUrl}
+                className="mt-3 min-h-11 w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white font-bold text-sm focus-visible:outline-3 focus-visible:outline-blue-600">
+                <Download size={16} aria-hidden="true" />{t('mobileInstall.download')}
+              </a>}
+              {!needsDiscovery && !apkUrl && <p role="status" className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                {t(downloadState === 'checking' ? 'mobileInstall.checking' : 'mobileInstall.unavailable')}
+                {downloadState === 'unavailable' && <button type="button" onClick={retryDownloadCheck}
+                  className="min-h-11 px-3 underline focus-visible:outline-3 focus-visible:outline-blue-600">{t('mobileInstall.retry')}</button>}
+              </p>}
 
               {/* Direct Install button if supported by browser */}
               {isInstallable && !apkUrl && (

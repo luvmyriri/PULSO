@@ -45,8 +45,9 @@ export default function WorkOrdersWorkspace(){
     </GovWorkspace>;
 }
 
-function WorkOrderRecord({id,onClose,onChanged}){
+export function WorkOrderRecord({id,onClose,onChanged}){
     const navigate=useNavigate();
+    const access=useGovernmentData('/api/gov/navigation');
     const record=useGovernmentData(`/api/gov/work-orders/${id}`);
     const permissions=useGovernmentData(`/api/gov/work-order-actions/${id}`);
     const timeline=useGovernmentData(`/api/gov/timeline/work-order/${id}`);
@@ -87,8 +88,8 @@ function WorkOrderRecord({id,onClose,onChanged}){
     </>:null}>
         <GovState loading={record.loading&&!work} error={record.error||permissions.error} onRetry={()=>{record.reload();permissions.reload();}}/>
         {work&&!record.error&&<>
-            <section><h3>{work.title}</h3><GovStatus value={work.status}/>{work.description&&<p>{work.description}</p>}<dl className="gov-facts"><dt>Owner</dt><dd>{work.assigned_to_name||'Unassigned'}</dd><dt>Assigned by</dt><dd>{work.assigned_by_name||'Not recorded'}</dd><dt>Priority</dt><dd><GovStatus value={work.priority}/></dd><dt>Location</dt><dd>{work.location_string||work.barangay||'Not recorded'}</dd><dt>Created</dt><dd>{formatDate(work.created_at)}</dd><dt>Updated</dt><dd>{formatDate(work.updated_at)}</dd>{work.report_id&&<><dt>Source report</dt><dd><Link className="gov-text-button" to={`/gov/reports?reportId=${work.report_id}`}>Open report #{work.report_id}</Link></dd></>}</dl></section>
-            {work.project_id&&<p><Link className="gov-text-button" to={`/gov/projects?project=${work.project_id}`}>Open linked project coordination</Link></p>}
+            <section><h3>{work.title}</h3><GovStatus value={work.status}/>{work.description&&<p>{work.description}</p>}<dl className="gov-facts"><dt>Owner</dt><dd>{work.assigned_to_name||'Unassigned'}</dd><dt>Assigned by</dt><dd>{work.assigned_by_name||'Not recorded'}</dd><dt>Priority</dt><dd><GovStatus value={work.priority}/></dd><dt>Location</dt><dd>{work.location_string||work.barangay||'Not recorded'}</dd><dt>Created</dt><dd>{formatDate(work.created_at)}</dd><dt>Updated</dt><dd>{formatDate(work.updated_at)}</dd>{work.report_id&&<><dt>Source report</dt><dd>{access.data?.modules?.includes('reports')?<Link className="gov-text-button" to={`/gov/reports?reportId=${work.report_id}`}>Open report #{work.report_id}</Link>:`Report #${work.report_id}`}</dd></>}</dl></section>
+            {work.project_id&&<p>{access.data?.modules?.includes('projects')?<Link className="gov-text-button" to={`/gov/projects?project=${work.project_id}`}>Open linked project coordination</Link>:`Linked project #${work.project_id}`}</p>}
             {work.status==='blocked'&&<section><h3>Recorded blocker</h3><p>{work.notes||'See the work history for the recorded reason.'}</p></section>}
             <section><h3>Completion evidence</h3><WorkOrderEvidence url={proof} title={work.title}/></section>
             <section><h3>Assignment and status history</h3><GovState loading={timeline.loading&&!timeline.data} error={timeline.error} onRetry={timeline.reload}/>{timeline.data&&!timeline.error?<ul className="gov-inline-list">{[...timeline.data].reverse().map(entry=><li key={entry.id}><GovStatus value={entry.status}/><p>{entry.note||'Status recorded.'}</p><small>{entry.actor_name||'Recorded staff'} · {formatDate(entry.created_at)}</small></li>)}</ul>:null}</section>

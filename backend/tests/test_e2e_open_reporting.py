@@ -291,21 +291,8 @@ async def create_open_report(
             detail=f"Location (Lat: {lat}, Lng: {lng}) is outside the jurisdiction of Caloocan City. Please move the pin within city borders."
         )
 
-    # 3. Duplicate Detection within 15 meters
-    active_reports = db.query(TestReport).filter(
-        TestReport.category == category,
-        TestReport.status.notin_(["resolved", "cancelled", "rejected"]),
-        TestReport.location_lat != None,
-        TestReport.location_lng != None
-    ).all()
-    for r in active_reports:
-        dist = calculate_haversine_distance(lat, lng, r.location_lat, r.location_lng) * 1000.0  # meters
-        if dist <= 15.0:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"A report for '{category}' at this exact location is already being processed.",
-                headers={"X-Canonical-Ticket-ID": r.ticket_id}
-            )
+    # Independent nearby observations retain their own tickets. Concern linking
+    # is covered by the real application's report-intelligence tests, not this harness.
 
     # 4. Image Validation & Magic Byte Check
     image_url = None
@@ -1413,7 +1400,7 @@ class TestTier2BoundaryCornerCases(TestOpenReportingBase):
         self.assertEqual(res.status_code, 404)
 
     def test_t2_b5_05_duplicate_report_proximity_15m_conflict_check(self):
-        """Verify active duplicate report within 15 meters of exact category triggers 409 Conflict."""
+        """Nearby independent observations retain their own report tickets."""
         # First submission
         res1 = self.client.post("/api/reports", data={
             "category": "Street Lighting",
@@ -1430,8 +1417,8 @@ class TestTier2BoundaryCornerCases(TestOpenReportingBase):
             "lat": 14.75604,
             "lng": 121.04204
         })
-        self.assertEqual(res2.status_code, 409)
-        self.assertIn("already being processed", res2.json()["detail"])
+        self.assertEqual(res2.status_code, 201)
+        self.assertNotEqual(res1.json()["ticket_id"], res2.json()["ticket_id"])
 
 
 # =====================================================================================

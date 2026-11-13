@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { GOV_ROLES, EXECUTIVE_ROLES, SENIOR_ROLES, ADMIN_ONLY } from './ProtectedRoute';
 import { checkPermission } from '../utils/rbac_utils';
+import { governmentRouteModule } from '../utils/governmentRouteAccess';
 
 const RECORD_ROLES = ['admin_officer', 'admin_clerk', 'records_officer', ...EXECUTIVE_ROLES];
 
@@ -57,7 +58,8 @@ export const GOVERNMENT_WORKSPACES = {
         label: 'Administration',
         path: '/gov/administration',
         views: [
-            { key: 'staff', label: 'Staff and Roles', icon: UserCog, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
+            { key: 'staff', label: 'Staff', icon: UserCog, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
+            { key: 'roles', label: 'Roles and permissions', icon: ShieldCheck, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
             { key: 'residents', label: 'Resident Accounts', icon: Users, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
             { key: 'settings', label: 'System Settings', icon: Settings, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
             { key: 'automated-ai', label: 'Automated & AI Tools', icon: Bot, roles: [...ADMIN_ONLY, 'city_engineer', 'asst_city_engineer', 'admin_officer'] },
@@ -74,7 +76,7 @@ export function readGovernmentUser() {
     }
 }
 
-export function getAvailableWorkspaceViews(workspace, currentUser) {
+export function getAvailableWorkspaceViews(workspace, currentUser, permittedModules = null) {
     const definition = GOVERNMENT_WORKSPACES[workspace];
     if (!definition) return [];
 
@@ -83,9 +85,13 @@ export function getAvailableWorkspaceViews(workspace, currentUser) {
     const isMasterAdmin = role === 'system_admin' || role === 'city_engineer' || role === 'asst_city_engineer';
 
     return definition.views.filter((view) => {
+        if (permittedModules) {
+            const module = governmentRouteModule(definition.path, `?view=${view.key}`);
+            if (module && !permittedModules.includes(module)) return false;
+        }
         if (workspace === 'administration') return adminAllows(user,ADMIN_VIEWS.find(item=>item.value===view.key)?.action||'unsupported');
         if (isMasterAdmin) return true;
-        if (view.roles && !view.roles.includes(role)) return false;
+        if (!permittedModules && view.roles && !view.roles.includes(role)) return false;
         if (view.permission && !checkPermission(user, view.permission[0], view.permission[1])) return false;
         return true;
     });

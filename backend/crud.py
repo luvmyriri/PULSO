@@ -298,6 +298,7 @@ def create_report(
     ai_analysis: Optional[dict] = None,
     tracking_token_hash: Optional[str] = None,
     queue_resident_receipt: bool = False,
+    observation_items: Optional[list] = None,
 ) -> models.Report:
     from sqlalchemy.exc import IntegrityError
     import logging
@@ -386,17 +387,20 @@ def create_report(
             db_report = models.Report(**report_data, resident_id=resident_id, ticket_id=new_ticket_id)
             db.add(db_report)
             db.flush()
+            from report_screening import record_assessment
+            record_assessment(db, db_report, ai_analysis)
+            if observation_items:
+                from report_intelligence import initialize_observations
+                initialize_observations(db, db_report, observation_items)
             from report_review import auto_route
             auto_route(db, db_report)
             if queue_resident_receipt:
                 from report_receipts import queue_intents
                 queue_intents(db, db_report)
-            db.commit()
-            db.refresh(db_report)
-            
             # Initial Timeline Entry
             _append_timeline(db, report_id=db_report.id, status="pending", note="Report logged and queued for engineering assessment.", is_public=True)
             db.commit()
+            db.refresh(db_report)
             
             return db_report
         except IntegrityError as e:

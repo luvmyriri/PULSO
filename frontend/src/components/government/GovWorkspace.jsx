@@ -8,7 +8,7 @@ import ThemeToggle from '../ThemeToggle';
 import { getAuthUser } from '../../utils/authSession';
 import './gov-workspace.css';
 
-export function GovWorkspace({ title, description, parent, actions, children, className = '' }) {
+export function GovWorkspace({ title, description, parent, actions, children, className = '', headingIcon, headerActions, sidebarDecoration }) {
     const [navOpen, setNavOpen] = useState(false);
     const dialog = useRef(null);
     const trigger = useRef(null);
@@ -22,26 +22,28 @@ export function GovWorkspace({ title, description, parent, actions, children, cl
     }, [navOpen]);
     return <div className={`gov-core-workspace ${className}`}>
         <a className="gov-skip" href="#gov-main">Skip to workspace</a>
-        <div className="gov-core-workspace__nav"><GovSidebar currentUser={user} responsive={false} /></div>
+        <div className="gov-core-workspace__nav"><GovSidebar currentUser={user} responsive={false} decoration={sidebarDecoration} /></div>
         <dialog ref={dialog} className="gov-nav-dialog" aria-label="Government navigation" onClose={() => { setNavOpen(false); trigger.current?.focus(); }} onClick={e => { if (e.target === e.currentTarget) setNavOpen(false); }}>
             <button className="gov-button gov-nav-close" onClick={() => setNavOpen(false)}><X size={16} /> Close navigation</button>
             <GovSidebar currentUser={user} responsive={false} onTabChange={() => setNavOpen(false)} />
         </dialog>
         <div className="gov-core-workspace__body">
-            <GovPageHeader title={title} description={description} parent={parent} user={user} navigation={<button ref={trigger} className="gov-button gov-menu-trigger" onClick={() => setNavOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>}/>
+            <GovPageHeader title={title} description={description} parent={parent} user={user} headingIcon={headingIcon} actions={headerActions} navigation={<button ref={trigger} className="gov-button gov-menu-trigger" onClick={() => setNavOpen(true)} aria-label="Open navigation"><Menu size={20} /></button>}/>
             {actions && <div className="gov-page-actions">{actions}</div>}
             <main id="gov-main" tabIndex={-1} className="gov-page-content">{import.meta.env.DEV && <p className="gov-development-note">Local development · records are not verified city data.</p>}{children}</main>
         </div>
     </div>;
 }
 
-export function GovPageHeader({title, description, parent, user, navigation}) {
+export function GovPageHeader({title, description, parent, user, navigation, headingIcon, actions}) {
     return <header className="gov-page-header">
         {navigation}
+        {headingIcon}
         <div className="gov-page-heading">
             {parent && <div className="gov-breadcrumb"><Link to={parent.to}>{parent.label}</Link><span aria-hidden="true">/</span><span>{title}</span></div>}
             <h1>{title}</h1>{description && <p>{description}</p>}
         </div>
+        {actions}
         <div className="gov-page-header__account"><GovNotificationDropdown/><ThemeToggle responsiveBreakpoint="xl"/><GovUserDropdown currentUser={user}/></div>
     </header>;
 }
@@ -115,7 +117,7 @@ export function GovRecordRow({row,columns,selected,onSelect}) {
     </tr>;
 }
 
-export function GovConfirm({ open, title, children, confirmLabel = 'Confirm', onConfirm, onClose, busy, error, className = '' }) {
+export function GovConfirm({ open, title, children, confirmLabel = 'Confirm', onConfirm, onClose, busy, confirmDisabled = false, error, className = '' }) {
     const titleId = useId();
     const ref = useRef(null);
     const priorFocus = useRef(null);
@@ -131,7 +133,7 @@ export function GovConfirm({ open, title, children, confirmLabel = 'Confirm', on
             if (destination?.isConnected) destination.focus({ preventScroll: true });
         };
     }, [open]);
-    return <dialog className={`gov-confirm ${className}`} ref={ref} aria-labelledby={titleId} onCancel={e => { e.preventDefault(); if (!busy) onClose(); }}><h2 id={titleId}>{title}</h2>{children}{error && <p role="alert" className="gov-error">{error}</p>}<div className="gov-form-actions"><GovButton disabled={busy} onClick={onClose}>Cancel</GovButton><GovButton primary disabled={busy} onClick={onConfirm}>{busy ? 'Saving…' : confirmLabel}</GovButton></div></dialog>;
+    return <dialog className={`gov-confirm ${className}`} ref={ref} aria-labelledby={titleId} onCancel={e => { e.preventDefault(); if (!busy) onClose(); }}><h2 id={titleId}>{title}</h2>{children}{error && <p role="alert" className="gov-error">{error}</p>}<div className="gov-form-actions"><GovButton disabled={busy} onClick={onClose}>Cancel</GovButton><GovButton primary disabled={busy || confirmDisabled} onClick={onConfirm}>{busy ? 'Saving…' : confirmLabel}</GovButton></div></dialog>;
 }
 
 export function formatDate(value) { return value ? new Date(value).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not recorded'; }

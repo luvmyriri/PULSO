@@ -70,9 +70,9 @@ def clean_postgis(postgis_database):
 
 @pytest.fixture(autouse=True)
 def reset_auth_limits():
-    from utils.rate_limiter import auth_limiter, otp_verification_limiter
+    from utils.rate_limiter import auth_limiter, otp_verification_limiter, report_analysis_limiter
 
-    for limiter in (auth_limiter, otp_verification_limiter):
+    for limiter in (auth_limiter, otp_verification_limiter, report_analysis_limiter):
         limiter.reset()
 
 

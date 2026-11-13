@@ -37,6 +37,8 @@ def context(clean_postgis):
         db.add(delegated)
         db.flush()
         db.get(models.Official,3).role_id = delegated.id
+        db.add(models.ReportReviewerAvailability(official_id=3, state='available', capacity=50,
+            last_seen_at=datetime.now(timezone.utc), session_expires_at=datetime.now(timezone.utc)+timedelta(hours=1)))
         db.add_all([models.Resident(id=100, full_name='FAKE Owner', email='owner@test.invalid', password_hash='test-not-login', is_active=True, is_verified=True), models.Resident(id=101, full_name='FAKE Other resident', email='resident2@test.invalid', password_hash='test-not-login', is_active=True, is_verified=True)])
         db.flush()
         for id, owner in ((1,100),(2,100),(3,101)):
@@ -67,21 +69,31 @@ def attach_document(client, tokens, item, **values):
 
 def test_overview_drillthrough_matches_scoped_report_and_work_queues(context):
     client, sessions, tokens = context
+    now = datetime.now(timezone.utc)
     with sessions() as db:
         db.get(models.Official, 1).primary_jurisdiction = [1]
         first = db.get(models.Report, 1)
         first.priority_grade = 'P5'
+        first.satisfaction_rating = 4
         second = db.get(models.Report, 2)
         second.status = 'under_review'
         second.review_assigned_to_id = 3
         second.location_barangay = None
         db.get(models.Report, 3).status = 'resolved'
-        db.add(models.Report(id=4, ticket_id='FAKE-REPORT-4', resident_id=101, category='Roads', description='FAKE outside district', status='pending', barangay_id=2, location_barangay='FAKE Area two', priority_grade='P5'))
+        db.add_all([
+            models.Barangay(id=176, name='Barangay 176', district_id=1),
+            models.Barangay(id=177, name='176', district_id=1),
+            models.Barangay(id=171, name='Barangay 171', district_id=2),
+        ])
+        db.add(models.Report(id=4, ticket_id='FAKE-REPORT-4', resident_id=101, category='Roads', description='FAKE outside district', status='pending', barangay_id=2, location_barangay='FAKE Area two', priority_grade='P5', satisfaction_rating=1))
         db.add(models.Report(id=5, ticket_id='FAKE-REPORT-5', resident_id=101, category='Roads', description='FAKE closed report', status='closed', barangay_id=1, location_barangay='FAKE Area one', priority_grade='P5'))
         db.add_all([
-            gm.WorkOrder(id=201, wo_number='FAKE-WO-IN', title='FAKE scoped blocker', status='blocked', district_id=1, assigned_to_id=2, report_id=1),
+            gm.WorkOrder(id=201, wo_number='FAKE-WO-IN', title='FAKE scoped blocker', status='blocked', district_id=1, barangay_id=1, assigned_to_id=2, report_id=1),
             gm.WorkOrder(id=202, wo_number='FAKE-WO-OUT', title='FAKE outside blocker', status='blocked', district_id=2, assigned_to_id=3, report_id=4),
-            gm.WorkOrder(id=203, wo_number='FAKE-WO-DONE', title='FAKE completed work', status='completed', district_id=1, assigned_to_id=2, report_id=1),
+            gm.WorkOrder(id=203, wo_number='FAKE-WO-DONE', title='FAKE completed work', status='completed', district_id=1, assigned_to_id=2, report_id=1, completed_date=now),
+            gm.WorkOrder(id=204, wo_number='FAKE-WO-CANCELLED', title='FAKE cancelled work', status='cancelled', district_id=1),
+            gm.ProjectRequest(id=1, proj_number='FAKE-PROJECT-IN', title='FAKE scoped project', status='in_progress', district_id=1, next_review_at=now + timedelta(days=2)),
+            gm.ProjectRequest(id=2, proj_number='FAKE-PROJECT-OUT', title='FAKE outside project', status='in_progress', district_id=2, next_review_at=now + timedelta(days=1)),
             gm.InfrastructureAsset(asset_id='FAKE-ASSET-IN', asset_name='FAKE scoped asset', category='Road', barangay_id=1, condition_score=20),
             gm.InfrastructureAsset(asset_id='FAKE-ASSET-OUT', asset_name='FAKE outside asset', category='Road', barangay_id=2, condition_score=20),
             gm.Announcement(id=201, title_en='FAKE scoped update', content_en='FAKE scoped publication', author_id=1, status='in_review', district_id=1),
@@ -112,6 +124,24 @@ def test_overview_drillthrough_matches_scoped_report_and_work_queues(context):
     assert [item['id'] for item in overview['asset_exceptions']] == ['FAKE-ASSET-IN']
     assert [item['id'] for item in overview['update_exceptions']] == [201]
     assert overview['review_queues'][0]['action_url'] == '/gov/reports?overview=unowned'
+    dashboard = overview['dashboard']
+    assert dashboard['report_types'] == [{'label': 'Roads', 'count': 2}]
+    assert dashboard['feedback'] == {'average': 4, 'count': 1}
+    assert dashboard['work']['areas'] == [{'label': 'FAKE Area one', 'count': 1}]
+    area_map = dashboard['work']['area_map']
+    assert area_map['totals'] == {'current': 1, 'blocked': 1, 'verification': 0, 'without_barangay': 0}
+    assert [district['id'] for district in area_map['districts']] == [1]
+    assert area_map['districts'][0]['barangays'] == [
+        {'id': 1, 'label': 'FAKE Area one', 'reference': None, 'current': 1, 'blocked': 1, 'verification': 0},
+        {'id': 176, 'label': 'Barangay 176', 'reference': 176, 'current': 0, 'blocked': 0, 'verification': 0},
+    ]
+    assert dashboard['work']['completion'] == {'eligible': 2, 'completed': 1}
+    assert len(dashboard['work']['series']) == 30
+    assert sum(day['created'] for day in dashboard['work']['series']) == 3
+    assert sum(day['completed'] for day in dashboard['work']['series']) == 1
+    assert dashboard['inventory'] == {'total': 1, 'statuses': {'operational': 1}, 'categories': {'Road': 1}}
+    assert dashboard['projects']['in_progress'] == 1
+    assert [review['url'] for review in dashboard['projects']['reviews']] == ['/gov/projects?project=1']
 
     selections = {'open': {1, 2}, 'unowned': {1}, 'triage': {1, 2}, 'urgent': {1}, 'unlocated': {2}, 'with_work': {1}, 'without_work': {2}, 'with_work&priority=P5': {1}, 'without_work&priority=unassessed': {2}, 'with_work&priority=unassessed': set(), 'area&area=FAKE+Area+one': {1}, 'with_work&area=FAKE+Area+one': {1}, 'without_work&area=FAKE+Area+one': set(), 'priority&priority=P5': {1}, 'priority&priority=unassessed': {2}}
     for selection, expected_ids in selections.items():
@@ -143,6 +173,10 @@ def test_review_routing_balances_eligible_staff_and_does_not_duplicate_or_dispat
         db.add(models.Official(id=7,full_name='FAKE Second reviewer',email='reviewer2@test.invalid',password_hash='test-only',role='project_engineer',primary_jurisdiction=[1],is_active=True))
         db.add(models.Official(id=8,full_name='FAKE Suspended reviewer',email='suspended@test.invalid',password_hash='test-only',role='project_engineer',primary_jurisdiction=[1],is_active=True,is_suspended=True))
         db.add(models.Official(id=9,full_name='FAKE Other district',email='otherdistrict@test.invalid',password_hash='test-only',role='project_engineer',primary_jurisdiction=[2],is_active=True))
+        db.flush()
+        for person_id in (7,8,9):
+            db.add(models.ReportReviewerAvailability(official_id=person_id, state='available', capacity=50,
+                last_seen_at=datetime.now(timezone.utc), session_expires_at=datetime.now(timezone.utc)+timedelta(hours=1)))
         db.commit()
         assert report_review.route_waiting(db)==3
         assert [r.review_assigned_to_id for r in db.query(models.Report).order_by(models.Report.id)] == [3,7,3]
@@ -253,7 +287,7 @@ def test_authorized_coordinator_can_take_unassigned_report_into_my_work(context)
     assert 'take' in docket['allowed_actions']
     assert 'take' not in client.get('/api/gov/reports/1/docket',headers=tokens['clerk']).json()['allowed_actions']
     assert client.post(path,json=body,headers=tokens['clerk']).status_code==403
-    assert client.post(path,json=body,headers=tokens['platform']).status_code==403
+    assert 'take' in client.get('/api/gov/reports/1/docket',headers=tokens['platform']).json()['allowed_actions']
     taken=client.post(path,json=body,headers=tokens['chief'])
     assert taken.status_code==200,taken.text
     assert taken.json()['review_owner_id']==1 and taken.json()['assignment_mode']=='self_take'
@@ -267,6 +301,42 @@ def test_authorized_coordinator_can_take_unassigned_report_into_my_work(context)
         assert audit.actor_id==1
         assert '"mode": "self_take"' in audit.details
         assert '"previous_owner_id": null' in audit.details
+
+
+def test_stored_role_grants_report_queue_and_take_without_legacy_role_name(context):
+    client,sessions,tokens=context
+    caps={'reports':['view'],'report_review':['assign']}
+    created=client.post('/api/gov/roles',headers=tokens['platform'],json={
+        'name':'fake_intake_coordinator','label':'FAKE Intake Coordinator',
+        'access_level':'staff','capabilities':caps,'reason':'FAKE documented test delegation',
+    })
+    assert created.status_code==200,created.text
+    with sessions() as db:
+        db.add(models.Official(id=30,full_name='FAKE custom coordinator',email='custom@test.invalid',
+            password_hash='test-only',role='fake_intake_coordinator',role_id=created.json()['id'],is_active=True))
+        db.commit()
+    custom={'Authorization':f'Bearer {auth.create_access_token({"sub":"custom@test.invalid"})}'}
+    assert 'reports' in client.get('/api/gov/navigation',headers=custom).json()['modules']
+    assert client.get('/api/reports',headers=custom).status_code==200
+    docket=client.get('/api/gov/reports/1/docket',headers=custom)
+    assert docket.status_code==200,docket.text
+    assert docket.json()['can_assign_review'] and 'take' in docket.json()['allowed_actions']
+    assert client.get('/api/gov/report-review/1/reviewers',headers=custom).status_code==200
+    taken=client.post('/api/gov/report-review/1/take',headers=custom,json={'expected_version':docket.json()['report']['version']})
+    assert taken.status_code==200,taken.text
+    restricted={'reports':['view'],'report_review':[]}
+    updated=client.put(f"/api/gov/roles/{created.json()['id']}",headers=tokens['platform'],json={
+        'name':'fake_intake_coordinator','label':'FAKE Intake Coordinator',
+        'access_level':'staff','capabilities':restricted,'expected_capabilities':caps,
+        'reason':'FAKE revoke test assignment delegation',
+    })
+    assert updated.status_code==200,updated.text
+    assert client.get('/api/gov/reports/2/docket',headers=custom).status_code==401
+    refreshed={'Authorization':f'Bearer {auth.create_access_token({"sub":"custom@test.invalid","sv":1})}'}
+    after=client.get('/api/gov/reports/2/docket',headers=refreshed)
+    assert after.status_code==200,after.text
+    assert not after.json()['can_assign_review'] and 'take' not in after.json()['allowed_actions']
+    assert client.post('/api/gov/report-review/2/take',headers=refreshed,json={'expected_version':after.json()['report']['version']}).status_code==403
 
 
 def test_take_from_colleague_requires_reason_and_transfers_my_work(context):
@@ -474,9 +544,10 @@ def test_role_families_and_process_boundaries_match_server_actions(context):
         assert not project_workspace.allowed(db.get(models.Official,2),'manage')
         assert project_workspace.allowed(db.get(models.Official,6),'view')
         assert not project_workspace.allowed(db.get(models.Official,6),'manage')
-        assert not report_review.permitted(db.get(models.Official,6),'assign')
-        assert not report_review.permitted(db.get(models.Official,6),'review')
-        assert not report_review.permitted(db.get(models.Official,6),'verify')
+        assert report_review.permitted(db.get(models.Official,6),'assign')
+        assert report_review.permitted(db.get(models.Official,6),'review')
+        assert report_review.permitted(db.get(models.Official,6),'verify')
+        assert report_review.permitted(db.get(models.Official,6),'approve')
         platform=db.get(models.Official,6)
         assert can(platform,'announcements','view')
         assert can(platform,'announcements','create')
@@ -494,7 +565,7 @@ def test_role_families_and_process_boundaries_match_server_actions(context):
     officer_token={'Authorization':f'Bearer {auth.create_access_token({"sub":"adminofficer@test.invalid"})}'}
     assert client.get('/api/reports',headers=chief_token).status_code==200
     assert client.get('/api/gov/navigation',headers=chief_token).json()['modules'].count('projects')==1
-    assert client.get('/api/gov/report-review/1/reviewers',headers=tokens['platform']).status_code==403
+    assert client.get('/api/gov/report-review/1/reviewers',headers=tokens['platform']).status_code==200
     assigned=client.post('/api/gov/report-review/1/assignment',json={'expected_version':1,'assigned_to_id':2,'reason':'FAKE administrative intake ownership'},headers=officer_token)
     assert assigned.status_code==200,assigned.text
     assert client.post('/api/gov/report-review/1/priority',json={'expected_version':assigned.json()['version'],'priority_grade':'P2','reason':'FAKE unauthorized technical grade'},headers=officer_token).status_code==403
@@ -980,12 +1051,13 @@ def test_unreviewed_candidates_never_receive_related_report_change_notices(conte
 def test_map_docket_actions_use_authoritative_status_versions_and_scope(context):
     client, sessions, tokens = context
     platform = client.get('/api/gov/reports/1/docket',headers=tokens['platform'])
-    assert platform.status_code == 200 and platform.json()['allowed_actions'] == []
+    assert platform.status_code == 200
+    assert set(platform.json()['allowed_actions']) == {'verify', 'reject', 'request_info', 'take'}
+    assert platform.json()['can_grade_priority'] is True
     response = client.get('/api/gov/reports/1/docket',headers=tokens['chief'])
     assert response.status_code == 200, response.text
     data = response.json()
     assert set(data['allowed_actions']) == {'verify','request_info','take'}
-    assert client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers={**tokens['platform'],'If-Match':str(data['report']['version'])}).status_code == 403
     command = {**tokens['chief'],'If-Match':str(data['report']['version']),'Idempotency-Key':'fake-map-verify-123'}
     verified = client.patch('/api/reports/1/status',json={'status':'pending_approval','public_content_reviewed':True},headers=command)
     assert verified.status_code == 200, verified.text
@@ -1004,6 +1076,62 @@ def test_map_docket_actions_use_authoritative_status_versions_and_scope(context)
     assert client.get('/api/gov/reports/1/docket',headers=tokens['chief']).status_code == 403
     assert client.post('/api/gov/reports/1/approve-for-work',json={'reason':'FAKE reviewed evidence'},headers=tokens['chief']).status_code == 403
     assert client.get('/api/gov/reports/1/docket',headers=tokens['owner']).status_code == 403
+
+
+def test_system_admin_can_verify_approve_dispatch_and_independently_close_report(context):
+    client, sessions, tokens = context
+    headers = tokens['platform']
+    docket = client.get('/api/gov/reports/1/docket', headers=headers).json()
+    verified = client.patch('/api/reports/1/status', json={
+        'status': 'pending_approval', 'public_content_reviewed': True,
+    }, headers={**headers, 'If-Match': str(docket['report']['version']), 'Idempotency-Key': 'fake-admin-verify-123'})
+    assert verified.status_code == 200, verified.text
+
+    awaiting = client.get('/api/gov/reports/1/docket', headers=headers).json()
+    assert 'approve' in awaiting['allowed_actions']
+    approved = client.post('/api/gov/reports/1/approve-for-work', json={
+        'reason': 'FAKE evidence and location reviewed for repair',
+    }, headers={**headers, 'If-Match': str(awaiting['report']['version']), 'Idempotency-Key': 'fake-admin-approve-123'})
+    assert approved.status_code == 200, approved.text
+    assert approved.json()['status'] == 'approved_internal'
+
+    ready = client.get('/api/gov/reports/1/docket', headers=headers).json()
+    assert 'assign' in ready['allowed_actions']
+    created = client.post('/api/gov/work-orders', json={
+        'title': 'FAKE repair road surface', 'description': 'FAKE field repair for road hazard',
+        'report_id': 1, 'assigned_to_id': 4,
+    }, headers={**headers, 'If-Match': str(ready['report']['version']), 'Idempotency-Key': 'fake-admin-work-123'})
+    assert created.status_code == 200, created.text
+    work_id = created.json()['id']
+    with sessions() as db:
+        work = db.get(gm.WorkOrder, work_id)
+        work.status = 'completed_pending_review'
+        db.commit()
+    work_actions = client.get(f'/api/gov/work-order-actions/{work_id}', headers=headers)
+    assert work_actions.status_code == 200, work_actions.text
+    assert 'verify' in work_actions.json()['allowed_actions']
+    inspected = client.post(f'/api/gov/work-orders/{work_id}/verify', json={
+        'passed': True, 'notes': 'FAKE independent road repair inspection passed',
+        'checklist_results': {'specifications': True, 'siteCleared': True, 'qualityTested': True, 'photoVerified': True},
+    }, headers=headers)
+    assert inspected.status_code == 200, inspected.text
+    assert client.get('/api/gov/reports/1/docket', headers=headers).json()['report']['status'] == 'resolved'
+
+
+def test_system_admin_explicit_report_decision_denial_overrides_default(context):
+    client, sessions, tokens = context
+    with sessions() as db:
+        role = models.SystemRole(name='FAKE restricted admin', capabilities={'report_review': []})
+        db.add(role)
+        db.flush()
+        db.get(models.Official, 6).role_id = role.id
+        db.commit()
+    docket = client.get('/api/gov/reports/1/docket', headers=tokens['platform'])
+    assert docket.status_code == 200, docket.text
+    assert not docket.json()['allowed_actions']
+    assert client.patch('/api/reports/1/status', json={
+        'status': 'pending_approval', 'public_content_reviewed': True,
+    }, headers=tokens['platform']).status_code == 403
 
 
 def test_active_work_reassignment_moves_personal_queue_and_keeps_history(context):

@@ -1,4 +1,6 @@
+import { isReportPhotoRestricted } from '../utils/reportScreening';
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Zap,
@@ -8,8 +10,8 @@ import {
     CameraOff,
     Loader2
 } from 'lucide-react';
-import { drawEvidenceWatermark, burnEvidenceWatermark, formatWatermarkTimestamp, formatWatermarkCoordinates } from '../utils/watermark';
-import { formatWatermarkAddress } from '../utils/locationPrivacy';
+import useCaptureLocation from '../hooks/useCaptureLocation';
+import CaptureLocationStatus from './camera/CaptureLocationStatus';
 import { API_BASE_URL } from '../utils/apiBase';
 import { useAndroidBack } from '../utils/nativeAndroid';
 import { isNativeAndroid } from '../utils/appContext';
@@ -18,7 +20,6 @@ import CameraTopBar from './camera/CameraTopBar';
 import CameraMessage from './camera/CameraMessage';
 import ShutterButton from './camera/ShutterButton';
 import RatioSelector from './camera/RatioSelector';
-import WatermarkPainter from './camera/WatermarkPainter';
 import CameraZoomControls from './camera/CameraZoomControls';
 
 // ---------------------------------------------------------------------------
@@ -99,6 +100,7 @@ const IDCameraModal = ({
     useAndroidBack(isOpen, 50, onClose);
     const nativeCamera = isNativeAndroid() && !standalone;
 
+    const { t } = useTranslation();
     // Dynamic theme awareness: uses prop if supplied, otherwise observes html.dark class
     const [isSystemDark, setIsSystemDark] = useState(() => {
         if (typeof document !== 'undefined') {
@@ -126,15 +128,19 @@ const IDCameraModal = ({
 
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
+    const captureProvenanceRef = useRef(null);
+    const captureGeneration = useRef(0);
+    const captureBusy = useRef(false);
+    const analysisRequest = useRef(null);
+    const streamGeneration = useRef(0);
+    const streamRequestPending = useRef(false);
     const streamRef = useRef(null);
     const modalRef = useRef(null);
-    const closeBtnRef = useRef(null);
 
     const [error, setError] = useState(null);
     const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
     const [facingMode, setFacingMode] = useState('environment');
     const [isLoading, setIsLoading] = useState(!previewMode);
-    const [liveTime, setLiveTime] = useState(() => new Date());
     const [isVerifying, setIsVerifying] = useState(false);
     const [capturedPreviewUrl, setCapturedPreviewUrl] = useState(null);
     const [capturedBlob, setCapturedBlob] = useState(null);
@@ -169,6 +175,8 @@ const IDCameraModal = ({
     const isCheckingState = isVerifying;
     const isPreviewAcceptedState = isAccepted && capturedPreviewUrl && !validationError && !isVerifying;
     const isLiveState = !capturedPreviewUrl && !error && !isCheckingState;
+    const captureLocation = useCaptureLocation(isOpen && isIssue && isLiveState && !isLoading && !previewMode,
+        metadata?.location?.deviceFix || metadata?.reportLocation?.deviceFix);
     const isFullBleed16x9 = (isLiveState || isCheckingState || isPreviewAcceptedState) && photoRatio === 'Full';
 
     // Sync ratio if controlled via dev showcase
@@ -239,6 +247,11 @@ const IDCameraModal = ({
 
     // Reset captured preview when modal opens or closes
     useEffect(() => {
+        captureGeneration.current++;
+        captureBusy.current = false;
+        analysisRequest.current?.abort();
+        captureProvenanceRef.current = null;
+        setAnnouncement('');
         if (isOpen) {
             setZoom(1);
             if (!previewMode) {
@@ -265,7 +278,28 @@ const IDCameraModal = ({
         }
     }, [isOpen]);
 
+    useEffect(() => () => { captureGeneration.current++; analysisRequest.current?.abort(); }, []);
+
+    useEffect(() => {
+        if (!isOpen || standalone) return;
+        const dialog = modalRef.current;
+        const trigger = document.activeElement;
+        if (dialog && !dialog.open) dialog.showModal();
+        return () => { if (dialog?.open) dialog.close(); if (trigger?.isConnected) trigger.focus(); };
+    }, [isOpen, standalone]);
+    useEffect(() => {
+        if (!isOpen || standalone) return;
+        const destination = isPreviewAcceptedState
+            ? modalRef.current?.querySelector('[data-camera-confirm]')
+            : modalRef.current?.querySelector('button');
+        destination?.focus();
+    }, [isOpen, standalone, isPreviewAcceptedState, isCheckingState]);
+
     const handleRetake = () => {
+        captureGeneration.current++;
+        captureBusy.current = false;
+        analysisRequest.current?.abort();
+        captureProvenanceRef.current = null;
         if (capturedPreviewUrl && !previewMode) {
             URL.revokeObjectURL(capturedPreviewUrl);
         }
@@ -402,41 +436,9 @@ const IDCameraModal = ({
         };
     }, [isOpen, isLiveState, applyZoom]);
 
-    // Live clock for real-time camera viewfinder watermark
-    useEffect(() => {
-        if (!isOpen || side !== 'ISSUE') return;
-        setLiveTime(new Date());
-        const interval = setInterval(() => {
-            setLiveTime(new Date());
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [isOpen, side]);
-
-    // Live Watermark Address & Coordinates for viewfinder
-    const addressSource = metadata?.structuredAddress || metadata?.locationAddress || metadata?.address;
-    const watermarkAddress = formatWatermarkAddress(
-        addressSource,
-        metadata?.location || metadata?.coordinates
-    );
-
-    let coordsText = '';
-    const loc = metadata?.location || metadata?.coordinates;
-    if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
-        const latDir = loc.lat >= 0 ? 'N' : 'S';
-        const lngDir = loc.lng >= 0 ? 'E' : 'W';
-        coordsText = `${Math.abs(loc.lat).toFixed(4)}° ${latDir}, ${Math.abs(loc.lng).toFixed(4)}° ${lngDir}`;
-        if (typeof loc.accuracy === 'number' && loc.accuracy > 0 && loc.accuracy < 100) {
-            coordsText += ` (±${Math.round(loc.accuracy)}m)`;
-        }
-    } else if (metadata?.lat && metadata?.lng) {
-        const latVal = Number(metadata.lat);
-        const lngVal = Number(metadata.lng);
-        const latDir = latVal >= 0 ? 'N' : 'S';
-        const lngDir = lngVal >= 0 ? 'E' : 'W';
-        coordsText = `${Math.abs(latVal).toFixed(4)}° ${latDir}, ${Math.abs(lngVal).toFixed(4)}° ${lngDir}`;
-    }
-
     const stopStream = useCallback(() => {
+        streamGeneration.current++;
+        streamRequestPending.current = false;
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => {
                 try {
@@ -449,6 +451,15 @@ const IDCameraModal = ({
             videoRef.current.srcObject = null;
         }
     }, []);
+
+    function closeCamera() {
+        captureGeneration.current++;
+        captureBusy.current = false;
+        analysisRequest.current?.abort();
+        captureLocation.stop();
+        stopStream();
+        onClose();
+    }
 
     // Flash / Torch toggle
     const handleToggleFlash = async () => {
@@ -477,6 +488,8 @@ const IDCameraModal = ({
         setIsLoading(true);
         setError(null);
         stopStream();
+        const request = streamGeneration.current;
+        streamRequestPending.current = true;
 
         try {
             const constraints = {
@@ -489,6 +502,7 @@ const IDCameraModal = ({
             };
 
             const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+            if (request !== streamGeneration.current) { newStream.getTracks().forEach(track => track.stop()); return; }
             streamRef.current = newStream;
 
             const videoTrack = newStream.getVideoTracks()[0];
@@ -512,10 +526,12 @@ const IDCameraModal = ({
             }
 
             const devices = await navigator.mediaDevices.enumerateDevices();
+            if (request !== streamGeneration.current) return;
             const videoDevices = devices.filter(d => d.kind === 'videoinput');
             setHasMultipleCameras(videoDevices.length > 1);
 
         } catch (err) {
+            if (request !== streamGeneration.current) return;
             console.error('Camera error:', err);
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                 setError('permission_denied');
@@ -527,7 +543,7 @@ const IDCameraModal = ({
                 setError(`Camera error: ${err.message}`);
             }
         } finally {
-            setIsLoading(false);
+            if (request === streamGeneration.current) { streamRequestPending.current = false; setIsLoading(false); }
         }
     }, [facingMode, stopStream, previewMode]);
 
@@ -538,13 +554,7 @@ const IDCameraModal = ({
             stopStream();
         }
         return () => stopStream();
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (isOpen) {
-            startStream();
-        }
-    }, [facingMode]);
+    }, [isOpen, startStream, stopStream]);
 
     // Watchdog effect: whenever modal is open in live state, ensure video is bound to active stream
     useEffect(() => {
@@ -554,7 +564,7 @@ const IDCameraModal = ({
         const stream = streamRef.current;
         const hasLiveTracks = stream && stream.getVideoTracks().some(t => t.readyState === 'live');
 
-        if (!hasLiveTracks) {
+        if (!hasLiveTracks && !streamRequestPending.current) {
             startStream();
         } else if (videoRef.current) {
             const video = videoRef.current;
@@ -592,16 +602,20 @@ const IDCameraModal = ({
     };
 
     const handleCapture = () => {
-        if (!canvasRef.current) return;
+        if (!canvasRef.current || captureBusy.current) return;
+        captureBusy.current = true;
+        const generation = ++captureGeneration.current;
 
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
+        if (!context) { captureBusy.current = false; setError(t('captureLocation.frameFailed')); return; }
 
         // Handle simulated capture when in previewMode without active media stream
         if (previewMode && !streamRef.current) {
             const sampleImg = new Image();
             sampleImg.crossOrigin = 'anonymous';
             sampleImg.onload = () => {
+                if (generation !== captureGeneration.current) return;
                 const imgW = sampleImg.naturalWidth || 1600;
                 const imgH = sampleImg.naturalHeight || 1200;
                 const isLandImg = imgW >= imgH;
@@ -637,28 +651,23 @@ const IDCameraModal = ({
                 canvas.height = Math.round(cH * sc);
                 context.drawImage(sampleImg, cX, cY, cW, cH, 0, 0, canvas.width, canvas.height);
 
-                if (side === 'ISSUE') {
-                    drawEvidenceWatermark(canvas, {
-                        ...metadata,
-                        timestamp: liveTime
-                    });
-                }
-
                 canvas.toBlob((blob) => {
-                    if (!blob) return;
+                    if (generation !== captureGeneration.current) return;
+                    captureBusy.current = false;
+                    if (!blob) { setError(t('captureLocation.frameFailed')); return; }
                     const previewUrl = URL.createObjectURL(blob);
                     setCapturedPreviewUrl(previewUrl);
                     setCapturedBlob(blob);
                     setIsVerifying(false);
                     setIsAccepted(true);
-                    setAnnouncement('Photo accepted. Review your photo or retake.');
+                    setAnnouncement(t('reportScreening.captured'));
                 }, 'image/jpeg', 0.92);
             };
             sampleImg.src = previewSamplePhoto || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?w=1600&auto=format&fit=crop&q=80";
             return;
         }
 
-        if (!videoRef.current) return;
+        if (!videoRef.current?.videoWidth || !videoRef.current?.videoHeight) { captureBusy.current = false; return; }
         const video = videoRef.current;
 
         const vw = video.videoWidth || 1920;
@@ -720,33 +729,27 @@ const IDCameraModal = ({
             context.scale(-1, 1);
         }
 
-        context.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+        // Snapshot at frame selection; never attach a fix obtained after this draw.
+        captureProvenanceRef.current = isIssue ? captureLocation.capture() : null;
+        try { context.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height); }
+        catch { captureBusy.current = false; setError(t('captureLocation.frameFailed')); return; }
 
         // Reset transform so watermark is never mirrored
         if (facingMode === 'user') {
             context.setTransform(1, 0, 0, 1, 0, 0);
         }
-
-        // Burn evidence watermark using shared function
-        if (side === 'ISSUE') {
-            drawEvidenceWatermark(canvas, {
-                ...metadata,
-                timestamp: liveTime
-            });
-        }
+        stopStream();
 
         canvas.toBlob(async (blob) => {
-            if (!blob) return;
+            if (generation !== captureGeneration.current) return;
+            captureBusy.current = false;
+            if (!blob) { setError(t('captureLocation.frameFailed')); return; }
             const file = new File([blob], `captured_evidence_${photoRatio.replace(':', '_')}.jpg`, { type: 'image/jpeg' });
-
-            // Attach text version of watermark in existing details data for screen readers
-            const fullAddr = formatWatermarkAddress(metadata?.structuredAddress || metadata?.locationAddress || metadata?.address, metadata?.location || metadata?.coordinates);
-            file.watermarkText = ['PULSO · Caloocan City', fullAddr, formatWatermarkCoordinates(metadata), formatWatermarkTimestamp(liveTime)].filter(Boolean).join(' | ');
 
             // If not issue photo (e.g. ID card), proceed directly
             if (side !== 'ISSUE') {
                 onCapture(file);
-                onClose();
+                closeCamera();
                 return;
             }
 
@@ -773,12 +776,15 @@ const IDCameraModal = ({
                 const res = await fetch(`${API_BASE_URL}/api/reports/analyze`, {
                     method: 'POST',
                     headers,
-                    body: formData
+                    body: formData,
+                    signal: (analysisRequest.current = new AbortController()).signal,
                 });
+                if (generation !== captureGeneration.current) return;
 
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.is_inappropriate || data.is_infrastructure === false) {
+                    if (generation !== captureGeneration.current) return;
+                    if (isReportPhotoRestricted(data)) {
                         const reason = data.rejection_reason || "This looks like a personal photo or selfie. Please take a clear photo of the public infrastructure issue instead.";
                         setValidationError(reason);
                         setIsVerifying(false);
@@ -790,7 +796,7 @@ const IDCameraModal = ({
                     setIsVerifying(false);
                     setIsAccepted(true);
                     setCapturedAiData(data);
-                    setAnnouncement('Photo accepted. Review your photo or retake.');
+                    setAnnouncement(t('reportScreening.captured'));
                 } else {
                     setIsVerifying(false);
                     setIsAccepted(true);
@@ -798,6 +804,7 @@ const IDCameraModal = ({
                     setAnnouncement('Photo captured.');
                 }
             } catch (err) {
+                if (generation !== captureGeneration.current || err.name === 'AbortError') return;
                 console.warn('AI infrastructure verification network error:', err);
                 setIsVerifying(false);
                 setIsAccepted(true);
@@ -810,33 +817,36 @@ const IDCameraModal = ({
     // User confirmed accepted photo in preview state
     const handleConfirmAcceptedPhoto = () => {
         if (!capturedBlob && !previewSamplePhoto) {
-            onClose();
+            closeCamera();
             return;
         }
         const file = capturedBlob
             ? new File([capturedBlob], `captured_evidence.jpg`, { type: 'image/jpeg' })
             : new File([], `preview_sample.jpg`, { type: 'image/jpeg' });
+        file.pulsoCapture = captureProvenanceRef.current;
         onCapture(file, capturedAiData);
-        onClose();
+        closeCamera();
     };
 
     const displayTitle = isIssue ? 'Take a photo' : (title || 'Take a photo');
-    const displaySubtitle = isIssue ? 'Photos are saved with your location and time.' : (subtitle || '');
+    const displaySubtitle = isIssue ? t('reportIntelligence.captureLocation') : (subtitle || '');
+    const DialogTag = standalone ? 'div' : 'dialog';
 
     return (
         <AnimatePresence>
             {isOpen && (
-                <div
+                <DialogTag
                     data-native-camera={nativeCamera || undefined}
                     role="dialog"
-                    aria-modal="true"
+                    aria-modal={standalone ? undefined : true}
                     aria-labelledby="camera-screen-title"
                     ref={modalRef}
                     className={`${
                         standalone
                             ? `absolute inset-0 z-20 w-full h-full ${isDark ? 'bg-black text-white' : 'bg-white text-slate-900'}`
                             : 'fixed inset-0 z-[200] w-full h-[100dvh] bg-black/75 backdrop-blur-md flex items-center justify-center'
-                    } overflow-hidden select-none touch-none`}
+                    } overflow-hidden select-none touch-none m-0 p-0 border-0 max-w-none max-h-none`}
+                    onCancel={event => { event.preventDefault(); closeCamera(); }}
                     style={{
                         touchAction: 'none',
                         paddingTop: standalone || nativeCamera ? '0px' : 'env(safe-area-inset-top, 0px)',
@@ -866,7 +876,7 @@ const IDCameraModal = ({
                         <CameraTopBar
                             title={displayTitle}
                             subtitle={displaySubtitle}
-                            onClose={onClose}
+                            onClose={closeCamera}
                             titleId="camera-screen-title"
                             isDark={isDark}
                             translucent={isFullBleed16x9}
@@ -954,30 +964,8 @@ const IDCameraModal = ({
                                     <img
                                         src={capturedPreviewUrl}
                                         alt="Captured problem photo"
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-contain"
                                     />
-                                    {/* For preview simulation, render WatermarkPainter overlay so reviewer sees the exact watermark on accepted preview */}
-                                    {isIssue && previewMode === 'accepted' && (
-                                        <div
-                                            className={`absolute inset-x-0 ${
-                                                isFullBleed16x9
-                                                    ? 'top-[64px] bottom-[148px]'
-                                                    : (photoRatio === '16:9' ? 'top-0 bottom-7' : 'inset-y-0')
-                                            } pointer-events-none z-20 flex flex-col justify-end`}
-                                        >
-                                            <WatermarkPainter
-                                                metadata={{
-                                                    ...metadata,
-                                                    timestamp: liveTime
-                                                }}
-                                            />
-                                        </div>
-                                    )}
-                                    {/* Success check badge top-left */}
-                                    <div className={`absolute ${isFullBleed16x9 ? 'top-[74px]' : 'top-3'} left-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/90 backdrop-blur-md text-white text-xs font-bold shadow-md z-30`}>
-                                        <Check size={14} strokeWidth={3} />
-                                        <span>Photo accepted ({photoRatio})</span>
-                                    </div>
                                 </div>
                             )}
 
@@ -1042,23 +1030,6 @@ const IDCameraModal = ({
                                         </div>
                                     )}
 
-                                    {/* Live Evidence Watermark Overlay on Viewfinder (Drawn with shared drawEvidenceWatermark) */}
-                                    {isIssue && (
-                                        <div
-                                            className={`absolute inset-x-0 ${
-                                                isFullBleed16x9
-                                                    ? 'top-[60px] bottom-[108px]'
-                                                    : (photoRatio === '16:9' ? 'top-0 bottom-7' : 'inset-y-0')
-                                            } pointer-events-none z-20 flex flex-col justify-end transition-all duration-300`}
-                                        >
-                                            <WatermarkPainter
-                                                metadata={{
-                                                    ...metadata,
-                                                    timestamp: liveTime
-                                                }}
-                                            />
-                                        </div>
-                                    )}
 
 
                                     {/* Loading spinner while stream initializes */}
@@ -1078,15 +1049,19 @@ const IDCameraModal = ({
                         {/* ZONE 3: SMARTPHONE BOTTOM CAMERA DECK                       */}
                         {/* ─────────────────────────────────────────────────────────── */}
                         <footer
-                            className="w-full bg-transparent px-4 pt-2.5 pb-4 z-30 shrink-0 transition-colors duration-300"
+                            className={`w-full ${isIssue ? 'bg-slate-950' : 'bg-transparent'} px-4 pt-2.5 pb-4 z-30 shrink-0 transition-colors duration-300`}
                             style={nativeCamera ? { paddingBottom: 'max(1rem, var(--pulso-safe-bottom, 0px))' } : undefined}
                         >
+                            {isIssue && <CaptureLocationStatus status={captureLocation.status}
+                                captured={Boolean(capturedPreviewUrl)} sample={Boolean(previewMode)}
+                                className="text-sm leading-snug text-slate-100 mb-2"/>}
                             {isPreviewAcceptedState ? (
                                 /* Acceptance actions in bottom deck */
                                 <div className="max-w-md mx-auto w-full space-y-2">
                                     <button
                                         type="button"
                                         onClick={handleConfirmAcceptedPhoto}
+                                        data-camera-confirm
                                         className="w-full h-12 min-h-[48px] rounded-xl bg-[#ff6b00] hover:bg-[#e05e00] text-white font-bold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00]"
                                     >
                                         <Check size={18} strokeWidth={2.75} />
@@ -1166,7 +1141,7 @@ const IDCameraModal = ({
                             )}
                         </footer>
                     </div>
-                </div>
+                </DialogTag>
             )}
         </AnimatePresence>
     );

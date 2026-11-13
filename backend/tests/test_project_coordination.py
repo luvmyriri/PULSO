@@ -173,7 +173,11 @@ def test_project_report_resolution_requires_explicit_verified_coverage(context):
     assert rejected.status_code==422,rejected.text
     resolved=command(client,tokens,project,'verify_report_resolution',actor='inspector',expected_report_version=project['source_report_version'],report_issue_addressed=True)
     assert resolved.status_code==200,resolved.text
-    with sessions() as db: assert db.get(models.Report,1).status=='resolved'
+    with sessions() as db:
+        assert db.get(models.Report,1).status=='resolved'
+        learning_event=db.query(models.ReportResolutionEvent).filter_by(report_id=1).one()
+        assert learning_event.kind=='verified' and learning_event.project_id==project['id']
+        assert learning_event.inspection_id is None
 
 
 def test_verified_work_does_not_close_report_with_pending_project(context):

@@ -1,7 +1,11 @@
+import { isReportPhotoRestricted } from '../utils/reportScreening';
 import NativeAppHeader, { NativeResidentGreeting } from '../components/mobile/NativeAppHeader';
 import NativeDashboardSearch from '../components/mobile/NativeDashboardSearch';
 import NativeBottomSheet from '../components/mobile/NativeBottomSheet';
 import NotificationDropdown from '../components/NotificationDropdown';
+import { finishReportIntake, locationEvidence, submitReportIntake, recoverReportIntake } from '../utils/reportIntake';
+import {reportDraftPrincipal} from '../utils/residentReportDraft';
+import {getStoredUser} from '../utils/auth';
 import { exportResidentReportsToXLSX } from '../utils/xlsxExport';
 import { residentPublication } from '../utils/publicationAdapter';
 import ResidentNotificationSettings from '../components/ResidentNotificationSettings';
@@ -7365,6 +7369,11 @@ const ResidentModals = ({
                         setActiveModal('map');
                     }}
                     onSubmitReport={handleQuickReportSubmit}
+                    onRestoreDraftLocation={context=>{
+                        stopDeviceLocationTracking();
+                        setReportLocation(context.location || null);setLocationAddress(context.address || '');
+                        setPlusCode(context.plusCode || '');setStructuredAddress(context.structuredAddress || null);
+                    }}
                     onTrackReport={(trackingId) => {
                         setActiveTab('reports');
                     }}
@@ -10776,6 +10785,7 @@ export default function ResidentDashboard() {
     const photoPinIcons = useReportPhotoPins(processedHazards, getReportCategoryMeta);
 
     const stopDeviceLocationTracking = useCallback(() => {
+        locationRequestRef.current++;
         if (locationWatchRef.current !== null && navigator.geolocation) {
             navigator.geolocation.clearWatch(locationWatchRef.current);
             locationWatchRef.current = null;
@@ -10800,6 +10810,7 @@ export default function ResidentDashboard() {
             accuracy: Number.isFinite(accuracy) ? Math.round(accuracy) : null,
             confirmed: true,
             source: 'device-gps',
+            deviceFix: { latitude, longitude, accuracy_m: accuracy > 0 ? accuracy : null, measured_at: position.timestamp ? new Date(position.timestamp).toISOString() : null },
             timestamp: position.timestamp || Date.now()
         };
         setReportLocation(loc);
@@ -10862,13 +10873,15 @@ export default function ResidentDashboard() {
             return;
         }
         stopDeviceLocationTracking();
+        const requestId=++locationRequestRef.current;
         setIsLocating(true);
         setIsTrackingLocation(true);
         locationWatchRef.current = navigator.geolocation.watchPosition(
             position => {
-                acceptDevicePosition(position);
+                if(requestId===locationRequestRef.current)acceptDevicePosition(position);
             },
             error => {
+                if(requestId!==locationRequestRef.current)return;
                 setIsLocating(false);
                 if (error?.code === 1) {
                     setLocationPermissionDenied(true);
@@ -10973,7 +10986,7 @@ export default function ResidentDashboard() {
                 const data = await res.json();
                 setAiFeedback(data);
 
-                if (data.is_inappropriate) {
+                if (isReportPhotoRestricted(data)) {
                     showToast(formatFriendlyNotice(data.rejection_reason), 'error');
                     setReportCategory([]);
                 } else {
@@ -11060,244 +11073,47 @@ export default function ResidentDashboard() {
             showToast('Please capture photo evidence of the infrastructure issue before submitting.', 'error');
             return;
         }
-        if (aiFeedback?.is_inappropriate) {
+        if (isReportPhotoRestricted(aiFeedback)) {
             showToast(formatFriendlyNotice(aiFeedback.rejection_reason) || 'Please upload a photo of the problem to submit your report.', 'error');
             return;
         }
         setIsSubmitConfirmOpen(true);
     };
 
-    const handleQuickReportSubmit = async ({
-        photo,
-        photoFile,
-        photoCapturedAt,
-        categories,
-        notes,
-        othersDescription,
-        locationDetails,
-        barangay,
-        location,
-        address
-    }) => {
-        const trackingNumbers = [];
-        const authToken = token || getAuthToken();
-
-        // Profanity & inappropriate words guard
-        const notesProfanity = validateProfanity(notes, 'notes');
-        if (notesProfanity.hasProfanity) {
-            throw new Error(notesProfanity.message || 'Inappropriate or profane language is not allowed in report notes.');
+    const handleQuickReportSubmit = async ({ recoverOnly=false, draftPrincipal, photo, photoFile, photoCapturedAt, photoProvenance, categories, notes, othersDescription, locationDetails, barangay, location, address }) => {
+        const authToken=getAuthToken() || token;
+        const expectedPrincipal=reportDraftPrincipal(authToken,currentUser);
+        if(draftPrincipal&&expectedPrincipal!==draftPrincipal)throw new Error(t('residentDraft.accountChanged'));
+        let result;
+        if(recoverOnly)result=await recoverReportIntake({token:authToken,apiBase:API_BASE_URL,draftKey:'quick'});
+        else {
+        const labels = Array.isArray(categories) ? [...new Set(categories)].slice(0, 3) : [];
+        if (!labels.length) throw new Error('Choose at least one category.');
+        for (const value of [notes, othersDescription]) {
+            const validation = validateProfanity(value || '', 'notes');
+            if (validation.hasProfanity) throw new Error(validation.message || 'Please review the report wording.');
         }
-        if (othersDescription) {
-            const othersProfanity = validateProfanity(othersDescription, 'description');
-            if (othersProfanity.hasProfanity) {
-                throw new Error(othersProfanity.message || 'Inappropriate or profane language is not allowed.');
-            }
+        const issueLocation = location || reportLocation || {};
+        const extra = [locationDetails?.subdivision, locationDetails?.houseNumber, locationDetails?.landmark].filter(Boolean).join(' · ');
+        const description = [notes, othersDescription, extra].filter(Boolean).join(' · ') || 'Resident infrastructure observation for staff review.';
+        const image = photoFile || (photo ? await (await fetch(photo)).blob() : null);
+        result = await submitReportIntake({
+            fields: {
+                category: labels[0], categories: labels, description,
+                lat: issueLocation.lat, lng: issueLocation.lng,
+                location_string: address || locationAddress || '',
+                location_barangay: barangay || structuredAddress?.barangay || '',
+                location_metadata: locationEvidence(issueLocation, photoProvenance || { capturedAt: photoCapturedAt, source: photoFile?.pulsoCapture ? 'camera' : 'unknown', photoDeviceFix: photoFile?.pulsoCapture?.deviceFix }),
+                submission_source: 'web_resident',
+            }, image, token:authToken, apiBase: API_BASE_URL, draftKey: 'quick',
+        });
         }
-
-        let fullDescription = notes || '';
-        const extraLocDetails = [];
-        if (locationDetails?.subdivision) extraLocDetails.push(`Subd: ${locationDetails.subdivision}`);
-        if (locationDetails?.houseNumber) extraLocDetails.push(`Address: ${locationDetails.houseNumber}`);
-        if (locationDetails?.landmark) extraLocDetails.push(`Landmark: ${locationDetails.landmark}`);
-        if (extraLocDetails.length > 0) {
-            fullDescription = fullDescription ? `${fullDescription} [${extraLocDetails.join(', ')}]` : `[${extraLocDetails.join(', ')}]`;
-        }
-
-        let imageBlob = photoFile;
-        if (!imageBlob && photo) {
-            try {
-                const res = await fetch(photo);
-                imageBlob = await res.blob();
-            } catch (e) {
-                console.warn('PULSO: Error converting photo to blob', e);
-            }
-        }
-
-        const catsToSubmit = Array.isArray(categories) && categories.length > 0 ? categories.slice(0, 3) : ['Roads & Bridges'];
-        const repLoc = location || reportLocation;
-        const repBarangay = barangay || structuredAddress?.barangay || (repLoc?.lat && repLoc?.lng ? findBarangayByCoordinates(repLoc.lat, repLoc.lng)?.name : 'Barangay 171');
-        const repAddress = address || locationAddress || `${repBarangay}, Caloocan City`;
-
-        let hasOfflineQueued = false;
-
-        for (const cat of catsToSubmit) {
-            let desc = cat === 'Others' && othersDescription
-                ? (fullDescription ? `${othersDescription} - ${fullDescription}` : othersDescription)
-                : (fullDescription || 'Citizen report from PULSO app.');
-            if (desc.trim().length < 10) {
-                desc = `${desc.trim()} (Citizen report from PULSO)`;
-            }
-
-            const formData = new FormData();
-            formData.append('category', cat);
-            formData.append('description', desc);
-            if (repLoc?.lat != null && !isNaN(repLoc.lat)) formData.append('lat', String(repLoc.lat));
-            if (repLoc?.lng != null && !isNaN(repLoc.lng)) formData.append('lng', String(repLoc.lng));
-            formData.append('location_string', repAddress);
-            if (repBarangay) {
-                formData.append('location_barangay', repBarangay.replace(/^Barangay\s*/i, ''));
-            }
-            if (imageBlob) {
-                formData.append('image', imageBlob, `report-${Date.now()}-${cat.replace(/\s+/g, '_')}.jpg`);
-            }
-            if (photoCapturedAt) {
-                formData.append('photo_captured_at', photoCapturedAt);
-            }
-
-            let submittedSuccessfully = false;
-
-            // Attempt online submission if browser is online
-            if (navigator.onLine) {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/api/reports`, {
-                        method: 'POST',
-                        headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json().catch(() => ({}));
-                        const ticketId = data.ticket_id || data.tracking_number || `#PUL-${new Date().getFullYear()}-${data.id || Math.floor(1000 + Math.random() * 9000)}`;
-                        trackingNumbers.push(ticketId);
-                        submittedSuccessfully = true;
-
-                        // Add live report to userReports state
-                        const liveReport = {
-                            id: data.id || Date.now(),
-                            ticket_id: ticketId,
-                            tracking_number: ticketId,
-                            category: cat,
-                            description: desc,
-                            status: data.status || 'unverified',
-                            location_string: repAddress,
-                            location_barangay: repBarangay,
-                            lat: repLoc?.lat ? Number(repLoc.lat) : 14.7566,
-                            lng: repLoc?.lng ? Number(repLoc.lng) : 121.0450,
-                            created_at: data.created_at || new Date().toISOString(),
-                            image_url: data.image_url || photo || null,
-                            urgency: data.urgency || 'medium'
-                        };
-                        setUserReports(prev => [liveReport, ...(Array.isArray(prev) ? prev : [])]);
-                    } else if (response.status >= 500 || response.status === 502 || response.status === 503 || response.status === 504) {
-                        // City Engineering server is unavailable or proxy cannot connect -> trigger graceful offline queue
-                        console.warn(`PULSO: Server returned HTTP ${response.status}. Queueing report offline.`);
-                    } else if (response.status === 409) {
-                        // 409 Conflict: A report for this category at this location is already being processed
-                        const errorData = await response.json().catch(() => ({}));
-                        const canonicalTicket = response.headers.get('x-canonical-ticket-id') || response.headers.get('X-Canonical-Ticket-ID');
-                        const canonicalId = response.headers.get('x-canonical-report-id') || response.headers.get('X-Canonical-Report-ID');
-
-                        // Find matching report in local publicReports or userReports
-                        const allReports = [...(userReports || []), ...(publicReports || [])];
-                        let matched = allReports.find(r =>
-                            (canonicalTicket && (r.ticket_id === canonicalTicket || formatTicketId(r.ticket_id, r.id) === formatTicketId(canonicalTicket))) ||
-                            (canonicalId && String(r.id) === String(canonicalId)) ||
-                            (r.category === cat && repLoc?.lat && repLoc?.lng && getDistance(repLoc, { lat: r.lat || r.location_lat, lng: r.lng || r.location_lng }) <= 35)
-                        );
-
-                        const formattedCanonTicket = canonicalTicket
-                            ? formatTicketId(canonicalTicket)
-                            : (matched?.ticket_id ? formatTicketId(matched.ticket_id, matched.id) : `#PUL-${new Date().getFullYear()}-4717`);
-
-                        const existingReportObj = matched ? {
-                            ...matched,
-                            ticket_id: formatTicketId(matched.ticket_id, matched.id),
-                            status: matched.status || 'in_progress',
-                            category: cat
-                        } : {
-                            id: canonicalId || Date.now(),
-                            ticket_id: formattedCanonTicket,
-                            category: cat,
-                            title: `Civic Concern - ${formattedCanonTicket}`,
-                            status: 'in_progress',
-                            location_string: repAddress,
-                            location_barangay: repBarangay,
-                            lat: repLoc?.lat ? Number(repLoc.lat) : 14.7566,
-                            lng: repLoc?.lng ? Number(repLoc.lng) : 121.0450,
-                            created_at: new Date().toISOString(),
-                            department_title: 'Report is active and being processed by City Engineering.',
-                            description: `An active case for ${cat} at this location is currently in progress with LGU engineering crew.`
-                        };
-
-                        const err = new Error(errorData.detail || errorData.message || `A report for '${cat}' at this exact location is already being processed.`);
-                        err.status = 409;
-                        err.isDuplicate = true;
-                        err.canonicalTicket = formattedCanonTicket;
-                        err.existingReport = existingReportObj;
-                        throw err;
-                    } else {
-                        // 4xx validation error
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(errorData.detail || errorData.message || `Server rejected report submission (HTTP ${response.status})`);
-                    }
-                } catch (netErr) {
-                    if (netErr.message && !netErr.message.includes('fetch') && !netErr.message.includes('NetworkError') && !netErr.message.includes('Failed to fetch')) {
-                        throw netErr;
-                    }
-                    console.warn('PULSO: Network error during report submit, queueing offline:', netErr);
-                }
-            }
-
-            // If not submitted online (due to offline state, server 503, or network failure), queue offline
-            if (!submittedSuccessfully) {
-                hasOfflineQueued = true;
-                const year = new Date().getFullYear();
-                const offlineId = `offline-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-                const ticketId = `#PUL-${year}-${Math.floor(1000 + Math.random() * 9000)}`;
-                trackingNumbers.push(ticketId);
-
-                const offlineReport = {
-                    id: offlineId,
-                    ticket_id: ticketId,
-                    tracking_number: ticketId,
-                    category: cat,
-                    description: desc,
-                    status: 'unverified',
-                    is_offline_draft: true,
-                    is_offline_pending: true,
-                    location_string: repAddress,
-                    location_barangay: repBarangay,
-                    lat: repLoc?.lat ? Number(repLoc.lat) : 14.7566,
-                    lng: repLoc?.lng ? Number(repLoc.lng) : 121.0450,
-                    created_at: new Date().toISOString(),
-                    image_url: photo || null,
-                    urgency: 'medium',
-                    submitted_by: currentUser?.id || null
-                };
-
-                // Add to state so user sees it right away in "My Reports"
-                setUserReports(prev => [offlineReport, ...(Array.isArray(prev) ? prev : [])]);
-
-                // Store in localStorage for automatic sync when server is reachable
-                try {
-                    const existingQueue = JSON.parse(localStorage.getItem('pulso_offline_reports') || '[]');
-                    existingQueue.unshift(offlineReport);
-                    localStorage.setItem('pulso_offline_reports', JSON.stringify(existingQueue.slice(0, 50)));
-                } catch (storageErr) {
-                    console.warn('PULSO: Could not save offline report queue to localStorage', storageErr);
-                }
-            }
-        }
-
-        if (hasOfflineQueued) {
-            showToast(
-                trackingNumbers.length > 1
-                    ? `${trackingNumbers.length} reports queued offline. Will sync when server is reachable.`
-                    : 'Report queued offline. Will sync when server is reachable.',
-                'info'
-            );
-        } else {
-            if (currentUser?.id) {
-                fetchUserReports(currentUser.id);
-            }
-            showToast(
-                trackingNumbers.length > 1
-                    ? `${trackingNumbers.length} reports submitted successfully!`
-                    : 'Report submitted successfully!'
-            );
-        }
-
-        return { success: true, trackingNumbers, isOfflineQueued: hasOfflineQueued };
+        if(reportDraftPrincipal(getAuthToken(),getStoredUser())!==expectedPrincipal)throw new Error('The active account changed. Recover this report when signed into its original account.');
+        finishReportIntake('quick',authToken);
+        setUserReports(prev => [{ ...result, lat: result.location_lat, lng: result.location_lng }, ...(prev || []).filter(r => r.id !== result.id)]);
+        if (currentUser?.id) fetchUserReports(currentUser.id);
+        showToast(t('reportIntelligence.received', 'Report received.'));
+        return { success: true, trackingNumbers: [result.ticket_id], report: result };
     };
 
     const actuallySubmitReport = async () => {
@@ -11305,48 +11121,23 @@ export default function ResidentDashboard() {
         setIsSubmitConfirmOpen(false);
         setSubmittingReport(true);
         try {
-            const formData = new FormData();
-            formData.append('category', Array.isArray(reportCategory) ? reportCategory.join(', ') : reportCategory);
-            formData.append('description', reportNotes || "Citizen report from PULSO app.");
-            formData.append('lat', reportLocation.lat);
-            formData.append('lng', reportLocation.lng);
-            formData.append('location_string', locationAddress || `Caloocan City (${reportLocation.lat.toFixed(4)}, ${reportLocation.lng.toFixed(4)})`);
-            let submitBrgy = structuredAddress?.barangay;
-            if (!submitBrgy && reportLocation?.lat && reportLocation?.lng) {
-                const autoBrgy = findBarangayByCoordinates(reportLocation.lat, reportLocation.lng);
-                if (autoBrgy) submitBrgy = autoBrgy.name;
-            }
-            if (submitBrgy) {
-                formData.append('location_barangay', submitBrgy.replace(/^Barangay\s*/i, ''));
-            }
-
-            if (selectedImage) {
-                const response = await fetch(selectedImage);
-                const blob = await response.blob();
-                formData.append('image', blob, `report-${Date.now()}.jpg`);
-                if (photoMetadata?.capturedAt) {
-                    formData.append('photo_captured_at', photoMetadata.capturedAt);
-                }
-            }
-
-            const response = await fetch(`${API_BASE_URL}/api/reports`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData
-            });
-
-            if (response.ok) {
-                showToast('Report verified and submitted!');
-                setActiveModal(null);
-                setActiveTab('reports');
-                setReportNotes('');
-                setSelectedImage(null);
-                setPhotoMetadata(null);
-                fetchUserReports(currentUser.id);
-            } else {
-                const errorData = await response.json();
-                showToast(errorData.detail || 'Failed to submit report', 'error');
-            }
+            const image = selectedImage ? await (await fetch(selectedImage)).blob() : null;
+            await submitReportIntake({ fields: {
+                categories: Array.isArray(reportCategory) ? reportCategory : String(reportCategory).split(',').map(c => c.trim()).filter(Boolean),
+                description: reportNotes || 'Resident infrastructure observation for staff review.',
+                lat: reportLocation.lat, lng: reportLocation.lng,
+                location_string: locationAddress || '', location_barangay: structuredAddress?.barangay || '',
+                location_metadata: locationEvidence(reportLocation, { capturedAt: photoMetadata?.capturedAt }),
+                submission_source: 'web_resident',
+            }, image, token, apiBase: API_BASE_URL, draftKey: 'legacy' });
+            finishReportIntake('legacy', token);
+            showToast(t('reportIntelligence.received'));
+            setActiveModal(null);
+            setActiveTab('reports');
+            setReportNotes('');
+            setSelectedImage(null);
+            setPhotoMetadata(null);
+            fetchUserReports(currentUser.id);
         } catch (error) {
             console.error("PULSO: Error submitting report:", error);
             showToast('Error connecting to server.', 'error');

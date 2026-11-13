@@ -1,13 +1,14 @@
 """Distribute completed resident APK builds, never an APK still being written."""
 import json
 import re
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 router = APIRouter(prefix='/api/mobile/app-updates', tags=['App updates'])
-RELEASE_DIRECTORY = Path(__file__).resolve().parent.parent / 'frontend/android/updates'
+RELEASE_DIRECTORY = Path(os.getenv('PULSO_ANDROID_UPDATE_DIRECTORY') or str(Path(__file__).resolve().parent.parent / 'frontend/android/updates'))
 APPLICATION_ID = 'ph.gov.caloocan.pulso'
 
 
@@ -32,6 +33,15 @@ def latest_release():
 def get_latest_update():
     release, _ = latest_release()
     return JSONResponse(release, headers={'Cache-Control': 'no-store'})
+
+
+@router.get('/download')
+def download_latest_update():
+    """Stable landing QR destination; only complete published packages."""
+    release, apk = latest_release()
+    return FileResponse(apk, filename=f"PULSO-{release['versionName']}.apk",
+        media_type='application/vnd.android.package-archive',
+        headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
 
 
 @router.get('/{version_code}/apk')

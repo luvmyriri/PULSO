@@ -1,6 +1,7 @@
 """Record-backed personal inbox and service investigations; no simulated capacity."""
 from collections import Counter, defaultdict
 from datetime import datetime, time, timedelta, timezone
+import logging
 from urllib.parse import urlencode
 from fastapi import HTTPException
 from sqlalchemy import func, or_
@@ -12,6 +13,7 @@ from government_access import can, require, scoped, scoped_assets, scoped_report
 CLOSED = {'completed', 'resolved', 'cancelled'}
 REPORT_CLOSED = {'resolved', 'completed', 'closed', 'closed_by_citizen', 'cancelled', 'rejected', 'spam', 'duplicate'}
 OVERVIEW_TRIAGE_STATES = {'submitted', 'received', 'pending', 'unverified', 'unvalidated', 'under_review'}
+logger = logging.getLogger(__name__)
 
 
 def overview_report_query(db, user, selection, area=None, priority=None):
@@ -82,6 +84,7 @@ def wo_location(db, wo):
 
 
 def my_work(db, user):
+    from legacy_operations import work_view, granted
     now = datetime.now(timezone.utc)
     items = []
     wos = scoped(db.query(gm.WorkOrder), gm.WorkOrder.district_id, user)
@@ -109,7 +112,7 @@ def my_work(db, user):
         else:
             append_wo(wo, 'assigned_to_me', 'You are the recorded work-order owner.', 'Open assigned work')
 
-    if can(user, 'verification'):
+    if work_view(user) and (can(user, 'verification') or user.role == 'system_admin') and granted(user, 'work_orders', 'verify', {user.role}):
         for wo in wos.filter(gm.WorkOrder.status.in_(['completed_pending_review', 'awaiting_verification']), or_(gm.WorkOrder.assigned_to_id != user.id, gm.WorkOrder.assigned_to_id.is_(None))).all():
             append_wo(wo, 'needs_my_review', 'Independent completion review is available within your operational scope.', 'Review completion evidence')
     review_reports = scoped_reports(db.query(models.Report),user).filter(models.Report.review_assigned_to_id == user.id,models.Report.status.in_(['pending','received','unverified','unvalidated','under_review','validated','needs_information','pending_approval','approved_internal',*report_review.CLOSED])).all()
@@ -119,7 +122,7 @@ def my_work(db, user):
             continue
         waiting = report.status in {'needs_information','pending_approval'}
         owner = db.get(models.Official,report.review_assigned_to_id)
-        next_action = 'Open report history' if closed else 'Complete intake and submit to engineering' if user.role == 'admin_clerk' and not waiting else 'Assess and verify report' if user.role in report_review.ENGINEER_ROLES and not waiting else 'Assign an intake reviewer' if report_review.permitted(user,'assign') and not report_review.permitted(user,'review') and not waiting else 'Review and route to engineering' if user.role in report_review.REVIEWERS and not waiting else 'Review report'
+        next_action = 'Open report history' if closed else 'Complete intake and submit to engineering' if user.role == 'admin_clerk' and not waiting else 'Assess and verify report' if report_review.permitted(user,'verify') and not waiting else 'Assign an intake reviewer' if report_review.permitted(user,'assign') and not report_review.permitted(user,'review') and not waiting else 'Review and route to engineering' if user.role in report_review.REVIEWERS and not waiting else 'Review report'
         items.append(dict(id=report.id,entity_type='report',ticket_id=report.ticket_id,title=(report.description or 'Citizen report')[:160],category=report.category or 'Unclassified',priority=report.priority_grade or 'Unreviewed',status=report.status,barangay=report.location_barangay,time_in_state=f'Updated {age(report.updated_at or report.created_at,now)}d ago',action_url=f'/gov/reports?reportId={report.id}',recommended_action=next_action,task_bucket='recently_completed' if closed else 'waiting_on_others' if waiting else 'assigned_to_me',assigned_to_id=user.id,assigned_to_name=owner.full_name,why_in_inbox='You were the recorded review owner when this report closed.' if closed else 'You are the recorded report review owner.',work_bundle='intake_review',updated_at=report.updated_at or report.created_at))
     if can(user, 'announcements', 'approve'):
         for item in scoped(db.query(gm.Announcement), gm.Announcement.district_id, user).filter(gm.Announcement.status.in_(['in_review', 'approved'])).all():
@@ -148,7 +151,7 @@ def my_work(db, user):
                 work_bundle='engineering_field',updated_at=project.updated_at or project.created_at,next_review_at=project.next_review_at))
     from referral_models import ExternalReferral, ReferralRecipient
     from external_referrals import grant as referral_grant, CLOSED as REFERRAL_CLOSED
-    if referral_grant(user,'view'):
+    if can(user,'reports') and referral_grant(user,'view'):
         referrals=db.query(ExternalReferral).filter(ExternalReferral.report_id.in_(scoped_reports(db.query(models.Report.id),user)),
             ExternalReferral.status.notin_(REFERRAL_CLOSED)).all()
         for referral in referrals:
@@ -172,7 +175,7 @@ def my_work(db, user):
             item['review_target']=review_target(target_config,reports_by_id[item['id']],now)
     counts = Counter(i['task_bucket'] for i in items)
     items.sort(key=lambda i: ({'P5':0,'critical':0,'P4':1,'P3':2,'high':2,'P2':3,'P1':4,'P0':5}.get(i['priority'],6), utc(i['updated_at']) or now))
-    return dict(timestamp=now,can_route_reports=report_review.permitted(user,'assign'),routing_enabled=read_config(db,'report_review_routing')['enabled'], metrics=None, sector_summary=None, team_capacity=[], needs_attention=items,
+    return dict(timestamp=now,can_route_reports=can(user,'reports') and report_review.permitted(user,'assign'),routing_enabled=read_config(db,'report_review_routing')['enabled'], metrics=None, sector_summary=None, team_capacity=[], needs_attention=items,
         user_role=user.role, user_display_name=user.full_name,
         work_bundles=[], inbox_counts={k: counts[k] for k in ['assigned_to_me', 'needs_my_review', 'waiting_on_others', 'recently_completed']})
 
@@ -215,6 +218,162 @@ def service_insights(db, user, days=90):
         limitations=['Age is time since report submission, not time in the current process step.', 'Report volume is not a measure of danger or staff productivity.', 'Availability and effort estimates are not recorded; work counts do not measure capacity.'])
 
 
+def overview_dashboard_details(db, user, now, local_today, manila, open_reports, report_scope, source_errors):
+    """Add read-only dashboard rollups using the same grants as each source workspace."""
+    import legacy_operations
+    import project_workspace
+
+    details = dict(
+        report_types=[dict(label=label, count=count) for label, count in
+                      Counter(report.category or 'Not classified' for report in open_reports).most_common()]
+        if can(user, 'reports') else None,
+        work=None, projects=None, inventory=None, feedback=None,
+    )
+    sources = {}
+    if can(user, 'reports'):
+        def feedback():
+            report = models.Report
+            first = datetime.combine(local_today - timedelta(days=29), time.min, tzinfo=manila)
+            average, count = (report_scope.filter(report.created_at.between(first, now),
+                                                 report.satisfaction_rating.between(1, 5))
+                              .with_entities(func.avg(report.satisfaction_rating), func.count(report.id)).one())
+            return dict(average=float(average) if count else None, count=count)
+        sources['feedback'] = feedback
+    if legacy_operations.work_view(user):
+        sources['work'] = lambda: overview_work_details(db, user, now, local_today, manila)
+    if project_workspace.allowed(user):
+        sources['projects'] = lambda: overview_project_details(db, user, now)
+    if can(user, 'maintenance'):
+        def inventory():
+            asset = gm.InfrastructureAsset
+            rows = scoped_assets(db.query(asset.status, asset.category, func.count(asset.asset_id)), user)
+            statuses, categories = Counter(), Counter()
+            for status, category, count in rows.group_by(asset.status, asset.category).all():
+                statuses[status or 'not_recorded'] += count
+                categories[category or 'Not classified'] += count
+            return dict(total=sum(statuses.values()), statuses=dict(statuses), categories=dict(categories))
+        sources['inventory'] = inventory
+    for name, load in sources.items():
+        try:
+            with db.begin_nested():
+                details[name] = load()
+        except Exception:
+            logger.exception('Overview %s source failed', name)
+            source_errors[f'overview_{name}'] = f'The {name} dashboard data could not be loaded.'
+    return details
+
+
+def overview_work_areas(db, user, scoped_work):
+    """Build map choices from authorized lookup rows, even when they have no orders."""
+    from project_workspace import area_name
+
+    districts = {
+        district.id: dict(id=district.id, label=district.name, barangays=[], current=0, blocked=0, verification=0, without_barangay=0)
+        for district in scoped(db.query(models.District), models.District.id, user).order_by(models.District.id)
+    }
+    areas = db.query(models.Barangay.id, models.Barangay.name, models.Barangay.display_name,
+                     models.Barangay.brgy_num, models.Barangay.district_id).order_by(models.Barangay.id).all()
+    reference_districts = defaultdict(set)
+    numbered = {}
+    for area in areas:
+        name_key = area_name(area.name)
+        number = area.brgy_num if area.brgy_num is not None else (int(name_key) if name_key.isdigit() else None)
+        numbered[area.id] = number
+        if number is not None:
+            reference_districts[number].add(area.district_id)
+
+    by_id, canonical = {}, {}
+    for area in areas:
+        if area.district_id not in districts:
+            continue
+        number = numbered[area.id]
+        key = (area.district_id, ('number', number) if number is not None else ('id', area.id))
+        if key not in canonical:
+            barangay = dict(id=area.id, label=f'Barangay {number}' if number is not None else area.display_name or area.name,
+                           reference=number if number is not None and len(reference_districts[number]) == 1 else None,
+                           current=0, blocked=0, verification=0)
+            canonical[key] = barangay
+            districts[area.district_id]['barangays'].append(barangay)
+        by_id[area.id] = (area.district_id, canonical[key])
+
+    totals = dict(current=0, blocked=0, verification=0, without_barangay=0)
+    area_counts = Counter()
+    wo = gm.WorkOrder
+    area_rows = (scoped_work.filter(wo.status.notin_(CLOSED))
+                 .with_entities(wo.district_id, wo.barangay_id, wo.status, func.count(wo.id))
+                 .group_by(wo.district_id, wo.barangay_id, wo.status).all())
+    for district_id, barangay_id, status, count in area_rows:
+        area_district, barangay = by_id.get(barangay_id, (None, None))
+        if district_id is not None and area_district != district_id:
+            barangay = None
+        district = districts.get(district_id if district_id is not None else area_district)
+        area_counts[barangay['label'] if barangay else 'Location not recorded'] += count
+        for summary in (totals, district, barangay):
+            if summary is None:
+                continue
+            summary['current'] += count
+            if status == 'blocked':
+                summary['blocked'] += count
+            if status in {'completed_pending_review', 'awaiting_verification'}:
+                summary['verification'] += count
+            if barangay is None:
+                summary['without_barangay'] += count
+
+    return [dict(label=label, count=count) for label, count in area_counts.most_common()], dict(
+        districts=list(districts.values()), totals=totals,
+    )
+
+
+def overview_work_details(db, user, now, local_today, manila):
+    from legacy_operations import work_query
+
+    wo = gm.WorkOrder
+    scoped_work = work_query(db, user)
+    areas, area_map = overview_work_areas(db, user, scoped_work)
+
+    first_day = local_today - timedelta(days=29)
+    first = datetime.combine(first_day, time.min, tzinfo=manila).astimezone(timezone.utc)
+    created_in_period = wo.created_at.between(first, now)
+    completed_in_period = wo.completed_date.between(first, now)
+    rows = (scoped_work.filter(or_(created_in_period, completed_in_period))
+            .with_entities(wo.created_at, wo.completed_date, wo.status).all())
+    created_by_day, completed_by_day = Counter(), Counter()
+    eligible = completed = 0
+    for created, finished, status in rows:
+        created, finished = utc(created), utc(finished)
+        is_completed = status in {'completed', 'resolved'} and finished is not None and finished <= now
+        if created and first <= created <= now:
+            created_by_day[created.astimezone(manila).date()] += 1
+            if status != 'cancelled':
+                eligible += 1
+                completed += int(is_completed)
+        if is_completed and first <= finished:
+            completed_by_day[finished.astimezone(manila).date()] += 1
+    days = [first_day + timedelta(days=i) for i in range(30)]
+    return dict(
+        areas=areas,
+        area_map=area_map,
+        series=[dict(date=day.isoformat(), created=created_by_day[day], completed=completed_by_day[day]) for day in days],
+        completion=dict(eligible=eligible, completed=completed),
+    )
+
+
+def overview_project_details(db, user, now):
+    from legacy_operations import project_query
+    from project_workspace import CLOSED as PROJECT_CLOSED
+
+    project = gm.ProjectRequest
+    active = project_query(db, user).filter(project.status.in_({'in_progress', 'dispatched', 'milestone_inspections'})).count()
+    reviews = (project_query(db, user).filter(project.status.notin_(PROJECT_CLOSED),
+               project.next_review_at.between(now, now + timedelta(days=30)))
+               .with_entities(project.id, project.title, project.proj_number, project.next_review_at)
+               .order_by(project.next_review_at, project.id).limit(5).all())
+    return dict(in_progress=active, reviews=[
+        dict(title=title or reference or 'Project', date=utc(review_at).isoformat(), url=f'/gov/projects?project={id}')
+        for id, title, reference, review_at in reviews
+    ])
+
+
 def operations_overview(db, user):
     now = datetime.now(timezone.utc)
 
@@ -249,9 +408,10 @@ def operations_overview(db, user):
     local_today = now.astimezone(manila).date()
     first_day = local_today - timedelta(days=13)
     first_instant = datetime.combine(first_day, time.min, tzinfo=manila).astimezone(timezone.utc)
-    intake_query = scoped_reports(db.query(models.Report), user).filter(models.Report.created_at >= first_instant, models.Report.created_at <= now)
+    report_scope = scoped_reports(db.query(models.Report), user)
     if user.role in FIELD_SELF_ROLES:
-        intake_query = intake_query.filter(models.Report.id.in_(db.query(gm.WorkOrder.report_id).filter(gm.WorkOrder.assigned_to_id == user.id)))
+        report_scope = report_scope.filter(models.Report.id.in_(db.query(gm.WorkOrder.report_id).filter(gm.WorkOrder.assigned_to_id == user.id)))
+    intake_query = report_scope.filter(models.Report.created_at.between(first_instant, now))
     intake_counts = Counter(utc(created).astimezone(manila).date().isoformat() for (created,) in intake_query.with_entities(models.Report.created_at).all() if created)
     intake_series = [
         dict(date=(first_day + timedelta(days=offset)).isoformat(), count=intake_counts[(first_day + timedelta(days=offset)).isoformat()])
@@ -467,6 +627,7 @@ def operations_overview(db, user):
     unlocated_count = sum(1 for r in open_reports if not r.location_barangay)
     unassigned_report_count = len(unowned_reports)
     unassigned_wo_count = sum(1 for w in open_wos if not w.assigned_to_id)
+    dashboard = overview_dashboard_details(db, user, now, local_today, manila, open_reports, report_scope, source_errors)
 
     return dict(
         as_of=now.isoformat(),
@@ -494,6 +655,7 @@ def operations_overview(db, user):
         asset_exceptions=asset_exceptions,
         update_exceptions=update_exceptions,
         source_errors=source_errors,
+        dashboard=dashboard,
         coverage=dict(
             unlocated_reports=unlocated_count,
             unassigned_reports=unassigned_report_count,

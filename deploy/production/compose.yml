@@ -25,7 +25,8 @@ services:
     restart: unless-stopped
     env_file: /opt/pulso/shared/backend.env
     environment:
-      PULSO_PREDICTIVE_ARTIFACT: /app/backend/predictive_artifact/current
+      PULSO_PREDICTIVE_ARTIFACT: ${PULSO_PREDICTIVE_ARTIFACT:-}
+      PULSO_ANDROID_UPDATE_DIRECTORY: /app/android_updates
     depends_on:
       db: {condition: service_healthy}
     volumes:
@@ -34,6 +35,7 @@ services:
       - /opt/pulso/shared/secrets:/run/secrets:ro
       - /opt/pulso/shared/ai_usage.json:/app/backend/.ai_usage.json
       - /opt/pulso/shared/predictive:/app/backend/predictive_artifact:ro
+      - /opt/pulso/shared/android_updates:/app/android_updates:ro
     networks: [data, egress]
     security_opt: [no-new-privileges:true]
     logging: *logs
@@ -43,7 +45,7 @@ services:
     command: [python, -u, scripts/score_production_predictive.py, --loop, --interval-minutes, "360"]
     env_file: /opt/pulso/shared/backend.env
     environment:
-      PULSO_PREDICTIVE_ARTIFACT: /app/backend/predictive_artifact/current
+      PULSO_PREDICTIVE_ARTIFACT: ${PULSO_PREDICTIVE_ARTIFACT:-}
     depends_on:
       db: {condition: service_healthy}
     volumes:

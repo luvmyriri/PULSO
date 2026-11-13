@@ -5,7 +5,9 @@ Prepared for the integrated branch on Ubuntu 24.04 / Docker. The VPS at
 PULSO uses `/opt/pulso`, a separate database/volumes/network, and the initial
 hostname `srv1857115.hstgr.cloud` (public DNS resolves to the VPS).
 
-The user selected a **clean database**. Do not restore the local database, demo
+The initial deployment used a **clean database**. Routine updates must preserve
+the existing production database and files, take a backup, and migrate the schema.
+Do not repeat the initial bootstrap or import local records. Do not restore the local database, demo
 accounts, fake reports, work orders, assets, model-training seed history, uploads
 or pending outbound messages. Bootstrap the schema with `scripts/bootstrap_db.sh`
 before starting the API; then explicitly run `initialize_production.py references`.
@@ -51,3 +53,22 @@ password, fake person or unsolicited email is created.
 Back up PostgreSQL with `pg_dump` and private/public file volumes before updates.
 Retain the prior image/release and edge configuration for rollback. Never run
 `docker compose down -v` against the deployment.
+
+The Android public test build uses `frontend/scripts/android.mjs apk-public` and
+the isolated Java 21 / SDK 36 builder in `android-builder.Dockerfile`. Supply only
+public browser configuration and a persistent private signing key to that builder;
+never mount backend credentials into it. Add the bundled `https://localhost` origin
+to the production backend's `ALLOWED_ORIGINS` without enabling development CAPTCHA.
+The signed APK is served from the read-only shared `android_updates` folder.
+Publish the complete APK first and `latest.json` last; the landing QR uses
+`/api/mobile/app-updates/download`. Preserve the signing key and its protected backup
+for future compatible updates. Physical-device acceptance remains a separate check.
+
+Predictive scoring defaults to unavailable. Set `PULSO_PREDICTIVE_ARTIFACT` in the
+Compose build environment only after an approved artifact is installed at the
+mounted container path, for example `/app/backend/predictive_artifact/current`.
+An absent model or licensed hazard feed must not become fabricated predictions.
+
+After recreating only the API, refresh the web proxy's cached Docker upstream:
+check API health, run `docker exec pulso-web-1 nginx -t`, then
+`docker exec pulso-web-1 nginx -s reload`, and verify the public HTTPS API again.

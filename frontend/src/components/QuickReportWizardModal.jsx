@@ -1,7 +1,14 @@
+import ReportScreeningNotice from './report-wizard/ReportScreeningNotice';
+import { isReportPhotoRestricted } from '../utils/reportScreening';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAndroidBack } from '../utils/nativeAndroid';
 import { isNativeAndroid } from '../utils/appContext';
+import useResidentReportDraft, {useReportDraftPrincipal} from '../hooks/useResidentReportDraft';
+import {packResidentPhoto,unpackResidentPhoto,reportDraftPrincipal} from '../utils/residentReportDraft';
+import {pendingReportIntake,locationEvidence} from '../utils/reportIntake';
+import {getStoredToken,getStoredUser} from '../utils/auth';
+import ResidentDraftStatus from './report-wizard/ResidentDraftStatus';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -129,7 +136,6 @@ export function formatRejectionReason(reason) {
         .trim();
 }
 
-const DRAFT_STORAGE_KEY = 'pulso_quick_report_draft_v2';
 const MAX_SELECTED_CATEGORIES = 3;
 
 // Unified Categories excluding "All" for reporting
@@ -182,6 +188,7 @@ function QuickReportWizardModal({
     onStopLocationTracking,
     locationPermissionDenied = false,
     onOpenLocationPicker,
+    onRestoreDraftLocation,
     onSubmitReport,
     onTrackReport,
     onViewExistingReport,
@@ -200,7 +207,13 @@ function QuickReportWizardModal({
     }, [isOpen, onStopLocationTracking]);
     const [photo, setPhoto] = useState(null); // Data URL or Blob URL
     const [photoFile, setPhotoFile] = useState(null);
-    const [photoCapturedAt, setPhotoCapturedAt] = useState(null);
+    const [photoProvenance, setPhotoProvenance] = useState(null);
+    const photoCapturedAt = photoProvenance?.capturedAt || null;
+    const [pendingSubmission,setPendingSubmission]=useState(false);
+    const [confirmedPoint, setConfirmedPoint] = useState(null);
+    const pointSignature = reportLocation ? `${reportLocation.lat},${reportLocation.lng}` : null;
+    const issuePinConfirmed = Boolean(pointSignature && confirmedPoint?.point === pointSignature);
+    const pointUsesDeviceFix=locationEvidence(reportLocation || {}).source==='device';
     const [isWatermarking, setIsWatermarking] = useState(false);
     const [isFullscreenPhotoOpen, setIsFullscreenPhotoOpen] = useState(false);
     const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
@@ -255,6 +268,7 @@ function QuickReportWizardModal({
     const [duplicateReport, setDuplicateReport] = useState(null);
     const [isDuplicateDescExpanded, setIsDuplicateDescExpanded] = useState(false);
     const [submittedTrackingNumbers, setSubmittedTrackingNumbers] = useState([]);
+    const [submittedReport,setSubmittedReport]=useState(null);
     const [isDiscardPromptOpen, setIsDiscardPromptOpen] = useState(false);
     const [copiedTrackingId, setCopiedTrackingId] = useState(null);
     const [isAddressCopied, setIsAddressCopied] = useState(false);
@@ -270,70 +284,51 @@ function QuickReportWizardModal({
     const recognitionRef = useRef(null);
     const contentAreaRef = useRef(null);
     const errorCardRef = useRef(null);
+    const modalRef=useRef(null),titleRef=useRef(null);
 
     // -------------------------------------------------------------------------
-    // Initialize & Restore Local Draft
+    // Account-scoped draft bytes, metadata and report fields share one transaction.
     // -------------------------------------------------------------------------
-    useEffect(() => {
-        if (!isOpen) return;
-
-        try {
-            const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
-            if (rawDraft) {
-                const draft = JSON.parse(rawDraft);
-                // Only restore if draft is less than 24 hours old
-                if (Date.now() - (draft.timestamp || 0) < 24 * 3600 * 1000) {
-                    if (draft.photo) setPhoto(draft.photo);
-                    if (draft.photoCapturedAt) setPhotoCapturedAt(draft.photoCapturedAt);
-                    if (Array.isArray(draft.selectedCategories) && draft.selectedCategories.length > 0) {
-                        setSelectedCategories(draft.selectedCategories.slice(0, MAX_SELECTED_CATEGORIES));
-                    }
-                    if (Array.isArray(draft.suggestedCategories)) {
-                        setSuggestedCategories(draft.suggestedCategories.slice(0, MAX_SELECTED_CATEGORIES));
-                    }
-                    if (draft.notes) setNotes(draft.notes);
-                    if (draft.othersDescription) setOthersDescription(draft.othersDescription);
-                    if (draft.locationDetails) setLocationDetails(draft.locationDetails);
-                    if (draft.step && draft.step <= 3) setStep(draft.step);
-                }
-            }
-        } catch (e) {
-            console.warn('Could not read Quick Report draft from localStorage', e);
-        }
-    }, [isOpen]);
-
-    // Save draft to localStorage whenever relevant fields update
-    useEffect(() => {
-        if (!isOpen || step === 4) return;
-        try {
-            const hasData = photo || notes.trim() || selectedCategories.length > 0;
-            if (hasData) {
-                const draft = {
-                    step,
-                    photo: photo && photo.length < 500000 ? photo : null, // only cache lightweight base64/blob
-                    photoCapturedAt,
-                    selectedCategories,
-                    suggestedCategories,
-                    notes,
-                    othersDescription,
-                    locationDetails,
-                    timestamp: Date.now()
-                };
-                localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-            }
-        } catch (e) {
-            // Ignore quota errors for large images
-        }
-    }, [isOpen, step, photo, photoCapturedAt, selectedCategories, suggestedCategories, notes, othersDescription, locationDetails]);
-
-    // Clear draft helper
-    const clearSavedDraft = useCallback(() => {
-        try {
-            localStorage.removeItem(DRAFT_STORAGE_KEY);
-        } catch (e) {
-            // Ignore
-        }
-    }, []);
+    const principal=useReportDraftPrincipal(currentUser);
+    const draftData=useMemo(()=>({step,photo:packResidentPhoto(photoFile,photoProvenance || {}),selectedCategories,suggestedCategories,
+        notes,othersDescription,locationDetails,customBarangay,
+        locationContext:{location:reportLocation,address:locationAddress,plusCode,structuredAddress}}),
+        [step,photoFile,photoProvenance,selectedCategories,suggestedCategories,notes,othersDescription,locationDetails,
+            customBarangay,reportLocation,locationAddress,plusCode,structuredAddress]);
+    const restoreDraft=useCallback((value,options)=>{
+        const restored=unpackResidentPhoto(value?.photo);
+        setPhotoFile(restored.file);setPhotoProvenance(restored.provenance);setConfirmedPoint(null);
+        setIsFullscreenPhotoOpen(false);setIsCameraModalOpen(false);
+        setSelectedCategories(Array.isArray(value?.selectedCategories)?value.selectedCategories.slice(0,MAX_SELECTED_CATEGORIES):[]);
+        setSuggestedCategories(Array.isArray(value?.suggestedCategories)?value.suggestedCategories.slice(0,MAX_SELECTED_CATEGORIES):[]);
+        setNotes(typeof value?.notes==='string'?value.notes:'');setOthersDescription(typeof value?.othersDescription==='string'?value.othersDescription:'');
+        setLocationDetails(value?.locationDetails || {subdivision:'',houseNumber:'',landmark:''});
+        setCustomBarangay(value?.customBarangay || null);setStep([1,2,3].includes(value?.step)?value.step:1);
+        setAiFeedback(null);setAiAnalysisError(null);
+        if(value?.locationContext)onRestoreDraftLocation?.(value.locationContext);
+        else if(options?.accountChanged)onRestoreDraftLocation?.({location:null,address:'',plusCode:'',structuredAddress:null});
+    },[onRestoreDraftLocation]);
+    const draft=useResidentReportDraft({kind:'quick',principal,active:isOpen&&step!==4,data:draftData,
+        hasContent:Boolean(photoFile||notes.trim()||selectedCategories.length),restore:restoreDraft});
+    useEffect(()=>{
+        setStep(1);setSubmittedTrackingNumbers([]);setSubmittedReport(null);
+        const check=()=>{try{setPendingSubmission(Boolean(pendingReportIntake('quick',getStoredToken())));}
+            catch(error){setPendingSubmission(true);setSubmitError(error.message);}};
+        check();window.addEventListener('storage',check);window.addEventListener('pulso-intake-state',check);
+        return()=>{window.removeEventListener('storage',check);window.removeEventListener('pulso-intake-state',check);};
+    },[principal,isOpen]);
+    useEffect(()=>{
+        if(!isOpen)return;
+        const dialog=modalRef.current,trigger=document.activeElement;
+        if(dialog&&!dialog.open)dialog.showModal();
+        return()=>{if(dialog?.open)dialog.close();if(trigger?.isConnected)trigger.focus();};
+    },[isOpen]);
+    useEffect(()=>{if(isOpen&&draft.ready)(step===4?modalRef.current?.querySelector('[data-quick-success]'):titleRef.current)?.focus();},[isOpen,step,draft.ready]);
+    useEffect(()=>{
+        if(!photoFile){setPhoto(null);return;}
+        const url=URL.createObjectURL(photoFile);setPhoto(url);return()=>URL.revokeObjectURL(url);
+    },[photoFile]);
+    const clearSavedDraft=options=>draft.clear(options);
 
     // -------------------------------------------------------------------------
     // Speech Recognition (Voice Notes) - Accurate, Duplication-Free Engine
@@ -500,7 +495,15 @@ function QuickReportWizardModal({
     // -------------------------------------------------------------------------
     // AI Photo Analysis (Vision Eye)
     // -------------------------------------------------------------------------
+    const screeningRequest = useRef(null);
+    useEffect(() => () => screeningRequest.current?.abort(), []);
+    useEffect(() => {
+        if (!isOpen) { screeningRequest.current?.abort(); setIsAnalyzing(false); }
+    }, [isOpen]);
     const runAIAnalysis = useCallback(async (fileOrBlob) => {
+        screeningRequest.current?.abort();
+        const controller = new AbortController();
+        screeningRequest.current = controller;
         if (!fileOrBlob) return;
         setIsAnalyzing(true);
         setAiAnalysisError(null);
@@ -528,18 +531,17 @@ function QuickReportWizardModal({
             const response = await fetch(`${API_BASE_URL}/api/reports/analyze`, {
                 method: 'POST',
                 headers,
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
 
+            if (controller.signal.aborted || screeningRequest.current !== controller) return;
             if (response.ok) {
                 const data = await response.json();
+                if (controller.signal.aborted || screeningRequest.current !== controller) return;
                 setAiFeedback(data);
 
-                const isRejected = Boolean(
-                    data.is_inappropriate ||
-                    data.is_infrastructure === false ||
-                    data.category === 'Inappropriate Content'
-                );
+                const isRejected = isReportPhotoRestricted(data);
 
                 if (isRejected) {
                     setAiAnalysisError(formatRejectionReason(data.rejection_reason));
@@ -568,11 +570,12 @@ function QuickReportWizardModal({
                 setIsExpandedCategories(true);
             }
         } catch (err) {
+            if (controller.signal.aborted || screeningRequest.current !== controller) return;
             console.error('PULSO Vision Eye analysis failed:', err);
             setAiAnalysisError("We couldn't detect the issue automatically. Please pick one below.");
             setIsExpandedCategories(true);
         } finally {
-            setIsAnalyzing(false);
+            if (screeningRequest.current === controller) setIsAnalyzing(false);
         }
     }, [notes, currentUser]);
 
@@ -584,21 +587,17 @@ function QuickReportWizardModal({
     };
 
     const handleCameraPhotoCaptured = (capturedFile, aiData) => {
+        screeningRequest.current?.abort();
         setIsCameraModalOpen(false);
         if (!capturedFile) return;
 
-        const objectUrl = URL.createObjectURL(capturedFile);
-        setPhoto(objectUrl);
+        try{packResidentPhoto(capturedFile,capturedFile.pulsoCapture || {});}catch{setSubmitError(t('residentDraft.photoError'));return;}
         setPhotoFile(capturedFile);
-        setPhotoCapturedAt(new Date().toISOString());
+        setPhotoProvenance(capturedFile.pulsoCapture ? {...capturedFile.pulsoCapture,source:'camera',photoDeviceFix:capturedFile.pulsoCapture.deviceFix} : {source:'unknown'});
 
         if (aiData) {
             setAiFeedback(aiData);
-            const isRejected = Boolean(
-                aiData.is_inappropriate ||
-                aiData.is_infrastructure === false ||
-                aiData.category === 'Inappropriate Content'
-            );
+            const isRejected = isReportPhotoRestricted(aiData);
 
             if (isRejected) {
                 setAiAnalysisError(formatRejectionReason(aiData.rejection_reason));
@@ -635,23 +634,14 @@ function QuickReportWizardModal({
 
         setIsWatermarking(true);
         try {
-            const watermarked = file;
-            const objectUrl = URL.createObjectURL(watermarked);
-            setPhoto(objectUrl);
-            setPhotoFile(watermarked);
-            setPhotoCapturedAt(new Date().toISOString());
+            packResidentPhoto(file,{source:'upload'});
+            setPhotoFile(file);
+            setPhotoProvenance({source:'upload'});
 
             // Run AI category analysis immediately
-            runAIAnalysis(watermarked);
-        } catch (err) {
-            console.warn('Evidence watermarking fallback:', err);
-            const fallbackUrl = URL.createObjectURL(file);
-            setPhoto(fallbackUrl);
-            setPhotoFile(file);
-            setPhotoCapturedAt(new Date().toISOString());
-
-            // Run AI category analysis immediately with original file
             runAIAnalysis(file);
+        } catch (err) {
+            setSubmitError(t('residentDraft.photoError'));
         } finally {
             setIsWatermarking(false);
             if (e.target) e.target.value = '';
@@ -660,6 +650,7 @@ function QuickReportWizardModal({
 
     // Simulated camera capture for desktop browser testing if user doesn't upload a file
     const handleSimulateCameraCapture = () => {
+        setPhotoProvenance({source:'unknown'});
         const canvas = document.createElement('canvas');
         canvas.width = 800;
         canvas.height = 600;
@@ -708,7 +699,7 @@ function QuickReportWizardModal({
 
             const simulatedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
             setPhoto(simulatedDataUrl);
-            setPhotoCapturedAt(new Date().toISOString());
+            setPhotoProvenance({source:'unknown'});
 
             // Convert data URL to Blob for upload and run AI analysis
             fetch(simulatedDataUrl)
@@ -746,13 +737,7 @@ function QuickReportWizardModal({
     const hasProfanityInForm = notesProfanityValidation.hasProfanity || othersProfanityValidation.hasProfanity;
     const isStep2Valid = selectedCategories.length > 0 && selectedCategories.length <= MAX_SELECTED_CATEGORIES && (!isOthersSelected || (othersDescription.trim().length > 0 && !othersProfanityValidation.hasProfanity));
 
-    const isPhotoIneligible = Boolean(
-        aiFeedback && (
-            aiFeedback.is_inappropriate === true ||
-            aiFeedback.is_infrastructure === false ||
-            aiFeedback.category === 'Inappropriate Content'
-        )
-    );
+    const isPhotoIneligible = isReportPhotoRestricted(aiFeedback);
     const canProceedStep1 = Boolean(photo && !isWatermarking && !isAnalyzing && !isPhotoIneligible);
 
     const handleContinueToStep2 = () => {
@@ -761,9 +746,10 @@ function QuickReportWizardModal({
     };
 
     const handleRemovePhoto = () => {
+        screeningRequest.current?.abort();
         setPhoto(null);
         setPhotoFile(null);
-        setPhotoCapturedAt(null);
+        setPhotoProvenance(null);
         setAiFeedback(null);
         setAiAnalysisError(null);
         setIsAnalyzing(false);
@@ -773,39 +759,27 @@ function QuickReportWizardModal({
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-        try {
-            const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
-            if (rawDraft) {
-                const draft = JSON.parse(rawDraft);
-                delete draft.photo;
-                delete draft.photoCapturedAt;
-                draft.selectedCategories = [];
-                draft.suggestedCategories = [];
-                localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-            }
-        } catch (e) {
-            console.error('Error updating draft after removing photo:', e);
-        }
     };
 
     // -------------------------------------------------------------------------
     // Modal Navigation & Discard Logic
     // -------------------------------------------------------------------------
-    const handleCloseAttempt = () => {
+    const handleCloseAttempt = async () => {
+        if(!draft.ready||step===4||pendingSubmission){onClose();return;}
         // If photo exists or notes typed, show confirmation modal
         if (photo || notes.trim() || selectedCategories.length > 0) {
             setIsDiscardPromptOpen(true);
         } else {
-            clearSavedDraft();
-            onClose();
+            try{await clearSavedDraft();onClose();}catch{setSubmitError(t('residentDraft.save_error'));}
         }
     };
 
-    const handleConfirmDiscard = () => {
-        clearSavedDraft();
+    const handleConfirmDiscard = async () => {
+        try{await clearSavedDraft();}catch{setSubmitError(t('residentDraft.save_error'));return;}
         setIsDiscardPromptOpen(false);
         setPhoto(null);
         setPhotoFile(null);
+        setPhotoProvenance(null);
         setNotes('');
         setSelectedCategories([]);
         setSuggestedCategories([]);
@@ -830,8 +804,9 @@ function QuickReportWizardModal({
     // Step 3 Submission
     // -------------------------------------------------------------------------
     const handleFinalSubmit = async () => {
+        if(draft.locked||pendingSubmission||isSubmitting)return;
         if (!selectedCategories.length) return;
-        if (duplicateReport) return;
+        if (duplicateReport || !issuePinConfirmed) return;
 
         // Inappropriate language / profanity validation guard
         if (notesProfanityValidation.hasProfanity) {
@@ -858,41 +833,20 @@ function QuickReportWizardModal({
         setSubmitError(null);
 
         try {
-            if (onSubmitReport) {
-                const result = await onSubmitReport({
-                    photo,
-                    photoFile,
-                    photoCapturedAt,
-                    categories: selectedCategories.slice(0, MAX_SELECTED_CATEGORIES),
-                    notes,
-                    othersDescription,
-                    locationDetails,
-                    barangay: resolvedBarangay,
-                    location: reportLocation,
-                    address: displayAddress
-                });
-                if (result?.trackingNumbers && result.trackingNumbers.length > 0) {
-                    setSubmittedTrackingNumbers(result.trackingNumbers);
-                } else {
-                    // Generate canonical PULSO tracking numbers based on timestamp
-                    const now = new Date();
-                    const year = now.getFullYear();
-                    const ids = selectedCategories.map(
-                        (_, idx) => `#PUL-${year}-${Math.floor(1000 + Math.random() * 9000 + idx)}`
-                    );
-                    setSubmittedTrackingNumbers(ids);
-                }
-            } else {
-                // Fallback simulation for preview/demo
-                await new Promise((r) => setTimeout(r, 1200));
-                const year = new Date().getFullYear();
-                const ids = selectedCategories.map(
-                    (_, idx) => `#PUL-${year}-${Math.floor(5100 + Math.random() * 200 + idx)}`
-                );
-                setSubmittedTrackingNumbers(ids);
-            }
+            await draft.flush();
+            if(reportDraftPrincipal(getStoredToken(),getStoredUser())!==principal)throw new Error(t('residentDraft.accountChanged'));
+            if (!onSubmitReport) throw new Error('Submission is unavailable. Your draft is preserved.');
+            const result = await onSubmitReport({
+                draftPrincipal:principal, photo, photoFile, photoCapturedAt, photoProvenance, categories: selectedCategories.slice(0, MAX_SELECTED_CATEGORIES),
+                notes, othersDescription, locationDetails, barangay: resolvedBarangay,
+                location: { ...reportLocation, pinConfirmed: true, confirmedAt: confirmedPoint.at }, address: displayAddress,
+            });
+            if (!result?.trackingNumbers?.length) throw new Error('No server receipt was returned. Retry to recover your ticket.');
+            setSubmittedTrackingNumbers(result.trackingNumbers);
+            setSubmittedReport(result.report || null);
 
-            clearSavedDraft();
+            try{await clearSavedDraft({confirmed:true});}catch{setSubmitError(t('residentDraft.cleanup'));}
+            setPendingSubmission(false);
             setStep(4); // Advance to Success Screen
         } catch (err) {
             console.error('PULSO: Error submitting quick report:', err);
@@ -902,18 +856,9 @@ function QuickReportWizardModal({
                 ? 'Unable to connect to City Engineering server. Please check your connection and try again.'
                 : rawMsg;
             setSubmitError(errMsg);
+            try{setPendingSubmission(Boolean(pendingReportIntake('quick',getStoredToken())));}catch{setPendingSubmission(true);}
 
-            if (err?.isDuplicate || rawMsg.includes('already being processed') || err?.status === 409) {
-                setDuplicateReport(err.existingReport || {
-                    ticket_id: err.canonicalTicket || `#PUL-${new Date().getFullYear()}-4717`,
-                    category: selectedCategories[0] || 'Roads & Bridges',
-                    status: 'in_progress',
-                    location_string: displayAddress || resolvedBarangay || 'Caloocan City',
-                    description: 'Civic concern reported at this location is currently active and being processed by City Engineering.'
-                });
-            } else {
-                setDuplicateReport(null);
-            }
+            setDuplicateReport(null);
 
             // Immediately scroll error / duplicate notice into visible view so resident sees it right away
             setTimeout(() => {
@@ -926,6 +871,20 @@ function QuickReportWizardModal({
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleRecoverSubmission=async()=>{
+        if(isSubmitting)return;
+        setIsSubmitting(true);setSubmitError(null);
+        try{
+            if(reportDraftPrincipal(getStoredToken(),getStoredUser())!==principal)throw new Error(t('residentDraft.accountChanged'));
+            const result=await onSubmitReport({recoverOnly:true,draftPrincipal:principal});
+            if(!result?.trackingNumbers?.length)throw new Error('No original receipt was returned.');
+            setSubmittedTrackingNumbers(result.trackingNumbers);setSubmittedReport(result.report || null);setPendingSubmission(false);
+            try{await clearSavedDraft({confirmed:true});}catch{setSubmitError(t('residentDraft.cleanup'));}
+            setStep(4);
+        }catch(error){setSubmitError(error.message);try{setPendingSubmission(Boolean(pendingReportIntake('quick',getStoredToken())));}catch{setPendingSubmission(true);}}
+        finally{setIsSubmitting(false);}
     };
 
     const handleCopyTrackingNumber = (trackingId) => {
@@ -947,12 +906,13 @@ function QuickReportWizardModal({
     }[step];
 
     return (
-        <div
-            className={`fixed inset-0 z-[75] flex items-center justify-center bg-black/65 p-0 overflow-hidden select-none ${nativeViewport ? '' : 'sm:backdrop-blur-xs sm:p-4 md:p-6'}`}
+        <dialog ref={modalRef}
+            className={`fixed inset-0 z-[75] w-full h-[100dvh] m-0 border-0 max-w-none max-h-none flex items-center justify-center bg-black/65 p-0 overflow-hidden select-none ${nativeViewport ? '' : 'sm:backdrop-blur-xs sm:p-4 md:p-6'}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="quick-report-wizard-title"
             onClick={handleCloseAttempt}
+            onCancel={event=>{event.preventDefault();void handleCloseAttempt();}}
         >
             {/* Modal Card: 100% Fullscreen on mobile, centered floating card on desktop */}
             <div
@@ -981,8 +941,9 @@ function QuickReportWizardModal({
                             </div>
                             <div>
                                 <h2
+                                    ref={titleRef} tabIndex={-1}
                                     id="quick-report-wizard-title"
-                                    className="text-xl font-bold tracking-tight text-slate-900 dark:text-white"
+                                    className="text-xl font-bold tracking-tight text-slate-900 dark:text-white focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-orange-500"
                                 >
                                     Quick Report
                                 </h2>
@@ -1039,6 +1000,9 @@ function QuickReportWizardModal({
                 {/* ----------------------------------------------------------------- */}
                 {/* 2. SCROLLABLE BODY CONTENT (Middle Area) */}
                 {/* ----------------------------------------------------------------- */}
+                {step!==4&&<ResidentDraftStatus draft={draft} pending={pendingSubmission} recovering={isSubmitting} onRecover={handleRecoverSubmission}/>}
+                {step===4&&submitError&&<p role="alert" className="text-sm text-amber-800 dark:text-amber-200 p-3">{submitError}</p>}
+                <fieldset className={draft.ready&&!pendingSubmission?'contents':'hidden'} disabled={draft.locked||isSubmitting||pendingSubmission} aria-label={t('residentDraft.editing')}>
                 <div
                     ref={contentAreaRef}
                     className="flex-1 overflow-y-auto overscroll-contain"
@@ -1099,15 +1063,15 @@ function QuickReportWizardModal({
                                                         )}
                                                     </span>
 
-                                                ) : !reportLocation ? null : (reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
+                                                ) : !reportLocation ? null : (pointUsesDeviceFix && reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50 shrink-0 whitespace-nowrap">
                                                         <Info size={13} className="text-amber-500 shrink-0" />
                                                         <span>{t('locationPrivacy.approximateAccuracy', { accuracy: Math.round(reportLocation.accuracy) })}</span>
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50 shrink-0 whitespace-nowrap">
-                                                        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                                                        <span>{reportLocation?.accuracy ? t('locationPrivacy.accurateAccuracy', { accuracy: Math.round(reportLocation.accuracy) }) : t('locationPrivacy.gpsSelected')}</span>
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/50 shrink-0">
+                                                        <Info size={13} className="shrink-0" />
+                                                        <span>{pointUsesDeviceFix ? t('locationPrivacy.gpsSelected') : t('residentDraft.manualLocation')}</span>
                                                     </span>
                                                 )}
                                             </LocationCoordinates>
@@ -1246,10 +1210,10 @@ function QuickReportWizardModal({
                                             </div>
                                             <div>
                                                 <div className="text-sm font-bold text-slate-900 dark:text-white">
-                                                    Photo captured
+                                                    {t(photoProvenance?.source==='camera'?'residentDraft.cameraPhoto':photoProvenance?.source==='upload'?'residentDraft.uploadPhoto':'residentDraft.unknownPhoto')}
                                                 </div>
                                                 <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                    Timestamped & tagged
+                                                    {photoProvenance?.source==='camera'&&photoCapturedAt?t('residentDraft.photoCaptureTime',{time:new Date(photoCapturedAt).toLocaleString()}):t('residentDraft.captureTimeUnknown')}
                                                 </div>
                                             </div>
                                         </div>
@@ -1264,6 +1228,7 @@ function QuickReportWizardModal({
                                         </button>
                                     </div>
 
+                                    {!isAnalyzing && <ReportScreeningNotice analysis={aiFeedback} />}
                                     {/* Detected Issues Banner / Scanning State */}
                                     {isAnalyzing ? (
                                         <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 flex items-center gap-3 animate-pulse">
@@ -1472,10 +1437,10 @@ function QuickReportWizardModal({
                                         </div>
                                     )}
 
-                                    {/* Soft Note Card: bold only "one report per issue" */}
+                                    {/* Multiple categories remain on the same submitted ticket. */}
                                     {selectedCategories.length > 0 && (
                                         <div className="bg-slate-50 dark:bg-slate-950/60 border border-slate-200/90 dark:border-slate-800/90 rounded-2xl p-3.5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                                            We will send <strong className="font-bold text-slate-900 dark:text-white">one report per issue</strong> so each reaches the right crew. All of them share your photo and location.
+                                            {t('reportWizard.step1Category.singleTicketNote')}
                                         </div>
                                     )}
 
@@ -1851,20 +1816,18 @@ function QuickReportWizardModal({
                             </div>
 
                             <div>
-                                <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                                    {submittedTrackingNumbers.length > 1
-                                        ? `Your ${submittedTrackingNumbers.length} reports were sent`
-                                        : 'Your report was sent'}
+                                <h3 data-quick-success tabIndex={-1} className="text-xl font-bold text-slate-900 dark:text-white focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-orange-500">
+                                    {t('reportIntelligence.received')}
                                 </h3>
                                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
-                                    City Engineering has received your report and dispatched verification.
+                                    {t('residentDraft.receivedReview')}
                                 </p>
                             </div>
 
                             {/* Tracking Number Cards */}
                             <div className="space-y-2 max-w-sm mx-auto text-left">
                                 {submittedTrackingNumbers.map((trackingId, idx) => {
-                                    const catName = selectedCategories[idx] || selectedCategories[0] || 'Infrastructure Hazard';
+                                    const catName = submittedReport?.categories?.join(' + ') || submittedReport?.category || t('residentDraft.infrastructureReport');
                                     return (
                                         <div
                                             key={trackingId}
@@ -1878,7 +1841,7 @@ function QuickReportWizardModal({
                                                     {trackingId}
                                                 </div>
                                                 <div className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                                                    Queued for Verification
+                                                    {submittedReport?.status?t(`track.status.${submittedReport.status}`,{defaultValue:submittedReport.status}):t('residentDraft.notRecorded')}
                                                 </div>
                                             </div>
 
@@ -2013,13 +1976,18 @@ function QuickReportWizardModal({
                     {/* STEP 3 FOOTER */}
                     {step === 3 && (
                         <div className="space-y-1.5">
-                            {/* Primary Button: Submit reports */}
+                            <label className="flex items-center gap-3 min-h-11 text-sm text-slate-900 dark:text-white">
+                                <input type="checkbox" checked={issuePinConfirmed} className="size-5 focus-visible:outline-3 focus-visible:outline-blue-600"
+                                    onChange={event => { onStopLocationTracking?.(); setConfirmedPoint(event.target.checked ? { point: pointSignature, at: new Date().toISOString() } : null); }} />
+                                {t('reportIntelligence.confirmIssuePin')}
+                            </label>
+                            {/* Submit one report with every selected category. */}
                             <button
                                 type="button"
-                                disabled={isSubmitting || hasProfanityInForm || Boolean(duplicateReport)}
+                                disabled={isSubmitting || hasProfanityInForm || Boolean(duplicateReport) || !issuePinConfirmed}
                                 onClick={handleFinalSubmit}
                                 className={`w-full min-h-[52px] h-[3.25rem] rounded-xl text-base font-bold text-white shadow-md transition-all flex items-center justify-center ${
-                                    isSubmitting || hasProfanityInForm || Boolean(duplicateReport)
+                                    isSubmitting || hasProfanityInForm || Boolean(duplicateReport) || !issuePinConfirmed
                                         ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none'
                                         : 'bg-[#ff6b00] hover:bg-[#e05e00] shadow-orange-500/20 active:scale-[0.99] cursor-pointer'
                                 }`}
@@ -2032,7 +2000,7 @@ function QuickReportWizardModal({
                                 ) : duplicateReport ? (
                                     <span>In Progress</span>
                                 ) : selectedCategories.length > 1 ? (
-                                    `Submit ${selectedCategories.length} reports`
+                                    t('reportIntelligence.submit')
                                 ) : (
                                     'Submit report'
                                 )}
@@ -2254,7 +2222,7 @@ function QuickReportWizardModal({
                 {/* 7. LIVE IN-APP CAMERA VIEWFINDER MODAL */}
                 {/* ----------------------------------------------------------------- */}
                 <IDCameraModal
-                    isOpen={isCameraModalOpen}
+                    isOpen={isCameraModalOpen&&draft.ready&&!pendingSubmission}
                     onClose={() => setIsCameraModalOpen(false)}
                     onCapture={handleCameraPhotoCaptured}
                     side="ISSUE"
@@ -2271,8 +2239,9 @@ function QuickReportWizardModal({
                         user: currentUser
                     }}
                 />
+                </fieldset>
             </div>
-        </div>
+        </dialog>
     );
 }
 

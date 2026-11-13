@@ -66,7 +66,7 @@ export default function CameraTopBar({
                     type="button"
                     onClick={onClose}
                     aria-label="Close camera"
-                    className={`w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] flex items-center justify-center transition-all cursor-pointer shrink-0 bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg ${
+                    className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all cursor-pointer shrink-0 bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] rounded-lg ${
                         isDark || translucent
                             ? 'text-white hover:text-white/80'
                             : 'text-[#ff6b00] hover:text-[#e05e00]'
@@ -88,7 +88,7 @@ export default function CameraTopBar({
                             onClick={() => setIsPopupOpen((prev) => !prev)}
                             aria-expanded={isPopupOpen}
                             aria-label={isPopupOpen ? 'Close camera sizing' : `Camera size (${photoRatio}). Tap to open camera sizing`}
-                            className={`w-10 h-10 min-w-[2.5rem] min-h-[2.5rem] flex items-center justify-center transition-all cursor-pointer bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg ${
+                            className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all cursor-pointer bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] rounded-lg ${
                                 isDark || translucent
                                     ? 'text-white hover:text-white/80'
                                     : 'text-[#ff6b00] hover:text-[#e05e00]'

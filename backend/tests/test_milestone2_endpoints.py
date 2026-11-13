@@ -259,7 +259,7 @@ class TestReportIntake:
         assert "outside the jurisdiction of Caloocan City" in response.json()["detail"]
 
     def test_duplicate_proximity_conflict(self, client):
-        """Reports within 15 meters for the same category return 409 Conflict with X-Canonical-Ticket-ID."""
+        """Independent reports about one location retain their own tickets."""
         # 1st report
         r1 = client.post(
             "/api/reports",
@@ -283,8 +283,8 @@ class TestReportIntake:
                 "lng": 121.0450
             }
         )
-        assert r2.status_code == 409
-        assert r2.headers.get("X-Canonical-Ticket-ID") == ticket_id1
+        assert r2.status_code == 201, r2.text
+        assert r2.json()["ticket_id"] != ticket_id1
 
     def test_file_upload_security_and_magic_bytes(self, client):
         """Valid JPEG/PNG/WebP uploads succeed; corrupt/disguised files and oversized files are rejected."""

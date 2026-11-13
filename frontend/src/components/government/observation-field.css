@@ -1,0 +1,27 @@
+.observation-field-assessment { border-block-start:1px solid var(--gov-rule); margin-block-start:24px; padding-block:4px 16px; min-width:0; overflow-wrap:anywhere; }
+.field-assessment-workspace { margin-block-start:16px; min-width:0; }
+.field-assessment-workspace fieldset { min-width:0; border:0; margin:0; padding:0; }
+.field-assessment-workspace legend { font-weight:650; margin-block-end:4px; }
+.field-assessment-workspace .gov-form-actions { display:flex; flex-wrap:wrap; gap:8px; margin-block:12px; }
+.field-assessment-workspace .gov-field { min-width:0; }
+.field-assessment-workspace :is(select,textarea) { max-width:100%; width:100%; }
+.field-assessment-identity { display:flex; gap:10px; align-items:flex-start; padding-block:12px; min-height:44px; }
+.field-assessment-identity input { flex:none; width:18px; height:18px; margin-top:3px; accent-color:var(--gov-action); }
+.field-assessment-blockers { margin-block:8px 16px; padding-inline-start:20px; }
+.field-assessment-workspace .concern-history li li { padding-block:4px; border:0; }
+.field-assessment-workspace .concern-evidence .gov-button { margin-block:8px; }
+.field-photo-inspection { width:min(1100px,calc(100vw - 32px)); max-width:calc(100vw - 32px); max-height:90dvh; overflow:auto; }
+.field-photo-inspection-region { max-height:65dvh; overflow:auto; margin-block-start:16px; background:var(--gov-canvas); }
+.field-photo-inspection-region img { display:block; max-width:100%; width:auto; height:auto; margin-inline:auto; filter:none; }
+.field-photo-inspection-region.is-full-resolution img { max-width:none; margin:0; }
+.field-photo-inspection :is(button,[tabindex]):focus-visible { outline:3px solid var(--gov-focus); outline-offset:3px; }
+@media(forced-colors:active) { .field-photo-inspection :is(button,[tabindex]):focus-visible { outline-color:Highlight; } }
+.field-assessment-workspace [role="status"] { max-width:75ch; }
+@media(max-width:540px) { .field-assessment-workspace .gov-form-actions > .gov-button { flex:1 1 auto; } }
+@media(prefers-reduced-motion:reduce) { .field-assessment-workspace * { animation:none; transition:none; } }
+@media(forced-colors:active) { .field-assessment-identity input { accent-color:auto; } }
+.field-review-fixture { max-width:1080px; margin-inline:auto; padding:24px; color:var(--gov-text); background:var(--gov-canvas); min-height:100dvh; }
+.field-review-fixture > header { padding-block-end:20px; margin-block-end:20px; border-block-end:1px solid var(--gov-rule); }
+.field-review-fixture > header .gov-form-actions { margin-block:12px; }
+.field-review-fixture pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:540px) { .field-review-fixture { padding:12px; } }

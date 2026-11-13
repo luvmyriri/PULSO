@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, Text, JSON, UniqueConstraint, CheckConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from typing import Optional, List, Union
@@ -319,13 +319,17 @@ class Report(Base):
     submission_source = Column(String(30), default="web", nullable=False)               # 'web' | 'mobile' | 'assisted'
 
     category = Column(String, index=True)
+    categories = Column(JSON, nullable=False, default=list, server_default='[]')
+    location_metadata = Column(JSON, nullable=False, default=dict, server_default='{}')
+    intake_key_hash = Column(String(64), nullable=True, unique=True)
+    intake_request_hash = Column(String(64), nullable=True)
     description = Column(String)
     location_lat = Column(Float, nullable=True)
     location_lng = Column(Float, nullable=True)
     location_string = Column(String, nullable=True)
     # PostGIS Spatial Core
     location = Column(Geometry(geometry_type="POINT", srid=4326), nullable=True)
-    accuracy_m = Column(Float, default=0.0)
+    accuracy_m = Column(Float, nullable=True)
     plus_code = Column(String(32), nullable=True)
     sector = Column(String(32), nullable=True, index=True) # 'North' | 'South'
     status = Column(String, default="pending", index=True)
@@ -554,6 +558,178 @@ class SystemSettingHistory(Base):
 
     setting = relationship("SystemSetting", back_populates="history")
     changed_by = relationship("Official", foreign_keys=[changed_by_id])
+
+
+class ReportReviewerAvailability(Base):
+    """Explicit acceptance of new validation work, backed by a short-lived lease."""
+    __tablename__ = 'report_reviewer_availability'
+    __table_args__ = (
+        CheckConstraint("state IN ('available','away','offline')", name='ck_review_availability_state'),
+        CheckConstraint('capacity BETWEEN 1 AND 50', name='ck_review_availability_capacity'),
+    )
+    official_id = Column(Integer, ForeignKey('officials.id'), primary_key=True)
+    state = Column(String(16), nullable=False, default='offline', server_default='offline')
+    capacity = Column(Integer, nullable=False, default=5, server_default='5')
+    version = Column(Integer, nullable=False, default=1, server_default='1')
+    access_version = Column(Integer, nullable=False, default=0, server_default='0')
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    session_expires_at = Column(DateTime(timezone=True), nullable=True)
+    last_assigned_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class ReportConcern(Base):
+    """A durable problem episode; proximity clusters never define its identity."""
+    __tablename__ = 'report_concerns'
+    id = Column(Integer, primary_key=True)
+    public_id = Column(String(40), unique=True, nullable=False, default=lambda: 'CON-' + uuid.uuid4().hex)
+    version = Column(Integer, nullable=False, default=1, server_default='1')
+    anchor_report_id = Column(Integer, ForeignKey('reports.id'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    completion_report_id = Column(Integer, ForeignKey('reports.id'), nullable=True)
+    __mapper_args__ = {'version_id_col': version}
+
+
+class ReportObservation(Base):
+    __tablename__ = 'report_observations'
+    __table_args__ = (UniqueConstraint('report_id', 'item_key', name='uq_report_observation_item'),)
+    id = Column(Integer, primary_key=True)
+    report_id = Column(Integer, ForeignKey('reports.id'), nullable=False, index=True)
+    item_key = Column(String(64), nullable=False)
+    categories = Column(JSON, nullable=False)
+    description = Column(Text, nullable=False)
+    concern_id = Column(Integer, ForeignKey('report_concerns.id'), nullable=False, index=True)
+    association_status = Column(String(24), nullable=False, default='unreviewed')
+    report = relationship('Report', foreign_keys=[report_id])
+    concern = relationship('ReportConcern', foreign_keys=[concern_id])
+
+
+class ObservationFieldAssessment(Base):
+    """Append-only category findings against independently reviewed survey evidence."""
+    __tablename__ = 'observation_field_assessments'
+    __table_args__ = (
+        UniqueConstraint('observation_id', 'revision', name='uq_observation_field_assessment_revision'),
+        CheckConstraint('revision > 0', name='ck_observation_field_assessment_revision'),
+    )
+    id = Column(Integer, primary_key=True)
+    observation_id = Column(Integer, ForeignKey('report_observations.id', ondelete='RESTRICT'), nullable=False)
+    field_observation_id = Column(String(36), ForeignKey('asset_field_observations.id', ondelete='RESTRICT'), nullable=False)
+    revision = Column(Integer, nullable=False)
+    category_findings = Column(JSON, nullable=False)
+    reason = Column(Text, nullable=False)
+    snapshot = Column(JSON, nullable=False)
+    actor_id = Column(Integer, ForeignKey('officials.id', ondelete='RESTRICT'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.statement_timestamp(), nullable=False)
+
+
+class ReportLearningSnapshot(Base):
+    """Submission-time features; later review/outcome fields never rewrite them."""
+    __tablename__ = 'report_learning_snapshots'
+    report_id = Column(Integer, ForeignKey('reports.id', ondelete='RESTRICT'), primary_key=True)
+    schema_version = Column(String(40), nullable=False)
+    received_at = Column(DateTime(timezone=True), nullable=False)
+    available_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    features = Column(JSON, nullable=False)
+
+
+class ConcernLearningCheckpoint(Base):
+    """Prospective server-known concern context, never reconstructed as intake truth."""
+    __tablename__='concern_learning_checkpoints'
+    __table_args__=(
+        UniqueConstraint('concern_id','concern_version',name='uq_concern_checkpoint_version'),
+        CheckConstraint('concern_version > 0',name='ck_concern_checkpoint_version'),
+        CheckConstraint("(trigger_kind = 'intake' AND decision_id IS NULL) OR (trigger_kind = 'association' AND decision_id IS NOT NULL)",name='ck_concern_checkpoint_source'),
+    )
+    id=Column(String(36),primary_key=True,default=lambda:str(uuid.uuid4()))
+    concern_id=Column(Integer,ForeignKey('report_concerns.id',ondelete='RESTRICT'),nullable=False,index=True)
+    concern_version=Column(Integer,nullable=False)
+    trigger_kind=Column(String(16),nullable=False)
+    trigger_report_id=Column(Integer,ForeignKey('reports.id',ondelete='RESTRICT'),nullable=False)
+    decision_id=Column(Integer,ForeignKey('concern_decisions.id',ondelete='RESTRICT'),nullable=True)
+    captured_at=Column(DateTime(timezone=True),nullable=False)
+    payload=Column(JSON,nullable=False)
+    payload_sha256=Column(String(64),nullable=False)
+
+
+class ReportResolutionEvent(Base):
+    """Authoritative verified transitions and invalidations, never inferred dates."""
+    __tablename__ = 'report_resolution_events'
+    __table_args__ = (
+        CheckConstraint("kind IN ('verified','invalidated')", name='ck_resolution_event_kind'),
+        CheckConstraint("(kind = 'invalidated' AND inspection_id IS NULL AND project_id IS NULL) OR (kind = 'verified' AND ((inspection_id IS NOT NULL AND project_id IS NULL) OR (inspection_id IS NULL AND project_id IS NOT NULL)))", name='ck_resolution_event_source'),
+    )
+    id = Column(Integer, primary_key=True)
+    report_id = Column(Integer, ForeignKey('reports.id', ondelete='RESTRICT'), nullable=False, index=True)
+    timeline_id = Column(Integer, ForeignKey('process_timelines.id', ondelete='RESTRICT'), nullable=False, unique=True)
+    kind = Column(String(16), nullable=False)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    actor_id = Column(Integer, ForeignKey('officials.id', ondelete='RESTRICT'), nullable=False)
+    inspection_id = Column(Integer, ForeignKey('work_order_inspections.id', ondelete='RESTRICT'), nullable=True)
+    project_id = Column(Integer, ForeignKey('project_requests.id', ondelete='RESTRICT'), nullable=True)
+
+
+class PairImageAnalysisJob(Base):
+    """Durable advisory job. AI output never becomes a human identity label."""
+    __tablename__ = 'pair_image_analysis_jobs'
+    __table_args__ = (
+        CheckConstraint('left_observation_id < right_observation_id', name='ck_pair_analysis_order'),
+        CheckConstraint("status IN ('queued','running','completed','failed','cancelled')", name='ck_pair_analysis_status'),
+        CheckConstraint('attempts >= 0 AND attempts <= 1', name='ck_pair_analysis_attempts'),
+    )
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    left_observation_id = Column(Integer, ForeignKey('report_observations.id', ondelete='RESTRICT'), nullable=False)
+    right_observation_id = Column(Integer, ForeignKey('report_observations.id', ondelete='RESTRICT'), nullable=False)
+    requested_by_id = Column(Integer, ForeignKey('officials.id', ondelete='RESTRICT'), nullable=False)
+    command_hash = Column(String(64), nullable=False, unique=True)
+    payload_hash = Column(String(64), nullable=False)
+    snapshot = Column(JSON, nullable=False)
+    image_hashes = Column(JSON, nullable=False)
+    categories = Column(JSON, nullable=False)
+    model = Column(String(200), nullable=False)
+    prompt_version = Column(String(40), nullable=False)
+    image_recipe = Column(String(80), nullable=False)
+    status = Column(String(16), nullable=False, default='queued')
+    attempts = Column(Integer, nullable=False, default=0)
+    lease_token = Column(String(36), nullable=True)
+    lease_until = Column(DateTime(timezone=True), nullable=True)
+    dispatched_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    result = Column(JSON, nullable=True)
+    failure_code = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class ObservationPairReview(Base):
+    """Append-only operational identity labels; never automatic training truth."""
+    __tablename__ = 'observation_pair_reviews'
+    __table_args__ = (
+        UniqueConstraint('left_observation_id', 'right_observation_id', 'revision', name='uq_observation_pair_revision'),
+        CheckConstraint('left_observation_id < right_observation_id', name='ck_observation_pair_order'),
+        CheckConstraint('revision > 0', name='ck_observation_pair_revision'),
+        CheckConstraint("relation IN ('same_problem','same_asset_different_problem','different_asset','uncertain')", name='ck_observation_pair_relation'),
+    )
+    id = Column(Integer, primary_key=True)
+    left_observation_id = Column(Integer, ForeignKey('report_observations.id', ondelete='RESTRICT'), nullable=False)
+    right_observation_id = Column(Integer, ForeignKey('report_observations.id', ondelete='RESTRICT'), nullable=False)
+    revision = Column(Integer, nullable=False)
+    relation = Column(String(32), nullable=False)
+    evidence_basis = Column(JSON, nullable=False)
+    reason = Column(Text, nullable=False)
+    snapshot = Column(JSON, nullable=False)
+    actor_id = Column(Integer, ForeignKey('officials.id', ondelete='RESTRICT'), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ConcernDecision(Base):
+    """Append-only history of reviewer corrections to problem membership."""
+    __tablename__ = 'concern_decisions'
+    id = Column(Integer, primary_key=True)
+    observation_id = Column(Integer, ForeignKey('report_observations.id'), nullable=False, index=True)
+    previous_concern_id = Column(Integer, ForeignKey('report_concerns.id'), nullable=False)
+    concern_id = Column(Integer, ForeignKey('report_concerns.id'), nullable=False)
+    actor_id = Column(Integer, ForeignKey('officials.id'), nullable=False)
+    reason = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 # Import gov_models at the end to resolve circular dependency for relationships

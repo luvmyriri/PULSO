@@ -6,11 +6,13 @@ import {
     readGovernmentUser,
 } from './governmentWorkspaceConfig';
 import './government-workspace-tabs.css';
+import { useGovernmentData } from '../utils/governmentApi';
 
 export default function GovernmentWorkspaceTabs({ workspace, currentUser, onViewChange }) {
     const location = useLocation();
+    const access = useGovernmentData('/api/gov/navigation');
     const definition = GOVERNMENT_WORKSPACES[workspace];
-    const availableViews = getAvailableWorkspaceViews(workspace, currentUser || readGovernmentUser());
+    const availableViews = getAvailableWorkspaceViews(workspace, currentUser || readGovernmentUser(), access.data?.modules || []);
     const requestedView = new URLSearchParams(location.search).get('view');
     const activeView = availableViews.find((view) => view.key === requestedView) || availableViews[0];
 

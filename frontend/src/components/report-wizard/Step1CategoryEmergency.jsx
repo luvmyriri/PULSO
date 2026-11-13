@@ -419,7 +419,7 @@ export default function Step1CategoryEmergency({
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-400">
                 {selectedCatObjs.length > 1
-                  ? 'We will send one report per issue so each reaches the right crew. All of them share your photo and location.'
+                  ? t('reportWizard.step1Category.singleTicketNote')
                   : t('reportWizard.step1Category.nextDetails', 'Next, provide specific details about the issue.')}
               </p>
             </div>

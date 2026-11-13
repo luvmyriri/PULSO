@@ -57,14 +57,14 @@ import georisk_router                    # Public planning hazard map layers
 import document_router                  # System Document & FQA Manager
 import announcements_router               # Governed Announcements & Notices
 import report_review_router
+import report_media
 import external_referrals
 import pulseai_router                    # PULSEAI Persistent Chat & History Engine
 import government_assistant
 from database import get_db
 import spatial_router                    # PostGIS Spatial Queries & GeoEngine
 import admin_router                      # Staff, Residents, Settings & Governance
-from services.spatial_service import PUBLIC_REPORT_STATUSES
-from public_reports import safe_public_area, safe_public_category, public_incident_description, public_report_photo
+from public_reports import PUBLIC_REPORT_STATUSES, safe_public_area, safe_public_category, public_incident_description, public_report_photo
 from utils.geometry_utils import is_in_caloocan
 from spatial_queries import nearby_active_report
 from utils.rate_limiter import report_submission_limiter, tracking_query_limiter, claim_limiter, auth_limiter, availability_check_limiter, otp_verification_limiter
@@ -143,12 +143,19 @@ UPLOAD_DIR = "uploads/reports"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class PublicUploadFiles(StaticFiles):
-    """Keep government document bytes out of legacy public static mounts."""
+    """Keep government documents and old thumbnail files off public static mounts."""
 
     async def get_response(self, path: str, scope):
-        if path.replace("\\", "/").lstrip("/").split("/", 1)[0].lower() == "docs":
+        folder = path.replace("\\", "/").lstrip("/").split("/", 1)[0].lower()
+        if folder == "docs":
             raise HTTPException(status_code=404, detail="File not found")
+        if folder == "thumbnails":
+            raise report_media.missing_photo()
         response = await super().get_response(path, scope)
+        if folder == "reports":
+            response.headers.update(report_media.NO_STORE)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         return response
 
@@ -287,58 +294,12 @@ async def get_system_ip():
 # ---------------------------------------------------------------------------
 # High-Performance Image Thumbnail Endpoint (for GIS map markers)
 # ---------------------------------------------------------------------------
-THUMBNAIL_DIR = "uploads/thumbnails"
-os.makedirs(THUMBNAIL_DIR, exist_ok=True)
-
 @app.get("/api/thumbnails")
-async def get_thumbnail(src: str = Query(..., description="Relative path to upload image"), size: int = 80):
-    """
-    Returns an optimized thumbnail of an image, caching it on disk.
-    Prevents map markers from loading full 5MB+ citizen photos into canvas textures.
-    """
-    try:
-        clean_src = src.lstrip("/")
-        if clean_src.startswith("api/"):
-            clean_src = clean_src[4:]
-        
-        base_dir = os.path.abspath("uploads")
-        full_path = os.path.abspath(clean_src if clean_src.startswith("uploads") else os.path.join("uploads", clean_src))
-        if os.path.commonpath([base_dir, full_path]) != base_dir or not os.path.exists(full_path):
-            raise HTTPException(status_code=404, detail="Image not found")
-        if os.path.relpath(full_path, base_dir).replace("\\", "/").split("/", 1)[0].lower() not in {"reports", "news"}:
-            raise HTTPException(status_code=404, detail="Image not found")
-        if size < 24 or size > 512:
-            raise HTTPException(status_code=400, detail="Thumbnail size must be between 24 and 512 pixels")
-        
-        file_hash = hashlib.md5(f"{clean_src}_{size}".encode('utf-8')).hexdigest()
-        thumb_filename = f"thumb_{file_hash}_{size}x{size}.jpg"
-        thumb_path = os.path.join(THUMBNAIL_DIR, thumb_filename)
-
-        if not os.path.exists(thumb_path):
-            from PIL import Image, ImageOps
-            with Image.open(full_path) as img:
-                img = ImageOps.exif_transpose(img)
-                if size >= 512:
-                    img.thumbnail((size, size), Image.Resampling.LANCZOS)
-                else:
-                    img = ImageOps.fit(img, (size, size), Image.Resampling.LANCZOS)
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                img.save(thumb_path, "JPEG", quality=85, optimize=True)
-
-        return FileResponse(
-            thumb_path,
-            media_type="image/jpeg",
-            headers={
-                "Cache-Control": "public, max-age=31536000, immutable",
-                "Cross-Origin-Resource-Policy": "cross-origin",
-            }
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Thumbnail generation error: {e}")
-        raise HTTPException(status_code=500, detail="Error generating thumbnail")
+def get_thumbnail(src: str = Query(..., max_length=200), size: int = 80, db: Session = Depends(get_db)):
+    """Only reviewed public report photos and public news images can be previewed."""
+    if not 24 <= size <= 512:
+        raise HTTPException(status_code=400, detail="Thumbnail size must be between 24 and 512 pixels")
+    return report_media.public_thumbnail(db, src, size, UPLOAD_DIR, NEWS_UPLOAD_DIR)
 
 # ---------------------------------------------------------------------------
 # Included Routers — Government-Side & Analytics Engine
@@ -409,6 +370,14 @@ app.include_router(pulseai_router.router)
 app.include_router(government_assistant.router)
 # PostGIS Spatial Engine (Reverse geocoding, Nearby, Viewport GeoJSON, Hotspots, Duplicates)
 app.include_router(spatial_router.router)
+import report_intelligence_router
+app.include_router(report_intelligence_router.router)
+import reviewer_availability_router
+app.include_router(reviewer_availability_router.router)
+import field_inventory_router
+app.include_router(field_inventory_router.router)
+import report_learning_router
+app.include_router(report_learning_router.router)
 # Administrative & Governance Engine (Staff, Residents, System Settings, Audit)
 app.include_router(admin_router.router)
 
@@ -1830,7 +1799,7 @@ def read_reports(
     priority: Optional[str] = None,
     as_of: Optional[datetime] = None,
     db: Session = Depends(get_db),
-    current_user: Union[models.Official, models.Resident] = Depends(require_role(*gov_router.GOV_ROLES))
+    current_user: Union[models.Official, models.Resident] = Depends(auth.get_current_user)
 ):
     """
     Returns a listing of all city reports with status filtering.
@@ -2163,6 +2132,20 @@ def read_report(
         require_report_access(db, current_user, db_report)
     return db_report
 
+
+@app.get("/api/reports/{report_id}/photo", response_class=FileResponse)
+def read_report_photo(report_id: int, db: Session = Depends(get_db), current_user=Depends(auth.get_current_user)):
+    """Read the original photo using the report's existing ownership and jurisdiction rules."""
+    if isinstance(current_user, models.Official) and current_user.invitation_pending:
+        raise report_media.missing_photo()
+    try:
+        report = read_report(report_id, db, current_user)
+    except HTTPException as exc:
+        if exc.status_code in (403, 404):
+            raise report_media.missing_photo() from None
+        raise
+    return report_media.original(report, UPLOAD_DIR)
+
 @app.get("/api/reports/{report_id}/timeline", response_model=List[gov_schemas.ProcessTimelineResponse])
 def read_report_timeline(
     report_id: int,
@@ -2188,28 +2171,39 @@ def read_report_timeline(
 
 @app.post("/api/reports/analyze")
 async def analyze_report_only(
+    request: Request,
     description: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
-    Perform AI analysis on a report description and image without saving to DB.
-    Used for real-time frontend categorization.
+    Return an ephemeral RELogic assessment; receipt and service verification are separate.
     """
+    from report_screening import MAX_IMAGE_BYTES, validate_analysis_image, finalize_analysis, analysis_digest
+    clean_description = (description or '').strip()
+    if len(clean_description) > 5000 or '\x00' in clean_description:
+        raise HTTPException(422, 'Use a report description of at most 5000 characters without null bytes.')
+    from utils.rate_limiter import report_analysis_limiter
+    report_analysis_limiter.check(request, identifier=f'{type(current_user).__name__}_{current_user.id}' if current_user else None)
     image_bytes = None
     if image:
-        image_bytes = await image.read()
+        image_bytes = await image.read(MAX_IMAGE_BYTES + 1)
+        validate_analysis_image(image_bytes)
     
     import system_settings
-    ai_analysis = system_settings.report_analysis(db,description or "",image_data=image_bytes)
-    return ai_analysis
+    ai_analysis = system_settings.report_analysis(db,clean_description,image_data=image_bytes)
+    return finalize_analysis(ai_analysis, has_image=bool(image_bytes),
+        input_digest=analysis_digest(clean_description,image_bytes))
 
 @app.post("/api/reports", response_model=schemas.ReportResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_report(
     request: Request,
     background_tasks: BackgroundTasks,
-    category: str = Form(...),
+    category: Optional[str] = Form(None),
+    categories: Optional[str] = Form(None),
+    location_metadata: Optional[str] = Form(None),
+    observation_items: Optional[str] = Form(None),
     description: str = Form(...),
     lat: Optional[float] = Form(None),
     lng: Optional[float] = Form(None),
@@ -2226,7 +2220,7 @@ async def create_new_report(
 ):
     """
     Open report intake endpoint supporting both anonymous/guest and authenticated submissions.
-    Executes rate limiting, boundary enforcement, spatial duplicate check, magic byte validation,
+    Executes rate limiting, boundary enforcement, operation replay checks, magic byte validation,
     multi-modal Gemini AI triage, cryptographic token generation, and DB persistence.
     """
     # 0. Rate limiting check (per-account for authenticated residents, per-IP for guest submissions)
@@ -2255,6 +2249,18 @@ async def create_new_report(
             detail="Description exceeds maximum allowable length of 5000 characters."
         )
 
+    import report_intelligence as intelligence
+    import command_integrity
+    from sqlalchemy.exc import IntegrityError
+    labels, location_evidence, items = intelligence.decode_input(category, categories, location_metadata, observation_items, clean_desc)
+    category = labels[0]
+    intelligence.validate_point(lat, lng, evidence=location_evidence)
+    operation_key = command_integrity.validate_key(request.headers.get('Idempotency-Key'))
+    if operation_key and len(operation_key) < 32:
+        raise HTTPException(422, 'Use a random Idempotency-Key of at least 32 characters.')
+    principal = f'{type(current_user).__name__}:{current_user.id}' if current_user else 'guest'
+    scoped_key = hashlib.sha256(f'{principal}:{operation_key}'.encode()).hexdigest() if operation_key else None
+
     # 2. Jurisdictional Boundary Check
     if lat is not None and lng is not None:
         if not is_in_caloocan(lat, lng):
@@ -2263,15 +2269,8 @@ async def create_new_report(
                 detail=f"Location (Lat: {lat}, Lng: {lng}) is outside the jurisdiction of Caloocan City. Please move the pin within city borders."
             )
 
-    # 3. Duplicate Detection within 15 meters
-    if lat is not None and lng is not None:
-        existing = nearby_active_report(db, category, lat, lng)
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"A report for '{category}' at this exact location is already being processed.",
-                headers={"X-Canonical-Ticket-ID": existing.ticket_id or ""}
-            )
+    # New observations of the same concern are independent reports. Only a
+    # replay of the same client operation is deduplicated at intake.
 
     # 4. Upload Security & Magic Byte Inspection
     image_bytes = None
@@ -2299,35 +2298,38 @@ async def create_new_report(
                 detail="Uploaded file must be a valid JPEG, PNG, or WebP image."
             )
 
-        file_extension = os.path.splitext(image.filename)[1].lower() if image.filename else ".jpg"
-        if file_extension not in [".jpg", ".jpeg", ".png", ".webp"]:
-            file_extension = ".jpg" if is_jpeg else (".png" if is_png else ".webp")
-            
-        unique_filename = f"report_{secrets.token_hex(8)}{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, unique_filename)
-        with open(file_path, "wb") as buffer:
-            buffer.write(image_bytes)
-        image_url = f"/api/uploads/reports/{unique_filename}"
+    digest = intelligence.request_digest(dict(categories=labels, description=clean_desc, lat=lat, lng=lng,
+        location_string=location_string, location_barangay=location_barangay,
+        location_metadata=location_evidence.model_dump(mode='json'), items=[i.model_dump() for i in items],
+        contact_email=contact_email, contact_phone=contact_phone, reporter_name=reporter_name,
+        urgency=urgency, submission_source=submission_source), image_bytes)
+    plaintext_token = hmac.new(auth.SECRET_KEY.encode(), f'intake-receipt:{scoped_key}'.encode(), hashlib.sha256).hexdigest() if scoped_key else auth.generate_tracking_token()
 
-    # 5. Advanced Multi-Modal AI Triage (Gemini 1.5 Flash)
+    def receipt(report):
+        report.tracking_token = plaintext_token
+        public_origin = os.getenv('PULSO_PUBLIC_BASE_URL', 'https://srv1857115.hstgr.cloud').rstrip('/')
+        report.tracking_url = f'{public_origin}/track?id={report.ticket_id}&code={plaintext_token}'
+        return report
+
+    if scoped_key:
+        existing = db.query(models.Report).filter_by(intake_key_hash=scoped_key).first()
+        if existing:
+            if existing.intake_request_hash != digest:
+                raise HTTPException(409, 'Idempotency-Key was already used with different input. Keep the original draft for reconciliation.')
+            return receipt(existing)
+
+    # AI/provider failure does not erase a valid observation or prevent review.
     import system_settings
-    ai_analysis = system_settings.report_analysis(db,clean_desc,image_data=image_bytes)
-    if ai_analysis and ai_analysis.get("is_inappropriate"):
-        reason = ai_analysis.get("rejection_reason", "Inappropriate content detected.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=reason or "Please upload a clear photo showing the actual problem."
-        )
-
-    # 6. Auto-reverse-geocode address if missing
-    final_location_string = location_string
-    if lat is not None and lng is not None:
-        if not final_location_string or final_location_string.startswith("Lat:"):
-            final_location_string = await maps_service.reverse_geocode(lat, lng)
-
-    # 7. Cryptographic Token Generation & Hashing
-    plaintext_token = auth.generate_tracking_token()
-    token_hash = auth.hash_tracking_token(plaintext_token)
+    try:
+        ai_analysis = system_settings.report_analysis(db, clean_desc, image_data=image_bytes)
+    except Exception:
+        logging.getLogger(__name__).warning('Report analysis unavailable; preserving report for human review.')
+        ai_analysis = None
+    from report_screening import finalize_analysis
+    ai_analysis = finalize_analysis(ai_analysis, has_image=bool(image_bytes), input_digest=digest,
+        location_evidence=location_evidence, latitude=lat, longitude=lng, items=items)
+    if ai_analysis['screening']['outcome'] == 'restricted_upload':
+        raise HTTPException(400, ai_analysis.get('rejection_reason') or 'Please upload a clear photo showing the actual problem.')
 
     # Determine Reporter Identity
     is_registered_resident = isinstance(current_user, models.Resident)
@@ -2340,9 +2342,38 @@ async def create_new_report(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This Gmail address already has an account on PULSO. Please sign in or use a different Gmail address.")
     submission_src = submission_source or ("web_resident" if is_registered_resident else "web_guest")
 
+
+    if image_bytes:
+        file_extension = os.path.splitext(image.filename)[1].lower() if image.filename else ".jpg"
+        if file_extension not in [".jpg", ".jpeg", ".png", ".webp"]:
+            file_extension = ".jpg" if is_jpeg else (".png" if is_png else ".webp")
+            
+        unique_filename = f"report_{secrets.token_hex(8)}{file_extension}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        with open(file_path, "wb") as buffer:
+            buffer.write(image_bytes)
+        image_url = f"/api/uploads/reports/{unique_filename}"
+
+    # 6. Auto-reverse-geocode address if missing
+    final_location_string = location_string
+    if lat is not None and lng is not None:
+        if not final_location_string or final_location_string.startswith("Lat:"):
+            try:
+                final_location_string = await maps_service.reverse_geocode(lat, lng)
+            except Exception:
+                final_location_string = location_string or f'{lat}, {lng}'
+
+    # 7. Cryptographic Token Generation & Hashing
+    token_hash = auth.hash_tracking_token(plaintext_token)
+
     # 8. Report DTO & Database Persistence
     report_dto = schemas.ReportCreate(
         category=category,
+        categories=labels,
+        accuracy_m=intelligence.issue_accuracy(location_evidence, lat, lng),
+        location_metadata={**location_evidence.model_dump(mode='json'), 'quality': intelligence.location_quality(location_evidence)},
+        intake_key_hash=scoped_key,
+        intake_request_hash=digest if scoped_key else None,
         description=clean_desc,
         location_lat=lat,
         location_lng=lng,
@@ -2357,44 +2388,25 @@ async def create_new_report(
         submitted_urgency=urgency,
     )
 
-    db_report = crud.create_report(
-        db=db,
-        report=report_dto,
-        resident_id=resident_id,
-        ai_analysis=ai_analysis,
-        tracking_token_hash=token_hash,
-        queue_resident_receipt=is_registered_resident,
-    )
+    try:
+        db_report = crud.create_report(
+            db=db, report=report_dto, resident_id=resident_id, ai_analysis=ai_analysis,
+            tracking_token_hash=token_hash, queue_resident_receipt=is_registered_resident,
+            observation_items=items,
+        )
+    except Exception as exc:
+        db.rollback()
+        if image_url:
+            os.remove(file_path)
+        if isinstance(exc, IntegrityError) and scoped_key:
+            existing = db.query(models.Report).filter_by(intake_key_hash=scoped_key).first()
+            if existing and existing.intake_request_hash == digest:
+                return receipt(existing)
+            if existing:
+                raise HTTPException(409, 'Idempotency-Key was already used with different input.') from exc
+        raise
 
-    # 9. Geospatial DBSCAN Clustering
-    recent_reports = db.query(models.Report).filter(
-        models.Report.status != "resolved",
-        models.Report.location_lat.isnot(None),
-        models.Report.location_lng.isnot(None)
-    ).all()
-    if len(recent_reports) > 1:
-        report_list = [
-            {
-                'id': r.id,
-                'latitude': r.location_lat,
-                'longitude': r.location_lng,
-                'category': r.category,
-                'severity_score': r.severity_score or 0.0
-            }
-            for r in recent_reports
-        ]
-        clustered = deduplication_service.cluster_reports(report_list, epsilon_meters=10.0)
-        for r_data in clustered:
-            db_r = db.query(models.Report).filter(models.Report.id == r_data['id']).first()
-            if db_r:
-                db_r.cluster_id = r_data['cluster_id']
-        db.commit()
-        db.refresh(db_report)
-
-    # 10. Attach Ephemeral Plaintext Credentials to Response
-    db_report.tracking_token = plaintext_token
-    public_origin = os.getenv('PULSO_PUBLIC_BASE_URL', 'https://srv1857115.hstgr.cloud').rstrip('/')
-    db_report.tracking_url = f"{public_origin}/track?id={db_report.ticket_id}&code={plaintext_token}"
+    receipt(db_report)
     recipient_email = (contact_email or (current_user.email if is_registered_resident else None) or "").strip().lower()
     if recipient_email:
         from report_receipts import send_report_gmail_notification
@@ -2405,6 +2417,20 @@ async def create_new_report(
 
 
 DUMMY_SALTED_HASH = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+
+@app.post("/api/reports/track/photo", response_class=FileResponse)
+def read_tracking_photo(req: schemas.ReportTrackRequest, request: Request, db: Session = Depends(get_db)):
+    """Read one original using a private tracking token submitted in the request body."""
+    tracking_query_limiter.check(request)
+    ticket_id = (req.ticket_id or req.report_id or "").strip().upper()
+    token = req.get_token()
+    report = db.query(models.Report).filter(func.upper(models.Report.ticket_id) == ticket_id).first()
+    stored_hash = report.tracking_token_hash if report else None
+    matches = auth.verify_tracking_token(token or "DUMMY_TOKEN", stored_hash or DUMMY_SALTED_HASH)
+    if not (stored_hash and token and token != ticket_id and matches):
+        raise report_media.missing_photo()
+    return report_media.original(report, UPLOAD_DIR)
 
 @app.post("/api/reports/track", response_model=schemas.ReportTrackResponse)
 def track_report_status(

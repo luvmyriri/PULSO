@@ -402,7 +402,7 @@ def execute(db,user,project_id,payload):
         if active_work or active_project: raise HTTPException(409,'Other linked work or project coordination remains open.')
         if not project.completion_reviewed_by_id: raise HTTPException(409,'Independent project completion review is not recorded.')
         from gov_crud import _sync_report_status
-        _sync_report_status(db,report.id,'resolved',user.id,user.role,note='A staff verifier confirmed that the completed engineering project addressed the reported issue.')
+        _sync_report_status(db,report.id,'resolved',user.id,user.role,note='A staff verifier confirmed that the completed engineering project addressed the reported issue.', resolution_evidence=('project_review', project.id))
         details=dict(report_id=report.id,report_version=report.version)
     elif payload.action=='cancel':
         project.status='cancelled';project.next_review_at=None

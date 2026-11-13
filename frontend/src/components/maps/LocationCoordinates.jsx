@@ -33,11 +33,13 @@ export default function LocationCoordinates({ coordinates, children }) {
         <div className="min-w-0 max-w-full mt-1">
             <div data-location-coordinates className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1.5">
                 {valid && (
-                    <div className="inline-flex items-center gap-1.5 shrink-0 max-w-full">
-                        <p className="shrink-0 whitespace-nowrap text-xs tabular-nums text-slate-600 dark:text-slate-300 select-text">
+                    <div className="inline-flex flex-wrap items-center gap-1.5 min-w-0 max-w-full">
+                        <p className="flex flex-wrap gap-x-1 min-w-0 text-xs tabular-nums text-slate-600 dark:text-slate-300 select-text">
+                            <span className="whitespace-nowrap">
                             <abbr title={t('locationPrivacy.latitude')} className="no-underline">Lat</abbr> {coordinates.lat.toFixed(6)}
-                            {' · '}
+                            </span><span aria-hidden="true">·</span><span className="whitespace-nowrap">
                             <abbr title={t('locationPrivacy.longitude')} className="no-underline">Lng</abbr> {coordinates.lng.toFixed(6)}
+                            </span>
                         </p>
                         <button type="button" onClick={copyCoordinates}
                             aria-label={t(copied ? 'locationPrivacy.coordinatesCopied' : 'locationPrivacy.copyCoordinates')}

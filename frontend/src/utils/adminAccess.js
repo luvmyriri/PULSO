@@ -9,7 +9,8 @@ export function adminAllows(user, action) {
 }
 
 export const ADMIN_VIEWS = [
-    {value:'staff',label:'Staff and roles',action:'staff_view'},
+    {value:'staff',label:'Staff',action:'staff_view'},
+    {value:'roles',label:'Roles and permissions',action:'staff_view'},
     {value:'residents',label:'Resident accounts',action:'residents_view'},
     {value:'settings',label:'System settings',action:'settings_view'},
     {value:'automated-ai',label:'Automation and AI',action:'settings_view'},

@@ -2,8 +2,25 @@ apply plugin: 'com.android.application'
 
 def appVersion = new Properties()
 rootProject.file('version.properties').withInputStream { appVersion.load(it) }
+def publicApk = System.getenv('PULSO_ANDROID_PUBLIC') == '1'
 
 android {
+    signingConfigs {
+        if (publicApk) {
+            publicPilot {
+                storeFile file(System.getenv('PULSO_ANDROID_KEYSTORE'))
+                storePassword System.getenv('PULSO_ANDROID_STORE_PASSWORD')
+                keyAlias System.getenv('PULSO_ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('PULSO_ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (publicApk) signingConfig signingConfigs.publicPilot
+            minifyEnabled false
+        }
+    }
     namespace = "ph.gov.caloocan.pulso"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
@@ -25,7 +42,7 @@ android {
 // This wrapper is for local debug builds. Its bundled assets use a local API.
 androidComponents {
     beforeVariants(selector().withBuildType('release')) { variant ->
-        variant.enable = false
+        variant.enable = publicApk
     }
 }
 

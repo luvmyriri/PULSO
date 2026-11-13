@@ -1,3 +1,4 @@
+import { isReportPhotoRestricted } from '../../utils/reportScreening';
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -68,7 +69,7 @@ export default function Step3EvidenceUpload({
 
       if (res.ok) {
         const data = await res.json();
-        const isInappropriate = Boolean(data.is_inappropriate);
+        const isInappropriate = isReportPhotoRestricted(data);
         const reason = isInappropriate
           ? (data.rejection_reason || t('reportWizard.validation.evidence.rejected', 'This looks like a personal photo. Please take a clear photo of the problem.'))
           : '';
@@ -119,7 +120,7 @@ export default function Step3EvidenceUpload({
     setFileError(null);
     const objectUrl = URL.createObjectURL(capturedFile);
 
-    const isAiRejected = Boolean(aiData?.is_inappropriate);
+    const isAiRejected = isReportPhotoRestricted(aiData);
     const aiReason = isAiRejected
       ? (aiData?.rejection_reason || t('reportWizard.validation.evidence.rejected', 'This looks like a personal photo. Please take a clear photo of the problem.'))
       : '';

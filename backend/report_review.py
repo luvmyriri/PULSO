@@ -5,6 +5,7 @@ import json
 import re
 from fastapi import HTTPException
 from sqlalchemy import text, func, or_
+from sqlalchemy.orm import selectinload
 import models
 import gov_models as gm
 from government_access import jurisdiction_ids, require_report_scope
@@ -16,12 +17,13 @@ REVIEWERS = {'dispatcher','project_engineer'}
 CLERK_ROLES = {'admin_clerk'}
 ENGINEER_ROLES = {'city_engineer','asst_city_engineer'}
 COORDINATORS = {'dispatcher','manager','city_engineer','asst_city_engineer','division_chief'}
-ASSIGNERS = COORDINATORS | {'admin_officer'}
+ASSIGNERS = COORDINATORS | {'admin_officer', 'system_admin', 'admin'}
 REJECTERS = {'dispatcher','manager'}
 APPROVERS = {'dispatcher','manager','city_engineer','asst_city_engineer'}
 GRADES = {'P0':'Monitoring','P1':'Preventive work','P2':'Standard repair','P3':'High priority','P4':'Severe hazard','P5':'Immediate response'}
 PRIORITY_POLICY = 'p0-p5-ascending-v2'
 POLICY = 'report-review-pilot-v1'
+AUTO_ROUTING_POLICY = 'available-validation-least-load-v1'
 _routing_cursor = 0
 
 
@@ -40,6 +42,10 @@ def permitted(user, action):
     if 'report_review' in caps:
         grant = caps['report_review']
         return isinstance(grant,list) and (action in grant or '*' in grant)
+    # System Admin may make technical report decisions; explicit role grants above
+    # still take precedence, including an empty grant that removes this access.
+    if role == 'system_admin':
+        return action in {'assign', 'review', 'verify', 'approve', 'reject'}
     if action == 'assign': return role in ASSIGNERS
     if action == 'reject': return role in REJECTERS
     if action == 'approve': return role in APPROVERS
@@ -69,18 +75,18 @@ def eligible(db, report, manual=False):
     from gov_router import GOV_ROLES
     area = routing_area(db,report)
     if not area or not area.district_id: return []
-    users = db.query(models.Official).filter(models.Official.is_active.is_(True),models.Official.is_suspended.is_not(True)).order_by(models.Official.id).all()
+    users = db.query(models.Official).options(selectinload(models.Official.role_ref)).filter(models.Official.is_active.is_(True),models.Official.is_suspended.is_not(True)).order_by(models.Official.id).all()
     result = []
     for user in users:
-        # Leaders/admins coordinate by default; they are not an automatic employee pool.
         caps = user.role_ref.capabilities or {} if user.role_ref else {}
         role = canonical_role(user.role)
-        if user.role not in GOV_ROLES: continue
+        if user.role not in GOV_ROLES and 'report_review' not in caps: continue
         if manual:
-            if role in CLERK_ROLES:
+            if role in CLERK_ROLES or (permitted(user,'intake') and not permitted(user,'review')):
                 if not permitted(user,'intake'): continue
             elif not permitted(user,'review'): continue
-        elif not permitted(user,'review') or (role not in REVIEWERS and 'report_review' not in caps): continue
+        else:
+            if not permitted(user,'review'): continue
         try:
             ids = jurisdiction_ids(user)
         except HTTPException:
@@ -99,39 +105,51 @@ def assign(db, report, person, reason, actor=None, automatic=False, mode=None):
     report.review_assigned_at = datetime.now(timezone.utc)
     report.review_assignment_mode = mode or ('automatic' if automatic else 'manual')
     report.review_routing_reason = reason
+    if automatic:
+        availability = db.get(models.ReportReviewerAvailability, person.id)
+        availability.last_assigned_at = datetime.now(timezone.utc)
     db.flush()
     previous_owner = db.get(models.Official,previous) if previous else None
-    _history(db,report,'report_assignment',dict(policy=POLICY,previous_owner_id=previous,previous_owner_name=previous_owner.full_name if previous_owner else None,owner_id=person.id,owner_name=person.full_name,reason=reason,automatic=automatic,mode=report.review_assignment_mode),actor)
+    _history(db,report,'report_assignment',dict(policy=AUTO_ROUTING_POLICY if automatic else POLICY,previous_owner_id=previous,previous_owner_name=previous_owner.full_name if previous_owner else None,owner_id=person.id,owner_name=person.full_name,reason=reason,automatic=automatic,mode=report.review_assignment_mode),actor)
     if previous != person.id:
-        next_step = 'complete intake and submit to engineering' if person.role in CLERK_ROLES else 'assess the evidence and verify public details' if person.role in ENGINEER_ROLES else 'assign an eligible intake reviewer' if permitted(person,'assign') and not permitted(person,'review') else 'review the concern and route it for engineering verification'
+        next_step = 'complete intake and submit to engineering' if permitted(person,'intake') and not permitted(person,'verify') else 'assess the evidence and verify public details' if permitted(person,'verify') else 'assign an eligible intake reviewer' if permitted(person,'assign') and not permitted(person,'review') else 'review the concern and route it for engineering verification'
         db.add(models.Notification(official_id=person.id,title='Report assigned for review',message=f'{report.ticket_id}: {next_step}.',target_url=f'/gov/my-work?selected=report:{report.id}'))
 
 
 def auto_route(db, report):
     from system_settings import read_config
+    from reviewer_availability import utc, fresh
+    if report.status not in INTAKE or report.review_assigned_to_id: return False
+    db.execute(text('SELECT pg_advisory_xact_lock(86173301)'))
+    db.flush()
+    db.refresh(report, with_for_update=True)
+    # A manual take/reassign may have committed while this worker waited.
+    if report.status not in INTAKE or report.review_assigned_to_id: return False
     if not read_config(db,'report_review_routing')['enabled']:
         if report.review_assigned_to_id is None and report.status in INTAKE:
             report.review_assignment_mode='needs_routing'
             report.review_routing_reason='Automatic review assignment is paused.'
         return False
-    if report.status not in INTAKE or report.review_assigned_to_id: return False
-    db.execute(text('SELECT pg_advisory_xact_lock(86173301)'))
-    routing_area(db,report,persist=True)
+    area = routing_area(db,report,persist=True)
     pool = eligible(db,report)
-    if not pool:
-        reason = 'Location needs routing review' if not report.barangay_id else 'No eligible reviewer in the recorded district'
+    leases = {r.official_id:r for r in db.query(models.ReportReviewerAvailability).filter(models.ReportReviewerAvailability.official_id.in_([p.id for p in pool])).all()} if pool else {}
+    connected = [p for p in pool if fresh(leases.get(p.id),p)]
+    counts = Counter(dict(db.query(models.Report.review_assigned_to_id,func.count(models.Report.id)).filter(
+        models.Report.status.in_(INTAKE),models.Report.review_assigned_to_id.in_([p.id for p in connected])).group_by(models.Report.review_assigned_to_id).all())) if connected else Counter()
+    available = [p for p in connected if counts[p.id] < leases[p.id].capacity]
+    reason = 'Location needs routing review' if not area or not area.district_id else 'No available authorized validation employee in the recorded district' if not connected else 'All available validation employees are at capacity'
+    if not available:
         if report.review_routing_reason != reason:
             report.review_routing_reason = reason
             report.review_assignment_mode = 'needs_routing'
             _history(db,report,'report_assignment',dict(policy=POLICY,reason=reason,owner_id=None))
         return False
-    counts = Counter(owner for (owner,) in db.query(models.Report.review_assigned_to_id).filter(models.Report.status.in_(INTAKE),models.Report.review_assigned_to_id.in_([p.id for p in pool])).all())
-    person = min(pool,key=lambda p:(counts[p.id],p.id))
-    assign(db,report,person,'Automatic routing by recorded district and lowest open review count.',automatic=True)
+    person = min(available,key=lambda p:(counts[p.id],utc(leases[p.id].last_assigned_at) or datetime.min.replace(tzinfo=timezone.utc),p.id))
+    assign(db,report,person,'Automatic assignment to an available authorized validator in the recorded district, by lowest open review count and longest time since automatic assignment.',automatic=True)
     return True
 
 
-def route_waiting(db, limit=50):
+def route_waiting(db, limit=50, commit=True):
     global _routing_cursor
     from system_settings import read_config
     if not read_config(db,'report_review_routing')['enabled']: return 0
@@ -142,7 +160,7 @@ def route_waiting(db, limit=50):
         _routing_cursor = 0
         rows = query.order_by(models.Report.id).with_for_update(skip_locked=True).limit(limit).all()
     count = sum(auto_route(db,r) for r in rows)
-    db.commit()
+    if commit: db.commit()
     if rows: _routing_cursor = rows[-1].id
     return count
 

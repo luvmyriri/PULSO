@@ -23,7 +23,9 @@ export default function ReportSelectionActions({reports, selectedIds, activeId, 
             <GovButton primary onClick={()=>onReview(selected[position>=0?position:0].id)}>Review {single?'report':'selected'}</GovButton>
             {single&&docket.data&&!docket.error&&!docket.loading&&<>
                 {docket.data.allowed_actions?.includes('routing_area')&&<GovButton onClick={()=>onReview(single.id,'routing_area')}>Confirm routing barangay</GovButton>}
+                {docket.data.can_assign_review&&!docket.data.review_operations?.routing_area_id&&<span className="gov-note" role="status">Confirm the routing barangay to enable assignment and Take it.</span>}
                 {docket.data.can_assign_review&&docket.data.review_operations?.routing_area_id&&!['resolved','rejected','cancelled','completed'].includes(docket.data.report.status)&&<GovButton onClick={()=>onReview(single.id,'owner')}>Assign intake owner</GovButton>}
+                {docket.data.allowed_actions?.includes('take')&&<GovButton onClick={()=>onReview(single.id,'take')}>Take it</GovButton>}
                 {docket.data.can_grade_priority&&<GovButton onClick={()=>onReview(single.id,'priority')}>Assess severity</GovButton>}
                 {docket.data.allowed_actions?.includes('assign')&&<GovButton onClick={()=>onReview(single.id,'assign')}>Create work order</GovButton>}
             </>}

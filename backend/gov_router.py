@@ -15,7 +15,7 @@ Endpoints:
   User Management      : /api/gov/users  (admin only)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Form, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Form, Header, Request
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -43,7 +43,28 @@ import re
 import notification_service
 import fqa_engine
 
-router = APIRouter(prefix="/api/gov", tags=["Government"])
+async def enforce_explicit_work_commands(request: Request, user=Depends(get_current_user)):
+    """Explicit operation grants apply to every retained work-order command alias."""
+    if request.url.path.startswith(('/api/gov/obo/', '/api/gov/obo-', '/api/gov/obo')):
+        from government_access import require
+        action = 'view' if request.method in {'GET','HEAD','OPTIONS'} else 'create' if request.method == 'POST' else 'edit'
+        require(user, 'obo', action)
+    if request.method in {'GET','HEAD','OPTIONS'} or '/work-orders' not in request.url.path: return
+    caps=(user.role_ref.capabilities or {}) if isinstance(user,models.Official) and user.role_ref else {}
+    if 'work_orders' not in caps: return
+    suffix=request.url.path.rsplit('/',1)[-1]
+    action={'work-orders':'create','assignment':'assign','reassignment':'reassign','completion-evidence':'submit_completion','updates':'remark','approval':'approve','promote':'refer_project','acknowledge':'acknowledge'}.get(suffix,suffix if suffix in {'block','unblock','verify'} else 'edit')
+    if suffix=='status':
+        try: body=await request.json()
+        except ValueError: raise HTTPException(422,'Provide a valid work-order status request.')
+        if not isinstance(body,dict): raise HTTPException(422,'Provide a valid work-order status request.')
+        action={'in_progress':'start','completed_pending_review':'submit_completion','cancelled':'cancel','blocked':'block','assigned':'assign'}.get(body.get('status') or body.get('new_status'),'edit')
+    grants=caps['work_orders']
+    if not isinstance(grants,list) or not ({action,'*'} & set(grants)):
+        raise HTTPException(403,f'Your account cannot {action} work orders.')
+
+
+router = APIRouter(prefix="/api/gov", tags=["Government"], dependencies=[Depends(enforce_explicit_work_commands)])
 
 
 @router.get('/account')
@@ -60,12 +81,16 @@ def government_navigation(db: Session=Depends(get_db), current_user=Depends(get_
         raise HTTPException(403, 'Staff access is required.')
     modules = ['my-work']
     if can(current_user, 'overview'): modules.append('overview')
-    modules += ['reports', 'work-orders']
-    if current_user.role in FIELD_ROLES or current_user.role in {'system_admin', 'admin'}:
+    if can(current_user, 'reports'): modules.append('reports')
+    if legacy_operations.work_view(current_user): modules.append('work-orders')
+    if can(current_user, 'field'):
         modules.append('field')
     import project_workspace
     if project_workspace.allowed(current_user): modules.append('projects')
-    if can(current_user, 'maintenance'): modules += ['assets', 'analytics', 'predictive']
+    if can(current_user, 'maintenance'): modules += ['assets', 'predictive']
+    if can(current_user, 'analytics'): modules.append('analytics')
+    if can(current_user, 'obo'): modules.append('obo')
+    if legacy_operations.granted(current_user, 'procurement', 'view', legacy_operations.FINANCIAL_READERS): modules.append('financial-history')
     if roles_service.has_permission(db, current_user, 'records', 'view'): modules.append('records')
     if can(current_user, 'announcements'): modules.append('announcements')
     import staff_accounts
@@ -138,12 +163,14 @@ FIELD_ROLES = [
     "asst_city_engineer", "city_engineer", "manager", "foreman", "construction_foreman", "field_worker"
 ]
 
-DISPATCH_ROLES = ["dispatcher", "project_engineer", "asst_city_engineer", "city_engineer", "manager"]
+DISPATCH_ROLES = ["dispatcher", "project_engineer", "asst_city_engineer", "city_engineer", "manager", "system_admin"]
 FIELD_SELF_ROLES = {"field_worker", "foreman", "construction_foreman"}
 
 
 def _require_work_order_view(wo, user):
     from government_access import require_scope
+    if not legacy_operations.work_view(user) and wo.assigned_to_id != user.id:
+        raise HTTPException(403, 'Work order access is required.')
     require_scope(user, wo)
     if user.role in FIELD_SELF_ROLES and wo.assigned_to_id != user.id:
         raise HTTPException(status_code=403, detail="Work order is outside your assignment")
@@ -194,6 +221,15 @@ def _assert_role(user, *allowed_roles):
         )
 
 
+def work_order_command_allowed(user, action):
+    return legacy_operations.granted(user, 'work_orders', action, DISPATCH_ROLES)
+
+
+def _require_work_order_command(user, action):
+    if not work_order_command_allowed(user, action):
+        raise HTTPException(403, f'Your account cannot {action} work orders.')
+
+
 def _name(db: Session, user_id: Optional[int]) -> Optional[str]:
     """Return full_name for a user_id, or None. Probes both Official and Resident."""
     if user_id is None:
@@ -224,6 +260,8 @@ def gov_dashboard_stats(
     Accessible to all authenticated LGU staff.
     """
     _assert_role(current_user, *EXECUTIVE_ROLES)
+    from government_access import require
+    require(current_user, 'overview')
     return gov_crud.get_gov_dashboard_stats(db)
 
 
@@ -238,6 +276,7 @@ def list_eligible_assignees(
     current_user=Depends(get_current_user),
 ):
     _assert_role(current_user, *DISPATCH_ROLES)
+    _require_work_order_command(current_user, 'assign')
     eligible_roles = ("field_worker", "foreman", "construction_foreman", "project_engineer", "building_inspector")
     officials = db.query(models.Official).filter(
         models.Official.is_active == True,
@@ -268,6 +307,7 @@ def list_eligible_assignees(
 @router.post('/work-orders/{wo_id}/assignment', response_model=gov_schemas.WorkOrderResponse)
 def assign_work_order_owner(wo_id: int, payload: gov_schemas.WorkOrderAssignment, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     _assert_role(current_user, *DISPATCH_ROLES)
+    _require_work_order_command(current_user, 'assign')
     from government_access import require_scope, jurisdiction_ids
     wo = db.query(gov_models.WorkOrder).filter_by(id=wo_id).with_for_update().first()
     if not wo: raise HTTPException(404, 'Work order not found.')
@@ -290,6 +330,7 @@ def assign_work_order_owner(wo_id: int, payload: gov_schemas.WorkOrderAssignment
 @router.post('/work-orders/{wo_id}/reassignment',response_model=gov_schemas.WorkOrderResponse)
 def reassign_work_order_owner(wo_id:int,payload:gov_schemas.WorkOrderReassignment,db:Session=Depends(get_db),current_user=Depends(get_current_user)):
     _assert_role(current_user,*DISPATCH_ROLES)
+    _require_work_order_command(current_user, 'reassign')
     from government_access import require_scope,jurisdiction_ids
     import staff_accounts
     staff_accounts.lock_accounts(db,current_user)
@@ -335,6 +376,7 @@ def create_work_order(
     """
     _assert_role(current_user, *DISPATCH_ROLES)
     from government_access import require_report_scope,jurisdiction_ids
+    _require_work_order_command(current_user, 'create')
     import project_workspace
     project=None
     if data.project_id:
@@ -410,6 +452,7 @@ def list_work_orders(
 ):
     """List work orders; field staff only see their assignments."""
     _assert_role(current_user, *GOV_ROLES)
+    if not legacy_operations.work_view(current_user): raise HTTPException(403, 'Work order access is required.')
     if current_user.role in FIELD_SELF_ROLES:
         assigned_to_id = current_user.id
     from government_access import jurisdiction_ids
@@ -703,10 +746,10 @@ def get_report_timeline(
             raise HTTPException(status_code=403, detail="Not authorized")
     else:
         _assert_role(current_user, *GOV_ROLES)
-        from government_access import require_report_scope
+        from report_review_router import require_report_access
         report=db.get(models.Report,report_id)
         if not report: raise HTTPException(404,'Report not found.')
-        require_report_scope(db,current_user,report)
+        require_report_access(db,current_user,report)
         if current_user.role in FIELD_SELF_ROLES:
             linked = db.query(gov_models.WorkOrder).filter(
                 gov_models.WorkOrder.report_id == report_id,
@@ -1145,16 +1188,16 @@ def obo_history(obo_id: int, db: Session = Depends(get_db), current_user=Depends
 @router.get("/obo-options")
 def obo_options(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     _assert_role(current_user, *GOV_ROLES)
-    from government_access import jurisdiction_ids
+    from government_access import jurisdiction_ids, can
     ids = jurisdiction_ids(current_user)
     query = db.query(models.Barangay)
     if ids:
         query = query.filter(models.Barangay.district_id.in_(ids))
     role = current_user.role
     return dict(
-        create=role in ["admin_clerk", "admin", *INSPECTOR_ROLES],
-        inspect=role in ["admin", *INSPECTOR_ROLES],
-        record_decision=role in ["admin", *EXECUTIVE_ROLES],
+        create=can(current_user,'obo','create') and role in ["admin_clerk", "admin", *INSPECTOR_ROLES],
+        inspect=can(current_user,'obo','edit') and role in ["admin", *INSPECTOR_ROLES],
+        record_decision=can(current_user,'obo','edit') and role in ["admin", *EXECUTIVE_ROLES],
         barangays=[dict(id=b.id, name=b.name) for b in query.order_by(models.Barangay.name).all()],
     )
 
@@ -2624,7 +2667,9 @@ def verify_work_order_endpoint(
       passed=True  → status = 'completed'
       passed=False → status = 'rework_required'
     """
-    _assert_role(current_user, *INSPECTOR_ROLES)
+    _assert_role(current_user, *INSPECTOR_ROLES, "system_admin")
+    if not legacy_operations.granted(current_user, 'work_orders', 'verify', {current_user.role}):
+        raise HTTPException(403, 'Your account cannot verify work orders.')
     wo = db.query(gov_models.WorkOrder).filter(gov_models.WorkOrder.id == wo_id).first()
     if not wo:
         raise HTTPException(status_code=404, detail="Work order not found")
@@ -2783,8 +2828,7 @@ def get_report_docket(
     - Linked work orders with inspections and blockers
     - Audit logs
     """
-    from government_access import require, require_report_scope
-    require(current_user, 'reports')
+    from government_access import require_report_scope
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Citizen report not found")
@@ -2797,8 +2841,8 @@ def get_report_docket(
     require_report_access(db, current_user, report)
     actions = []
     can_review = report_review.permitted(current_user,'review') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id)
-    can_clerk_intake = current_user.role == 'admin_clerk' and report_review.permitted(current_user,'intake') and report.review_assigned_to_id == current_user.id and report.status in report_review.INTAKE
-    can_handoff = report.review_assigned_to_id == current_user.id and report.status in report_review.INTAKE and not report_review.permitted(current_user,'verify') and report_review.permitted(current_user,'intake' if current_user.role in report_review.CLERK_ROLES else 'review')
+    can_clerk_intake = report_review.permitted(current_user,'intake') and report.review_assigned_to_id == current_user.id and report.status in report_review.INTAKE
+    can_handoff = report.review_assigned_to_id == current_user.id and report.status in report_review.INTAKE and not report_review.permitted(current_user,'verify') and (report_review.permitted(current_user,'intake') or report_review.permitted(current_user,'review'))
     can_verify = report_review.permitted(current_user,'verify') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id)
     if can_verify and report.status in intake: actions.append('verify')
     public_details_approved = report.status in {'pending_approval', 'validated', 'approved_internal', 'dispatched', 'in_progress', 'resolved'}
@@ -2808,7 +2852,7 @@ def get_report_docket(
     if can_clerk_intake:
         actions.append('peer_transfer')
     if can_handoff and report.status != 'needs_information': actions.append('submit_engineering')
-    if current_user.role in DISPATCH_ROLES:
+    if current_user.role in DISPATCH_ROLES and work_order_command_allowed(current_user, 'create'):
         if report.status == 'approved_internal': actions.append('assign')
     if report_review.permitted(current_user,'approve') and report.status == 'pending_approval': actions.append('approve')
 
@@ -2847,13 +2891,15 @@ def get_report_docket(
         "review_operations": dict(report_review.projection(db, report),routing_area_id=routing_area.id if routing_area else None,routing_area_name=routing_area.name if routing_area else None),
         "review_history": report_review.history(db, report),
         "referral_permissions": external_referrals.permissions(current_user, report),
-        "can_assign_review": report_review.permitted(current_user,'assign'),
-        "can_grade_priority": report_review.permitted(current_user,'review') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id),
+        "can_assign_review": report_review.permitted(current_user,'assign') and report.status in report_review.INTAKE | {'pending_approval','approved_internal'},
+        "can_grade_priority": report.status not in report_review.CLOSED and report_review.permitted(current_user,'review') and (report_review.permitted(current_user,'assign') or report.review_assigned_to_id == current_user.id),
         "report": {
             "id": report.id,
             "version": report.version,
             "ticket_id": report.ticket_id,
             "category": report.category,
+            "categories": report.categories or [report.category],
+            "accuracy_m": report.accuracy_m,
             "ai_category": report.ai_category,
             "description": report.description,
             "status": report.status,

@@ -19,6 +19,7 @@ with SessionLocal() as db:
     db.add_all([
         models.Official(id=1, full_name='Sample Engineering Reviewer', email='review.engineer@test.invalid', password_hash=password, role='city_engineer', is_active=True),
         models.Official(id=2, full_name='Sample Field Worker', email='review.field@test.invalid', password_hash=password, role='field_worker', is_active=True),
+        models.Official(id=3, full_name='Sample Field Inspector', email='review.inspector@test.invalid', password_hash=password, role='building_inspector', is_active=True),
         models.Resident(id=100, full_name='Sample Resident', email='review.resident@test.invalid', password_hash=password, is_verified=True, is_active=True),
     ])
     db.flush()
@@ -26,6 +27,12 @@ with SessionLocal() as db:
     for id, title, status in [(1,'Sample drainage concern awaiting review','pending'),(2,'Sample road surface concern','validated'),(3,'Sample drainage work awaiting verification','in_progress')]:
         db.add(models.Report(id=id, ticket_id=f'SAMPLE-REPORT-{id:03}', resident_id=100, description=title, category='Drainage' if id != 2 else 'Roads', status=status, barangay_id=1, location_barangay='Sample review area', created_at=datetime.now(timezone.utc)-timedelta(days=8+id)))
     db.flush()
+    from report_intelligence import initialize_observations, ObservationInput
+    for report in db.query(models.Report).order_by(models.Report.id):
+        report.categories = [report.category]
+        report.location_lat = 14.75 + report.id * .00002
+        report.location_lng = 121.05
+        initialize_observations(db, report, [ObservationInput(item_key='issue-1', categories=[report.category], description=report.description)])
     db.add_all([
         gm.WorkOrder(id=1, wo_number='SAMPLE-WORK-001', title='Inspect sample road surface', assigned_by_id=1, assigned_to_id=1, status='assigned', category='Roads', district_id=1, barangay_id=1, report_id=2),
         gm.WorkOrder(id=2, wo_number='SAMPLE-WORK-002', title='Review sample drainage completion evidence', assigned_by_id=1, assigned_to_id=2, status='completed_pending_review', category='Drainage', district_id=1, barangay_id=1, report_id=3),

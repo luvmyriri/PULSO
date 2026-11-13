@@ -9,6 +9,8 @@ import RecordsWorkspacePage from './RecordsWorkspacePage';
 import WorkOrdersPage from './WorkOrdersPage';
 import GovDivisionPage from './GovDivisionPage';
 import GovSystemBanner from '../components/GovSystemBanner';
+import { useGovernmentData } from '../utils/governmentApi';
+import { GovState } from '../components/government/GovWorkspace';
 import {
     GOVERNMENT_WORKSPACES,
     getAvailableWorkspaceViews,
@@ -36,6 +38,7 @@ const VIEW_COMPONENTS = {
     },
     administration: {
         staff: AdministrationWorkspacePage,
+        roles: AdministrationWorkspacePage,
         audit: AdministrationWorkspacePage,
         residents: AdministrationWorkspacePage,
         settings: AdministrationWorkspacePage,
@@ -47,9 +50,10 @@ const VIEW_COMPONENTS = {
 
 export default function GovernmentWorkspaceRoute({ workspace }) {
     const location = useLocation();
+    const access = useGovernmentData('/api/gov/navigation');
     const currentUser = readGovernmentUser();
     const definition = GOVERNMENT_WORKSPACES[workspace];
-    const availableViews = getAvailableWorkspaceViews(workspace, currentUser);
+    const availableViews = getAvailableWorkspaceViews(workspace, currentUser, access.data?.modules || []);
     const searchParams = new URLSearchParams(location.search);
     const rawRequested = searchParams.get('view') || searchParams.get('tab');
     const requestedView =
@@ -60,7 +64,8 @@ export default function GovernmentWorkspaceRoute({ workspace }) {
             : rawRequested;
     const activeView = availableViews.find((view) => view.key === requestedView) || availableViews[0];
 
-    if (!definition || !activeView) return <Navigate to="/gov/dashboard" replace />;
+    if (access.loading || access.error) return <GovState loading={access.loading} error={access.error} onRetry={access.reload}/>;
+    if (!definition || !activeView) return <Navigate to="/gov/my-dashboard" replace />;
     if (requestedView && requestedView !== activeView.key) {
         const nextParams = new URLSearchParams(location.search);
         nextParams.set('view', activeView.key);

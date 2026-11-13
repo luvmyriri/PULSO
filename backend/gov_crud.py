@@ -249,7 +249,7 @@ def _validate_work_order_transition(db: Session, wo, new_status: str, evidence_u
             raise HTTPException(status_code=409, detail="Completion evidence is required before review")
 
 
-def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: int, actor_role: str, note: Optional[str] = None):
+def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: int, actor_role: str, note: Optional[str] = None, resolution_evidence: Optional[tuple[str, int]] = None):
     """Update the citizen report status + notify the citizen. Called by gov CRUD functions."""
     from datetime import datetime, timezone
     report = db.query(models.Report).filter(models.Report.id == report_id).first()
@@ -266,6 +266,8 @@ def _sync_report_status(db: Session, report_id: int, new_status: str, actor_id: 
         report_id=report_id, is_public=True,
         note=note or f"Report status updated to {new_status}",
     )
+    from report_learning import record_transition
+    record_transition(db, report, previous, timeline, resolution_evidence)
     _append_audit(
         db, trigger_type="status_change",
         action=f"Report {report.ticket_id} status → {new_status}",
@@ -2442,9 +2444,12 @@ def list_infrastructure_assets(
 
     if category:
         cat_norm = normalize_asset_category(category)
+        aliases = {'Roads':['road','roads'],'Bridges':['bridge','bridges'],'Public Buildings':['building','public buildings'],
+                   'Facilities':['light','facilities'],'Drainage':['drainage']}.get(cat_norm,[])
         q = q.filter(or_(
             gov_models.InfrastructureAsset.category.ilike(f"%{cat_norm}%"),
-            gov_models.InfrastructureAsset.category.ilike(f"%{category}%")
+            gov_models.InfrastructureAsset.category.ilike(f"%{category}%"),
+            func.lower(gov_models.InfrastructureAsset.category).in_(aliases)
         ))
 
     if barangay:
@@ -2765,7 +2770,8 @@ def verify_work_order_inspection(
             referral_pending = bool(db.query(ExternalReferral.id).filter(ExternalReferral.report_id == wo.report_id,
                 ExternalReferral.status.notin_({'coordinated_closed', 'superseded', 'cancelled'})).first())
             if remaining == 0 and not project_pending and not referral_pending:
-                _sync_report_status(db, wo.report_id, "resolved", inspector_id, inspector_role)
+                _sync_report_status(db, wo.report_id, "resolved", inspector_id, inspector_role,
+                    resolution_evidence=('work_order_inspection', inspection.id))
             elif project_pending:
                 report=db.get(models.Report,wo.report_id)
                 if report:

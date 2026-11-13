@@ -63,6 +63,12 @@ def _assert_permission(user, db, module, action):
     """Check the requested operation, not merely membership in a broad staff list."""
     if not isinstance(user, models.Official):
         raise HTTPException(status_code=403, detail="Government capability required")
+    explicit = (user.role_ref.capabilities or {}) if user.role_ref else {}
+    if module in explicit:
+        grant = explicit[module]
+        if not isinstance(grant, list) or not ({action, '*'} & set(grant)):
+            raise HTTPException(403, f'User lacks required capability: {module}:{action}')
+        return
     role_matrix = {
         ("analytics", "view"): ANALYTICS_VIEW_ROLES,
         ("analytics", "narrative"): ANALYTICS_REVIEW_ROLES,

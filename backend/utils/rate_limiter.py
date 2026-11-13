@@ -114,3 +114,7 @@ availability_check_limiter = SlidingWindowRateLimiter(
     window_seconds=60,
     error_detail="Too many check attempts. Please slow down."
 )
+
+
+# Photo prechecks must not consume the resident report-submission quota.
+report_analysis_limiter = SlidingWindowRateLimiter(20, 60, "Too many photo checks. Wait a minute and try again.")

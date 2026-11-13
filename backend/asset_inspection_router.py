@@ -1,17 +1,16 @@
 """Independently reviewed asset observations for maintenance evidence and labels."""
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
-from io import BytesIO
 from io import StringIO
 import csv
 import json
 import os
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse
-from PIL import Image, UnidentifiedImageError
+from asset_evidence_store import MAX_EVIDENCE_BYTES
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from geoalchemy2.elements import WKTElement
 from sqlalchemy.exc import IntegrityError
@@ -34,8 +33,6 @@ router = APIRouter(prefix="/api/gov/predictive", tags=["predictive"])
 INSPECTOR_ROLES = {"building_inspector", "architect", "project_engineer", "asst_city_engineer",
                    "city_engineer", "manager", "electrical_inspector", "mechanical_inspector"}
 EVIDENCE_ROOT = Path(os.getenv("PUBLICATION_FILE_DIR", Path(__file__).parent / "private_publications")) / "asset_inspections"
-MAX_EVIDENCE_BYTES = 5 * 1024 * 1024
-IMAGE_TYPES = {"PNG": (".png", "image/png"), "JPEG": (".jpg", "image/jpeg"), "WEBP": (".webp", "image/webp")}
 
 
 def _testing_access(user):
@@ -173,32 +170,15 @@ async def upload_inspection_evidence(asset_id: str, file: UploadFile = File(...)
         raise HTTPException(404, "Infrastructure asset not found.")
     require_asset_scope(db, user, asset)
     data = await file.read(MAX_EVIDENCE_BYTES + 1)
-    if not data or len(data) > MAX_EVIDENCE_BYTES:
-        raise HTTPException(422, "Choose an image up to 5 MB.")
+    from asset_evidence_store import store_image
+    row, location = store_image(db,EVIDENCE_ROOT,asset_id,user.id,data)
     try:
-        with Image.open(BytesIO(data)) as image:
-            image_format = image.format
-            image.verify()
-        suffix, media_type = IMAGE_TYPES[image_format]
-    except (UnidentifiedImageError, KeyError, ValueError, OSError, Image.DecompressionBombError):
-        raise HTTPException(422, "Choose a valid PNG, JPEG or WebP image.")
-    evidence_id = str(uuid4())
-    folder = EVIDENCE_ROOT / evidence_id[:2]
-    folder.mkdir(parents=True, exist_ok=True)
-    location = folder / f"{evidence_id}{suffix}"
-    try:
-        with location.open("xb") as target:
-            target.write(data)
-        row = AssetInspectionEvidence(id=evidence_id, asset_id=asset_id, uploaded_by_id=user.id,
-                                      stored_path=str(location.relative_to(EVIDENCE_ROOT)),
-                                      content_type=media_type, byte_size=len(data), sha256=sha256(data).hexdigest())
-        db.add(row)
         db.commit()
     except Exception:
         db.rollback()
         location.unlink(missing_ok=True)
         raise
-    return {"id": evidence_id, "byte_size": len(data), "content_type": media_type}
+    return {"id": row.id, "byte_size": row.byte_size, "content_type": row.content_type}
 
 
 @router.get("/inspection-evidence/{evidence_id}")

@@ -1,4 +1,3 @@
-import { adminAllows } from '../utils/adminAccess';
 import React, { useState, useRef } from 'react';
 import ReCAPTCHA from "react-google-recaptcha";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -53,16 +52,9 @@ export default function GovLanding() {
                 if (response.ok) {
                     const data = await response.json();
                     setAuthSession(data.access_token, data.user);
-                    const GOV_ROLES = [
-                        'city_engineer','asst_city_engineer','admin_officer','admin_clerk',
-                        'records_officer','division_chief','design_engineer','estimator',
-                        'cad_operator','project_engineer','construction_foreman','field_worker',
-                        'building_inspector','electrical_inspector','mechanical_inspector',
-                        'dispatcher','manager','system_admin',
-                    ];
-                    if (GOV_ROLES.includes(data.user.role) || data.user.account_type === 'staff') {
+                    if (data.user.role && data.user.role !== 'resident') {
                         const returnTo=new URLSearchParams(window.location.search).get('returnTo');
-                        const fallback=GOV_ROLES.includes(data.user.role)?'/gov/my-dashboard':adminAllows(data.user,'view')?'/gov/administration':'/gov/account';
+                        const fallback='/gov/my-dashboard';
                         navigate(returnTo && /^\/gov\/(?:account|reports|map|dashboard|my-work|today|work-orders|assets|records-workspace|insights|announcements|administration)(?:[/?#]|$)/.test(returnTo) && !returnTo.includes('\\') ? returnTo : fallback, { replace: true });
                     } else {
                         setError('Authorized Government Personnel Only. Citizens please use the Citizen Portal.');

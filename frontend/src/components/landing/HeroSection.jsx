@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import React, { useState } from 'react';
 import { SquarePen, Search, ArrowRight, Smartphone } from 'lucide-react';
@@ -19,10 +20,11 @@ import { useMobileInstallLink } from './useMobileInstallLink';
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
+  const { t } = useTranslation();
   const [internalPwaOpen, setInternalPwaOpen] = useState(false);
   const handleOpenPwa = onOpenPwaModal || (() => setInternalPwaOpen(true));
 
-  const { activeUrl, apkUrl } = useMobileInstallLink();
+  const { activeUrl, apkUrl, isLanDownload, release } = useMobileInstallLink();
 
   return (
     <section
@@ -93,10 +95,10 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
 
                     <div className="flex flex-col text-left min-w-0">
                       <span className="font-heading font-black text-xs sm:text-sm text-[#0f2347] dark:text-white">
-                        {apkUrl ? 'PULSO Android APK' : 'Install Mobile App'}
+                        {apkUrl ? t('mobileInstall.androidApp') : t('mobileInstall.mobileWebsite')}
                       </span>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
-                        {apkUrl ? 'Development build for Android on the same Wi-Fi.' : 'Scan to open PULSO on your phone.'}
+                        {apkUrl ? isLanDownload ? t('mobileInstall.sameWifi') : t('mobileInstall.publicBuild', {version: release?.versionName}) : t('mobileInstall.openWebsite')}
                       </p>
                     </div>
                   </div>
@@ -108,7 +110,7 @@ export default function HeroSection({ onOpenTrackModal, onOpenPwaModal }) {
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-[#0f2347] dark:text-white border border-slate-300 dark:border-slate-700 text-xs font-heading font-bold shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00]"
                   >
                     <Smartphone size={14} className="text-[#ff6b00]" />
-                    <span>{apkUrl ? 'View APK download' : 'Install App'}</span>
+                    <span>{apkUrl ? t('mobileInstall.viewDownload') : t('mobileInstall.openOnPhone')}</span>
                   </button>
 
                 </div>

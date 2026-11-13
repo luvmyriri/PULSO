@@ -9,8 +9,9 @@ GROUPS={'open':['open'],'assigned':['assigned'],'active':['in_progress','rework_
 
 def queue(db,user,page,view,search,assignee=None):
     import gov_crud
-    from gov_router import FIELD_SELF_ROLES, DISPATCH_ROLES
-    query=db.query(gm.WorkOrder)
+    from gov_router import FIELD_SELF_ROLES, work_order_command_allowed
+    from legacy_operations import work_query
+    query=work_query(db,user)
     ids=jurisdiction_ids(user)
     if ids: query=query.filter(gm.WorkOrder.district_id.in_(ids))
     if user.role in FIELD_SELF_ROLES: query=query.filter(gm.WorkOrder.assigned_to_id==user.id)
@@ -43,25 +44,26 @@ def queue(db,user,page,view,search,assignee=None):
     total=query.count()
     query=query.order_by(case((gm.WorkOrder.status.in_(['completed','resolved','cancelled']),1),else_=0),gm.WorkOrder.updated_at.desc().nullslast(),gm.WorkOrder.id.desc())
     owner = db.get(models.Official, int(assignee)) if total and assignee and assignee != 'unassigned' else None
-    return dict(items=[gov_crud.enrich_work_order(work,db) for work in query.offset((page-1)*15).limit(15).all()],total=total,page=page,counts=counts,can_create=user.role in DISPATCH_ROLES,
+    return dict(items=[gov_crud.enrich_work_order(work,db) for work in query.offset((page-1)*15).limit(15).all()],total=total,page=page,counts=counts,can_create=work_order_command_allowed(user,'create'),
                 owner_filter='Unassigned' if assignee=='unassigned' else owner.full_name if owner else None)
 
 def actions(db,user,work_id):
-    from gov_router import _require_work_order_view, DISPATCH_ROLES, FIELD_ROLES, INSPECTOR_ROLES
+    from gov_router import _require_work_order_view, DISPATCH_ROLES, FIELD_ROLES, INSPECTOR_ROLES, work_order_command_allowed
     work=db.get(gm.WorkOrder,work_id)
     if not work: raise HTTPException(404,'Work order not found.')
     _require_work_order_view(work,user)
     allowed=[]
     owner=work.assigned_to_id==user.id
     dispatch=user.role in DISPATCH_ROLES
-    if dispatch and work.status=='open': allowed.append('assign')
-    if dispatch and work.assigned_to_id and work.status in {'assigned','in_progress','blocked','rework_required'}: allowed.append('reassign')
+    if dispatch and work_order_command_allowed(user,'assign') and work.status=='open': allowed.append('assign')
+    if dispatch and work_order_command_allowed(user,'reassign') and work.assigned_to_id and work.status in {'assigned','in_progress','blocked','rework_required'}: allowed.append('reassign')
     if owner and user.role in FIELD_ROLES and work.status in ['assigned','rework_required']: allowed.append('start')
     if owner and user.role in FIELD_ROLES and work.status=='in_progress': allowed.append('submit_completion')
     if user.role in FIELD_ROLES and (owner or dispatch) and work.status in ['assigned','in_progress']: allowed.append('block')
     if user.role in FIELD_ROLES and (owner or dispatch) and work.status=='blocked': allowed.append('unblock')
-    if user.role in INSPECTOR_ROLES and not owner and work.status in ['completed_pending_review','awaiting_verification']: allowed.append('verify')
+    if user.role in [*INSPECTOR_ROLES, 'system_admin'] and not owner and work.status in ['completed_pending_review','awaiting_verification']: allowed.append('verify')
     import project_workspace
     if dispatch and project_workspace.allowed(user,'manage') and not work.project_id and work.status not in {'completed','cancelled','resolved'}:
         allowed.append('refer_project')
-    return dict(allowed_actions=allowed)
+    from legacy_operations import granted
+    return dict(allowed_actions=[action for action in allowed if granted(user,'work_orders',action,{user.role})])

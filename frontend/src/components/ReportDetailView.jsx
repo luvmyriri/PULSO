@@ -99,7 +99,7 @@ function ReportDetailViewContent({
     }, [report?.id, report?.ticket_id]);
 
     const ticketId = report.ticket_id || `Report ${report.id}`;
-    const categoryName = report.category || report.ai_category || 'Public Safety & Hazards';
+    const categoryName = report.categories?.length ? report.categories.join(' + ') : report.category || report.ai_category || 'Public Safety & Hazards';
 
     // Format date e.g. "Oct 27, 2026"
     const formattedDate = report.created_at

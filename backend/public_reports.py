@@ -4,6 +4,9 @@ import re
 from urllib.parse import quote
 
 
+PUBLIC_REPORT_STATUSES = ("pending_approval", "validated", "dispatched", "approved_internal", "in_progress", "resolved")
+
+
 PUBLIC_CATEGORIES = frozenset({
     "Water Supply & Distribution",
     "Water Pipeline",
@@ -70,4 +73,4 @@ def public_report_photo(value: str | None) -> str | None:
     """Serve a metadata-free copy of a local report photo, never an arbitrary URL."""
     if not value or not re.fullmatch(r"/api/uploads/reports/report_[a-f0-9]{16}\.(?:jpe?g|png|webp)", value, re.IGNORECASE):
         return None
-    return f"/api/thumbnails?src={quote(value, safe='')}&size=512"
+    return f"/api/thumbnails?src={quote(value, safe='')}&size=512&v=2"

@@ -42,7 +42,7 @@ if not exists:
     run(str(ROOT / 'scripts/db_schema.py'), 'bootstrap')
     run('-m', 'alembic', 'stamp', 'c455ca49f6d5')
 run('-m', 'alembic', 'upgrade', 'head')
-run(str(ROOT / 'scripts/db_schema.py'), 'inventory', '--output', str(ROOT / 'backend/schema/head_23a7b8c9d0e1.inventory.json'))
+run(str(ROOT / 'scripts/db_schema.py'), 'inventory', '--output', str(ROOT / 'backend/schema/head_31c5d6e7f8a9.inventory.json'))
 if sys.argv[1:] in (['--browser-review'], ['--browser-resume']):
     if sys.argv[1:] == ['--browser-review']:
         run('-m', 'tests.government_browser_fixture')

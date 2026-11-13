@@ -180,6 +180,9 @@ class UserUpdate(BaseModel):
 
 class ReportBase(BaseModel):
     category: str
+    categories: List[str] = Field(default_factory=list)
+    accuracy_m: Optional[float] = None
+    location_metadata: dict = Field(default_factory=dict)
     description: str
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
@@ -207,6 +210,8 @@ class ReportBase(BaseModel):
 
 
 class ReportCreate(ReportBase):
+    intake_key_hash: Optional[str] = None
+    intake_request_hash: Optional[str] = None
     reporter_type: Optional[str] = "registered"
     guest_reporter_name: Optional[str] = Field(None, max_length=160)
     submitted_urgency: Optional[str] = None

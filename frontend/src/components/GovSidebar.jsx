@@ -21,7 +21,7 @@ import { readGovernmentUser } from './governmentWorkspaceConfig';
 import { useGovernmentData } from '../utils/governmentApi';
 import './gov-sidebar-responsive.css';
 
-export default function GovSidebar({ activeTab, onTabChange, currentUser, responsive = true }) {
+export default function GovSidebar({ activeTab, onTabChange, currentUser, responsive = true, decoration }) {
     const location = useLocation();
     const resolvedUser = currentUser || readGovernmentUser();
     const navigation = useGovernmentData('/api/gov/navigation');
@@ -286,6 +286,7 @@ export default function GovSidebar({ activeTab, onTabChange, currentUser, respon
                     })}
                 </nav>
                 {navigation.error && <p className="px-5 py-2 text-xs" role="alert">Navigation unavailable. <button className="underline" onClick={navigation.reload}>Try again</button></p>}
+                {!isCollapsed && decoration}
             </div>
 
         </aside>

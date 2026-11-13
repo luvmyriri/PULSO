@@ -1,6 +1,6 @@
-# Resident and Android update integration — 12 November 2026
+# Resident and Android update integration â€” 12 November 2026
 
-**Status:** Integrated locally; no push, deployment, APK publication or physical-device validation performed. This is a source-integration record, not implementation of the proposed PULSO RELogic phase.
+**Status at the initial integration checkpoint:** Integrated locally; no push, deployment, APK publication or physical-device validation had been performed at that point. This section is a historical source-integration record. Subsequent RELogic 0A work is recorded in [the screening foundation](pulso-relogic-screening-foundation-2026-11-12.md), public deployment in [the release record](production-relogic-android-release-2026-11-12.md), and team synchronization in [the 13 November handoff](developer-sync-2026-11-13.md). Physical-device validation remains pending.
 
 ## Source and recovery
 
@@ -33,11 +33,26 @@ Thirteen files conflicted when restoring the local checkpoint. Resolutions combi
 
 No new report lifecycle, responsibility exclusion rule, model threshold or automatic rejection policy was introduced. See [PULSO RELogic](../government-system-proposal/47-pulso-relogic-development-plan-2026-11-12.md) for that proposed work.
 
+## Backend authority confirmation
+
+The user confirmed on 12 November that the workspace backend is the primary, more recent backend. Use that as the integration baseline: preserve local models, migrations, intelligence, assignment, authorization and report contracts; review upstream backend changes individually for resident/Android compatibility rather than replacing the workspace backend wholesale.
+
+A follow-up comparison against the pre-integration checkpoint found:
+
+- All **84 previously untracked backend files** still exist and match their checkpoint content after line-ending normalization.
+- The workspace `models.py`, `gov_models.py`, `schemas.py`, `requirements.txt`, government-access implementation and report-review implementation remain identical to the checkpoint.
+- AST comparison found the existing report creation, report analysis, protected-thumbnail implementation and local router registration retained. The main API has 88 unchanged top-level definitions; its changed definitions concern authentication/recovery. The government router has 123 unchanged definitions; the changed self-service work-order projection avoids nonexistent WorkOrder location attributes while retaining scope checks.
+- Imported backend changes are scoped to account-bound authentication/recovery and throttling, selected-point address interpretation, Android update endpoints/development CORS, safer database configuration, and compatible work-order lookup fixes. The local independent-ticket/concern, reviewer assignment, survey, learning and media modules were not replaced.
+- The only intentional change in a local-only backend file after restoration is the documented obsolete standalone-test gate correction. No production backend file was changed during this follow-up authority audit.
+
+Passing checks are evidence for the tested contracts; they do not certify every endpoint, external provider or the existing application database.
+
 ## Verification
 
 - Production web build passed; Android-mode web assets also built successfully with a synthetic API origin for isolated browser tests. The final web output is restored to the normal production configuration after those tests.
 - **98 frontend tests passed**, covering native media/update helpers, resident navigation and report rendering, capture provenance, drafts, intake and government permission helpers.
 - **87 focused backend tests passed** in the dedicated disposable intelligence PostGIS database, covering intake, matching, reviewer availability, capture metadata, protected media/public projections, Android update endpoints, authentication recovery, address handling and receipts.
+- The backend-authority follow-up passed **118 additional intelligence checks** for field inventory/capture, report learning, pair-analysis jobs, observation assessments and concern checkpoints, plus **87 government checks** for projects, staff accounts, operational settings and retained operations. These ran in the separate guarded test databases; no application data was reset.
 - The broader workflow run passed **132 government/resident checks** and initially exposed one inconsistent expectation in a separate 64-case standalone reporting harness. That harness still implemented the obsolete 15 m proximity rejection even though its local assertion already required independent tickets. Removing that test-only gate produced **64/64 passing standalone checks** on rerun. The product intake's independent-ticket behavior was retained. The standalone harness uses its own in-memory app and is not proof of the real API by itself.
 - Focused merged-file lint completed without errors. Python syntax and translation JSON parsed successfully. No unresolved merge entries or conflict markers remained.
 - Browser checks passed for web/native-byte map photo pins, slow rerenders, correct fallback evidence and source refresh.
@@ -50,6 +65,8 @@ The frontend runs at `http://127.0.0.1:5173`; the configured backend runs at `ht
 
 **Existing application schema drift remains open.** The configured application database reports revision `31c5d6e7f8a9`, but read-only normalized comparison differs from its expected inventory: three column definitions (`agent_locations.location_geog`, `reports.location_geog`, `chat_conversations.owner_type`), chat ownership constraints/index, and checks on document targets/work-order priority. Running the original checkpoint's pre-integration checker against the unchanged inventory reproduced the same differences. These differences therefore were not introduced by the imported checker/source merge. Test databases match the checked-in inventory; passing their tests does not certify the drifted application database. Reconciliation needs a separate data-preserving migration review, not an automatic reset or downgrade during this pull.
 
-An APK was not built. This machine exposes Android SDK platforms 34 and 36, while the imported project requires compile SDK 37, and no configured Java command or standard Android Studio bundled JDK was found. Use the [Android setup instructions](../../frontend/android/README.md) before native compilation. No signing, installation, device camera/GPS trial or published app-update artifact is claimed.
+Follow-up inspection narrows that finding: the geography expressions differ by redundant parentheses, and the document-target/priority checks express the same value lists with different cast rendering. Those textual differences alone do not establish a functional failure. **Chat ownership is a substantive mismatch:** the application database retains a resident-only `chat_conversations.user_id` foreign key, permits null `owner_type` without its expected default/check, and lacks the composite owner index. The existing model/router supports both residents and officials. A staff conversation whose official ID has no matching resident ID can consequently fail the old foreign key; no live conversation was created to reproduce it. This predates the merge and needs its own reviewed schema repair without losing or reassigning conversation history.
+
+At the initial integration check, an APK was not built: this PC lacked a configured Java 21 toolchain and the imported wrapper requested SDK 37. The subsequent authorized deployment uses an isolated Java 21 / Android SDK 36 builder, matching Capacitor 8’s supported SDK. The signed public test build and release verification are recorded separately in `production-relogic-android-release-2026-11-12.md`. Physical-device camera/GPS and installation remain device acceptance work.
 
 The build retains its existing large-bundle warning. Private-media consumer migration and measured phone accuracy remain open work; merging upstream image handling does not close those product gaps. The backup checkpoint and original branch remain available locally.

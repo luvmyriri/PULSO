@@ -103,6 +103,11 @@ def has_permission(db: Session, user: Union[models.Official, models.Resident], m
     Fine-grained permission check.
     Example: has_permission(db, user, "records", "view")
     """
+    if not isinstance(user, models.Official): return False
+    explicit = (user.role_ref.capabilities or {}) if user.role_ref else {}
+    if module in explicit:
+        grant = explicit[module]
+        return isinstance(grant, list) and (action in grant or '*' in grant)
     # The fallback Official.capabilities property gives platform admins '*'.
     # Domain grants come only from the stored role, never that fallback.
     if module in {'analytics','reports','procurement'}:

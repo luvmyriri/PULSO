@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
       },
     }),
     tailwindcss(),
-    mode === 'android' && {
+    (mode === 'android' || mode === 'android-public') && {
       name: 'android-safe-viewport',
       // Let Capacitor reserve the system bars for every route and fixed overlay.
       transformIndexHtml(html) {
