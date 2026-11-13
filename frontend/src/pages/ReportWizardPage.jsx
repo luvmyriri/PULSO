@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGoogleMaps } from '../contexts/GoogleMapsContext';
-import { finishReportIntake, locationEvidence, submitReportIntake, pendingReportIntake, recoverReportIntake } from '../utils/reportIntake';
+import { finishReportIntake, locationEvidence, hasReportLocation, submitReportIntake, pendingReportIntake, recoverReportIntake } from '../utils/reportIntake';
 import useResidentReportDraft, {useReportDraftPrincipal} from '../hooks/useResidentReportDraft';
 import {packResidentPhoto,unpackResidentPhoto,reportDraftPrincipal} from '../utils/residentReportDraft';
 import ResidentDraftStatus from '../components/report-wizard/ResidentDraftStatus';
@@ -29,13 +29,13 @@ function wizardForm(data) {
   return {
     category:typeof saved.category==='string'?saved.category:'',
     location:{lat:null,lng:null,address:'',landmark:'',isInCaloocan:false,...savedLocation,
-      barangay:area,confirmed:false,pinConfirmed:false},
+      barangay:area},
     evidence:{file:restored.file,previewUrl:restored.file?URL.createObjectURL(restored.file):null,
       fileName:restored.file?.name || '',fileSize:restored.file?.size || 0,mimeType:restored.file?.type || '',
       ...restored.provenance,aiCategorySuggestion:saved.evidence?.aiCategorySuggestion || null,
       aiConfidence:saved.evidence?.aiConfidence || null,isAiScanning:false},
     details:{description:'',urgency:'medium',...saved.details},
-    contact:{type:'notify',name:'',email:'',phone:'',...saved.contact},consentAccepted:false,
+    contact:{type:'notify',name:'',email:'',phone:'',...saved.contact},
   };
 }
 
@@ -166,10 +166,10 @@ export default function ReportWizardPage() {
     finally{setIsSubmitting(false);}
   };
   const handleSubmitReport = async () => {
-    if (!formData.consentAccepted || isSubmitting || draft.locked || pendingSubmission) return;
-    if (!Number.isFinite(formData.location.lat) || !Number.isFinite(formData.location.lng) || formData.location.isInCaloocan === false || !formData.location.pinConfirmed) {
+    if (isSubmitting || draft.locked || pendingSubmission) return;
+    if (!hasReportLocation(formData.location) || formData.location.isInCaloocan === false) {
       setCurrentStep(1);
-      setSubmissionError('Select the issue location before submitting.');
+      setSubmissionError(t('reportAutomation.locationMissing'));
       return;
     }
     let evidenceFile = formData.evidence.file;
@@ -423,7 +423,6 @@ export default function ReportWizardPage() {
                 formData={formData}
                 isSubmitting={isSubmitting}
                 onJumpToStep={jumpToStep}
-                onConsentChange={(val) => setFormData(p => ({ ...p, consentAccepted: val }))}
                 onBack={goToPreviousStep}
                 onSubmit={handleSubmitReport}
               />

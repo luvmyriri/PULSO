@@ -1,3 +1,4 @@
+import { hasReportLocation } from './reportIntake.js';
 /**
  * PULSO Report Wizard Validation Module
  * Pure validation functions, normalizers, and edge-case guards for the 5-step flow.
@@ -5,12 +6,12 @@
  * Rules:
  * - Step 1: 1 to 3 valid categories selected.
  * - Step 2: Location inside Caloocan, valid source (GPS/pin/search), readable address.
- *           Warning if GPS accuracy > 20m without confirmation checkbox. Optional fields <= 100 chars.
+ *           Warning if GPS accuracy > 20m without a manual correction. Optional fields <= 100 chars.
  * - Step 3: 1 to 5 photos, max 10MB each, JPG/PNG/WebP, min 640px, no duplicates, no rejected/inappropriate.
  * - Step 4: Description 20-1000 chars after trimming, collapse whitespace, no gibberish/repeated chars.
  * - Step 5: Full Name 2-80 chars (letters/accents/hyphen/period/apostrophe only, no digits).
  *           Gmail / Email address required (valid format, email typo suggestions, guest existing account check).
- *           Consent checkbox confirmed. Honeypot empty.
+ *           Contact-use notice is informational. Honeypot empty.
  * - Step 6: Full revalidation of all steps with aggregated error mapping.
  */
 
@@ -55,6 +56,7 @@ const COMMON_EMAIL_DOMAINS = {
 export function cleanDescription(raw) {
   if (typeof raw !== 'string') return '';
   return raw
+    // eslint-disable-next-line no-control-regex -- Strip non-printing control bytes from user text.
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -206,9 +208,8 @@ export function validateLocation(locationData) {
   const warnings = [];
 
   const loc = locationData || {};
-  const hasCoords = Number.isFinite(loc.lat) && Number.isFinite(loc.lng);
 
-  if (!hasCoords || !loc.confirmed) {
+  if (!hasReportLocation(loc)) {
     errors.push({
       field: 'location',
       code: 'LOCATION_REQUIRED',
@@ -221,14 +222,14 @@ export function validateLocation(locationData) {
       message: 'This spot is outside Caloocan City. Please move the pin inside the city.',
     });
   } else {
-    // Address must be readable: cannot be pure coordinates or pure Plus Code without address words
+    // Address-provider failure must not block a report with an actual location.
     const address = (loc.address || '').trim();
     const isPurePlusCodeOrCoord = !address ||
       /^[A-Z0-9]{4}\+[A-Z0-9]{2,}/i.test(address) && !/[a-zA-Z]{4,}/.test(address.replace(/^[A-Z0-9+,\s]+/, '')) ||
       /^(external|caloocan city \()?-?\d+\.\d+/i.test(address) && !/[a-zA-Z]{4,}/.test(address.replace(/[\d.,()\-\s]+/g, ''));
 
     if (isPurePlusCodeOrCoord && !loc.barangay) {
-      errors.push({
+      warnings.push({
         field: 'address',
         code: 'ADDRESS_NOT_READABLE',
         message: 'Please ensure the address is readable or adjust the pin.',
@@ -364,11 +365,10 @@ export function validateDetails(detailsData) {
  * Guest Gmail accounts that already belong to a registered PULSO account are flagged.
  * Consent is required.
  */
-export function validateContact(contactData, consentAccepted) {
+export function validateContact(contactData) {
   const errors = [];
   const warnings = [];
   const contact = contactData || {};
-  const isConsentChecked = Boolean(consentAccepted ?? contact.consentAccepted);
 
   // 1. Full Name
   const nameRes = validateFullName(contact.name || contact.fullName);
@@ -414,15 +414,6 @@ export function validateContact(contactData, consentAccepted) {
     }
   }
 
-  // 3. Consent check
-  if (!isConsentChecked) {
-    errors.push({
-      field: 'consent',
-      code: 'CONSENT_REQUIRED',
-      message: 'Please confirm to continue.',
-    });
-  }
-
   // 4. Honeypot check (anti-bot)
   if (contact.website_hp && contact.website_hp.trim() !== '') {
     errors.push({
@@ -458,7 +449,7 @@ export function validateStep(stepNumber, formData) {
     case 4:
       return validateDetails(data.details);
     case 5:
-      return validateContact(data.contact, data.consentAccepted);
+      return validateContact(data.contact);
     case 6:
       return validateAllSteps(data);
     default:
@@ -477,7 +468,7 @@ export function validateAllSteps(formData) {
     2: validateLocation(data.location),
     3: validateEvidence(data.evidence),
     4: validateDetails(data.details),
-    5: validateContact(data.contact, data.consentAccepted),
+    5: validateContact(data.contact),
   };
 
   const allErrors = [];

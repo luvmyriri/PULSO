@@ -63,3 +63,10 @@ only the tested contracts. Physical-phone installation, camera/GPS, native CAPTC
 Google authentication and field accuracy remain pending. Predictive scoring remains
 unavailable until an approved trained artifact is installed; licensed hazard ingestion
 is disabled. No production report/account submissions were made for release verification.
+
+## Resident automation follow-up
+
+The subsequent [resident report automation update](resident-report-automation-2026-11-13.md)
+removes manual resident validation checkboxes across the full/quick flows and location
+editor, while preserving source uncertainty, staff review and receipt recovery.
+It also prefills available resident contact details and retains optional location correction.

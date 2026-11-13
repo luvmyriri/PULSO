@@ -40,6 +40,13 @@ const iso = value => {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 };
 
+export function hasReportLocation(location = {}) {
+  if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lng)
+      || Math.abs(location.lat) > 90 || Math.abs(location.lng) > 180) return false;
+  return ['device-gps', 'selected-map', 'place-search', 'manual-geocode'].includes(location.source)
+    || location.confirmed === true || location.pinConfirmed === true;
+}
+
 export function locationEvidence(location = {}, photo = {}) {
   const raw = location.deviceFix;
   const device = raw && Number.isFinite(raw.latitude) && Number.isFinite(raw.longitude) ? {
@@ -49,7 +56,7 @@ export function locationEvidence(location = {}, photo = {}) {
   } : null;
   const source = device && location.source === 'device-gps' && device.latitude === location.lat && device.longitude === location.lng ? 'device'
     : location.source === 'place-search' ? 'search'
-      : location.confirmed || location.pinConfirmed ? 'manual' : 'unknown';
+      : ['selected-map', 'manual-geocode'].includes(location.source) || location.confirmed || location.pinConfirmed ? 'manual' : 'unknown';
   return {
     source, device_fix: device,
     issue_pin_confirmed: Boolean(location.pinConfirmed || (source !== 'device' && location.confirmed)),

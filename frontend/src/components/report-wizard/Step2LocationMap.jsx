@@ -1,3 +1,4 @@
+import { hasReportLocation } from '../../utils/reportIntake';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GoogleMap, MarkerF } from '@react-google-maps/api';
@@ -48,6 +49,7 @@ export default function Step2LocationMap({
   onLocationChange, 
   onBack, 
   onContinue,
+  showFooter = true,
   stepErrors = [],
   stepWarnings = [],
 }) {
@@ -81,7 +83,7 @@ export default function Step2LocationMap({
   const currentLat = locationData?.lat ?? CALOOCAN_CENTERS.north.lat;
   const currentLng = locationData?.lng ?? CALOOCAN_CENTERS.north.lng;
   const hasSavedCoordinates = Number.isFinite(locationData?.lat) && Number.isFinite(locationData?.lng);
-  const hasSelection = locationData?.confirmed === true && hasSavedCoordinates;
+  const hasSelection = hasReportLocation(locationData);
   const inCaloocan = hasSelection && isInCaloocan(currentLat, currentLng);
   const safeBrgy = typeof locationData?.barangay === 'object' && locationData?.barangay !== null
     ? (locationData.barangay.name || locationData.barangay.displayName || '')
@@ -158,7 +160,7 @@ export default function Step2LocationMap({
   const acceptPosition = (position) => {
     const { latitude, longitude, accuracy } = position.coords;
     onLocationChange(previous => ({ ...previous, lat: latitude, lng: longitude, accuracy,
-      source: 'device-gps', confirmed: false, pinConfirmed: false,
+      source: 'device-gps', confirmed: false, pinConfirmed: false, confirmedAt: null,
       deviceFix: { latitude, longitude, accuracy_m: accuracy, measured_at: position.timestamp ? new Date(position.timestamp).toISOString() : null } }));
     if (mapRef.current) {
       mapRef.current.panTo({ lat: latitude, lng: longitude });
@@ -384,23 +386,13 @@ export default function Step2LocationMap({
 
 
 
-              {!hasSelection && hasSavedCoordinates && <button type="button" onClick={() => updateCoordinates(locationData.lat, locationData.lng, locationData.address)} className="min-h-11 px-3 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus-visible:outline-3 focus-visible:outline-blue-600">{t('reportWizard.step2Location.confirmSavedLocation', 'Confirm saved location')}</button>}
-              {/* Accuracy Warning and Confirmation Checkbox */}
+              {/* Optional accuracy guidance */}
               {locationData?.accuracy > 20 && (
                 <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-xs space-y-2">
                   <p className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
                     <AlertTriangle size={14} className="shrink-0 text-amber-600" />
                     <span>{t('reportWizard.validation.location.accuracyWarning', 'Location may be off. Tap Change location to fix it.')}</span>
                   </p>
-                  <label className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={locationData?.pinConfirmed || false}
-                      onChange={(e) => onLocationChange(prev => ({ ...prev, pinConfirmed: e.target.checked }))}
-                      className="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500"
-                    />
-                    <span>{t('reportWizard.validation.location.confirmPin', 'This pin is the right spot')}</span>
-                  </label>
                 </div>
               )}
               {/* Nearby Landmark Field */}
@@ -433,12 +425,12 @@ export default function Step2LocationMap({
       </div>
 
       {/* Pinned Footer */}
-      <WizardCardFooter
+      {showFooter && <WizardCardFooter
         onBack={onBack}
         canBack={true}
         onContinue={onContinue}
         isContinueDisabled={false}
-      />
+      />}
     </div>
   );
 }

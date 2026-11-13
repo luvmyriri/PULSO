@@ -1,5 +1,10 @@
 {
   "translation": {
+    "reportAutomation": {
+      "contactUse": "Your contact details are used for report verification, receipts, updates and follow-ups. They are not shown on the public report.",
+      "submitNotice": "By selecting Submit report, you send these details and photos to City Engineering for review. Your contact details are used for the receipt and report follow-ups.",
+      "locationMissing": "Location is unavailable. Use your device location or select the issue point on the map."
+    },
     "mobileInstall": {
       "androidApp": "PULSO Android app",
       "mobileWebsite": "PULSO mobile website",
@@ -44,7 +49,7 @@
       "new":"Not yet submitted. This draft will be saved on this device for this account.",
       "saving":"Saving the original photo and draft on this device…",
       "saved":"Draft and original photo saved on this device; not submitted.",
-      "restored":"Draft and original photo restored. Review the issue location and give fresh submission consent.",
+      "restored":"Draft and original photo restored. Continue when ready; you can edit the details before submitting.",
       "expired":"The previous unsent draft is older than 24 hours. Start a new report with current evidence.",
       "load_error":"The device draft could not be opened. Retry storage before editing so the saved draft is preserved.",
       "save_error":"The latest draft could not be saved. Keep this tab open and retry storage before submitting.",

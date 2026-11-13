@@ -1,5 +1,10 @@
 {
   "translation": {
+    "reportAutomation": {
+      "contactUse": "Ginagamit ang iyong contact details sa pagsusuri ng report, resibo, updates at follow-up. Hindi ito ipinapakita sa pampublikong report.",
+      "submitNotice": "Sa pagpindot ng Ipasa ang report, ipapadala ang mga detalye at larawan sa City Engineering para suriin. Gagamitin ang iyong contact details para sa resibo at follow-up ng report.",
+      "locationMissing": "Walang makuhang lokasyon. Gamitin ang lokasyon ng device o piliin ang lugar ng problema sa mapa."
+    },
     "mobileInstall": {
       "androidApp": "PULSO Android app",
       "mobileWebsite": "PULSO mobile website",
@@ -44,7 +49,7 @@
       "new":"Hindi pa naipapasa. Ise-save ang draft sa device na ito para sa account na ito.",
       "saving":"Sine-save ang orihinal na larawan at draft sa device na ito…",
       "saved":"Naka-save sa device na ito ang draft at orihinal na larawan; hindi pa naipapasa.",
-      "restored":"Naibalik ang draft at orihinal na larawan. Suriin ang lokasyon ng problema at muling pumayag sa pagpapasa.",
+      "restored":"Naibalik ang draft at orihinal na larawan. Magpatuloy kapag handa na; maaari mong baguhin ang mga detalye bago ipasa.",
       "expired":"Mahigit 24 oras na ang dating hindi pa naipapasang draft. Magsimula ng bagong ulat gamit ang kasalukuyang ebidensiya.",
       "load_error":"Hindi mabuksan ang draft sa device. Subukang muli ang storage bago mag-edit upang mapanatili ang naka-save na draft.",
       "save_error":"Hindi na-save ang pinakabagong draft. Panatilihing bukas ang tab at subukang muli ang storage bago magpasa.",

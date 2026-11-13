@@ -25,6 +25,7 @@ import {
 import { findBarangayByCoordinates } from '../../data/caloocanBoundaries';
 import IDCameraModal from '../IDCameraModal';
 import WizardCardFooter from './WizardCardFooter';
+import Step2LocationMap from './Step2LocationMap';
 import LocationAddressPanel from '../maps/LocationAddressPanel';
 import LocationCoordinates from '../maps/LocationCoordinates';
 import { reverseGeocodeLocation } from '../../utils/reverseGeocode';
@@ -32,7 +33,7 @@ import { displayAddressFields, normalizeDisplayAddress, parseLegacyDisplayAddres
 import { API_BASE_URL } from '../../utils/apiBase';
 import { getStoredToken } from '../../utils/auth';
 import { isNativeAndroid } from '../../utils/appContext';
-import {locationEvidence} from '../../utils/reportIntake';
+import {locationEvidence, hasReportLocation} from '../../utils/reportIntake';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
@@ -65,6 +66,7 @@ export default function Step2CameraLocation({
   const [dragActive, setDragActive] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [geoError, setGeoError] = useState(null);
+  const [editingLocation, setEditingLocation] = useState(false);
   const [photoError, setPhotoError] = useState(null);
   const [isAddressCopied, setIsAddressCopied] = useState(false);
 
@@ -121,6 +123,7 @@ export default function Step2CameraLocation({
       isInCaloocan: inBounds,
       confirmed: false,
       pinConfirmed: false,
+      confirmedAt: null,
       source: customAddress ? 'manual-geocode' : 'device-gps',
       deviceFix: customAddress ? previous.deviceFix : { latitude: lat, longitude: lng, accuracy_m: accuracy, measured_at: measuredAt },
     }));
@@ -492,7 +495,7 @@ export default function Step2CameraLocation({
   };
 
   const canProceed = hasPhoto && !evidenceData?.isAiScanning && !evidenceData?.isInappropriate && hasCoordinates
-    && isInsideJurisdiction && locationData?.pinConfirmed && !isLocating && locationData?.addressStatus !== 'LOADING';
+    && hasReportLocation(locationData) && isInsideJurisdiction && !isLocating;
 
   useEffect(() => {
     if (shouldAutoAdvanceRef.current && canProceed) {
@@ -701,13 +704,20 @@ export default function Step2CameraLocation({
         )}
       </div>
 
-      {hasCoordinates && <label className="flex items-center gap-3 min-h-11 text-sm text-slate-900 dark:text-white">
-        <input type="checkbox" checked={Boolean(locationData?.pinConfirmed)}
-          className="size-5 focus-visible:outline-3 focus-visible:outline-blue-600"
-          onChange={event => onLocationChange(previous => ({ ...previous, pinConfirmed: event.target.checked, confirmed: event.target.checked, confirmedAt: event.target.checked ? new Date().toISOString() : null }))} />
-        {t('reportIntelligence.confirmIssuePin')}
-      </label>}
+
       {/* â”€â”€ Pinned Card Footer â”€â”€ */}
+      <div className="space-y-3">
+        {geoError && <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{geoError}</p>}
+        <button type="button" onClick={() => setEditingLocation(value => !value)}
+          aria-expanded={editingLocation} aria-controls="report-location-editor"
+          className="min-h-11 px-2 text-sm font-semibold text-orange-700 dark:text-orange-300 underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-blue-600">
+          {t('reportWizard.step2Location.changeLocation', 'Change location')}
+        </button>
+        {editingLocation && <div id="report-location-editor">
+          <Step2LocationMap isMapLoaded={isMapLoaded} locationData={locationData}
+            onLocationChange={onLocationChange} showFooter={false} />
+        </div>}
+      </div>
       <WizardCardFooter
         onBack={onBack}
         onContinue={onContinue}

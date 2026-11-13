@@ -6,7 +6,7 @@ import { useAndroidBack } from '../utils/nativeAndroid';
 import { isNativeAndroid } from '../utils/appContext';
 import useResidentReportDraft, {useReportDraftPrincipal} from '../hooks/useResidentReportDraft';
 import {packResidentPhoto,unpackResidentPhoto,reportDraftPrincipal} from '../utils/residentReportDraft';
-import {pendingReportIntake,locationEvidence} from '../utils/reportIntake';
+import {pendingReportIntake,locationEvidence,hasReportLocation} from '../utils/reportIntake';
 import {getStoredToken,getStoredUser} from '../utils/auth';
 import ResidentDraftStatus from './report-wizard/ResidentDraftStatus';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -210,9 +210,6 @@ function QuickReportWizardModal({
     const [photoProvenance, setPhotoProvenance] = useState(null);
     const photoCapturedAt = photoProvenance?.capturedAt || null;
     const [pendingSubmission,setPendingSubmission]=useState(false);
-    const [confirmedPoint, setConfirmedPoint] = useState(null);
-    const pointSignature = reportLocation ? `${reportLocation.lat},${reportLocation.lng}` : null;
-    const issuePinConfirmed = Boolean(pointSignature && confirmedPoint?.point === pointSignature);
     const pointUsesDeviceFix=locationEvidence(reportLocation || {}).source==='device';
     const [isWatermarking, setIsWatermarking] = useState(false);
     const [isFullscreenPhotoOpen, setIsFullscreenPhotoOpen] = useState(false);
@@ -297,7 +294,7 @@ function QuickReportWizardModal({
             customBarangay,reportLocation,locationAddress,plusCode,structuredAddress]);
     const restoreDraft=useCallback((value,options)=>{
         const restored=unpackResidentPhoto(value?.photo);
-        setPhotoFile(restored.file);setPhotoProvenance(restored.provenance);setConfirmedPoint(null);
+        setPhotoFile(restored.file);setPhotoProvenance(restored.provenance);
         setIsFullscreenPhotoOpen(false);setIsCameraModalOpen(false);
         setSelectedCategories(Array.isArray(value?.selectedCategories)?value.selectedCategories.slice(0,MAX_SELECTED_CATEGORIES):[]);
         setSuggestedCategories(Array.isArray(value?.suggestedCategories)?value.suggestedCategories.slice(0,MAX_SELECTED_CATEGORIES):[]);
@@ -806,7 +803,8 @@ function QuickReportWizardModal({
     const handleFinalSubmit = async () => {
         if(draft.locked||pendingSubmission||isSubmitting)return;
         if (!selectedCategories.length) return;
-        if (duplicateReport || !issuePinConfirmed) return;
+        if (duplicateReport || !hasReportLocation(reportLocation)) return;
+        onStopLocationTracking?.();
 
         // Inappropriate language / profanity validation guard
         if (notesProfanityValidation.hasProfanity) {
@@ -839,7 +837,7 @@ function QuickReportWizardModal({
             const result = await onSubmitReport({
                 draftPrincipal:principal, photo, photoFile, photoCapturedAt, photoProvenance, categories: selectedCategories.slice(0, MAX_SELECTED_CATEGORIES),
                 notes, othersDescription, locationDetails, barangay: resolvedBarangay,
-                location: { ...reportLocation, pinConfirmed: true, confirmedAt: confirmedPoint.at }, address: displayAddress,
+                location: reportLocation, address: displayAddress,
             });
             if (!result?.trackingNumbers?.length) throw new Error('No server receipt was returned. Retry to recover your ticket.');
             setSubmittedTrackingNumbers(result.trackingNumbers);
@@ -1976,18 +1974,14 @@ function QuickReportWizardModal({
                     {/* STEP 3 FOOTER */}
                     {step === 3 && (
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-3 min-h-11 text-sm text-slate-900 dark:text-white">
-                                <input type="checkbox" checked={issuePinConfirmed} className="size-5 focus-visible:outline-3 focus-visible:outline-blue-600"
-                                    onChange={event => { onStopLocationTracking?.(); setConfirmedPoint(event.target.checked ? { point: pointSignature, at: new Date().toISOString() } : null); }} />
-                                {t('reportIntelligence.confirmIssuePin')}
-                            </label>
+                            <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">{t('reportAutomation.submitNotice')}</p>
                             {/* Submit one report with every selected category. */}
                             <button
                                 type="button"
-                                disabled={isSubmitting || hasProfanityInForm || Boolean(duplicateReport) || !issuePinConfirmed}
+                                disabled={isSubmitting || hasProfanityInForm || Boolean(duplicateReport) || !hasReportLocation(reportLocation)}
                                 onClick={handleFinalSubmit}
                                 className={`w-full min-h-[52px] h-[3.25rem] rounded-xl text-base font-bold text-white shadow-md transition-all flex items-center justify-center ${
-                                    isSubmitting || hasProfanityInForm || Boolean(duplicateReport) || !issuePinConfirmed
+                                    isSubmitting || hasProfanityInForm || Boolean(duplicateReport) || !hasReportLocation(reportLocation)
                                         ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none'
                                         : 'bg-[#ff6b00] hover:bg-[#e05e00] shadow-orange-500/20 active:scale-[0.99] cursor-pointer'
                                 }`}

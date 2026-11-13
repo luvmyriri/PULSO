@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  MapPin, Edit2, ShieldCheck, AlertCircle, ChevronDown, ChevronUp, AlertTriangle, Check
+  MapPin, Edit2, ShieldCheck, AlertCircle, ChevronDown, ChevronUp, AlertTriangle
 } from 'lucide-react';
 import WizardCardFooter from './WizardCardFooter';
 
@@ -9,7 +9,6 @@ export default function Step6ReviewConsent({
   formData,
   isSubmitting,
   onJumpToStep,
-  onConsentChange,
   onBack,
   onSubmit,
   reviewErrors = [],
@@ -18,7 +17,6 @@ export default function Step6ReviewConsent({
   const { t } = useTranslation();
   const [isDescExpanded, setIsDescExpanded] = useState(false);
 
-  const consentAccepted = formData?.consentAccepted || false;
   const { category, location, evidence, details, contact } = formData || {};
   const safeAddress = typeof location?.address === 'string'
     ? location.address.replace(/\[object Object\]/g, 'Caloocan City')
@@ -238,27 +236,9 @@ export default function Step6ReviewConsent({
               </div>
             </div>
 
-            {/* Declaration & Consent Checkbox */}
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                  consentAccepted
-                    ? 'bg-[#ff6b00] text-white'
-                    : 'border border-slate-300 dark:border-slate-600 bg-transparent'
-                }`}>
-                  {consentAccepted && <Check size={14} strokeWidth={3} aria-hidden="true" />}
-                </div>
-                <input
-                  type="checkbox"
-                  checked={consentAccepted}
-                  onChange={(e) => onConsentChange(e.target.checked)}
-                  className="sr-only"
-                />
-                <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 leading-relaxed">
-                  {t('reportWizard.step6Review.confirmAccuracy', 'I confirm that this report is accurate to the best of my knowledge and follows the City of Caloocan reporting guidelines.')}
-                </span>
-              </label>
-            </div>
+            <p className="pt-4 border-t border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              {t('reportAutomation.submitNotice')}
+            </p>
           </div>
 
           {/* Right Column: Previews & Emergency 911 Note */}
@@ -309,7 +289,7 @@ export default function Step6ReviewConsent({
         onBack={onBack}
         canBack={true}
         onContinue={onSubmit}
-        isContinueDisabled={!consentAccepted || hasReviewErrors || isSubmitting}
+        isContinueDisabled={hasReviewErrors || isSubmitting}
         isSubmit={true}
         isSubmitting={isSubmitting}
       />

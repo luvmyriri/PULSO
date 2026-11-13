@@ -11,9 +11,10 @@ import ReportWizardPage from '../../src/pages/ReportWizardPage';
 import ReportSuccessPage from '../../src/pages/ReportSuccessPage';
 import {createResidentDraft,packResidentPhoto,reportDraftPrincipal} from '../../src/utils/residentReportDraft';
 import {getStoredToken} from '../../src/utils/auth';
-import {submitReportIntake,recoverReportIntake,finishReportIntake} from '../../src/utils/reportIntake';
+import {submitReportIntake,recoverReportIntake,finishReportIntake,locationEvidence} from '../../src/utils/reportIntake';
 
 const mode=new URLSearchParams(location.search).get('view') || 'quick';
+const automation=new URLSearchParams(location.search).get('automation')==='1';
 const user={id:901,role:'resident',full_name:'SAMPLE resident',email:'SAMPLE-resident-901@test.invalid'};
 function setAccount(id){const account={...user,id,email:`SAMPLE-resident-${id}@test.invalid`};
     const token='SAMPLE.'+btoa(JSON.stringify({sub:account.email}))+'.SAMPLE';
@@ -35,6 +36,7 @@ window.fetch=async(input,options={})=>{
     if(url.includes('/intake-receipt')){const receipt=localStorage.getItem(receiptKey);return new Response(receipt || '{}',{status:receipt?200:404,headers:{'Content-Type':'application/json'}});}
     if(url.endsWith('/api/reports')&&options.method==='POST'){
         const body=options.body;
+        window.__SAMPLE_submissions=(window.__SAMPLE_submissions||[]).concat({metadata:JSON.parse(body.get('location_metadata')||'null'),email:body.get('contact_email')});
         const report={id:901,ticket_id:'SAMPLE-RECEIPT-901',tracking_token:'SAMPLE-private-code',
             categories:JSON.parse(body.get('categories')||'[]'),category:body.get('category'),description:body.get('description'),
             location_string:body.get('location_string'),created_at:new Date().toISOString(),reporter_type:'registered'};
@@ -44,7 +46,8 @@ window.fetch=async(input,options={})=>{
     return new Response('{}',{status:503,headers:{'Content-Type':'application/json'}});
 };
 
-const point={lat:14.7565,lng:121.045,source:'selected-map',isInCaloocan:true,confirmed:false};
+const point={lat:14.7565,lng:121.045,source:automation?'device-gps':'selected-map',isInCaloocan:true,confirmed:false,pinConfirmed:false,
+    ...(automation?{accuracy:55,deviceFix:{latitude:14.7565,longitude:121.045,accuracy_m:55,measured_at:new Date().toISOString()}}:{})};
 function QuickCase(props){const {theme}=useTheme();return <QuickReportWizardModal {...props} theme={theme}/>;}
 async function samplePhoto(){const result=await import('./sample-field-evidence.png?url');
     // Image bytes are served from the local test fixture via a native image/canvas.
@@ -56,8 +59,8 @@ function Review(){
     const kind=mode==='wizard'?'wizard':'quick';
     async function seed(){const driver=createResidentDraft({kind,principal:reportDraftPrincipal(getStoredToken(),account)});await driver.load();
         const photo=packResidentPhoto(await samplePhoto(),{source:'camera',capturedAt:new Date(Date.now()-2000).toISOString(),photoDeviceFix:{latitude:14.7564,longitude:121.0449,accuracy_m:12,measured_at:new Date(Date.now()-3000).toISOString()}});
-        await driver.save(kind==='quick'?{step:1,photo,notes:'SAMPLE concern retained across reload',selectedCategories:['Roads & Bridges'],suggestedCategories:[],locationDetails:{},locationContext:context}:
-            {currentStep:1,maxStepReached:5,photo,formData:{category:'Roads & Bridges',location:{...point,barangay:'Barangay 171',address:'SAMPLE test site'},details:{description:'SAMPLE concern retained across reload',urgency:'medium'},contact:{name:'SAMPLE resident',email:account.email,phone:''}}});setInfo('SAMPLE original photo and metadata seeded');}
+        await driver.save(kind==='quick'?{step:automation?3:1,photo,notes:'SAMPLE concern retained across reload',selectedCategories:['Roads & Bridges'],suggestedCategories:[],locationDetails:{},locationContext:context}:
+            {currentStep:1,maxStepReached:5,photo,formData:{category:'Roads & Bridges',location:{...point,barangay:'Barangay 171',address:'SAMPLE test site'},details:{description:'SAMPLE concern retained across reload',urgency:'medium'},contact:automation?{}:{name:'SAMPLE resident',email:account.email,phone:''}}});setInfo('SAMPLE original photo and metadata seeded');}
     async function concurrency(){const args={kind:'SAMPLE-cas',principal:'SAMPLE-browser-concurrency'};const a=createResidentDraft(args),b=createResidentDraft(args);await Promise.all([a.load(),b.load()]);const results=await Promise.allSettled([a.save({notes:'SAMPLE one'}),b.save({notes:'SAMPLE two'})]);setInfo(JSON.stringify(results.map(r=>r.status==='fulfilled'?'saved':r.reason.name)));}
     async function uncertain(){try{await submitReportIntake({draftKey:kind,token:getStoredToken(),image:await samplePhoto(),fields:{category:'Roads & Bridges',categories:['Roads & Bridges'],description:'SAMPLE immutable original submission',location_string:'SAMPLE test site'},
         fetchImpl:async(url,options)=>{const response=await window.fetch(url,options);if(options.method==='POST')throw new Error('SAMPLE lost acknowledgement');return response;}});}catch{setInfo('SAMPLE uncertain original operation seeded');}}
@@ -75,7 +78,7 @@ function Review(){
         {kind==='quick'&&mode!=='receipt'&&<QuickCase isOpen={open} onClose={()=>setOpen(false)} currentUser={account}
             reportLocation={context.location} locationAddress={context.address} structuredAddress={context.structuredAddress}
             onRestoreDraftLocation={setContext} onSubmitReport={async({recoverOnly,...values})=>{
-                const token=getStoredToken();const report=recoverOnly?await recoverReportIntake({token,draftKey:'quick'}):await submitReportIntake({token,draftKey:'quick',image:values.photoFile,fields:{category:values.categories[0],categories:values.categories,description:values.notes,location_string:values.address}});
+                const token=getStoredToken();const report=recoverOnly?await recoverReportIntake({token,draftKey:'quick'}):await submitReportIntake({token,draftKey:'quick',image:values.photoFile,fields:{category:values.categories[0],categories:values.categories,description:values.notes,location_string:values.address,location_metadata:locationEvidence(values.location,values.photoProvenance)}});
                 finishReportIntake('quick',token);return {trackingNumbers:[report.ticket_id],report};
             }}/>}
     </div><Routes><Route path="/report" element={kind==='wizard'?<ReportWizardPage/>:<div/>}/><Route path="/report/success" element={<ReportSuccessPage/>}/></Routes></MemoryRouter></ThemeProvider>;

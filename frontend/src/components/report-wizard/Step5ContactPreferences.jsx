@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { validateFullName, validateEmail, validateContact } from '../../utils/reportWizardValidation';
 import { API_BASE_URL } from '../../utils/apiBase';
-import { getStoredToken } from '../../utils/auth';
+import { getStoredToken, getStoredUser } from '../../utils/auth';
 import WizardCardFooter from './WizardCardFooter';
 
 export default function Step5ContactPreferences({
@@ -20,7 +20,6 @@ export default function Step5ContactPreferences({
   const { t } = useTranslation();
   const nameInputRef = useRef(null);
   const emailInputRef = useRef(null);
-  const consentRef = useRef(null);
 
   const [localSubmitted, setLocalSubmitted] = useState(false);
   const [emailCheckStatus, setEmailCheckStatus] = useState('idle'); // 'idle' | 'checking' | 'available' | 'inUse' | 'error'
@@ -29,19 +28,29 @@ export default function Step5ContactPreferences({
 
   const fullName = contactData?.name || '';
   const email = contactData?.email || '';
-  const consentAccepted = contactData?.consentAccepted || false;
 
   const isGuest = !getStoredToken();
 
+  useEffect(() => {
+    const account = getStoredUser();
+    if (!getStoredToken() || account?.role !== 'resident') return;
+    const name = contactData?.name || account.full_name || account.name || '';
+    const email = contactData?.email || account.email || '';
+    if (name !== (contactData?.name || '') || email !== (contactData?.email || '')) {
+      onContactChange({ ...contactData, name, email });
+    }
+    // Prefill once on entering this step; subsequent resident edits stay editable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Compute live validation when user tries to continue or when fields are touched
-  const liveValidation = validateContact(contactData, consentAccepted);
+  const liveValidation = validateContact(contactData);
   const activeErrors = localSubmitted ? liveValidation.errors : stepErrors;
   const activeWarnings = liveValidation.warnings.length > 0 ? liveValidation.warnings : stepWarnings;
 
   const nameError = activeErrors.find(e => e.field === 'name');
   const contactError = activeErrors.find(e => e.field === 'contact');
   const emailError = activeErrors.find(e => e.field === 'email');
-  const consentError = activeErrors.find(e => e.field === 'consent');
 
   const emailWarning = activeWarnings.find(w => w.field === 'email');
 
@@ -50,10 +59,8 @@ export default function Step5ContactPreferences({
       nameInputRef.current.focus();
     } else if (emailError && emailInputRef.current) {
       emailInputRef.current.focus();
-    } else if (consentError && consentRef.current) {
-      consentRef.current.focus();
     }
-  }, [nameError, emailError, consentError]);
+  }, [nameError, emailError]);
 
   // Real-time debounced Gmail account availability check for Guests
   useEffect(() => {
@@ -163,7 +170,7 @@ export default function Step5ContactPreferences({
   const handleAttemptContinue = () => {
     setLocalSubmitted(true);
     if (emailCheckStatus === 'checking') return;
-    const check = validateContact(contactData, consentAccepted);
+    const check = validateContact(contactData);
     if (!check.valid || emailCheckStatus === 'inUse') {
       return;
     }
@@ -176,8 +183,7 @@ export default function Step5ContactPreferences({
   const hasRequiredFields = Boolean(
     nameCheck.valid &&
     emailCheck.valid &&
-    !emailCheck.typoSuggestion &&
-    consentAccepted
+    !emailCheck.typoSuggestion
   );
 
   return (
@@ -334,45 +340,6 @@ export default function Step5ContactPreferences({
           </p>
         </div>
 
-        {/* Consent Checkbox (Required) */}
-        <div className="pt-2">
-          <label className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-colors cursor-pointer ${
-            consentError
-              ? 'border-red-500 ring-1 ring-red-500 bg-red-50/20 dark:bg-red-950/20'
-              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-          }`}>
-            <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-              consentAccepted
-                ? 'bg-[#ff6b00] text-white'
-                : 'border border-slate-300 dark:border-slate-600 bg-transparent'
-            }`}>
-              {consentAccepted && <Check size={14} strokeWidth={3} aria-hidden="true" />}
-            </div>
-            <input
-              ref={consentRef}
-              type="checkbox"
-              checked={consentAccepted}
-              onChange={(e) => onContactChange({ ...contactData, consentAccepted: e.target.checked })}
-              className="sr-only"
-            />
-            <div className="space-y-0.5">
-              <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 leading-relaxed block">
-                {t('reportWizard.validation.contact.consentLabel', 'I agree to the use of my contact details for report verification, updates, and follow-ups')}
-                <span className="text-red-500 ml-1" aria-hidden="true">*</span>
-              </span>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Your contact details are strictly protected and never published publicly.
-              </p>
-            </div>
-          </label>
-          {consentError && (
-            <p className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 mt-1.5 pl-1 animate-fadeIn">
-              <AlertCircle size={14} className="shrink-0 text-red-500" aria-hidden="true" />
-              <span>{consentError.message}</span>
-            </p>
-          )}
-        </div>
-
         {/* Privacy Note */}
         <aside
           aria-label="Privacy guarantee"
@@ -386,7 +353,7 @@ export default function Step5ContactPreferences({
               {t('reportWizard.step5Contact.privacyCardTitle', 'Your contact details are private')}
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {t('reportWizard.step5Contact.privacyCardDesc', 'They will not appear on the public report.')}
+              {t('reportAutomation.contactUse')}
             </p>
           </div>
         </aside>
