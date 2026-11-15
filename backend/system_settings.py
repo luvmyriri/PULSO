@@ -165,19 +165,19 @@ def review_target(value,report,now):
     return dict(due_at=due,hours=hours,overdue=now>due,measured_from='submission')
 
 
-def report_analysis(db,description,image_data=None):
+def report_analysis(db,description,image_data=None,selected_categories=None):
     import gemini_service
     from report_screening import normalize_analysis
     value=read_config(db,'ai_report_category_suggestion')
     state='disabled' if not value['enabled'] else 'unavailable' if gemini_service.AI_DISABLED or not gemini_service._SDK_READY else None
     try:
-        result=gemini_service.analyze_report(description,image_data=image_data) if state is None else {}
+        result=gemini_service.analyze_report(description,image_data=image_data,selected_categories=selected_categories) if state is None else {}
     except Exception:
         result={};state='unavailable'
     if not isinstance(result,dict): result={};state='unavailable'
     if result.get('analysis_status')=='manual_review': state='unavailable'
     if state:
-        return normalize_analysis({},has_image=bool(image_data),provider_state=state)
-    result=normalize_analysis(result,has_image=bool(image_data),provider_state='suggested')
+        return normalize_analysis({},has_image=bool(image_data),provider_state=state,selected_categories=selected_categories or ())
+    result=normalize_analysis(result,has_image=bool(image_data),provider_state='suggested',selected_categories=selected_categories or ())
     if not value['suggest_urgency']: result['urgency']=None;result['severity_score']=None
     return result

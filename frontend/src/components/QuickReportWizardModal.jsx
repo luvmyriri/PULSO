@@ -6,9 +6,10 @@ import { useAndroidBack } from '../utils/nativeAndroid';
 import { isNativeAndroid } from '../utils/appContext';
 import useResidentReportDraft, {useReportDraftPrincipal} from '../hooks/useResidentReportDraft';
 import {packResidentPhoto,unpackResidentPhoto,reportDraftPrincipal} from '../utils/residentReportDraft';
-import {pendingReportIntake,locationEvidence,hasReportLocation} from '../utils/reportIntake';
+import {pendingReportIntake,hasReportLocation} from '../utils/reportIntake';
 import {getStoredToken,getStoredUser} from '../utils/auth';
 import ResidentDraftStatus from './report-wizard/ResidentDraftStatus';
+import LocationAccuracyBadge from './report-wizard/LocationAccuracyBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X,
@@ -23,7 +24,6 @@ import {
     MicOff,
     FileText,
     Copy,
-    Info,
     AlertTriangle,
     AlertCircle,
     PhoneCall,
@@ -210,7 +210,6 @@ function QuickReportWizardModal({
     const [photoProvenance, setPhotoProvenance] = useState(null);
     const photoCapturedAt = photoProvenance?.capturedAt || null;
     const [pendingSubmission,setPendingSubmission]=useState(false);
-    const pointUsesDeviceFix=locationEvidence(reportLocation || {}).source==='device';
     const [isWatermarking, setIsWatermarking] = useState(false);
     const [isFullscreenPhotoOpen, setIsFullscreenPhotoOpen] = useState(false);
     const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
@@ -1061,17 +1060,7 @@ function QuickReportWizardModal({
                                                         )}
                                                     </span>
 
-                                                ) : !reportLocation ? null : (pointUsesDeviceFix && reportLocation?.accuracy && reportLocation.accuracy > 25) ? (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50 shrink-0 whitespace-nowrap">
-                                                        <Info size={13} className="text-amber-500 shrink-0" />
-                                                        <span>{t('locationPrivacy.approximateAccuracy', { accuracy: Math.round(reportLocation.accuracy) })}</span>
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/50 shrink-0">
-                                                        <Info size={13} className="shrink-0" />
-                                                        <span>{pointUsesDeviceFix ? t('locationPrivacy.gpsSelected') : t('residentDraft.manualLocation')}</span>
-                                                    </span>
-                                                )}
+                                                ) : <LocationAccuracyBadge location={reportLocation} />}
                                             </LocationCoordinates>
                                         )}
                                         {!reportLocation && requestDeviceLocation && (

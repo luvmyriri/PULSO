@@ -3,6 +3,10 @@ import {useTranslation} from 'react-i18next';
 export default function ResidentDraftStatus({draft,pending=false,recovering=false,onRecover}) {
     const {t}=useTranslation();
     const error=['load_error','save_error','conflict'].includes(draft.status);
+    // Keep routine local-save state out of the form. It is not a submission
+    // confirmation, and it competes with the reporting task on small screens.
+    // Failures and an in-flight recovery remain visible so the resident can act.
+    if(!pending&&!error)return null;
     return <div className="resident-draft-status" style={{padding:'12px 16px',borderBottom:'1px solid var(--color-slate-200,#cbd5e1)'}}>
         <p className="text-sm text-slate-700 dark:text-slate-200" role={error?'alert':'status'} aria-live="polite">
             {t(`residentDraft.${pending?'pending':draft.status}`)}

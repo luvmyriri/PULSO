@@ -3,8 +3,8 @@ import React from 'react';
 /**
  * ShutterButton
  * ─────────────────────────────────────────────────────────────────────────────
- * Shutter: a 4.5rem (72px) round button with a white ring (4px) and a solid inner
- * circle in the existing orange token (#ff6b00).
+ * Shutter: a transparent round button with a white ring and solid white inner
+ * circle, matching the native camera reference.
  * Pressed state: the inner circle shrinks to 90% (with reduced motion: no shrink).
  */
 export default function ShutterButton({
@@ -22,7 +22,7 @@ export default function ShutterButton({
             aria-label={ariaLabel}
             className={`w-[4.25rem] h-[4.25rem] min-w-[4.25rem] min-h-[4.25rem] rounded-full border-[3.5px] flex items-center justify-center transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] disabled:opacity-40 disabled:cursor-not-allowed select-none ${
                 isDark
-                    ? 'border-white bg-white/10 backdrop-blur-xs shadow-lg'
+                    ? 'border-white bg-transparent shadow-[0_0_0_1px_rgba(0,0,0,0.6)]'
                     : 'border-slate-300 bg-white shadow-md'
             } ${className}`}
         >

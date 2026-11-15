@@ -126,7 +126,7 @@ export function NativeResidentGreeting({ user, onOpenAccount }) {
   </button>;
 }
 
-export default function NativeAppHeader({ children, onLanguageChange, onBrandClick, brand, showThemeToggle = true, appearance = 'default', borderless = appearance === 'hero', transparent = false }) {
+export default function NativeAppHeader({ children, onLanguageChange, onBrandClick, brand, showThemeToggle = true, appearance = 'default', borderless = appearance === 'hero', transparent = false, sticky = true }) {
   const { i18n } = useTranslation();
   const { isDark } = useTheme();
   const filipino = i18n.resolvedLanguage === 'tl';
@@ -139,7 +139,7 @@ export default function NativeAppHeader({ children, onLanguageChange, onBrandCli
   };
 
   return (
-    <header data-native-app-header data-landing-theme={isDark ? 'dark' : 'light'} className={`${appearance === 'hero' ? 'native-app-header--hero ' : ''}${transparent ? 'native-app-header--transparent ' : ''}sticky top-0 z-40 w-full shrink-0 bg-[#f7f9fc] text-[#172339] dark:bg-[#0c1421] dark:text-slate-50 ${borderless ? '' : 'border-b border-slate-300 dark:border-slate-700'}`}>
+    <header data-native-app-header data-landing-theme={isDark ? 'dark' : 'light'} className={`${appearance === 'hero' ? 'native-app-header--hero ' : ''}${transparent ? 'native-app-header--transparent ' : ''}${sticky ? 'sticky top-0 ' : 'relative '}z-40 w-full shrink-0 bg-[#f7f9fc] text-[#172339] dark:bg-[#0c1421] dark:text-slate-50 ${borderless ? '' : 'border-b border-slate-300 dark:border-slate-700'}`}>
       <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-2 px-4">
         {brand || <NativeAppBrand appearance={appearance} onClick={onBrandClick} />}
         <div className="relative flex shrink-0 items-center gap-1">

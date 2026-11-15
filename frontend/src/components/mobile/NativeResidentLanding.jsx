@@ -1,10 +1,11 @@
 import { ArrowRight, Camera, ChevronRight, CircleCheck, Search, Send } from 'lucide-react';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import NativeAppHeader, { NativeResidentAccountLink } from './NativeAppHeader';
 import NativeTrackSheet from './NativeTrackSheet';
+import NativeGuestReportSheet from './NativeGuestReportSheet';
 import NativeAppUpdateButton from './NativeAppUpdateButton';
 import './native-resident-theme.css';
 import './native-resident-landing.css';
@@ -20,9 +21,34 @@ export default function NativeResidentLanding({ residentSignedIn, trackingRoute 
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [trackingOpen, setTrackingOpen] = useState(false);
+  const [guestReportOpen, setGuestReportOpen] = useState(false);
+  const surface = useRef(null);
+  useLayoutEffect(() => {
+    const node = surface.current;
+    const measure = () => {
+      // Compact phones fit one screen; enlarged text can reflow without clipping.
+      const main = node.querySelector('.native-home__main');
+      const rootStyle = getComputedStyle(node), mainStyle = getComputedStyle(main);
+      const required = [...main.children].reduce((height, child) => {
+        if (!child.getClientRects().length) return height;
+        const style = getComputedStyle(child);
+        return height + child.getBoundingClientRect().height + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
+      }, 0) + parseFloat(mainStyle.paddingTop) + parseFloat(mainStyle.paddingBottom)
+        + parseFloat(mainStyle.rowGap) * (main.children.length - 1);
+      const available = window.innerHeight - node.querySelector('header').getBoundingClientRect().height
+        - parseFloat(rootStyle.paddingTop) - parseFloat(rootStyle.paddingBottom);
+      if (required > available + 2) node.setAttribute('data-content-overflow', 'true');
+      else node.removeAttribute('data-content-overflow');
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(node); observer.observe(node.querySelector('.native-home__main'));
+    for (const child of node.querySelector('.native-home__main').children) observer.observe(child);
+    document.fonts.ready.then(measure);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className="native-resident-landing" data-native-resident-landing data-landing-theme={isDark ? 'dark' : 'light'}
+    <div ref={surface} className="native-resident-landing" data-native-resident-landing data-landing-theme={isDark ? 'dark' : 'light'}
       lang={i18n.resolvedLanguage === 'tl' ? 'tl' : 'en'}>
       <div className="native-home__backdrop" aria-hidden="true">
         <img src="/resident-hero/native-bonifacio-monument.webp" alt="" fetchPriority="high" />
@@ -40,7 +66,12 @@ export default function NativeResidentLanding({ residentSignedIn, trackingRoute 
           <span className="native-home__signal" aria-hidden="true" />
           <p className="native-home__intro">{t('nativeAndroid.home.welcome')}</p>
           <nav aria-label={t('nativeAndroid.home.actions')} className="native-home__actions">
-            <Link to={residentSignedIn ? '/report' : '/report?source=guest'} className="native-home__report">
+            <Link to={residentSignedIn ? '/report' : '/report?source=guest'} className="native-home__report"
+              aria-haspopup={residentSignedIn ? undefined : 'dialog'} onClick={event => {
+                if (residentSignedIn) return;
+                event.preventDefault();
+                setGuestReportOpen(true);
+              }}>
               <Camera size={29} aria-hidden="true" />
               <span>{t('nativeAndroid.home.report')}</span>
               <ArrowRight size={24} aria-hidden="true" />
@@ -90,6 +121,7 @@ export default function NativeResidentLanding({ residentSignedIn, trackingRoute 
       <svg className="native-home__footer-cut" viewBox="0 0 390 40" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         <path d="M0 3C95-15 122 52 270 24C324 14 350 17 390 28V40C275 8 209 64 89 27C48 14 20 13 0 18Z" fill="currentColor" />
       </svg>
+      {guestReportOpen && <NativeGuestReportSheet onDismiss={() => setGuestReportOpen(false)} />}
       {(trackingOpen || trackingRoute) && <NativeTrackSheet onDismiss={() => {
         setTrackingOpen(false);
         if (trackingRoute) navigate('/', { replace: true });

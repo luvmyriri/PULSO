@@ -1,4 +1,5 @@
 import { hasReportLocation } from './reportIntake.js';
+import { isReportPhotoRestricted } from './reportScreening.js';
 /**
  * PULSO Report Wizard Validation Module
  * Pure validation functions, normalizers, and edge-case guards for the 5-step flow.
@@ -302,7 +303,7 @@ export function validateEvidence(evidenceData) {
   }
 
   // Check rejected/inappropriate photos
-  const rejected = photos.filter(p => p.isInappropriate);
+  const rejected = photos.filter(p => p.isInappropriate || isReportPhotoRestricted(p));
   if (rejected.length > 0) {
     errors.push({
       field: 'photos',

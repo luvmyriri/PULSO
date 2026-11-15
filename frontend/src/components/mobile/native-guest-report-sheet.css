@@ -1,0 +1,23 @@
+.native-guest-report__title { display: flex; align-items: center; gap: .75rem; }
+.native-guest-report__title svg {
+  box-sizing: content-box; flex: none; padding: .625rem; border-radius: 50%;
+  background: color-mix(in srgb, var(--home-action) 12%, var(--home-surface)); color: var(--home-action);
+}
+.native-guest-report__actions { display: grid; gap: .75rem; padding-bottom: .75rem; }
+.native-guest-report__actions a {
+  display: flex; align-items: center; justify-content: center; min-height: 48px;
+  padding: .625rem 1rem; border: 1px solid var(--home-rule); border-radius: 2rem;
+  text-align: center; text-decoration: none; font-size: .9375rem; line-height: 1.4; font-weight: 750;
+}
+.native-guest-report__continue {
+  background: var(--home-action);
+  color: #fff !important;
+  -webkit-text-fill-color: #fff;
+}
+.native-guest-report__sign-in { background: var(--home-surface); color: var(--home-ink); }
+.native-guest-report__actions a:hover { filter: brightness(.95); }
+.native-guest-report__actions a:active { filter: brightness(.9); }
+@media (forced-colors: active) {
+  .native-guest-report__actions a { background: ButtonFace; color: ButtonText; border-color: ButtonText; }
+  .native-guest-report__title svg { color: CanvasText; }
+}

@@ -55,6 +55,7 @@ export default function Step3EvidenceUpload({
       formData.append('image', fileToScan, fileToScan.name || 'evidence.jpg');
       if (category) {
         formData.append('description', `Selected category: ${category}`);
+        formData.append('selected_categories', JSON.stringify([category]));
       }
 
       const token = getStoredToken();
@@ -553,6 +554,8 @@ export default function Step3EvidenceUpload({
         title="Civic Evidence Camera"
         subtitle="Capture real-time field photo with GPS & timestamp watermark"
         metadata={{
+          category,
+          categories: category ? [category] : [],
           location: locationData,
           reportLocation: locationData,
           structuredAddress: locationData?.structuredAddress || null,

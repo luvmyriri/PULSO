@@ -1,9 +1,16 @@
-// Advice about a photo is separate from the backend's explicit upload restriction.
+// A screen capture is not usable photo evidence. Keep this client guard aligned
+// with the backend restriction so an older assessment cannot enable submission.
 export const REPORT_SCREENING_VERSION = 'pulso-relogic-screening-v1';
 
 export function isReportPhotoRestricted(analysis) {
-    return analysis?.screening?.version === REPORT_SCREENING_VERSION &&
-        analysis.screening.outcome === 'restricted_upload' && analysis.screening.submission_allowed === false;
+    const screening = analysis?.screening;
+    if (screening?.version !== REPORT_SCREENING_VERSION) return false;
+    return (screening.outcome === 'restricted_upload' && screening.submission_allowed === false) ||
+        (screening.provider_state === 'suggested' && [
+            screening.authenticity === 'screen_suspected',
+            screening.scene_context === 'private_indoor_suspected',
+            screening.category_fit === 'mismatch_selected',
+        ].some(Boolean));
 }
 
 export function canAutoAdvancePhoto(analysis) {
@@ -22,7 +29,6 @@ export function screeningMessageKey(analysis) {
     if (!screening || screening.version !== REPORT_SCREENING_VERSION) return null;
     if (isReportPhotoRestricted(analysis)) return 'reportScreening.replacePhoto';
     if (screening.provider_state !== 'suggested') return 'reportScreening.unavailable';
-    if (screening.authenticity === 'screen_suspected') return 'reportScreening.possibleScreen';
     if (screening.service_eligibility === 'potentially_out_of_service') return 'reportScreening.scopeUnknown';
     return 'reportScreening.review';
 }

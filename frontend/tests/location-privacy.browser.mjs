@@ -36,7 +36,7 @@ function App(){
   <p className="text-xs mb-3">Synthetic test data · GPS/Google Maps test doubles</p>
   {mode==='map' ? <MapStep isMapLoaded locationData={locationData} onLocationChange={onLocationChange} onBack={()=>{}} onContinue={()=>{}} />
    : mode==='camera' ? <CameraStep locationData={locationData} onLocationChange={onLocationChange} evidenceData={evidenceData} onEvidenceChange={onEvidenceChange} onBack={()=>{}} onContinue={()=>{}} />
-   : mode==='quick' ? <QuickReport isOpen onClose={()=>{}} theme={window.__theme} structuredAddress={address} reportLocation={{lat:14.7566,lng:121.045,accuracy:15}} />
+   : mode==='quick' ? <QuickReport isOpen onClose={()=>{}} theme={window.__theme} structuredAddress={address} reportLocation={{lat:14.7566,lng:121.045,accuracy:15,source:'device-gps',deviceFix:{latitude:14.7566,longitude:121.045,accuracy_m:15}}} />
    : mode==='viewfinder' ? <CameraModal isOpen side="ISSUE" onClose={()=>{}} onCapture={()=>{}} metadata={{structuredAddress:address,location:{lat:14.7566,lng:121.045,accuracy:15}}} />
    : <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4"><Panel address={address} status="OK" /></div>}
  </I18nextProvider>;
@@ -53,7 +53,7 @@ export function GoogleMap({children,onLoad,onClick,center,zoom}){
 export function MarkerF({position}){return <span data-testid="marker" data-lat={position.lat} data-lng={position.lng}>Selected marker (test double)</span>}
 `;
 const output = await build({ stdin: { contents: entry, resolveDir: frontend, sourcefile: 'privacy-browser-fixture.jsx', loader: 'jsx' },
-    bundle: true, format: 'esm', write: false, define: { 'process.env.NODE_ENV': '"test"', 'import.meta.env': '{"DEV":true,"VITE_API_BASE_URL":""}' },
+    bundle: true, format: 'esm', jsx: 'automatic', write: false, define: { 'process.env.NODE_ENV': '"test"', 'import.meta.env': '{"DEV":true,"VITE_API_BASE_URL":""}' },
     plugins: [{ name: 'component-test-doubles', setup(builder) {
         builder.onResolve({ filter: /^@react-google-maps\/api$/ }, () => ({ path: 'maps', namespace: 'test' }));
         builder.onResolve({ filter: /ThemeContext$/ }, () => ({ path: 'theme', namespace: 'test' }));
@@ -78,7 +78,7 @@ const server = createServer((req, res) => {
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 let browser;
-const screenshots = resolve(frontend, '../docs/location-privacy/evidence');
+const screenshots = process.env.PULSO_LOCATION_REVIEW_OUTPUT || resolve(frontend, '../docs/location-privacy/evidence');
 await mkdir(screenshots, { recursive: true });
 try {
     browser = await chromium.launch({ headless: true, args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'], ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}) });
@@ -102,7 +102,7 @@ try {
         window.__gps = { coords: { latitude: 14.7566, longitude: 121.045, accuracy: 15 }, timestamp: Date.now() };
         Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
             getCurrentPosition(success, error) { window.__gpsError ? error({ code: window.__gpsError }) : success(window.__gps); },
-            watchPosition(success) { window.__watch = success; return 1; }, clearWatch() { window.__watch = null; },
+            watchPosition(success) { window.__watch = success; setTimeout(() => success({ ...window.__gps, timestamp: Date.now() }), 0); return 1; }, clearWatch() { window.__watch = null; },
         } });
         window.__mockLookup = async endpoint => {
             window.__calls.push(endpoint);
@@ -120,7 +120,8 @@ try {
     await page.getByRole('button', { name: 'Use my location', exact: true }).click();
     await page.waitForFunction(() => window.__mapEvents.some(([type]) => type === 'panTo'));
     assert.deepEqual(await page.evaluate(() => window.__mapEvents), [['panTo', { lat: 14.7566, lng: 121.045 }], ['setZoom', 16]]);
-    await page.getByText(/Address details are unavailable or incomplete/).waitFor();
+    await page.waitForFunction(() => window.__calls.length > 0 && [...document.querySelectorAll('section[aria-busy]')].every(node => node.getAttribute('aria-busy') === 'false'));
+    assert.equal(await page.getByText(/Address details are unavailable or incomplete/).count(), 0);
     await page.getByRole('button', { name: 'Copy latitude and longitude', exact: true }).click();
     assert.equal(await page.evaluate(() => window.__copiedCoordinates), '14.756600, 121.045000');
     await page.getByRole('button', { name: 'Coordinates copied', exact: true }).waitFor();
@@ -163,7 +164,7 @@ try {
     const quickReportText = await page.locator('body').innerText();
     assert.doesNotMatch(quickReportText, /PRIVATE/);
     assert.match(quickReportText, /Q24W\+J2R/);
-    assert.match(quickReportText, /Lat 14\.756600 · Lng 121\.045000/);
+    assert.match(quickReportText.replace(/\s+/g, ' '), /Lat 14\.756600 · Lng 121\.045000/);
     const row = page.locator('[data-location-coordinates]');
     const rowPositions = await row.locator(':scope > *').evaluateAll(nodes => nodes.map(node => { const rect = node.getBoundingClientRect(); return rect.y + rect.height / 2; }));
     assert.ok(Math.max(...rowPositions) - Math.min(...rowPositions) < 3, 'Coordinates, copy button and accuracy badge share one row.');
@@ -182,10 +183,15 @@ try {
     await page.getByRole('button', { name: 'Zoom 2x', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('button[aria-label="Zoom 2x"]')?.className.includes('bg-white text-black'));
     await page.waitForTimeout(250);
-    await page.waitForFunction(() => window.__watermarkText.some(text => text.includes('Lat 14.756600 · Lng 121.045000')));
+    assert.equal(await page.getByText(/Reported accuracy: 15 m/).count(), 0);
+    const watermark = page.locator('[data-camera-watermark]');
+    await watermark.waitFor();
+    assert.match(await watermark.innerText(), /PULSO/);
+    assert.match(await watermark.innerText(), /Lat 14\.756600 · Lng 121\.045000/);
+    assert.doesNotMatch(await watermark.innerText(), /PRIVATE/);
     await page.screenshot({ path: join(screenshots, 'camera-top-zoom-watermark-640.png'), fullPage: true });
     assert.deepEqual(errors, []);
-    console.log('PASS: GPS recentering, lookup failure/denial, stale-response protection, precise Plus Codes, coordinate copying, one-row GPS metadata, bilingual themes, top-bar zoom, and live watermark coordinates.');
+    console.log('PASS: GPS recentering, lookup failure/denial, stale-response protection, precise Plus Codes, coordinate copying, one-row GPS metadata, bilingual themes, top-bar zoom, and camera watermark without a duplicate location notice.');
 } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

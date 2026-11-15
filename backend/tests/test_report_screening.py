@@ -23,7 +23,6 @@ def photo():
     {'category': 'Undetermined', 'is_infrastructure': False, 'is_inappropriate': True},
     {'category': 'Inappropriate Content', 'rejection_reason': 'A university is outside scope.'},
     {'screening_signals': {'service_scope': 'potentially_out_of_service'}},
-    {'screening_signals': {'authenticity': 'screen_suspected', 'evidence_quality': 'unclear'}},
     {'screening_signals': {'authenticity': 'verified', 'service_scope': 'excluded'}},
     {'screening_signals': 'not an object'},
     {'screening': {'outcome': 'refer_out_of_service', 'responsibility_verified': True}},
@@ -55,10 +54,22 @@ def test_unavailable_vision_does_not_invent_assessment_or_reject_hazard_words(st
     assert _local_safety_check('An explosive electrical fault is a threat to people.')['is_inappropriate'] is False
 
 
-def test_explicit_visual_prohibited_content_is_separate_from_authenticity():
+def test_prohibited_content_and_clear_invalid_evidence_are_ineligible():
     raw = {'screening_signals': {'content_safety': 'prohibited'}}
     assert screening.normalize_analysis(raw, has_image=True)['screening']['outcome'] == 'restricted_upload'
     assert screening.normalize_analysis(raw, has_image=False)['screening']['outcome'] == 'submit_for_review'
+    screen = screening.normalize_analysis({'screening_signals': {'authenticity': 'screen_suspected'}}, has_image=True)
+    assert screen['screening']['outcome'] == 'restricted_upload'
+    assert screen['screening']['submission_allowed'] is False
+    assert 'Retake it' in screen['rejection_reason']
+    private = screening.normalize_analysis({'screening_signals': {'scene_context': 'private_indoor_suspected'}}, has_image=True)
+    assert private['screening']['outcome'] == 'restricted_upload'
+    assert 'private home' in private['rejection_reason']
+    mismatch = screening.normalize_analysis({'screening_signals': {'category_fit': 'mismatch_selected'}},
+        has_image=True, selected_categories=['Roads & Bridges'])
+    assert mismatch['screening']['outcome'] == 'restricted_upload'
+    assert 'selected issue category' in mismatch['rejection_reason']
+    assert screening.normalize_analysis({'screening_signals': {'category_fit': 'mismatch_selected'}}, has_image=True)['screening']['outcome'] == 'submit_for_review'
 
 
 @pytest.mark.parametrize('payload', [b'', b'<svg></svg>', b'\x89PNG\r\n\x1a\nnot-a-photo', b'x' * (screening.MAX_IMAGE_BYTES + 1)],
@@ -73,29 +84,22 @@ def test_precheck_accepts_a_bounded_decodable_photo():
     screening.validate_analysis_image(photo())
 
 
-def test_intake_records_server_assessment_and_replay_does_not_duplicate_it(connected, monkeypatch):
+def test_selected_categories_are_bounded_before_image_analysis():
+    assert screening.selected_categories('["Roads & Bridges", "Street Lighting"]') == ['Roads & Bridges', 'Street Lighting']
+    with pytest.raises(HTTPException):
+        screening.selected_categories('not-json')
+
+
+def test_intake_rejects_screen_photos_before_creating_a_report(connected, monkeypatch):
     client, sessions, headers, _ = connected
     monkeypatch.setattr('system_settings.report_analysis', lambda *a, **k: {
         'category': 'Undetermined', 'is_inappropriate': True, 'is_infrastructure': False,
         'screening_signals': {'authenticity': 'screen_suspected', 'service_scope': 'potentially_out_of_service'}})
-    key = {'Idempotency-Key': str(uuid4())}
-    first = submit(client, key)
-    assert first.status_code == 201, first.text
-    again = submit(client, key)
-    assert again.status_code == 201 and again.json()['id'] == first.json()['id']
+    result = submit(client, {'Idempotency-Key': str(uuid4())})
+    assert result.status_code == 400, result.text
     with sessions() as db:
-        report = db.get(models.Report, first.json()['id'])
-        assert report.status == 'pending'
-        event = db.query(gm.AuditLog).filter_by(report_id=report.id, trigger_type=screening.EVENT).one()
-        assessment = json.loads(event.details)
-        assert assessment['input_digest'] == report.intake_request_hash
-        assert assessment['authenticity'] == 'screen_suspected'
-        assert assessment['observations'][0]['service_eligibility'] == 'unknown'
-        assert assessment['location']['reported_accuracy_m'] is None
-    private = client.get(f"/api/report-intelligence/reports/{first.json()['id']}", headers=headers['chief'])
-    assert private.status_code == 200
-    assert private.json()['screening']['version'] == screening.VERSION
-    assert client.get(f"/api/report-intelligence/reports/{first.json()['id']}", headers=headers['resident']).status_code == 403
+        assert db.query(models.Report).count() == 0
+        assert db.query(gm.AuditLog).filter_by(trigger_type=screening.EVENT).count() == 0
 
 
 def test_mixed_categories_stay_in_one_received_report_with_reviewable_observations(connected, monkeypatch):
@@ -135,7 +139,9 @@ def test_precheck_is_ephemeral_and_does_not_claim_a_received_ticket(connected, m
         files={'image': ('FAKE.png', photo(), 'image/png')})
     assert result.status_code == 200, result.text
     assessment = result.json()['screening']
-    assert assessment['submission_allowed'] and assessment['input_digest']
+    assert assessment['submission_allowed'] is False
+    assert assessment['outcome'] == 'restricted_upload'
+    assert assessment['input_digest']
     assert 'ticket_id' not in result.json()
     with sessions() as db:
         assert db.query(models.Report).count() == 0

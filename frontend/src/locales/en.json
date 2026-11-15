@@ -27,7 +27,7 @@
           "possibleScreen": "This may be a photo of a screen. You can retake it with the surroundings visible, or submit it for staff review.",
           "scopeUnknown": "Service responsibility is not confirmed. You can submit the concern so staff can check the appropriate service.",
           "unavailable": "Automated screening is unavailable. You can still submit this concern for staff review.",
-          "replacePhoto": "This image cannot be used. Replace it with a photo of the issue."
+          "replacePhoto": "This photo cannot be submitted. Retake it with the surroundings visible."
     },
     "reportMedia": { "photoUnavailable": "Photo unavailable", "loading": "Loading photo", "retry": "Retry photo" },
     "residentDraft": {
@@ -74,7 +74,12 @@
       "unavailable": "A device estimate may be unavailable. You can still take the photo and check the issue pin manually.",
       "saved": "Photo capture time is recorded separately. Review the photo and confirm the issue pin; location is not verified.",
       "reading": "Reported accuracy: {{accuracy}}; measured at {{time}}.",
-      "unknownAccuracy": "unknown"
+      "unknownAccuracy": "unknown",
+      "watermarkSelected": "Selected issue location",
+      "watermarkDevice": "Approximate device location",
+      "watermarkUnavailable": "Location unavailable",
+      "watermarkAccuracy": "Approx. ±{{accuracy}}m",
+      "watermarkSample": "Sample preview · not field evidence"
     },
     "reportIntelligence": {
       "received": "Report received.",
@@ -115,7 +120,8 @@
       "copyCoordinatesFailed": "Could not copy coordinates. Select the numbers to copy them.",
       "approximateAccuracy": "Approx. ±{{accuracy}}m",
       "accurateAccuracy": "GPS ±{{accuracy}}m",
-      "gpsSelected": "GPS selected"
+      "gpsSelected": "GPS selected",
+      "approximateLocation": "Approximate location"
     },
     "mapPublicReports": {
       "loading": "Loading public reports…",
@@ -155,6 +161,9 @@
         "notificationSettingsBack": "Settings",
         "dashboard": { "hello": "Hello,", "resident": "Resident", "openAccount": "Open Account and Profile" },
         "appUpdate": {
+            "bannerLabel": "PULSO update available",
+            "bannerAvailable": "PULSO {{version}} is available.",
+            "bannerUpdate": "Update",
             "shortLabel": "App update",
             "confirmTitle": "Update PULSO?",
             "confirmDescription": "Your app data stays in place. You do not need to uninstall PULSO.",
@@ -170,7 +179,7 @@
             "checking": "Checking for updates…",
             "current": "You have the latest available version.",
             "available": "A new version is ready to download.",
-            "error": "Could not check for updates. Connect to the same Wi-Fi as the PULSO server and try again.",
+            "error": "Could not check for updates. Check your connection and try again.",
             "downloadOpened": "Open the downloaded APK and choose Install or Update. Android will ask you to confirm.",
             "downloadError": "Could not open the download. Try again.",
             "download": "Download update",
@@ -195,6 +204,12 @@
             "close": "Close"
         },
         "version": "App version {{version}}",
+        "guestReport": {
+            "title": "Report as guest?",
+            "description": "You can still send your report without an account. Track it any time with your receipt code. Sign in to keep all your reports in one place.",
+            "continue": "Continue as Guest",
+            "close": "Close guest report confirmation"
+        },
         "home": {
             "heading": "Report a problem in your neighborhood",
             "description": "Tell the City Engineering Department about damaged roads, blocked drains, and other public infrastructure issues in Caloocan.",

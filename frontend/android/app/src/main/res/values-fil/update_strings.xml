@@ -1,0 +1,5 @@
+<resources>
+    <string name="update_channel">Mga update ng PULSO</string>
+    <string name="update_available_title">May PULSO %1$s na</string>
+    <string name="update_available_body">May bagong bersyon na. Pindutin para buksan ang PULSO at i-update ang app.</string>
+</resources>

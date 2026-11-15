@@ -60,7 +60,7 @@ export default function CameraTopBar({
 
             {/* Top Icons Row */}
             <div className="w-full flex items-center justify-between gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2.5"
-                style={nativeCamera ? { paddingTop: 'max(.75rem, var(--pulso-safe-top, 0px))' } : undefined}>
+                style={nativeCamera ? { paddingTop: '.75rem' } : undefined}>
                 {/* Top Left: Back (<) Button */}
                 <button
                     type="button"

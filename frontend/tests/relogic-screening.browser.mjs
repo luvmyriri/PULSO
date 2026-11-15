@@ -54,7 +54,7 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const assessment = (overrides = {}) => ({ category: null, is_inappropriate: true, is_infrastructure: false,
-    screening: { version: 'pulso-relogic-screening-v1', outcome: 'submit_for_review', submission_allowed: true,
+    screening: { version: 'pulso-relogic-screening-v1', outcome: 'restricted_upload', submission_allowed: false,
         provider_state: 'suggested', authenticity: 'screen_suspected', ...overrides } });
 try {
     for (const [language, width, dark] of [['en', 1100, false], ['tl', 320, true]]) {
@@ -73,8 +73,8 @@ try {
                 observeLateRequest();
                 await new Promise(resolve => setTimeout(resolve, 700));
             }
-            const body = thisMode === 'late-restriction' ? assessment({ outcome: 'restricted_upload', submission_allowed: false })
-                : thisMode === 'scope' ? assessment({ authenticity: 'not_assessed', service_eligibility: 'potentially_out_of_service' })
+            const body = thisMode === 'late-restriction' ? assessment()
+                : thisMode === 'scope' ? assessment({ outcome: 'submit_for_review', submission_allowed: true, authenticity: 'not_assessed', service_eligibility: 'potentially_out_of_service' })
                 : assessment();
             await route.fulfill({ status: thisMode === 'offline' ? 503 : 200, json: body }).catch(() => {});
         });
@@ -82,15 +82,14 @@ try {
         const input = page.locator('input[type="file"]');
         const choose = name => input.setInputFiles({ name, mimeType: 'image/png', buffer: png });
         await choose('screen-observation.png');
-        const notice = page.locator('p[role="status"][aria-atomic="true"]');
+        const notice = page.locator('p[aria-atomic="true"]');
         await page.waitForFunction(() => window.__evidence.screening?.authenticity === 'screen_suspected');
         assert.deepEqual(errors, [], 'The real report step must render the assessment without runtime errors.');
-        assert.equal(await page.evaluate(() => window.__evidence.isInappropriate), false);
-        assert.ok(await page.getByRole('button', { name: language === 'en' ? 'Continue' : 'Magpatuloy', exact: true }).isEnabled());
-        assert.match(await notice.innerText(), language === 'en' ? /staff review/ : /kawani/);
-        assert.equal(await page.evaluate(() => window.__continued === true), false, 'The warning must not auto-advance out of view.');
-        await page.getByRole('button', { name: language === 'en' ? 'Continue' : 'Magpatuloy', exact: true }).click();
-        assert.equal(await page.evaluate(() => window.__continued), true);
+        const continueButton = page.getByRole('button', { name: language === 'en' ? 'Continue' : 'Magpatuloy', exact: true });
+        assert.equal(await page.evaluate(() => window.__evidence.isInappropriate), true);
+        assert.equal(await continueButton.isEnabled(), false, 'A suspected screen must be replaced before the report can continue.');
+        assert.match(await notice.innerText(), language === 'en' ? /cannot be submitted/ : /Hindi maaaring isumite/);
+        assert.equal(await page.evaluate(() => window.__continued === true), false, 'The failed validation must not auto-advance or submit.');
         mode = 'late-restriction';
         await choose('old-photo.png');
         await lateRequest;
@@ -99,6 +98,9 @@ try {
         await page.waitForFunction(() => window.__evidence.screening?.service_eligibility === 'potentially_out_of_service');
         await page.waitForTimeout(800);
         assert.equal(await page.evaluate(() => window.__evidence.isInappropriate), false, 'An old response must not reject a replacement photo.');
+        assert.ok(await continueButton.isEnabled());
+        await continueButton.click();
+        assert.equal(await page.evaluate(() => window.__continued), true);
         mode = 'offline';
         await choose('provider-unavailable.png');
         await page.waitForFunction(() => window.__evidence.analysisStatus === 'failed');
@@ -112,7 +114,7 @@ try {
         await page.screenshot({ path: `../scratch/relogic-browser/${language}-${width}.png`, fullPage: true });
         await page.close();
     }
-    console.log('PASS: reviewable screen/scope signals, superseded requests, outage recovery, bilingual guidance and 320px/200% reflow.');
+    console.log('PASS: screen-photo validation, replacement flow, superseded requests, outage recovery, bilingual guidance and 320px/200% reflow.');
 } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

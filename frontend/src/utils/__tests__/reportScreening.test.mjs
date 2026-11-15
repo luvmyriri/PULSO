@@ -3,19 +3,25 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { isReportPhotoRestricted, canAutoAdvancePhoto, screeningMessageKey, REPORT_SCREENING_VERSION } from '../reportScreening.js';
 
-test('unknown category, legacy invalid-photo flags and suspected screens remain reviewable', () => {
+test('unknown category and legacy invalid-photo flags remain reviewable', () => {
     for (const result of [null, {}, { is_inappropriate: true }, { is_infrastructure: false },
         { category: 'Undetermined' }, { screening: { outcome: 'restricted_upload', submission_allowed: false } },
-        { screening: { version: REPORT_SCREENING_VERSION, outcome: 'submit_for_review', authenticity: 'screen_suspected' } }]) {
+    ]) {
         assert.equal(isReportPhotoRestricted(result), false);
     }
 });
 
-test('only the explicit current upload restriction blocks the photo step', () => {
+test('a current restricted upload, screen, private indoor scene or category mismatch blocks the photo step', () => {
     const result = { screening: { version: REPORT_SCREENING_VERSION, outcome: 'restricted_upload', submission_allowed: false } };
     assert.equal(isReportPhotoRestricted(result), true);
     assert.equal(screeningMessageKey(result), 'reportScreening.replacePhoto');
     assert.equal(isReportPhotoRestricted({ screening: { ...result.screening, submission_allowed: true } }), false);
+    const screen = { screening: { version: REPORT_SCREENING_VERSION, outcome: 'submit_for_review', submission_allowed: true, provider_state: 'suggested', authenticity: 'screen_suspected' } };
+    assert.equal(isReportPhotoRestricted(screen), true);
+    assert.equal(screeningMessageKey(screen), 'reportScreening.replacePhoto');
+    for (const finding of [{ scene_context: 'private_indoor_suspected' }, { category_fit: 'mismatch_selected' }]) {
+        assert.equal(isReportPhotoRestricted({ screening: { ...screen.screening, ...finding } }), true);
+    }
 });
 
 test('review warnings stay visible until the resident explicitly continues', () => {
@@ -35,6 +41,6 @@ test('review guidance has English and Filipino parity without echoing model reas
         for (const key of keys) assert.ok(dictionary.translation.reportScreening[key]);
     }
     const screening = { version: REPORT_SCREENING_VERSION, provider_state: 'suggested', authenticity: 'screen_suspected' };
-    assert.equal(screeningMessageKey({ screening }), 'reportScreening.possibleScreen');
+    assert.equal(screeningMessageKey({ screening }), 'reportScreening.replacePhoto');
     assert.equal(screeningMessageKey({ screening: { ...screening, provider_state: 'disabled' } }), 'reportScreening.unavailable');
 });

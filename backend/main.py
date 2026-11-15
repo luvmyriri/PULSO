@@ -2173,6 +2173,7 @@ def read_report_timeline(
 async def analyze_report_only(
     request: Request,
     description: Optional[str] = Form(None),
+    selected_categories: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
@@ -2180,7 +2181,7 @@ async def analyze_report_only(
     """
     Return an ephemeral RELogic assessment; receipt and service verification are separate.
     """
-    from report_screening import MAX_IMAGE_BYTES, validate_analysis_image, finalize_analysis, analysis_digest
+    from report_screening import MAX_IMAGE_BYTES, validate_analysis_image, finalize_analysis, analysis_digest, selected_categories as parse_selected_categories
     clean_description = (description or '').strip()
     if len(clean_description) > 5000 or '\x00' in clean_description:
         raise HTTPException(422, 'Use a report description of at most 5000 characters without null bytes.')
@@ -2192,9 +2193,11 @@ async def analyze_report_only(
         validate_analysis_image(image_bytes)
     
     import system_settings
-    ai_analysis = system_settings.report_analysis(db,clean_description,image_data=image_bytes)
+    selected = parse_selected_categories(selected_categories)
+    ai_analysis = system_settings.report_analysis(db,clean_description,image_data=image_bytes,
+        selected_categories=selected)
     return finalize_analysis(ai_analysis, has_image=bool(image_bytes),
-        input_digest=analysis_digest(clean_description,image_bytes))
+        input_digest=analysis_digest(clean_description,image_bytes), selected_categories=selected)
 
 @app.post("/api/reports", response_model=schemas.ReportResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_report(
@@ -2321,13 +2324,13 @@ async def create_new_report(
     # AI/provider failure does not erase a valid observation or prevent review.
     import system_settings
     try:
-        ai_analysis = system_settings.report_analysis(db, clean_desc, image_data=image_bytes)
+        ai_analysis = system_settings.report_analysis(db, clean_desc, image_data=image_bytes, selected_categories=labels)
     except Exception:
         logging.getLogger(__name__).warning('Report analysis unavailable; preserving report for human review.')
         ai_analysis = None
     from report_screening import finalize_analysis
     ai_analysis = finalize_analysis(ai_analysis, has_image=bool(image_bytes), input_digest=digest,
-        location_evidence=location_evidence, latitude=lat, longitude=lng, items=items)
+        location_evidence=location_evidence, latitude=lat, longitude=lng, items=items, selected_categories=labels)
     if ai_analysis['screening']['outcome'] == 'restricted_upload':
         raise HTTPException(400, ai_analysis.get('rejection_reason') or 'Please upload a clear photo showing the actual problem.')
 

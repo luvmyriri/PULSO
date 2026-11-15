@@ -27,7 +27,7 @@
           "possibleScreen": "Posibleng kuha ito ng screen. Maaari kang kumuha muli na kita ang paligid, o ipasa ito para masuri ng kawani.",
           "scopeUnknown": "Hindi pa kumpirmado kung aling serbisyo ang responsable. Maaari mong ipasa ang concern para matukoy ito ng kawani.",
           "unavailable": "Hindi available ang awtomatikong pagsusuri. Maaari mo pa ring ipasa ang concern para masuri ng kawani.",
-          "replacePhoto": "Hindi magamit ang larawang ito. Palitan ito ng larawan ng problema."
+          "replacePhoto": "Hindi maaaring isumite ang larawang ito. Kumuha muli na kita ang paligid."
     },
     "reportMedia": { "photoUnavailable": "Hindi available ang larawan", "loading": "Kinukuha ang larawan", "retry": "Subukan muli" },
     "residentDraft": {
@@ -74,7 +74,12 @@
       "unavailable": "Maaaring walang makuhang tantiya ng lokasyon. Maaari pa ring kumuha ng larawan at manwal na suriin ang pin ng problema.",
       "saved": "Hiwalay na naitala ang oras ng pagkuha ng larawan. Suriin ang larawan at kumpirmahin ang pin ng problema; hindi pa beripikado ang lokasyon.",
       "reading": "Iniulat na accuracy: {{accuracy}}; nakuha noong {{time}}.",
-      "unknownAccuracy": "hindi alam"
+      "unknownAccuracy": "hindi alam",
+      "watermarkSelected": "Napiling lokasyon ng problema",
+      "watermarkDevice": "Tinatayang lokasyon ng device",
+      "watermarkUnavailable": "Walang lokasyon",
+      "watermarkAccuracy": "Tantiya ±{{accuracy}}m",
+      "watermarkSample": "Halimbawang preview · hindi aktuwal na ebidensya"
     },
     "reportIntelligence": {
       "received": "Natanggap ang ulat.",
@@ -115,7 +120,8 @@
       "copyCoordinatesFailed": "Hindi makopya ang mga coordinate. Piliin ang mga numero upang kopyahin.",
       "approximateAccuracy": "Tinataya ±{{accuracy}}m",
       "accurateAccuracy": "GPS ±{{accuracy}}m",
-      "gpsSelected": "Napiling GPS"
+      "gpsSelected": "Napiling GPS",
+      "approximateLocation": "Tinatayang lokasyon"
     },
     "mapPublicReports": {
       "loading": "Kinukuha ang mga pampublikong ulat…",
@@ -155,6 +161,9 @@
         "notificationSettingsBack": "Mga setting",
         "dashboard": { "hello": "Kumusta,", "resident": "Residente", "openAccount": "Buksan ang Account at Profile" },
         "appUpdate": {
+            "bannerLabel": "May update sa PULSO",
+            "bannerAvailable": "Maaari nang gamitin ang PULSO {{version}}.",
+            "bannerUpdate": "I-update",
             "shortLabel": "Update ng app",
             "confirmTitle": "I-update ang PULSO?",
             "confirmDescription": "Mananatili ang data ng app. Hindi kailangang i-uninstall ang PULSO.",
@@ -170,7 +179,7 @@
             "checking": "Tinitingnan ang mga update…",
             "current": "Nasa iyo na ang pinakabagong available na bersyon.",
             "available": "May bagong bersyong maaari nang i-download.",
-            "error": "Hindi matingnan ang update. Kumonekta sa parehong Wi-Fi ng PULSO server at subukang muli.",
+            "error": "Hindi matingnan ang update. Tingnan ang koneksyon at subukang muli.",
             "downloadOpened": "Buksan ang na-download na APK at piliin ang Install o Update. Hihingi ng kumpirmasyon ang Android.",
             "downloadError": "Hindi mabuksan ang download. Subukang muli.",
             "download": "I-download ang update",
@@ -195,6 +204,12 @@
             "close": "Isara"
         },
         "version": "Bersyon ng app {{version}}",
+        "guestReport": {
+            "title": "Mag-ulat bilang bisita?",
+            "description": "Maaari kang magpadala ng ulat kahit walang account. Gamitin ang code sa resibo para subaybayan ito anumang oras. Mag-sign in para makita ang lahat ng iyong ulat sa isang lugar.",
+            "continue": "Magpatuloy bilang Bisita",
+            "close": "Isara ang kumpirmasyon ng pag-uulat bilang bisita"
+        },
         "home": {
             "heading": "Iulat ang problema sa inyong lugar",
             "description": "Ipaalam sa City Engineering Department ang mga sirang kalsada, baradong kanal, at iba pang problema sa pampublikong imprastraktura sa Caloocan.",

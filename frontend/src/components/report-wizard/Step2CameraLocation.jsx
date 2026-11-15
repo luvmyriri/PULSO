@@ -13,8 +13,7 @@ import {
   Sparkles,
   X,
   Copy,
-  Check,
-  Info
+  Check
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
@@ -25,6 +24,7 @@ import {
 import { findBarangayByCoordinates } from '../../data/caloocanBoundaries';
 import IDCameraModal from '../IDCameraModal';
 import WizardCardFooter from './WizardCardFooter';
+import LocationAccuracyBadge from './LocationAccuracyBadge';
 import Step2LocationMap from './Step2LocationMap';
 import LocationAddressPanel from '../maps/LocationAddressPanel';
 import LocationCoordinates from '../maps/LocationCoordinates';
@@ -33,7 +33,7 @@ import { displayAddressFields, normalizeDisplayAddress, parseLegacyDisplayAddres
 import { API_BASE_URL } from '../../utils/apiBase';
 import { getStoredToken } from '../../utils/auth';
 import { isNativeAndroid } from '../../utils/appContext';
-import {locationEvidence, hasReportLocation} from '../../utils/reportIntake';
+import {hasReportLocation} from '../../utils/reportIntake';
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
@@ -90,7 +90,7 @@ export default function Step2CameraLocation({
   const currentLat = locationData?.lat ?? CALOOCAN_CENTERS.north.lat;
   const currentLng = locationData?.lng ?? CALOOCAN_CENTERS.north.lng;
   const hasCoordinates = Number.isFinite(locationData?.lat) && Number.isFinite(locationData?.lng);
-  const pointUsesDeviceFix=locationEvidence(locationData || {}).source==='device';
+  const native = isNativeAndroid();
   const isInsideJurisdiction = hasCoordinates && locationData?.isInCaloocan === true;
   const hasPhoto = Boolean(evidenceData?.previewUrl);
 
@@ -535,15 +535,15 @@ export default function Step2CameraLocation({
       <div className="space-y-3.5">
         {/* â”€â”€ 1. Location Card (Matches reference image) â”€â”€ */}
         <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/60 rounded-2xl transition-all shadow-2xs">
-          <div className="flex flex-col sm:flex-row items-start gap-3">
+          <div data-report-location-card className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2">
             {/* MapPin Badge Icon */}
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 text-[#ff6b00] border border-orange-500/25 flex items-center justify-center shrink-0 mt-0.5">
               <MapPin size={20} className="text-[#ff6b00]" />
             </div>
 
-            <div className="flex-1 min-w-0">
+            <div className="contents">
               {/* Address Text + Copy Button */}
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-start justify-between gap-2">
                 <LocationAddressPanel address={displayStructuredAddress} coordinates={locationData} gpsAddress showCoordinates={false} status={locationData?.addressStatus} loading={isLocating || locationData?.addressStatus === 'LOADING'} />
                 <button
                   type="button"
@@ -562,19 +562,9 @@ export default function Step2CameraLocation({
               </div>
 
               {/* Location Badges & Accuracy Indicator (Single line) */}
-              <LocationCoordinates coordinates={locationData}>
+              <div className="col-span-2 min-w-0"><LocationCoordinates coordinates={locationData}>
                 {/* Accuracy Pill matching reference */}
-                {pointUsesDeviceFix && locationData?.accuracy && locationData.accuracy > 25 ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-500/50">
-                    <Info size={13} className="text-amber-500 shrink-0" />
-                    <span>{t('locationPrivacy.approximateAccuracy', { accuracy: Math.round(locationData.accuracy) })}</span>
-                  </span>
-                ) : hasCoordinates ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/50">
-                    <Info size={13} className="shrink-0" />
-                    <span>{pointUsesDeviceFix?t('locationPrivacy.gpsSelected'):t('residentDraft.manualLocation')}</span>
-                  </span>
-                ) : null}
+                <LocationAccuracyBadge location={locationData} />
 
                 {/* Jurisdiction Check */}
                 {hasCoordinates && !isInsideJurisdiction && (
@@ -595,7 +585,7 @@ export default function Step2CameraLocation({
                 >
                   <RotateCcw size={13} className={isLocating ? 'animate-spin text-[#ff6b00]' : ''} />
                 </button>
-              </LocationCoordinates>
+              </LocationCoordinates></div>
             </div>
           </div>
         </div>
@@ -708,12 +698,12 @@ export default function Step2CameraLocation({
       {/* â”€â”€ Pinned Card Footer â”€â”€ */}
       <div className="space-y-3">
         {geoError && <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{geoError}</p>}
-        <button type="button" onClick={() => setEditingLocation(value => !value)}
+        {!native && <button type="button" onClick={() => setEditingLocation(value => !value)}
           aria-expanded={editingLocation} aria-controls="report-location-editor"
           className="min-h-11 px-2 text-sm font-semibold text-orange-700 dark:text-orange-300 underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-blue-600">
           {t('reportWizard.step2Location.changeLocation', 'Change location')}
-        </button>
-        {editingLocation && <div id="report-location-editor">
+        </button>}
+        {(editingLocation || (native && !isLocating && (!hasReportLocation(locationData) || !isInsideJurisdiction || geoError))) && <div id="report-location-editor">
           <Step2LocationMap isMapLoaded={isMapLoaded} locationData={locationData}
             onLocationChange={onLocationChange} showFooter={false} />
         </div>}
@@ -734,6 +724,8 @@ export default function Step2CameraLocation({
         title="Civic Evidence Camera"
         subtitle="Capture photo with auto-location watermark"
         metadata={{
+          category,
+          categories: category ? [category] : [],
           location: locationData,
           reportLocation: locationData,
           locationAddress: locationData?.address,

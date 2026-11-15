@@ -8,6 +8,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { dismissAndroidLayer } from '../../utils/nativeAndroid';
 import { syncNativeSystemBars } from '../../utils/nativeSystemBars';
 import MobileAppSplashScreen from './MobileAppSplashScreen';
+import NativeUpdateNotifications from './NativeUpdateNotifications';
 import './native-android.css';
 
 export default function NativeAndroidShell({ children }) {
@@ -100,5 +101,5 @@ export default function NativeAndroidShell({ children }) {
       nativeEdgeToEdge
       reducedMotion={window.matchMedia('(prefers-reduced-motion: reduce)').matches}
     />
-  ) : children;
+  ) : <><NativeUpdateNotifications />{children}</>;
 }

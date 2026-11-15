@@ -5,6 +5,8 @@ rootProject.file('version.properties').withInputStream { appVersion.load(it) }
 def publicApk = System.getenv('PULSO_ANDROID_PUBLIC') == '1'
 
 android {
+    buildFeatures { buildConfig true }
+    bundle { language { enableSplit = false } }
     signingConfigs {
         if (publicApk) {
             publicPilot {

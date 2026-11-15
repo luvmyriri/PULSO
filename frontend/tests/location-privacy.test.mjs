@@ -152,19 +152,19 @@ test('rendered panel hides unavailable rows, escapes values, and supports Englis
     assert.doesNotMatch(area, /No reliable street match/);
     const gpsFallback = render({ coordinates: { lat: 14.5, lng: 121.5 }, gpsAddress: true, status: 'UNAVAILABLE' });
     assert.match(gpsFallback, new RegExp(encodePlusCode(14.5, 121.5).replace('+', '\\+')));
-    assert.match(gpsFallback, /selected location is kept/);
+    assert.doesNotMatch(gpsFallback, /Address details are unavailable|selected location is kept/);
     const coordinates = render({ coordinates: { lat: 0, lng: -121.123456 }, status: 'UNAVAILABLE' });
     assert.match(coordinates, /title="Latitude"/);
     assert.match(coordinates, /0\.000000/);
     assert.match(coordinates, /title="Longitude"/);
     assert.match(coordinates, /-121\.123456/);
     assert.match(coordinates, /aria-label="Copy latitude and longitude"/);
-    assert.match(coordinates, /selected location is kept/);
+    assert.doesNotMatch(coordinates, /Address details are unavailable|selected location is kept/);
     for (const invalid of [{ lat: 91, lng: 121 }, { lat: 14, lng: NaN }, { lat: '14', lng: 121 }, {}]) {
         assert.doesNotMatch(render({ coordinates: invalid }), /title="Latitude"|title="Longitude"/);
     }
     assert.match(render({ loading: true }), /aria-busy="true"/);
-    assert.match(render({ status: 'REQUEST_DENIED' }), /selected location is kept/);
+    assert.ok(render({ status: 'REQUEST_DENIED' }).includes(i18n.t('locationPrivacy.empty')));
     await i18n.changeLanguage('tl');
     assert.match(render({ address: { city: 'Sample City' } }), /Kasalukuyang lokasyon/);
     const localizedCoordinates = render({ coordinates: { lat: 14.5, lng: 121.5 } });
@@ -172,7 +172,7 @@ test('rendered panel hides unavailable rows, escapes values, and supports Englis
     assert.match(localizedCoordinates, /14\.500000/);
     assert.match(localizedCoordinates, /title="Longhitud"/);
     assert.match(localizedCoordinates, /121\.500000/);
-    assert.match(render({ status: 'UNAVAILABLE' }), /Nananatili ang napiling lokasyon/);
+    assert.ok(render({ status: 'UNAVAILABLE' }).includes(i18n.t('locationPrivacy.empty')));
 });
 
 test('lookup shares in-flight work, falls back only to Google, and handles API failures/zero results', async () => {

@@ -26,6 +26,10 @@ await build({
     contents: `
       export { default as Track } from './pages/PublicTrackPage.jsx';
       export { default as Home } from './components/mobile/NativeResidentLanding.jsx';
+      export { default as GuestReport } from './components/mobile/NativeGuestReportSheet.jsx';
+      export { default as Accuracy } from './components/report-wizard/LocationAccuracyBadge.jsx';
+      export { default as Footer } from './components/report-wizard/WizardCardFooter.jsx';
+      export { default as DraftStatus } from './components/report-wizard/ResidentDraftStatus.jsx';
       export { ThemeProvider } from './contexts/ThemeContext.jsx';
     `,
     resolveDir: join(directory, '../src'),
@@ -40,7 +44,7 @@ globalThis.localStorage = { getItem: key => key === 'pulso_theme_mode' ? appeara
 globalThis.sessionStorage = { getItem: () => null };
 Capacitor.isNativePlatform = () => true;
 Capacitor.getPlatform = () => 'android';
-const { Track, Home, ThemeProvider } = await import(pathToFileURL(output));
+const { Track, Home, GuestReport, Accuracy, Footer, DraftStatus, ThemeProvider } = await import(pathToFileURL(output));
 const resources = {};
 for (const language of ['en', 'tl']) {
   resources[language] = JSON.parse(await readFile(join(directory, `../src/locales/${language}.json`), 'utf8'));
@@ -102,6 +106,39 @@ test('signed-in residents retain report and tracking access without registration
   assert.match(html, /<header\b[^>]*>[\s\S]*href="\/dashboard"[\s\S]*<\/header>/);
   assert.match(html, /<button[^>]*class="native-home__track" aria-haspopup="dialog"/);
   assert.doesNotMatch(html, /href="\/(?:login|register)"/);
+});
+
+test('guest confirmation offers both routes without the removed reminder in both languages', async () => {
+  for (const language of ['en', 'tl']) {
+    await i18n.changeLanguage(language);
+    const html = render(GuestReport, '/', { onDismiss() {} });
+    assert.match(html, /<dialog[^>]*aria-labelledby=/);
+    assert.match(html, /href="\/report\?source=guest"/);
+    assert.match(html, /href="\/login\?returnTo=%2Freport"/);
+    assert.ok(html.includes(i18n.t('nativeAndroid.guestReport.title')));
+    assert.doesNotMatch(html, /Save your receipt code after submitting|Itabi ang code sa resibo/);
+  }
+  await i18n.changeLanguage('en');
+});
+
+test('GPS estimates always show their measured accuracy; manual/default points do not inherit it', () => {
+  for (const accuracy of [5, 25, 119]) {
+    const location = { lat: 14.75, lng: 121.01, source: 'device-gps', accuracy: 999,
+      deviceFix: { latitude: 14.75, longitude: 121.01, accuracy_m: accuracy } };
+    assert.ok(render(Accuracy, '/', { location }).includes(`Approx. ±${accuracy}m`));
+    assert.doesNotMatch(render(Accuracy, '/', { location: { ...location, source: 'selected-map' } }), /±|GPS selected/);
+  }
+  const unknown = { lat: 14.75, lng: 121.01, source: 'device-gps', deviceFix: { latitude: 14.75, longitude: 121.01 } };
+  assert.match(render(Accuracy, '/', { location: unknown }), /Approximate location/);
+  assert.equal(render(Accuracy, '/', { location: { lat: 14.75, lng: 121.01 } }), '');
+});
+
+test('native report hides unsubmitted notices while keeping final review and recovery', () => {
+  assert.doesNotMatch(render(Footer), /Your report has not been submitted yet/);
+  assert.match(render(Footer, '/', { isSubmit: true }), /Review your details carefully/);
+  assert.equal(render(DraftStatus, '/', { draft: { status: 'new' } }), '');
+  assert.match(render(DraftStatus, '/', { draft: { status: 'new' }, pending: true, onRecover() {} }), /Recover previous submission/);
+  assert.match(render(DraftStatus, '/', { draft: { status: 'save_error', flush() {} } }), /role="alert"/);
 });
 
 test('Filipino tracking and the dark theme retain the same controls and short copy', async () => {

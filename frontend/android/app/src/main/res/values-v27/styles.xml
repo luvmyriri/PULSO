@@ -1,0 +1,5 @@
+<resources>
+    <style name="AppTheme.NoActionBarLaunch" parent="PulsoLaunchBase">
+        <item name="android:windowLightNavigationBar">@bool/pulso_light_system_bars</item>
+    </style>
+</resources>

@@ -12,7 +12,7 @@ import './native-app-update.css';
 
 const Updater = registerPlugin('PulsoAppUpdate');
 
-function UpdateSheet({ onDismiss }) {
+export function UpdateSheet({ onDismiss }) {
   const { t } = useTranslation();
   const text = key => t(`nativeAndroid.appUpdate.${key}`);
   const [state, setState] = useState('checking');

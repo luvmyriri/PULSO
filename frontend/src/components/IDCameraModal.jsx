@@ -11,7 +11,7 @@ import {
     Loader2
 } from 'lucide-react';
 import useCaptureLocation from '../hooks/useCaptureLocation';
-import CaptureLocationStatus from './camera/CaptureLocationStatus';
+import CameraWatermark from './camera/CameraWatermark';
 import { API_BASE_URL } from '../utils/apiBase';
 import { useAndroidBack } from '../utils/nativeAndroid';
 import { isNativeAndroid } from '../utils/appContext';
@@ -163,8 +163,10 @@ const IDCameraModal = ({
         zoomRef.current = zoom;
     }, [zoom]);
 
-    // Aspect ratio selection state (4:3 default, persists during retakes, resets on new report)
-    const [photoRatio, setPhotoRatio] = useState(ratioOverride || '4:3');
+    // Native issue capture starts with a continuous full-screen view like the
+    // supplied camera reference. Explicit size choices persist during retakes.
+    const defaultPhotoRatio = nativeCamera && isIssue ? 'Full' : '4:3';
+    const [photoRatio, setPhotoRatio] = useState(ratioOverride || defaultPhotoRatio);
     const [isLandscape, setIsLandscape] = useState(false);
     const prevIsOpenRef = useRef(false);
 
@@ -198,13 +200,13 @@ const IDCameraModal = ({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Reset to 4:3 default every time camera opens fresh for a new report
+    // Reset the camera size on a fresh entry, retaining explicit preview fixtures.
     useEffect(() => {
         if (isOpen && !prevIsOpenRef.current && !ratioOverride) {
-            setPhotoRatio('4:3');
+            setPhotoRatio(defaultPhotoRatio);
         }
         prevIsOpenRef.current = isOpen;
-    }, [isOpen, ratioOverride]);
+    }, [isOpen, ratioOverride, defaultPhotoRatio]);
 
     // Apply previewMode overrides if supplied (for dev showcase testing)
     useEffect(() => {
@@ -734,7 +736,7 @@ const IDCameraModal = ({
         try { context.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height); }
         catch { captureBusy.current = false; setError(t('captureLocation.frameFailed')); return; }
 
-        // Reset transform so watermark is never mirrored
+        // Restore the transform after drawing the front-facing frame.
         if (facingMode === 'user') {
             context.setTransform(1, 0, 0, 1, 0, 0);
         }
@@ -767,6 +769,9 @@ const IDCameraModal = ({
                 formData.append('image', blob, 'captured_evidence.jpg');
                 if (metadata?.category) {
                     formData.append('description', `Selected category: ${metadata.category}`);
+                }
+                if (Array.isArray(metadata?.categories) && metadata.categories.length) {
+                    formData.append('selected_categories', JSON.stringify(metadata.categories));
                 }
 
                 const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null;
@@ -849,8 +854,11 @@ const IDCameraModal = ({
                     onCancel={event => { event.preventDefault(); closeCamera(); }}
                     style={{
                         touchAction: 'none',
-                        paddingTop: standalone || nativeCamera ? '0px' : 'env(safe-area-inset-top, 0px)',
-                        paddingBottom: standalone || nativeCamera ? '0px' : 'env(safe-area-inset-bottom, 0px)'
+                        paddingTop: nativeCamera ? 'var(--pulso-safe-top, 0px)' : standalone ? '0px' : 'env(safe-area-inset-top, 0px)',
+                        paddingBottom: nativeCamera ? 'var(--pulso-safe-bottom, 0px)' : standalone ? '0px' : 'env(safe-area-inset-bottom, 0px)',
+                        paddingLeft: nativeCamera ? 'var(--pulso-safe-left, 0px)' : undefined,
+                        paddingRight: nativeCamera ? 'var(--pulso-safe-right, 0px)' : undefined,
+                        backgroundColor: nativeCamera ? '#000000' : undefined,
                     }}
                 >
                     {/* Smartphone Camera Frame: Fullscreen on mobile/standalone, sleek smartphone viewport on desktop */}
@@ -966,6 +974,8 @@ const IDCameraModal = ({
                                         alt="Captured problem photo"
                                         className="w-full h-full object-contain"
                                     />
+                                    {isIssue && <CameraWatermark metadata={metadata} status={captureLocation.status}
+                                        capturedAt={captureProvenanceRef.current?.capturedAt} sample={Boolean(previewMode)} />}
                                 </div>
                             )}
 
@@ -1016,6 +1026,9 @@ const IDCameraModal = ({
                                     )}
 
 
+                                    {isIssue && !isLoading && <CameraWatermark metadata={metadata}
+                                        status={captureLocation.status} sample={Boolean(previewMode)} />}
+
                                     {/* ID Card Silhouette (Only when capturing resident ID) */}
                                     {!isIssue && (
                                         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-4">
@@ -1048,13 +1061,10 @@ const IDCameraModal = ({
                         {/* ─────────────────────────────────────────────────────────── */}
                         {/* ZONE 3: SMARTPHONE BOTTOM CAMERA DECK                       */}
                         {/* ─────────────────────────────────────────────────────────── */}
-                        <footer
-                            className={`w-full ${isIssue ? 'bg-slate-950' : 'bg-transparent'} px-4 pt-2.5 pb-4 z-30 shrink-0 transition-colors duration-300`}
-                            style={nativeCamera ? { paddingBottom: 'max(1rem, var(--pulso-safe-bottom, 0px))' } : undefined}
+                        {!isInvalidState && !isCheckingState && <footer
+                            data-camera-live-controls={isLiveState || undefined}
+                            className={`w-full ${isIssue && !isLiveState ? 'bg-slate-950' : 'bg-transparent'} px-4 pt-2.5 pb-4 z-30 shrink-0 transition-colors duration-300`}
                         >
-                            {isIssue && <CaptureLocationStatus status={captureLocation.status}
-                                captured={Boolean(capturedPreviewUrl)} sample={Boolean(previewMode)}
-                                className="text-sm leading-snug text-slate-100 mb-2"/>}
                             {isPreviewAcceptedState ? (
                                 /* Acceptance actions in bottom deck */
                                 <div className="max-w-md mx-auto w-full space-y-2">
@@ -1092,7 +1102,7 @@ const IDCameraModal = ({
                                                     type="button"
                                                     onClick={handleSwitchCamera}
                                                     aria-label="Switch camera"
-                                                    className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all cursor-pointer bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg ${
+                                                    className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all cursor-pointer bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] rounded-lg ${
                                                         isDark || isFullBleed16x9
                                                             ? 'text-white hover:text-white/80'
                                                             : 'text-[#ff6b00] hover:text-[#e05e00]'
@@ -1122,7 +1132,7 @@ const IDCameraModal = ({
                                                     onClick={handleToggleFlash}
                                                     aria-pressed={flashOn}
                                                     aria-label={flashOn ? "Turn flash off" : "Turn flash on"}
-                                                    className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all cursor-pointer bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff6b00] rounded-lg ${
+                                                    className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all cursor-pointer bg-transparent border-0 active:scale-95 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#ff6b00] rounded-lg ${
                                                         isDark || isFullBleed16x9
                                                             ? 'text-white hover:text-white/80'
                                                             : 'text-[#ff6b00] hover:text-[#e05e00]'
@@ -1139,7 +1149,7 @@ const IDCameraModal = ({
                                     </div>
                                 </div>
                             )}
-                        </footer>
+                        </footer>}
                     </div>
                 </DialogTag>
             )}

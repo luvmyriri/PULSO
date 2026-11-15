@@ -44,6 +44,7 @@ export default function NativeAppGuide({ firstLaunch = false, onComplete, onNavi
   useLayoutEffect(() => {
     if (previousStep.current === step) return;
     main.current?.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, behavior: 'instant' });
     heading.current?.focus({ preventScroll: true });
     previousStep.current = step;
   }, [step]);

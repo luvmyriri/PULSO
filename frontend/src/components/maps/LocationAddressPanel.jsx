@@ -4,7 +4,7 @@ import { displayAddressFields } from '../../utils/locationPrivacy';
 import LocationCoordinates from './LocationCoordinates';
 
 /** Shared by the reporting panel and any marker popup; React escapes all values. */
-export default function LocationAddressPanel({ address, coordinates, showCoordinates = true, gpsAddress = false, status, loading = false }) {
+export default function LocationAddressPanel({ address, coordinates, showCoordinates = true, gpsAddress = false, loading = false }) {
     const { t } = useTranslation();
     const fields = displayAddressFields(address, coordinates, { preferAddress: gpsAddress });
     const hasStreet = fields.some(([field]) => field === 'street');
@@ -13,7 +13,6 @@ export default function LocationAddressPanel({ address, coordinates, showCoordin
         && Math.abs(coordinates.lat) <= 90 && Math.abs(coordinates.lng) <= 180;
     let message = '';
     if (loading) message = t(gpsAddress ? 'locationPrivacy.gpsAddressLoading' : 'locationPrivacy.loading');
-    else if (status && status !== 'OK') message = t('locationPrivacy.unavailable');
     else if (!fields.length && !hasCoordinates) message = t('locationPrivacy.empty');
     return (
         <section className="min-w-0 space-y-2 text-slate-900 dark:text-slate-100" aria-label={title} aria-busy={loading}>

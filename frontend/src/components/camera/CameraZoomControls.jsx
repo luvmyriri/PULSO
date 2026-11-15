@@ -29,7 +29,7 @@ export default function CameraZoomControls({
                         type="button"
                         onClick={() => onZoomChange(preset.target)}
                         aria-label={`Zoom ${preset.label}`}
-                        className={`min-w-[34px] h-7 px-2.5 rounded-full text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
+                        className={`min-w-[44px] min-h-[44px] px-2.5 rounded-full text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center active:scale-95 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-white ${
                             preset.active
                                 ? 'bg-white text-black shadow-xs'
                                 : 'text-white/80 hover:text-white hover:bg-white/15'

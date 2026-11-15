@@ -2,6 +2,7 @@
 @import "./components/modals/modal-dialogs.css";
 @import "./styles/sweetalert-civic.css";
 @import "./components/search-input.css";
+@import "./components/camera/camera-ui.css";
 
 /* ── SELF-HOSTED INTER VARIABLE FONT (Weights 400 to 700 / 100-900, Latin & Latin-Ext under 100KB, no CDN) ── */
 @font-face {

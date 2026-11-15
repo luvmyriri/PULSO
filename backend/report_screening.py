@@ -22,6 +22,8 @@ class ScreeningSignals(BaseModel):
     authenticity: Literal['not_assessed', 'uncertain', 'screen_suspected'] = 'not_assessed'
     evidence_quality: Literal['not_assessed', 'usable', 'unclear'] = 'not_assessed'
     content_safety: Literal['not_assessed', 'clear', 'requires_review', 'prohibited'] = 'not_assessed'
+    scene_context: Literal['not_assessed', 'public_or_outdoor', 'private_indoor_suspected', 'uncertain'] = 'not_assessed'
+    category_fit: Literal['not_assessed', 'matches_selected', 'mismatch_selected', 'uncertain'] = 'not_assessed'
 
 
 def validate_analysis_image(data):
@@ -41,8 +43,23 @@ def _text(value, limit=4000):
     return value.strip()[:limit] if isinstance(value, str) else None
 
 
-def normalize_analysis(result, *, has_image=False, provider_state=None):
-    """Discard provider-supplied decisions. Only explicit visual safety uses the existing restriction."""
+def selected_categories(value):
+    """Accept a bounded category list for advisory image comparison only."""
+    if value is None:
+        return []
+    try:
+        parsed = json.loads(value) if isinstance(value, str) else value
+    except (TypeError, ValueError):
+        raise HTTPException(422, 'Selected categories must be a JSON list.') from None
+    if not isinstance(parsed, list) or len(parsed) > 3:
+        raise HTTPException(422, 'Choose up to three categories.')
+    if any(not isinstance(item, str) or not 1 <= len(item.strip()) <= 80 or '\x00' in item for item in parsed):
+        raise HTTPException(422, 'Selected categories must be nonempty text up to 80 characters.')
+    return list(dict.fromkeys(item.strip() for item in parsed))
+
+
+def normalize_analysis(result, *, has_image=False, provider_state=None, selected_categories=()):
+    """Discard provider-supplied decisions and enforce PULSO's evidence eligibility rules."""
     raw = result if isinstance(result, dict) else {}
     state = provider_state or raw.get('analysis_status', 'suggested' if raw else 'unavailable')
     if not isinstance(state, str) or state not in {'suggested', 'disabled', 'unavailable'}:
@@ -75,9 +92,26 @@ def normalize_analysis(result, *, has_image=False, provider_state=None):
         reasons.append('service_scope_requires_review')
     if signals.content_safety in {'requires_review', 'prohibited'}:
         reasons.append('content_safety_review')
-    # Preserve the existing explicit-content restriction, separate from eligibility,
-    # screen suspicion, an incidental face, a private-property guess or unclear evidence.
-    restricted = available and has_image and signals.content_safety == 'prohibited'
+    if signals.scene_context == 'private_indoor_suspected':
+        reasons.append('private_indoor_rephotography')
+    if signals.category_fit == 'mismatch_selected':
+        reasons.append('category_mismatch_rephotography')
+    # A screen photo cannot establish the required true-color, on-site evidence.
+    # This is an intake validation only: it does not decide city responsibility.
+    screen_suspected = signals.authenticity == 'screen_suspected'
+    private_indoor = signals.scene_context == 'private_indoor_suspected'
+    category_mismatch = bool(selected_categories) and signals.category_fit == 'mismatch_selected'
+    restricted = available and has_image and (signals.content_safety == 'prohibited' or screen_suspected or private_indoor or category_mismatch)
+    if private_indoor:
+        rejection_reason = 'This appears to be inside a private home. Retake the photo outside, showing the public infrastructure issue.'
+    elif category_mismatch:
+        rejection_reason = 'This photo does not match the selected issue category. Retake it showing the reported problem.'
+    elif screen_suspected:
+        rejection_reason = 'This appears to be a photo of a screen. Retake it with the surroundings visible.'
+    elif restricted:
+        rejection_reason = 'This image cannot be used. Replace it with a photo of the issue.'
+    else:
+        rejection_reason = ''
     if category is None or raw.get('is_infrastructure') is False:
         category = None
     severity = raw.get('severity_score') if available else None
@@ -92,10 +126,10 @@ def normalize_analysis(result, *, has_image=False, provider_state=None):
         'reasoning': _text(raw.get('reasoning')) if available else 'Staff review required.',
         'image_analysis': _text(raw.get('image_analysis')) if available and has_image else None,
         'auto_description': (_text(raw.get('auto_description')) or '') if category and not restricted else '',
-        # Compatibility fields for older clients: uncertainty is never an invalid-photo verdict.
+        # Compatibility fields for older clients.
         'is_infrastructure': True if available and raw.get('is_infrastructure') is True else None,
         'is_inappropriate': restricted,
-        'rejection_reason': 'This image cannot be used. Replace it with a photo of the issue.' if restricted else '',
+        'rejection_reason': rejection_reason,
         'analysis_status': state,
         'provider_used': available,
         'screening_signals': signals.model_dump(),
@@ -105,15 +139,16 @@ def normalize_analysis(result, *, has_image=False, provider_state=None):
             'submission_allowed': not restricted, 'requires_human_review': True,
             'service_eligibility': signals.service_scope,
             'authenticity': signals.authenticity, 'evidence_quality': signals.evidence_quality,
-            'content_safety': signals.content_safety, 'provider_state': state,
+            'content_safety': signals.content_safety, 'scene_context': signals.scene_context,
+            'category_fit': signals.category_fit, 'provider_state': state,
             'reason_codes': list(dict.fromkeys(reasons)),
             'location_verified': False, 'responsibility_verified': False,
         },
     }
 
 
-def finalize_analysis(result, *, has_image, input_digest, location_evidence=None, latitude=None, longitude=None, items=()):
-    analysis = normalize_analysis(result, has_image=has_image)
+def finalize_analysis(result, *, has_image, input_digest, location_evidence=None, latitude=None, longitude=None, items=(), selected_categories=()):
+    analysis = normalize_analysis(result, has_image=has_image, selected_categories=selected_categories)
     assessment = analysis['screening']
     assessment['input_digest'] = input_digest
     assessment['assessed_at'] = datetime.now(timezone.utc).isoformat()

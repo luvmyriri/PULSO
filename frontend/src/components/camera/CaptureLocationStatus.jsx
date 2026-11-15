@@ -8,7 +8,7 @@ export default function CaptureLocationStatus({ status, captured = false, sample
     return <p className={className} role="status" aria-live="polite" aria-atomic="true">
         {t(`captureLocation.${key}`)}{' '}
         {fix && !captured && !sample && t('captureLocation.reading', {
-            accuracy: fix.accuracy_m == null ? t('captureLocation.unknownAccuracy') : `${fix.accuracy_m} m`,
+            accuracy: fix.accuracy_m == null ? t('captureLocation.unknownAccuracy') : `${Math.round(fix.accuracy_m * 10) / 10} m`,
             time: new Date(fix.measured_at).toLocaleTimeString(i18n.language?.startsWith('tl') ? 'fil-PH' : 'en-PH'),
         })}
     </p>;

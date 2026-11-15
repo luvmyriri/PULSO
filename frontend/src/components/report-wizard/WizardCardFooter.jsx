@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowRight, Send, Loader2, Info } from 'lucide-react';
+import { isNativeAndroid } from '../../utils/appContext';
 
 export default function WizardCardFooter({
   onBack,
@@ -26,6 +27,7 @@ export default function WizardCardFooter({
     (isSubmit
       ? t('reportWizard.shell.reviewBeforeSubmit', 'Review your details carefully before submitting.')
       : t('reportWizard.shell.notSubmittedYet', 'Your report has not been submitted yet.'));
+  const showNote = !isNativeAndroid() || isSubmit;
 
   return (
     <footer className="fixed bottom-0 inset-x-0 z-30 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/90 dark:border-slate-800 px-4 py-3 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] lg:static lg:inset-auto lg:z-auto lg:w-full lg:bg-transparent lg:dark:bg-transparent lg:backdrop-blur-none lg:border-t lg:border-slate-100 lg:dark:border-slate-800 lg:px-0 lg:py-0 lg:pt-4 lg:mt-auto lg:shadow-none shrink-0">
@@ -47,10 +49,10 @@ export default function WizardCardFooter({
             </button>
           )}
 
-          <div className="flex items-center gap-1.5 leading-snug">
+          {showNote && <div className="flex items-center gap-1.5 leading-snug">
             <Info size={15} className="text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true" />
             <span className="text-xs">{resolvedNote}</span>
-          </div>
+          </div>}
         </div>
 
         {/* Right: Continue / Submit Action Button */}

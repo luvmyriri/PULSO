@@ -17,9 +17,9 @@ export function useMobileInstallLink(enabled = true) {
   const hostname = typeof window === 'undefined' ? '' : window.location.hostname;
   const needsDiscovery = import.meta.env.DEV && ['localhost', '127.0.0.1'].includes(hostname);
   const lanHost = needsDiscovery ? wifiIp.trim() : hostname;
-  const lanApkUrl = import.meta.env.DEV && isPrivateIpv4(lanHost) ? `http://${lanHost}:4174/` : '';
+  const lanApkUrl = import.meta.env.DEV && release && isPrivateIpv4(lanHost) ? `http://${lanHost}:33159/api/mobile/app-updates/download` : '';
   const isLanDownload = Boolean(lanApkUrl);
-  const apkUrl = lanApkUrl || (release && typeof window !== 'undefined' ? `${window.location.origin}/api/mobile/app-updates/download` : '');
+  const apkUrl = lanApkUrl || (!import.meta.env.DEV && release && typeof window !== 'undefined' ? `${window.location.origin}/api/mobile/app-updates/download` : '');
   const activeUrl = apkUrl || (typeof window === 'undefined' ? 'https://pulso.caloocan.gov.ph' : window.location.origin);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export function useMobileInstallLink(enabled = true) {
   }, [enabled, needsDiscovery]);
 
   useEffect(() => {
-    if (!enabled || import.meta.env.DEV) return undefined;
+    if (!enabled) return undefined;
     const controller = new AbortController();
     let active = true;
     setDownloadState('checking');

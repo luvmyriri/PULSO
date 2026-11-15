@@ -1,0 +1,44 @@
+/* Camera UI is outlined for contrast over both bright and dark live imagery. */
+.pulso-camera-watermark {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  padding: .5rem clamp(.75rem, 3vw, 1.25rem);
+  pointer-events: none;
+  user-select: none;
+  background: transparent;
+  color: white;
+  font-size: clamp(.75rem, 3vw, .875rem);
+  line-height: 1.4;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  text-shadow: -1px -1px 0 #151515, 1px -1px 0 #151515,
+    -1px 1px 0 #151515, 1px 1px 0 #151515, 0 1px 2px #000;
+}
+
+.pulso-camera-watermark__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: .75rem;
+  row-gap: .125rem;
+  margin-bottom: .65rem;
+}
+
+.pulso-camera-watermark__address {
+  font-size: clamp(.75rem, 3.5vw, .9375rem);
+  font-weight: 750;
+}
+
+[data-camera-live-controls] svg {
+  filter: drop-shadow(0 1px 1px #000) drop-shadow(0 0 1px #000);
+}
+
+@media (forced-colors: active) {
+  .pulso-camera-watermark {
+    color: CanvasText;
+    background: Canvas;
+    text-shadow: none;
+  }
+}

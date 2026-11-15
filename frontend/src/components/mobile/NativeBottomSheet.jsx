@@ -47,9 +47,22 @@ export default function NativeBottomSheet({ title, description, closeLabel, onDi
     if (dismiss) onDismiss();
   }
 
+  function keepKeyboardFocus(event) {
+    if (event.key !== 'Tab') return;
+    const controls = [...dialog.current.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
+      .filter(node => node.tabIndex >= 0 && !node.disabled && node.getClientRects().length && !node.closest('[hidden], [inert]'));
+    const first = controls[0], last = controls.at(-1);
+    if (!first) { event.preventDefault(); heading.current?.focus(); return; }
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === heading.current)) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus();
+    }
+  }
+
   return (
     <dialog ref={dialog} className="native-bottom-sheet" data-landing-theme={isDark ? 'dark' : 'light'} aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}
-      onCancel={event => { event.preventDefault(); onDismiss(); }}
+      onKeyDown={keepKeyboardFocus} onCancel={event => { event.preventDefault(); onDismiss(); }}
       onClick={event => {
         if (event.target !== event.currentTarget) return;
         const panel = event.currentTarget.getBoundingClientRect();

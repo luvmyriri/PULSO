@@ -25,7 +25,7 @@ import '../index.css';
 
 function residentReturnPath() {
     const target = new URLSearchParams(window.location.search).get('returnTo') || '';
-    return /^\/updates\/\d+(?:\?lang=(?:en|fil))?$/.test(target) ? target : '/dashboard';
+    return target === '/report' || /^\/updates\/\d+(?:\?lang=(?:en|fil))?$/.test(target) ? target : '/dashboard';
 }
 
 /**

@@ -227,7 +227,7 @@ export default function PwaModal({ isOpen, onClose }) {
                 className="mt-3 min-h-11 w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#ff6b00] hover:bg-[#e65c00] text-white font-bold text-sm focus-visible:outline-3 focus-visible:outline-blue-600">
                 <Download size={16} aria-hidden="true" />{t('mobileInstall.download')}
               </a>}
-              {!needsDiscovery && !apkUrl && <p role="status" className="mt-3 text-sm text-slate-700 dark:text-slate-200">
+              {!apkUrl && <p role="status" className="mt-3 text-sm text-slate-700 dark:text-slate-200">
                 {t(downloadState === 'checking' ? 'mobileInstall.checking' : 'mobileInstall.unavailable')}
                 {downloadState === 'unavailable' && <button type="button" onClick={retryDownloadCheck}
                   className="min-h-11 px-3 underline focus-visible:outline-3 focus-visible:outline-blue-600">{t('mobileInstall.retry')}</button>}
