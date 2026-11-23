@@ -49,6 +49,8 @@ ehthumbs.db
 Thumbs.db
 
 # Project specifics
-google-credentials.json
+# Service-account credentials are local secrets. Never commit them.
+google-credentials*.json
+pulso-*.json
 *.pptx
 ~$*
