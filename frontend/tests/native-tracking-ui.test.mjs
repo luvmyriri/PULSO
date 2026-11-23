@@ -78,9 +78,10 @@ test('receipt deep links keep both credential formats intact', () => {
     assert.doesNotMatch(html, /<button[^>]*type="submit"[^>]* disabled=/);
 
     const native = render(Home, `/track?id=FAKE-TEST-340&${parameter}=FAKE-SECRET`, { trackingRoute: true });
-    assert.match(native, /<dialog[^>]*class="native-bottom-sheet"/);
+    assert.match(native, /<dialog[^>]*class="native-bottom-sheet(?:\s[^"]*)?"/);
     assert.match(native, /id="track-ticket-id"[^>]*value="FAKE-TEST-340"/);
     assert.match(native, /id="track-token"[^>]*value="FAKE-SECRET"/);
+    assert.doesNotMatch(native, /native-bottom-sheet__close/);
   }
 });
 
@@ -98,6 +99,7 @@ test('home uses the same header without duplicating language or theme controls',
   assert.match(html, /<header\b[^>]*>[\s\S]*href="\/login"[\s\S]*<\/header>/);
   assert.doesNotMatch(html, /href="\/register"/);
   assert.match(html, /native-bonifacio-monument.webp/);
+  assert.doesNotMatch(html, /native-home__step-icon"><span/);
 });
 
 test('signed-in residents retain report and tracking access without registration prompts', () => {

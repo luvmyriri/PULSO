@@ -971,8 +971,8 @@ export default function Login() {
                                                                         }
                                                                     }
                                                                 }}
-                                                                className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-3.5 py-3 transition-all"
-                                                                placeholder="e.g. 09XXXXXXXXX or juan@email.com"
+                                                                className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-[11px] sm:text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff6b00] block pl-10 pr-3.5 py-3 transition-all"
+                                                                placeholder="09XXXXXXXXX or juan@email.com"
                                                                 required
                                                                 autoComplete="username"
                                                             />

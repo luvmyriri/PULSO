@@ -142,7 +142,7 @@ test('rendered panel hides unavailable rows, escapes values, and supports Englis
     assert.match(html, /<p class="[^"]*font-bold[^"]*">Example &amp; Sample City<\/p>/);
     assert.doesNotMatch(html, /<dt|<dd/);
     const fullAddress = privacy.parseGoogleDisplayAddress(syntheticResults, { global_code: '849VCWC8+R9' });
-    assert.match(render({ address: fullAddress }), /<strong class="font-extrabold">CWC8\+R9<\/strong>, Sample Village Phase 2, Sample Community, Acacia Road, Barangay Sample, Example City, 1234, Example Region/);
+    assert.match(render({ address: fullAddress }), /<strong class="font-extrabold" aria-label="Plus Code CWC8\+R9">CWC8\+R9<\/strong>, Sample Village Phase 2, Sample Community, Acacia Road, Barangay Sample, Example City, 1234, Example Region/);
     const gpsAddress = render({ address: fullAddress, gpsAddress: true, status: 'OK' });
     assert.match(gpsAddress, /Address near your GPS point/);
     assert.match(gpsAddress, /Acacia Road, Sample Village Phase 2, Sample Community, Barangay Sample, Example City, 1234, Example Region/);
@@ -150,6 +150,10 @@ test('rendered panel hides unavailable rows, escapes values, and supports Englis
     const area = render({ address: { ...fullAddress, street: '', streetAddress: '' }, gpsAddress: true, status: 'OK' });
     assert.match(area, /CWC8\+R9/);
     assert.doesNotMatch(area, /No reliable street match/);
+    const cameraAddress = render({ address: fullAddress, gpsAddress: true, showPlusCode: true, hideTitle: true, showCoordinates: false });
+    assert.doesNotMatch(cameraAddress, /<h3/);
+    assert.match(cameraAddress, /aria-label="Address near your GPS point"/);
+    assert.match(cameraAddress.replace(/<[^>]+>/g, '').replace(/\s+/g, ' '), /CWC8\+R9, Acacia Road, Sample Village Phase 2, Sample Community, Barangay Sample, Example City, 1234, Example Region/);
     const gpsFallback = render({ coordinates: { lat: 14.5, lng: 121.5 }, gpsAddress: true, status: 'UNAVAILABLE' });
     assert.match(gpsFallback, new RegExp(encodePlusCode(14.5, 121.5).replace('+', '\\+')));
     assert.doesNotMatch(gpsFallback, /Address details are unavailable|selected location is kept/);

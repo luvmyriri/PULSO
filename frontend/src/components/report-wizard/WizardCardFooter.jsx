@@ -30,38 +30,36 @@ export default function WizardCardFooter({
   const showNote = !isNativeAndroid() || isSubmit;
 
   return (
-    <footer className="fixed bottom-0 inset-x-0 z-30 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/90 dark:border-slate-800 px-4 py-3 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] lg:static lg:inset-auto lg:z-auto lg:w-full lg:bg-transparent lg:dark:bg-transparent lg:backdrop-blur-none lg:border-t lg:border-slate-100 lg:dark:border-slate-800 lg:px-0 lg:py-0 lg:pt-4 lg:mt-auto lg:shadow-none shrink-0">
-      <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-        {/* Left: Back Button (if allowed) + Information Note */}
-        <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 order-2 sm:order-1 self-start sm:self-auto">
-          {onBack && canBack && (
+    <footer className="fixed bottom-0 inset-x-0 z-30 w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/90 dark:border-slate-800 px-3 sm:px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(15,23,42,0.06)] lg:static lg:inset-auto lg:z-auto lg:w-full lg:bg-transparent lg:dark:bg-transparent lg:backdrop-blur-none lg:border-t lg:border-slate-100 lg:dark:border-slate-800 lg:px-0 lg:py-0 lg:pt-4 lg:mt-auto lg:shadow-none shrink-0">
+      <div className="max-w-7xl mx-auto w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-3 gap-y-2 sm:gap-4">
+        {/* Back stays beside the primary action at the bottom on phones. */}
+        {onBack && canBack && (
             <button
               type="button"
               onClick={onBack}
               disabled={!canBack || isSubmitting}
               aria-label={resolvedBackText}
               title={resolvedBackText}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98] flex items-center justify-center shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 cursor-pointer ${
+              className={`order-1 min-h-12 px-3 sm:px-4 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 inline-flex items-center justify-center gap-2 shrink-0 transition-colors focus-visible:outline-3 focus-visible:outline-blue-600 cursor-pointer ${
                 isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              <ArrowLeft size={17} aria-hidden="true" />
+              <ArrowLeft size={18} aria-hidden="true" />
+              <span className="text-sm font-bold">{resolvedBackText}</span>
             </button>
-          )}
-
-          {showNote && <div className="flex items-center gap-1.5 leading-snug">
+        )}
+        {showNote && <div className="order-3 sm:order-2 flex w-full sm:w-auto sm:flex-1 items-center gap-1.5 text-xs leading-snug text-slate-500 dark:text-slate-400">
             <Info size={15} className="text-slate-400 dark:text-slate-500 shrink-0" aria-hidden="true" />
             <span className="text-xs">{resolvedNote}</span>
           </div>}
-        </div>
 
-        {/* Right: Continue / Submit Action Button */}
-        <div className="w-full sm:w-auto order-1 sm:order-2 flex justify-end">
+        {/* Continue shares the same reachable action row. */}
+        <div className="order-2 sm:order-3 flex flex-1 sm:flex-none min-w-0 justify-end">
           <button
             type="button"
             onClick={onContinue}
             disabled={isContinueDisabled || isSubmitting}
-            className={`w-full sm:w-auto min-h-[46px] h-11 sm:h-12 px-6 sm:px-7 text-sm sm:text-base rounded-xl font-bold flex items-center justify-center gap-2 shadow-xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${
+            className={`w-full sm:w-auto min-h-12 px-3 sm:px-7 text-sm sm:text-base rounded-xl font-bold flex items-center justify-center gap-2 shadow-xs transition-colors focus-visible:outline-3 focus-visible:outline-blue-600 focus-visible:outline-offset-2 ${
               isSubmitting
                 ? 'bg-[#ff6b00]/90 text-white cursor-wait shadow-xs'
                 : !isContinueDisabled

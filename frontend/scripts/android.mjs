@@ -25,8 +25,13 @@ const env = { ...process.env, PULSO_CAPACITOR_DEBUG: publicBuild ? '0' : '1', PU
 const studioJdk = 'C:/Program Files/Android/Android Studio/jbr';
 const projectSdk = join(root, '.android-sdk');
 const defaultSdk = join(homedir(), 'AppData', 'Local', 'Android', 'Sdk');
-env.ANDROID_HOME ||= env.ANDROID_SDK_ROOT || (existsSync(join(projectSdk, 'platforms')) ? projectSdk : '');
-if (isWindows && !env.ANDROID_HOME && existsSync(defaultSdk)) env.ANDROID_HOME = defaultSdk;
+const hasSdk36 = sdk => sdk && existsSync(join(sdk, 'platforms', 'android-36', 'android.jar'));
+const candidates = [env.ANDROID_HOME, env.ANDROID_SDK_ROOT, projectSdk, ...(isWindows ? [defaultSdk] : [])];
+const selectedSdk = candidates.find(hasSdk36);
+if (!selectedSdk) throw new Error('Android SDK Platform 36 is required. Set ANDROID_HOME to an SDK with platforms/android-36.');
+if (env.ANDROID_HOME !== selectedSdk) console.log(`Using installed Android SDK 36 at ${selectedSdk}`);
+env.ANDROID_HOME = selectedSdk;
+env.ANDROID_SDK_ROOT = selectedSdk;
 if (isWindows && !env.JAVA_HOME && existsSync(studioJdk)) env.JAVA_HOME = studioJdk;
 
 function run(command, args, cwd = root) {

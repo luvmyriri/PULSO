@@ -271,7 +271,7 @@ export default function ReportWizardPage() {
       )}
 
       {/* Main Responsive Container */}
-      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-2 sm:pt-3 pb-32 lg:pb-6 flex flex-col">
+      <main className="max-w-7xl min-w-0 w-full mx-auto px-3 sm:px-6 pt-2 sm:pt-3 pb-[calc(9rem+env(safe-area-inset-bottom))] lg:pb-6 flex flex-col">
         <ResidentDraftStatus draft={draft} pending={pendingSubmission} recovering={isSubmitting} onRecover={handleRecover}/>
         {submissionError&&<p role="alert" className="text-sm text-red-700 dark:text-red-300 py-2">{submissionError}</p>}
         <fieldset disabled={draft.locked||pendingSubmission||isSubmitting} className={draft.ready&&!pendingSubmission?'contents':'hidden'} aria-label={t('residentDraft.editing')}>
@@ -340,7 +340,7 @@ export default function ReportWizardPage() {
           {draft.ready&&!pendingSubmission&&<section
             ref={stepSection} tabIndex={-1}
             aria-label={`Step ${currentStep} form content`}
-            className="lg:flex-1 w-full lg:min-h-[540px] rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 md:p-6 shadow-2xs flex flex-col justify-between"
+            className="lg:flex-1 min-w-0 w-full lg:min-h-[540px] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 sm:p-5 md:p-6 shadow-2xs flex flex-col justify-between"
           >
             {draft.ready && !pendingSubmission && currentStep === 1 && (
               <Step2CameraLocation

@@ -90,7 +90,6 @@ export default function NativeResidentLanding({ residentSignedIn, trackingRoute 
             {steps.map(({ key, icon }, index) => (
               <li key={key}>
                 <div className="native-home__step-icon">
-                  <span aria-hidden="true">{index + 1}</span>
                   {icon}
                 </div>
                 <h3>{t(`nativeAndroid.home.steps.${key}.title`)}</h3>

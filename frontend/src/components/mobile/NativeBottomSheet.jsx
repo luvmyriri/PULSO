@@ -1,17 +1,17 @@
 import { useId, useLayoutEffect, useRef } from 'react';
-import { X } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAndroidBack } from '../../utils/nativeAndroid';
 import './native-resident-theme.css';
 import './native-bottom-sheet.css';
 
-export default function NativeBottomSheet({ title, description, closeLabel, onDismiss, children }) {
+export default function NativeBottomSheet({ title, description, closeLabel, onDismiss, children, className = '' }) {
   const { isDark } = useTheme();
   useAndroidBack(true, 30, onDismiss);
   const id = useId();
   const dialog = useRef(null);
   const heading = useRef(null);
   const drag = useRef(null);
+  const suppressHandleClick = useRef(false);
 
   useLayoutEffect(() => {
     const panel = dialog.current;
@@ -29,6 +29,7 @@ export default function NativeBottomSheet({ title, description, closeLabel, onDi
 
   function startDrag(event) {
     if (!event.isPrimary || event.button !== 0) return;
+    suppressHandleClick.current = false;
     drag.current = { pointerId: event.pointerId, startY: event.clientY };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -36,6 +37,7 @@ export default function NativeBottomSheet({ title, description, closeLabel, onDi
   function moveDrag(event) {
     if (drag.current?.pointerId !== event.pointerId) return;
     const offset = Math.max(0, event.clientY - drag.current.startY);
+    if (Math.abs(event.clientY - drag.current.startY) > 8) suppressHandleClick.current = true;
     dialog.current.style.setProperty('--bottom-sheet-offset', `${offset}px`);
   }
 
@@ -60,8 +62,13 @@ export default function NativeBottomSheet({ title, description, closeLabel, onDi
     }
   }
 
+  const handlePointerEvents = {
+    onPointerDown: startDrag, onPointerMove: moveDrag, onPointerUp: endDrag,
+    onPointerCancel: endDrag, onLostPointerCapture: endDrag,
+  };
+
   return (
-    <dialog ref={dialog} className="native-bottom-sheet" data-landing-theme={isDark ? 'dark' : 'light'} aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}
+    <dialog ref={dialog} className={`native-bottom-sheet ${className}`} data-landing-theme={isDark ? 'dark' : 'light'} aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}
       onKeyDown={keepKeyboardFocus} onCancel={event => { event.preventDefault(); onDismiss(); }}
       onClick={event => {
         if (event.target !== event.currentTarget) return;
@@ -70,17 +77,13 @@ export default function NativeBottomSheet({ title, description, closeLabel, onDi
           event.clientX < panel.left || event.clientX >= panel.right) onDismiss();
       }}>
       <header className="native-bottom-sheet__header">
-        <div className="native-bottom-sheet__grab" aria-hidden="true"
-          onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag}
-          onPointerCancel={endDrag} onLostPointerCapture={endDrag}>
-          <span />
-        </div>
+        <button type="button" data-native-dismiss className="native-bottom-sheet__grab native-bottom-sheet__grab--button"
+          aria-label={closeLabel} {...handlePointerEvents}
+          onClick={event => { if (event.detail === 0 || !suppressHandleClick.current) onDismiss(); }}>
+          <span aria-hidden="true" />
+        </button>
         <h2 id={`${id}-title`} ref={heading} tabIndex={-1} className="font-bold tracking-tight">{title}</h2>
         <p id={`${id}-description`} className="text-sm">{description}</p>
-        <button type="button" data-native-dismiss className="native-bottom-sheet__close"
-          aria-label={closeLabel} onClick={onDismiss}>
-          <X size={18} aria-hidden="true" />
-        </button>
       </header>
       <div className="native-bottom-sheet__body">
         {children}

@@ -21,7 +21,7 @@ export default function PwaModal({ isOpen, onClose }) {
   const [isEditingIp, setIsEditingIp] = useState(false);
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
-  const { activeUrl, apkUrl, needsDiscovery, wifiIp, setWifiIp, isLanDownload, release, downloadState, retryDownloadCheck } = useMobileInstallLink(isOpen);
+  const { activeUrl, apkUrl, needsDiscovery, wifiIp, setWifiIp, isLanDownload, isLanWebsite, release, downloadState, retryDownloadCheck } = useMobileInstallLink(isOpen);
   const canCopy = typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText);
 
   useEffect(() => {
@@ -126,12 +126,12 @@ export default function PwaModal({ isOpen, onClose }) {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1">
-                  {apkUrl ? <Wifi size={13} /> : <Globe size={13} />}
-                  {apkUrl ? isLanDownload ? t('mobileInstall.sameWifi') : t('mobileInstall.publicBuild', {version: release?.versionName}) : t('mobileInstall.mobileWebsite')}
+                  {apkUrl || isLanWebsite ? <Wifi size={13} /> : <Globe size={13} />}
+                  {isLanWebsite ? t('mobileInstall.sameWifi') : apkUrl ? isLanDownload ? t('mobileInstall.sameWifi') : t('mobileInstall.publicBuild', {version: release?.versionName}) : t('mobileInstall.mobileWebsite')}
                 </span>
               </div>
               <h3 id="pwa-modal-title" className="font-heading font-black text-lg sm:text-xl text-slate-900 dark:text-white leading-tight mt-0.5">
-                {apkUrl ? 'PULSO Android APK' : 'Install PULSO Mobile App'}
+                {isLanWebsite ? 'PULSO Mobile Website' : apkUrl ? 'PULSO Android APK' : 'Install PULSO Mobile App'}
               </h3>
             </div>
           </div>
@@ -159,7 +159,7 @@ export default function PwaModal({ isOpen, onClose }) {
                 size={144}
                 level="H"
                 marginSize={4}
-                title={apkUrl ? t('mobileInstall.qrLabel') : t('mobileInstall.openWebsite')}
+                  title={apkUrl && !isLanWebsite ? t('mobileInstall.qrLabel') : t('mobileInstall.openWebsite')}
               />
               <span className="text-[10px] font-mono font-bold text-slate-500 mt-1.5 uppercase tracking-wider flex items-center gap-1">
                 <Wifi size={10} className="text-[#ff6b00]" />
@@ -171,15 +171,17 @@ export default function PwaModal({ isOpen, onClose }) {
             <div className="flex-1 text-center sm:text-left w-full min-w-0">
               <div className="flex items-center gap-2 justify-center sm:justify-start flex-wrap">
                 <h4 className="font-heading font-extrabold text-base text-slate-900 dark:text-white leading-snug">
-                  {apkUrl ? 'Scan to download the APK' : 'Scan to open on your phone'}
+                  {apkUrl && !isLanWebsite ? 'Scan to download the APK' : 'Scan to open on your phone'}
                 </h4>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
-                {apkUrl
-                  ? isLanDownload ? t('mobileInstall.sameWifi') : t('mobileInstall.installHelp')
-                  : needsDiscovery
-                    ? 'Enter your computer’s Wi-Fi address to show the Android APK QR code.'
-                    : 'Open PULSO on your phone.'}
+                {isLanWebsite
+                  ? 'Connect your phone to the same Wi-Fi and scan to open this PULSO preview.'
+                  : apkUrl
+                    ? isLanDownload ? t('mobileInstall.sameWifi') : t('mobileInstall.installHelp')
+                    : needsDiscovery
+                      ? 'Finding the computer Wi-Fi address. If it stays blank, enter the address manually.'
+                      : 'Open PULSO on your phone.'}
               </p>
 
               {/* Direct App URL pill + Copy */}

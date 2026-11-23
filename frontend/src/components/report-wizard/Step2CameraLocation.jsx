@@ -73,7 +73,7 @@ export default function Step2CameraLocation({
   const displayStructuredAddress = locationData?.structuredAddress
     ? normalizeDisplayAddress(locationData.structuredAddress, locationData)
     : parseLegacyDisplayAddress(locationData?.address, locationData);
-  const displayAddress = displayAddressFields(displayStructuredAddress, locationData, { preferAddress: true })
+  const displayAddress = displayAddressFields(displayStructuredAddress, locationData)
     .map(([, value]) => value).join(', ');
   const handleCopyAddress = async () => {
     if (!displayAddress) return;
@@ -505,7 +505,7 @@ export default function Step2CameraLocation({
   }, [canProceed, onContinue]);
 
   return (
-    <div className="flex flex-col justify-between flex-1 h-full space-y-4">
+    <div className="flex min-w-0 flex-col justify-between flex-1 space-y-4">
       {/* â”€â”€ Compact Header â”€â”€ */}
       <div className="space-y-0.5">
         <div className="flex items-center gap-2">
@@ -534,8 +534,8 @@ export default function Step2CameraLocation({
       {/* â”€â”€ Main Vertical Stack (Exact match to Quick Report reference) â”€â”€ */}
       <div className="space-y-3.5">
         {/* â”€â”€ 1. Location Card (Matches reference image) â”€â”€ */}
-        <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/60 rounded-2xl transition-all shadow-2xs">
-          <div data-report-location-card className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2">
+        <div className="min-w-0 p-3 sm:p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/60 rounded-2xl transition-all shadow-2xs">
+          <div data-report-location-card className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-x-2 sm:gap-x-3 gap-y-2">
             {/* MapPin Badge Icon */}
             <div className="w-10 h-10 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 text-[#ff6b00] border border-orange-500/25 flex items-center justify-center shrink-0 mt-0.5">
               <MapPin size={20} className="text-[#ff6b00]" />
@@ -544,7 +544,7 @@ export default function Step2CameraLocation({
             <div className="contents">
               {/* Address Text + Copy Button */}
               <div className="flex min-w-0 items-start justify-between gap-2">
-                <LocationAddressPanel address={displayStructuredAddress} coordinates={locationData} gpsAddress showCoordinates={false} status={locationData?.addressStatus} loading={isLocating || locationData?.addressStatus === 'LOADING'} />
+                <LocationAddressPanel address={displayStructuredAddress} coordinates={locationData} gpsAddress showCoordinates={false} showPlusCode hideTitle loading={isLocating || locationData?.addressStatus === 'LOADING'} />
                 <button
                   type="button"
                   onClick={handleCopyAddress}
@@ -579,9 +579,9 @@ export default function Step2CameraLocation({
                   type="button"
                   onClick={() => handleGeolocate(true)}
                   disabled={isLocating}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors cursor-pointer shrink-0 ml-auto active:scale-95 disabled:opacity-50"
-                  title="Resync GPS"
-                  aria-label="Resync GPS"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors cursor-pointer shrink-0 ml-auto disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-blue-600"
+                  title={t('locationPrivacy.resyncGps')}
+                  aria-label={t('locationPrivacy.resyncGps')}
                 >
                   <RotateCcw size={13} className={isLocating ? 'animate-spin text-[#ff6b00]' : ''} />
                 </button>
@@ -592,17 +592,17 @@ export default function Step2CameraLocation({
 
         {/* â”€â”€ 2. Photo / Camera Box (Exact match to reference) â”€â”€ */}
         {!hasPhoto ? (
-          <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 sm:p-7 bg-slate-50/50 dark:bg-slate-950/40 text-center flex flex-col items-center justify-center gap-3 transition-all">
+          <div className="min-w-0 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-4 sm:p-7 bg-slate-50/50 dark:bg-slate-950/40 text-center flex flex-col items-center justify-center gap-3 transition-all">
             <div className="w-14 h-14 rounded-full bg-white dark:bg-slate-800 shadow-xs border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300">
               <Camera size={26} strokeWidth={2} />
             </div>
 
             <div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                Take a photo of the problem
+                {t('reportWizard.step2CameraLocation.photoHeading')}
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-                Capture a clear photo. Location is added only when you select it.
+                {t('reportWizard.step2CameraLocation.photoHelp')}
               </p>
             </div>
 
@@ -614,7 +614,7 @@ export default function Step2CameraLocation({
                 className="w-full h-12 min-h-[48px] bg-[#ff6b00] hover:bg-[#e05e00] text-white hover:text-white font-bold px-6 rounded-xl shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99] group"
               >
                 <Camera size={18} strokeWidth={2.4} className="text-white group-hover:text-white" />
-                <span className="text-white group-hover:text-white">Open Camera</span>
+                <span className="text-white group-hover:text-white">{t('reportWizard.step2CameraLocation.openCameraBtn')}</span>
               </button>
             </div>
 

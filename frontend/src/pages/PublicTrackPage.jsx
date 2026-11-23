@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { 
   Search, ShieldCheck, MapPin,
   AlertTriangle, UserPlus, 
-  Calendar, Loader2, KeyRound
+  Calendar, Loader2
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/apiBase';
 import { getAuthToken } from '../utils/authSession';
@@ -158,7 +158,6 @@ export function TrackReportContent({ inSheet = false }) {
               <label htmlFor="track-ticket-id" className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
                 {t('track.lookup.ticketLabel', 'Ticket ID')}
               </label>
-              <div className={inSheet ? 'native-track-sheet__input' : undefined}>
               <input
                 id="track-ticket-id"
                 type="text"
@@ -169,15 +168,12 @@ export function TrackReportContent({ inSheet = false }) {
                 autoCapitalize="characters" autoCorrect="off" spellCheck={false} disabled={isLoading}
                 className="min-h-12 w-full rounded-md border border-slate-400 bg-white px-3 py-3 text-base text-slate-900 placeholder:text-slate-500 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 dark:focus-visible:outline-blue-300"
               />
-              {inSheet && <Search size={18} aria-hidden="true" />}
-              </div>
             </div>
 
             <div>
               <label htmlFor="track-token" className="block text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
                 {t('track.lookup.tokenLabel', 'Tracking code')}
               </label>
-              <div className={inSheet ? 'native-track-sheet__input' : undefined}>
               <input
                 id="track-token"
                 type="text"
@@ -188,8 +184,6 @@ export function TrackReportContent({ inSheet = false }) {
                 autoCapitalize="characters" autoCorrect="off" spellCheck={false} disabled={isLoading}
                 className="min-h-12 w-full rounded-md border border-slate-400 bg-white px-3 py-3 text-base text-slate-900 placeholder:text-slate-500 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-400 dark:focus-visible:outline-blue-300"
               />
-              {inSheet && <KeyRound size={18} aria-hidden="true" />}
-              </div>
             </div>
           </div>
 

@@ -95,6 +95,7 @@
       "longitude": "Longitude",
       "fields": {
         "plusCode": "Plus Code (coarse area)",
+        "plusCodeLabel": "Plus Code",
         "subdivision": "Village/Subdivision",
         "neighborhood": "Neighborhood / Community",
         "street": "Street/Road",
@@ -111,6 +112,8 @@
       "copy": "Copy displayed address",
       "copied": "Address copied",
       "copyFailed": "Could not copy the address. Select the displayed text to copy it.",
+      "plusCodePending": "Waiting for a location",
+      "resyncGps": "Refresh GPS location",
       "gpsDenied": "Location permission was denied. Allow location access in your browser or select the issue location manually.",
       "gpsUnavailable": "GPS is unavailable. Select the issue location manually or retry.",
       "gpsTimeout": "GPS timed out. Your previous selection is kept. Retry or select the issue location manually.",
@@ -828,6 +831,8 @@
       "step2CameraLocation": {
         "badge": "STEP 1 OF 5 / EVIDENCE & LOCATION",
         "title": "Take photo and auto-locate",
+        "photoHeading": "Take a photo of the problem",
+        "photoHelp": "Capture a clear photo. Location is added only when you select it.",
         "subtitle": "Capture a clear photo of the concern. Your location will be automatically tagged.",
         "cameraHeading": "Capture the issue with your camera",
         "cameraDesc": "Photos taken with the PULSO camera automatically record the verified GPS coordinates and time.",
@@ -948,6 +953,7 @@
         "tokenReceiptPlaceholder": "Code from your receipt",
         "submitBtn": "Track report",
         "closeSheet": "Close tracking panel",
+        "sheetSubtitle": "Use the ticket ID and tracking code on your report receipt.",
         "searching": "Checking…",
         "errorNotFound": "We could not find a report with those details. Check the ticket ID and tracking code.",
         "networkError": "Could not connect. Check your connection and try again.",

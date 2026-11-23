@@ -105,11 +105,6 @@
   display: grid; position: relative; place-items: center; width: 3.4rem; max-width: 100%; height: auto;
   aspect-ratio: 1; margin-inline: auto; background: var(--home-surface); border: 1px solid var(--home-rule); border-radius: 50%;
 }
-.native-home__step-icon > span {
-  position: absolute; top: -.4rem; left: 50%; transform: translateX(-50%);
-  display: grid; place-items: center; width: 1.2rem; height: 1.2rem;
-  background: var(--home-action); color: var(--color-light); border-radius: 50%; font-size: .75rem; font-weight: 800;
-}
 .native-home__steps h3 { margin: .3rem 0 .2rem; font-size: .9rem; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
 .native-home__steps p { margin: 0; color: var(--home-muted); font-size: .75rem; line-height: 1.4; overflow-wrap: anywhere; }
 .native-home__step-arrow { position: absolute; top: 1.1rem; right: -.9rem; color: var(--home-ink); }
@@ -188,5 +183,4 @@
   .native-home__report { text-shadow: none; }
   .native-home__report svg { filter: none; }
   .native-home__track { color: LinkText; }
-  .native-home__step-icon > span { background: Highlight; color: HighlightText; }
 }

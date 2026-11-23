@@ -95,6 +95,7 @@
       "longitude": "Longhitud",
       "fields": {
         "plusCode": "Plus Code (malawak na lugar)",
+        "plusCodeLabel": "Plus Code",
         "subdivision": "Village/Subdivision",
         "neighborhood": "Kapitbahayan / Komunidad",
         "street": "Kalye/Kalsada",
@@ -111,6 +112,8 @@
       "copy": "Kopyahin ang ipinapakitang address",
       "copied": "Nakopya ang address",
       "copyFailed": "Hindi makopya ang address. Piliin ang ipinapakitang teksto upang kopyahin.",
+      "plusCodePending": "Naghihintay ng lokasyon",
+      "resyncGps": "I-refresh ang lokasyon ng GPS",
       "gpsDenied": "Tinanggihan ang pahintulot sa lokasyon. Payagan ito sa browser o piliin ang lokasyon ng isyu.",
       "gpsUnavailable": "Hindi makuha ang GPS. Piliin ang lokasyon ng isyu o subukang muli.",
       "gpsTimeout": "Naubos ang oras ng GPS. Nananatili ang dating napili. Subukang muli o pumili ng lokasyon.",
@@ -825,6 +828,8 @@
       "step2CameraLocation": {
         "badge": "HAKBANG 1 NG 5 / EBIDENSYA AT LOKASYON",
         "title": "Kumuha ng litrato at hanapin ang lokasyon",
+        "photoHeading": "Kumuha ng litrato ng problema",
+        "photoHelp": "Kumuha ng malinaw na litrato. Idinadagdag lang ang lokasyon kapag pinili ninyo ito.",
         "subtitle": "Kumuha ng malinaw na litrato ng suliranin. Awtomatikong itatala ang inyong lokasyon.",
         "cameraHeading": "Kumuha ng litrato gamit ang kamera",
         "cameraDesc": "Ang mga litratong kuha gamit ang PULSO kamera ay awtomatikong nagtatala ng GPS at oras.",
@@ -945,6 +950,7 @@
         "tokenReceiptPlaceholder": "Code mula sa iyong resibo",
         "submitBtn": "Subaybayan ang ulat",
         "closeSheet": "Isara ang pagsubaybay",
+        "sheetSubtitle": "Gamitin ang ticket ID at tracking code na nasa resibo ng ulat mo.",
         "searching": "Sinusuri…",
         "errorNotFound": "Walang nahanap na ulat gamit ang mga detalyeng ito. Suriin ang ticket ID at tracking code.",
         "networkError": "Hindi makakonekta. Suriin ang koneksiyon at subukang muli.",

@@ -35,30 +35,21 @@
 }
 
 .native-bottom-sheet__grab:active { cursor: grabbing; }
+.native-bottom-sheet__grab--button {
+  width: 4rem;
+  min-height: 44px;
+  margin-inline: auto;
+  border-radius: .5rem;
+}
 .native-bottom-sheet__grab span { width: 1.875rem; height: 3px; border-radius: 999px; background: var(--home-muted); }
 
-.native-bottom-sheet__header h2 { padding-inline-end: 3rem; color: var(--home-ink); font-size: 1.25rem; line-height: 1.25; }
+.native-bottom-sheet__header h2 { color: var(--home-ink); font-size: 1.25rem; line-height: 1.25; }
 .native-bottom-sheet__header p { margin-block: .375rem 0; color: var(--home-muted); line-height: 1.5; }
 
 @layer base {
   /* The heading is focused on open for announcement and is outside the tab order. */
   .native-bottom-sheet__header h2[tabindex='-1']:focus-visible { outline: none !important; }
 }
-.native-bottom-sheet__close {
-  position: absolute;
-  inset-block-start: .95rem;
-  inset-inline-end: max(.6rem, var(--pulso-safe-right, 0px));
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: .5rem;
-  color: var(--home-muted);
-  cursor: pointer;
-}
-
-.native-bottom-sheet__close:hover { background: color-mix(in srgb, var(--home-ink) 10%, var(--home-surface)); }
-
 .native-bottom-sheet__body {
   min-height: 0;
   overflow-y: auto;
