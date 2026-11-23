@@ -97,9 +97,9 @@ export default function Step2CameraLocation({
   // -------------------------------------------------------------------------
   // Geolocation & Reverse Geocoding
   // -------------------------------------------------------------------------
-  const lookupAddress = useCallback((lat, lng) => {
+  const lookupAddress = useCallback((lat, lng, accuracy = null) => {
     const requestId = ++addressRequest.current;
-    reverseGeocodeLocation(lat, lng).then(result => {
+    reverseGeocodeLocation(lat, lng, accuracy).then(result => {
       if (requestId !== addressRequest.current) return;
       onLocationChange(previous => {
         if (previous.lat !== lat || previous.lng !== lng) return previous;
@@ -127,7 +127,7 @@ export default function Step2CameraLocation({
       source: customAddress ? 'manual-geocode' : 'device-gps',
       deviceFix: customAddress ? previous.deviceFix : { latitude: lat, longitude: lng, accuracy_m: accuracy, measured_at: measuredAt },
     }));
-    lookupAddress(lat, lng);
+    lookupAddress(lat, lng, accuracy);
   }, [lookupAddress, onLocationChange]);
 
   const handleGeolocate = useCallback((isExplicit = false) => {
@@ -172,7 +172,7 @@ export default function Step2CameraLocation({
         structuredAddress: fallback,
         addressStatus: 'LOADING',
       }));
-      lookupAddress(lat, lng);
+      lookupAddress(lat, lng, locationData.accuracy ?? locationData.deviceFix?.accuracy_m ?? null);
     }
   }, []);
 

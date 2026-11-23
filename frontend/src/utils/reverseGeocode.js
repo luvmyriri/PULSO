@@ -4,21 +4,23 @@ import { parseGeocodedAddress, formatFullAddress, normalizeDisplayAddress } from
 // Share concurrent lookups (dashboard, wizard, camera). Do not persist Google data.
 const pending = new Map();
 
-export function reverseGeocodeLocation(lat, lng) {
+export function reverseGeocodeLocation(lat, lng, accuracyM = null) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
         return Promise.resolve({ structuredAddress: normalizeDisplayAddress(), address: '', status: 'INVALID_REQUEST' });
     }
-    const key = `${lat},${lng}`;
+    const accuracy = Number.isFinite(accuracyM) && accuracyM >= 0 ? accuracyM : null;
+    const key = `${lat},${lng},${accuracy ?? 'unknown'}`;
     if (pending.has(key)) return pending.get(key);
-    const request = lookup(lat, lng).finally(() => pending.delete(key));
+    const request = lookup(lat, lng, accuracy).finally(() => pending.delete(key));
     pending.set(key, request);
     return request;
 }
 
-async function lookup(lat, lng) {
+async function lookup(lat, lng, accuracyM) {
     let status = 'UNAVAILABLE';
     try {
-        const response = await apiFetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}`, { timeout: 7000, cache: 'no-store' });
+        const accuracyQuery = accuracyM === null ? '' : `&accuracy_m=${encodeURIComponent(accuracyM)}`;
+        const response = await apiFetch(`/api/geocode/reverse?lat=${lat}&lng=${lng}${accuracyQuery}`, { timeout: 7000, cache: 'no-store' });
         status = response.data?.status || status;
         if (response.ok && response.data?.structuredAddress && status === 'OK') {
             const structuredAddress = normalizeDisplayAddress(response.data.structuredAddress, { lat, lng });

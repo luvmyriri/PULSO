@@ -2923,6 +2923,7 @@ async def upgrade_resident_kyc(
 async def geocode_reverse(
     lat: float = Query(..., ge=-90, le=90, description="Latitude"),
     lng: float = Query(..., ge=-180, le=180, description="Longitude"),
+    accuracy_m: Optional[float] = Query(None, ge=0, le=100000, description="Reported GPS accuracy in metres"),
     current_user: Optional[Union[models.Official, models.Resident]] = Depends(auth.get_optional_current_user)
 ):
     """
@@ -2930,7 +2931,7 @@ async def geocode_reverse(
     Proxies through the backend so the Maps API key is never exposed to clients.
     """
     # Return safe components alongside the existing address/coordinate keys.
-    result = await maps_service.reverse_geocode_details(lat, lng)
+    result = await maps_service.reverse_geocode_details(lat, lng, accuracy_m)
     return JSONResponse({**result, "lat": lat, "lng": lng}, headers={"Cache-Control": "no-store"})
 
 

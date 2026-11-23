@@ -19,7 +19,7 @@ PLACES_TEXT_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 DIRECTIONS_URL  = "https://maps.googleapis.com/maps/api/directions/json"
 
 
-async def reverse_geocode_details(lat: float, lng: float) -> dict:
+async def reverse_geocode_details(lat: float, lng: float, accuracy_m: Optional[float] = None) -> dict:
     """Google-only reverse lookup with safe fields and explicit provider status."""
     from address_privacy import parse_google_address, address_text, precise_plus_code
 
@@ -41,7 +41,7 @@ async def reverse_geocode_details(lat: float, lng: float) -> dict:
             data = {"status": "UNAVAILABLE", "results": []}
 
     status = data.get("status", "UNAVAILABLE")
-    address = parse_google_address(data if status in ("OK", "ZERO_RESULTS") else {}, (lat, lng))
+    address = parse_google_address(data if status in ("OK", "ZERO_RESULTS") else {}, (lat, lng), accuracy_m)
     address["plusCode"] = precise_plus_code(lat, lng)
     return {"address": address_text(address), "structuredAddress": address, "status": status}
 

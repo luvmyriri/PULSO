@@ -72,6 +72,17 @@ class AddressPrivacyTests(unittest.TestCase):
         rows.append(street_row("Cross Street", 14.50006))
         self.assertEqual(parse_google_address({"results": rows}, coordinates)["street"], "")
 
+    def test_wide_gps_radius_does_not_claim_a_specific_street(self):
+        row = {
+            "types": ["street_address"],
+            "geometry": {"location_type": "ROOFTOP", "location": {"lat": 14.50005, "lng": 121.5}},
+            "address_components": [component("Acacia Road", "route")],
+        }
+        area = {"types": ["political"], "address_components": [component("Barangay Sample", "sublocality")]}
+        result = parse_google_address({"results": [row, area]}, (14.5, 121.5), accuracy_m=100)
+        self.assertEqual(result["street"], "")
+        self.assertEqual(result["barangay"], "Barangay Sample")
+
     def test_private_labels_are_rejected_even_when_google_misclassifies_them(self):
         for value in ("123 Acacia Road", "Blk4 Lot16", "B4-L16", "Unit7", "Apartment 5", "#8", "12-A", "12A", "<script>x</script>", "14.123456, 121.123456", "Acacia\nUnit 1"):
             self.assertEqual(safe_value(value), "", value)

@@ -84,8 +84,8 @@ def _matching_rows(rows, lat, lng):
     return [row for _, row in nearby], area
 
 
-def parse_google_address(data, coordinates=None):
-    """Use nearby address results and containing area results for a GPS lookup."""
+def parse_google_address(data, coordinates=None, accuracy_m=None):
+    """Use coordinate-matched public address data without overstating GPS precision."""
     if not isinstance(data, dict):
         data = {}
     rows = data.get("results", [])
@@ -114,7 +114,11 @@ def parse_google_address(data, coordinates=None):
                     name = safe_value(component.get("long_name") or component.get("short_name"))
                     if name and not name.isdigit():
                         streets.setdefault(name.casefold(), name)
-        street = next(iter(streets.values())) if len(streets) == 1 else ""
+        # A road name is useful only when the device's own position is precise
+        # enough to support that claim. Keep the Plus Code and containing area
+        # for wider GPS estimates instead of naming a potentially wrong street.
+        precise_fix = not isinstance(accuracy_m, (int, float)) or accuracy_m <= MAX_STREET_MATCH_METERS
+        street = next(iter(streets.values())) if precise_fix and len(streets) == 1 else ""
     codes = [data.get("plus_code", {}).get("global_code", "")]
     codes += [row.get("plus_code", {}).get("global_code", "") for row in data.get("results", [])]
     codes += [c.get("long_name", "") for c in components if "plus_code" in c.get("types", [])]
